@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-deep:        #080c14;
+  --bg-surface:     #0d1220;
+  --bg-glass:       rgba(15, 22, 40, 0.75);
+  --bg-card:        rgba(13, 18, 32, 0.85);
+  --bg-input:       rgba(255, 255, 255, 0.04);
+  --bg-input-focus: rgba(255, 255, 255, 0.07);
+
+  --accent:         #00e5c3;
+  --accent-dim:     rgba(0, 229, 195, 0.12);
+  --accent-glow:    rgba(0, 229, 195, 0.35);
+  --accent-hover:   #00c9aa;
+  --teal-gradient:  linear-gradient(135deg, #00e5c3 0%, #00b8ff 100%);
+
+  --danger:         #ff4f6a;
+  --danger-dim:     rgba(255, 79, 106, 0.12);
+  --success:        #00d68f;
+
+  --text-primary:   #e8edf8;
+  --text-secondary: #7a8ba8;
+  --text-muted:     #4a5a72;
+
+  --border:         rgba(255, 255, 255, 0.07);
+  --border-accent:  rgba(0, 229, 195, 0.3);
+
+  --radius-card:  20px;
+  --radius-input: 12px;
+  --radius-btn:   12px;
+  --transition:   0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --navbar-h:     70px;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100%;
+  min-width: 320px;
+  font-family: 'Sora', sans-serif;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-weight: 400;
+  overflow-x: hidden;
+}
+
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+a:hover { color: var(--accent-hover); }
+
+h1 { font-size: 2.2em; line-height: 1.15; letter-spacing: -0.5px; }
+h2 { font-size: 1.7em; letter-spacing: -0.4px; }
+h3 { font-size: 1.3em; letter-spacing: -0.3px; }
+
+button {
+  border-radius: var(--radius-btn);
+  border: none;
+  padding: 0.6em 1.2em;
+  font-size: 0.9em;
+  font-weight: 600;
+  font-family: 'Sora', sans-serif;
+  background: var(--teal-gradient);
+  color: #050d14;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+button:hover { opacity: 0.9; transform: translateY(-1px); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+input, textarea, select {
+  font-family: 'Sora', sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: 11px 14px;
+  outline: none;
+  transition: all var(--transition);
+  width: 100%;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input:focus, textarea:focus {
+  border-color: rgba(0, 229, 195, 0.5);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+input:-webkit-autofill,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0d1220 inset;
+  -webkit-text-fill-color: var(--text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}

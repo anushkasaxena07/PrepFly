@@ -1,0 +1,5 @@
+/* App-level resets — component styles handled per-file */
+#root {
+  min-height: 100vh;
+  isolation: isolate;
+}
