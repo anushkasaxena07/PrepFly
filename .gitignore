@@ -1,0 +1,12 @@
+# backend virtual env
+f_backend/venv/
+
+# python cache
+__pycache__/
+*.pyc
+
+# node modules
+node_modules/
+
+# env
+.env

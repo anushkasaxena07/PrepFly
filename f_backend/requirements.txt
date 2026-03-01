@@ -1,0 +1,11 @@
+Flask
+flask-cors
+python-docx
+PyMuPDF
+langchain-google-genai
+langchain-core
+supabase
+gTTS
+python-dotenv
+werkzeug
+requests
