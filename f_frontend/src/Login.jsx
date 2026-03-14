@@ -174,7 +174,7 @@ export default function Login() {
               <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </div>
-          <span className="brand-name">Luminary</span>
+          <span className="brand-name">Interview-System</span>
         </div>
 
         {/* Heading */}
