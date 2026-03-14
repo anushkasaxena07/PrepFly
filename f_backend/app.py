@@ -8,6 +8,8 @@ from io import BytesIO
 
 from docx import Document
 from flask import Flask, request, jsonify, send_file, redirect
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,7 +21,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+
+# To this:
+CORS(app, resources={r"/*": {
+    "origins": ["http://localhost:5173", "http://localhost:5174"],
+    "supports_credentials": True
+}})
 
 # ─── Supabase Setup ────────────────────────────────────────────────────────────
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://atfozkznxxuehyjgqvvm.supabase.co/")
@@ -339,9 +346,101 @@ def auth_callback():
     return redirect(os.getenv("FRONTEND_URL", "http://localhost:5173") + "/dashboard")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  PROFILE ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
+@app.route("/auth/google/verify", methods=["POST"])
+def google_verify():
+    """
+    Verifies the Google ID token directly with Google (no Supabase Auth).
+    Upserts the user into your own `users` table — zero rate-limit exposure.
+    """
+    data       = request.json or {}
+    credential = data.get("credential", "").strip()
+
+    if not credential:
+        return jsonify({"error": "Google credential is required"}), 400
+
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not google_client_id:
+        return jsonify({"error": "GOOGLE_CLIENT_ID is not set in .env"}), 500
+
+    try:
+        # 1. Verify token directly with Google -- no Supabase Auth call
+        idinfo = id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            google_client_id,
+        )
+
+        google_sub = idinfo["sub"]          # unique stable Google user ID
+        email      = idinfo.get("email", "")
+        name       = idinfo.get("name", "")
+        avatar     = idinfo.get("picture", "")
+
+        # 2. Look up by google_id first (returning user)
+        existing = (
+            supabase.table("users")
+            .select("id, name, role, phone, avatar")
+            .eq("google_id", google_sub)
+            .maybe_single()
+            .execute()
+        )
+
+        # ADD NULL CHECK HERE
+        if existing and existing.data:
+            user    = existing.data
+            user_id = user["id"]
+
+        else:
+            # Check if email already exists (link accounts)
+            by_email = (
+                supabase.table("users")
+                .select("id, name, role, phone, avatar")
+                .eq("email", email)
+                .maybe_single()
+                .execute()
+            )
+            
+            # ADD NULL CHECK HERE
+            if by_email and by_email.data:
+                user_id = by_email.data["id"]
+                supabase.table("users").update({
+                    "google_id": google_sub,
+                    "avatar":    by_email.data.get("avatar") or avatar,
+                }).eq("id", user_id).execute()
+                user = by_email.data
+            else:
+                # Brand new user
+                new_row = supabase.table("users").insert({
+                    "email":     email,
+                    "name":      name,
+                    "avatar":    avatar,
+                    "google_id": google_sub,
+                }).execute()
+                
+                # ADD NULL CHECK HERE
+                if not new_row or not new_row.data or len(new_row.data) == 0:
+                    return jsonify({"error": "Failed to create user in database"}), 500
+                    
+                user    = new_row.data[0]
+                user_id = user["id"]
+
+        return jsonify({
+            "message": "Signed in with Google successfully",
+            "email":   email,
+            "user_id": user_id,
+            "name":    user.get("name") or name,
+            "role":    user.get("role", ""),
+            "phone":   user.get("phone", ""),
+            "avatar":  user.get("avatar") or avatar,
+        }), 200
+
+    except ValueError as e:
+        return jsonify({"error": f"Invalid Google token: {str(e)}"}), 401
+    except Exception as e:
+        # Add more detailed error logging
+        print(f"Google verify error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Google sign-in failed: {str(e)}"}), 500
 
 @app.route("/update-profile", methods=["PUT"])
 def update_profile():

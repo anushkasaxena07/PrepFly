@@ -1,12 +1,30 @@
-# backend virtual env
+# Python virtual environment
+venv/
 f_backend/venv/
 
-# python cache
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
 
-# node modules
+# Node modules
 node_modules/
 
-# env
+# Environment files
 .env
+.env.local
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Build outputs
+dist/
+build/
+*.log
