@@ -59,7 +59,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # ─── Gemini / LangChain ────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 chat_model = ChatGoogleGenerativeAI(
-    api_key=GEMINI_API_KEY, model="gemini-2.5-flash-lite", temperature=0.6
+    api_key=GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0.6
 )
 
 
@@ -195,12 +195,12 @@ def verify_otp_code(email: str, otp: str, purpose: str = "login") -> dict:
         res = supabase.table("otps").select("*") \
             .eq("email", email).eq("otp", otp) \
             .eq("is_used", False).eq("purpose", purpose) \
-            .maybe_single().execute()
+            .execute()
 
         if not res or not res.data:
             return {"valid": False, "error": "Invalid OTP"}
 
-        row        = res.data
+        row        = res.data[0]
         expires_at = datetime.fromisoformat(row["expires_at"].replace('Z', '+00:00'))
         now_aware  = datetime.utcnow().replace(tzinfo=expires_at.tzinfo)
 
@@ -216,9 +216,9 @@ def verify_otp_code(email: str, otp: str, purpose: str = "login") -> dict:
 
 def get_or_create_user(email, name=None, avatar=None, google_id=None):
     try:
-        res = supabase.table("users").select("*").eq("email", email).maybe_single().execute()
+        res = supabase.table("users").select("*").eq("email", email).execute()
         if res and res.data:
-            user    = res.data
+            user    = res.data[0]
             payload = {}
             if google_id and not user.get("google_id"):
                 payload["google_id"] = google_id
@@ -291,7 +291,7 @@ def register():
         return jsonify({"error": "All fields are required"}), 400
 
     try:
-        existing = supabase.table("users").select("id").eq("email", email).maybe_single().execute()
+        existing = supabase.table("users").select("id").eq("email", email).execute()
         if existing and existing.data:
             return jsonify({"error": "Email already registered"}), 400
 
@@ -334,11 +334,11 @@ def verify_signup_otp():
 
     try:
         # Fetch pending registration
-        pending = supabase.table("pending_users").select("*").eq("email", email).maybe_single().execute()
+        pending = supabase.table("pending_users").select("*").eq("email", email).execute()
         if not pending or not pending.data:
             return jsonify({"error": "Signup session expired. Please register again."}), 400
 
-        p = pending.data
+        p = pending.data[0]
 
         # Create real user
         ins = supabase.table("users").insert({
@@ -376,13 +376,13 @@ def login():
         return jsonify({"error": "Email and password are required"}), 400
 
     try:
-        res = supabase.table("users").select("*").eq("email", email).maybe_single().execute()
+        res = supabase.table("users").select("*").eq("email", email).execute()
 
         if not res or not res.data:
             log_authentication(email, "email_password", False, get_client_ip())
             return jsonify({"error": "Invalid credentials"}), 401
 
-        user = res.data
+        user = res.data[0]
         if user.get("password") != password:
             log_authentication(email, "email_password", False, get_client_ip())
             return jsonify({"error": "Invalid credentials"}), 401
@@ -423,16 +423,59 @@ def verify_login_otp():
         return jsonify({"error": result["error"]}), 401
 
     try:
-        res = supabase.table("users").select("*").eq("email", email).maybe_single().execute()
+        res = supabase.table("users").select("*").eq("email", email).execute()
         if not res or not res.data:
             return jsonify({"error": "User not found"}), 404
 
-        user = res.data
+        user = res.data[0]
         log_authentication(email, "email_password_otp", True, get_client_ip())
         return jsonify({"message": "Login successful", **user_response(user)}), 200
 
     except Exception as e:
         print(f"Verify login OTP error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/update-profile", methods=["PUT"])
+def update_profile():
+    data = request.get_json() or {}
+    user_id = data.get("user_id") or data.get("id")
+    email = data.get("email")
+
+    if not user_id and not email:
+        return jsonify({"error": "User identifier (user_id or email) is required"}), 400
+
+    payload = {}
+    if "name" in data:
+        payload["name"] = data["name"]
+    if "phone" in data:
+        payload["phone"] = data["phone"]
+    if "role" in data:
+        payload["role"] = data["role"]
+    if "avatar" in data:
+        payload["avatar"] = data["avatar"]
+    if "email" in data and data["email"]:
+        payload["email"] = data["email"]
+
+    if not payload:
+        return jsonify({"error": "No fields to update"}), 400
+
+    try:
+        if user_id:
+            res = supabase.table("users").update(payload).eq("id", user_id).execute()
+        else:
+            res = supabase.table("users").update(payload).eq("email", email).execute()
+
+        if not res or not res.data:
+            return jsonify({"error": "User not found or failed to update"}), 404
+
+        updated_user = res.data[0]
+        return jsonify({
+            "message": "Profile updated successfully",
+            **user_response(updated_user)
+        }), 200
+    except Exception as e:
+        print(f"Update profile error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -531,7 +574,7 @@ def forgot_password():
 
     try:
         # Check user exists — but don't reveal result to caller
-        res = supabase.table("users").select("id").eq("email", email).maybe_single().execute()
+        res = supabase.table("users").select("id").eq("email", email).execute()
         if res and res.data:
             if check_otp_rate_limit(email):
                 otp = generate_otp()
@@ -595,12 +638,12 @@ def reset_password():
     try:
         res = supabase.table("password_reset_tokens").select("*") \
             .eq("email", email).eq("token", reset_token).eq("is_used", False) \
-            .maybe_single().execute()
+            .execute()
 
         if not res or not res.data:
             return jsonify({"error": "Invalid or expired reset token"}), 401
 
-        row        = res.data
+        row        = res.data[0]
         expires_at = datetime.fromisoformat(row["expires_at"].replace('Z', '+00:00'))
         now_aware  = datetime.utcnow().replace(tzinfo=expires_at.tzinfo)
 
@@ -636,17 +679,43 @@ def extract_text_from_docx(file_path: str) -> str:
 
 
 def generate_question(resume_text: str, previous_questions: list = None) -> str:
-    focus_areas = [
-        "technical skills and tools", "work experience and achievements",
-        "education and learning approach", "problem-solving ability",
-        "team collaboration and leadership", "a specific project mentioned in the resume",
-        "career goals and motivation",
-    ]
+    is_job_details_only = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
     prev_q_text = ""
     if previous_questions:
         prev_q_text = "Already asked (do NOT repeat):\n" + "\n".join(f"- {q}" for q in previous_questions[-5:])
 
-    prompt = f"""You are Hana, a friendly anime-style AI interviewer.
+    if is_job_details_only:
+        focus_areas = [
+            "technical skills and tools relevant to the target role",
+            "practical experience with target tools and packages",
+            "problem-solving approach and technical scenario questions",
+            "collaboration, clean code practices, and tech stack trade-offs",
+            "career motivation and projects with target tools",
+        ]
+        prompt = f"""You are Hana, a friendly anime-style AI interviewer.
+You are interviewing a candidate based on their target Job Details (No Resume is provided).
+Generate ONE clear interview question.
+Focus: {random.choice(focus_areas)}
+
+{prev_q_text}
+
+Rules:
+- One question only (1-2 sentences)
+- Specific to the target role, tools, and experience level specified in the job profile details below
+- Do NOT refer to a "resume" or ask them to refer to their "resume"
+- Conversational tone
+- No preamble like "Here is a question:"
+
+Job Profile Details:
+{resume_text}"""
+    else:
+        focus_areas = [
+            "technical skills and tools", "work experience and achievements",
+            "education and learning approach", "problem-solving ability",
+            "team collaboration and leadership", "a specific project mentioned in the resume",
+            "career goals and motivation",
+        ]
+        prompt = f"""You are Hana, a friendly anime-style AI interviewer.
 Based on the resume, generate ONE clear interview question.
 Focus: {random.choice(focus_areas)}
 
@@ -660,16 +729,26 @@ Rules:
 
 Resume:
 {resume_text[:3000]}"""
+
     try:
         return chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
-    except Exception:
-        return "Tell me about your most impactful project from your resume."
+    except Exception as e:
+        print(f"Error generating question: {e}")
+        if is_job_details_only:
+            return "Tell me about a challenging project where you utilized your specified tools and how you solved a difficult problem."
+        else:
+            return "Tell me about your most impactful project from your resume."
 
 
 def analyze_response(resume_text: str, question: str, response: str) -> dict:
+    is_job_details_only = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
+    profile_type = "Job Profile Details" if is_job_details_only else "Resume"
+
     prompt = f"""You are Hana, an expert AI interviewer. Evaluate this answer.
 
-Resume: {resume_text[:1000]}
+{profile_type}:
+{resume_text[:1000]}
+
 Question: {question}
 Answer: {response}
 
@@ -708,7 +787,7 @@ SUMMARY: [2-3 sentences]"""
 #  INTERVIEW ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.route("/upload-resume", methods=["POST"])
+@app.route("/upload", methods=["POST"])
 def upload_resume():
     if "resume" not in request.files:
         return jsonify({"error": "No resume file provided"}), 400
@@ -752,6 +831,40 @@ def upload_resume():
             os.remove(save_path)
 
 
+@app.route("/create-session-no-resume", methods=["POST"])
+def create_session_no_resume():
+    data       = request.get_json() or {}
+    user_id    = data.get("user_id")
+    role       = data.get("role", "").strip()
+    tools      = data.get("tools", "").strip()
+    experience = data.get("experience", "").strip()
+
+    if not role or not tools or not experience:
+        return jsonify({"error": "Role, tools, and experience are required"}), 400
+
+    resume_text = f"JOB PROFILE DETAILS (No Resume Provided):\nTarget Role: {role}\nRequired Tools & Technologies: {tools}\nExperience Level: {experience}"
+    session_id  = str(uuid.uuid4())
+
+    session_data = {
+        "session_id": session_id,
+        "resume_text": resume_text,
+        "question_index": 0,
+        "questions": [],
+        "responses": [],
+        "feedbacks": [],
+        "active": True,
+    }
+    if user_id:
+        session_data["user_id"] = user_id
+
+    try:
+        supabase.table("sessions").insert(session_data).execute()
+        return jsonify({"message": "Session created without resume", "session_id": session_id}), 200
+    except Exception as e:
+        print(f"Create session no resume error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/start-interview", methods=["POST"])
 def start_interview():
     data       = request.get_json() or {}
@@ -760,11 +873,11 @@ def start_interview():
         return jsonify({"error": "session_id is required"}), 400
 
     try:
-        res = supabase.table("sessions").select("*").eq("session_id", session_id).eq("active", True).maybe_single().execute()
+        res = supabase.table("sessions").select("*").eq("session_id", session_id).eq("active", True).execute()
         if not res or not res.data:
             return jsonify({"error": "Session not found or already completed"}), 404
 
-        session   = res.data
+        session   = res.data[0]
         first_q   = generate_question(session.get("resume_text", ""))
         questions = [first_q]
 
@@ -776,36 +889,51 @@ def start_interview():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/next-question", methods=["POST"])
+@app.route("/next", methods=["POST"])
 def next_question():
     data       = request.get_json() or {}
     session_id = data.get("session_id", "").strip()
     answer     = data.get("answer", "").strip()
 
-    if not session_id or not answer:
-        return jsonify({"error": "session_id and answer are required"}), 400
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
 
     try:
-        res = supabase.table("sessions").select("*").eq("session_id", session_id).eq("active", True).maybe_single().execute()
+        res = supabase.table("sessions").select("*").eq("session_id", session_id).eq("active", True).execute()
         if not res or not res.data:
             return jsonify({"error": "Session not found or already completed"}), 404
 
-        session        = res.data
+        session        = res.data[0]
         resume_text    = session.get("resume_text", "")
         questions      = session.get("questions") or []
         responses      = session.get("responses") or []
         feedbacks      = session.get("feedbacks") or []
         question_index = session.get("question_index", 1)
-        current_q      = questions[-1] if questions else "Tell me about yourself."
 
+        # Case 1: No answer provided -> Just return the current question
+        if not answer:
+            if not questions:
+                # If no questions exist yet, generate the first one (fallback for /start-interview)
+                first_q = generate_question(resume_text)
+                questions = [first_q]
+                supabase.table("sessions").update({"questions": [first_q], "question_index": 1}).eq("session_id", session_id).execute()
+                return jsonify({"question": first_q, "question_number": 1}), 200
+            
+            return jsonify({
+                "question": questions[-1],
+                "question_number": question_index
+            }), 200
+
+        current_q = questions[-1] if questions else "Tell me about yourself."
         feedback = analyze_response(resume_text, current_q, answer)
         responses.append(answer)
         feedbacks.append(feedback)
 
         MAX_QUESTIONS = 5
+        scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
         if question_index >= MAX_QUESTIONS:
-            avg_score = round(sum(f.get("score", 0) for f in feedbacks) / len(feedbacks), 1) if feedbacks else 0
-            supabase.table("sessions").update({"responses": responses, "feedbacks": feedbacks, "active": False}).eq("session_id", session_id).execute()
+            avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+            supabase.table("sessions").update({"responses": responses, "feedbacks": feedbacks, "scores": scores, "active": False}).eq("session_id", session_id).execute()
             return jsonify({"message": "Interview complete", "done": True, "final_feedback": feedback,
                             "average_score": avg_score, "total_questions": len(questions), "all_feedbacks": feedbacks}), 200
 
@@ -813,7 +941,7 @@ def next_question():
         questions.append(next_q)
         supabase.table("sessions").update({
             "questions": questions, "responses": responses,
-            "feedbacks": feedbacks, "question_index": question_index + 1,
+            "feedbacks": feedbacks, "scores": scores, "question_index": question_index + 1,
         }).eq("session_id", session_id).execute()
         return jsonify({"message": "Answer recorded", "done": False, "feedback": feedback,
                         "next_question": next_q, "question_number": question_index + 1}), 200
@@ -829,10 +957,10 @@ def get_session():
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
     try:
-        res = supabase.table("sessions").select("*").eq("session_id", session_id).maybe_single().execute()
+        res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
         if not res or not res.data:
             return jsonify({"error": "Session not found"}), 404
-        session = res.data
+        session = res.data[0]
         session.pop("resume_text", None)
         return jsonify(session), 200
     except Exception as e:
@@ -852,6 +980,40 @@ def user_sessions():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/speech-to-text", methods=["POST"])
+def speech_to_text():
+    data = request.get_json() or {}
+    audio_b64 = data.get("audio_base64")
+    mime_type = data.get("mime_type", "audio/webm")
+
+    if not audio_b64:
+        return jsonify({"error": "audio_base64 is required"}), 400
+
+    try:
+        # Use Gemini's multimodal capabilities to transcribe the audio
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": "Please transcribe this audio accurately. Return only the transcript text, no other symbols or preamble."},
+                {
+                    "type": "media",
+                    "mime_type": mime_type,
+                    "data": audio_b64
+                },
+            ]
+        )
+        response = chat_model.invoke([message])
+        transcript = response.content.strip()
+        
+        # Clean up common AI prefixes if any
+        if transcript.lower().startswith("transcript:"):
+            transcript = transcript[len("transcript:"):].strip()
+            
+        return jsonify({"transcript": transcript}), 200
+    except Exception as e:
+        print(f"Speech-to-text error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/text-to-speech", methods=["POST"])
 def text_to_speech():
     data = request.get_json() or {}
@@ -865,6 +1027,300 @@ def text_to_speech():
         buf.seek(0)
         return send_file(buf, mimetype="audio/mpeg", as_attachment=False, download_name="speech.mp3")
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def generate_final_report_async(session_id, resume_text, questions, responses, feedbacks):
+    is_job_details_only = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
+    profile_type = "job details profile" if is_job_details_only else "resume"
+
+    try:
+        # Format the questions and answers for Gemini
+        qa_history = ""
+        for i, (q, r, f) in enumerate(zip(questions, responses, feedbacks)):
+            qa_history += f"Question {i+1}: {q}\n"
+            qa_history += f"Candidate Answer: {r}\n"
+            qa_history += f"Hana's Feedback: {f.get('feedback', '')}\n"
+            qa_history += f"Score: {f.get('score', 0)}/10\n\n"
+
+        prompt = f"""You are Hana, the AI Interviewer. Write a comprehensive, supportive, yet professional final evaluation report for the candidate based on their {profile_type} and their performance during this technical interview.
+
+Candidate {profile_type} details:
+{resume_text[:1500]}
+
+Interview QA history:
+{qa_history}
+
+Please structure the final report in markdown with the following clear sections:
+1. **Executive Summary**: A summary of their overall performance and suitability.
+2. **Key Strengths**: Highlight what they did well (technical depth, clarity, STAR method usage, etc.).
+3. **Areas for Improvement**: Provide constructive advice on where they can improve.
+4. **Actionable Roadmap**: 2-3 specific topics or skills they should practice or learn next.
+
+Keep the tone encouraging, anime-interviewer style (friendly and warm), and format it cleanly using markdown bullet points. Do NOT refer to a "resume" if it is in Job Profile Details mode."""
+
+        response = chat_model.invoke([HumanMessage(content=prompt)])
+        report_text = response.content.strip()
+
+        # Update final_report in database
+        supabase.table("sessions").update({"final_report": report_text}).eq("session_id", session_id).execute()
+    except Exception as e:
+        print(f"Error generating final report asynchronously: {e}")
+        try:
+            fallback_report = "Detailed report generation failed, but you can review your question-by-question feedback below."
+            supabase.table("sessions").update({"final_report": fallback_report}).eq("session_id", session_id).execute()
+        except:
+            pass
+
+
+@app.route("/end-interview", methods=["POST"])
+def end_interview():
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "").strip()
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+
+    try:
+        res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+        if not res or not res.data:
+            return jsonify({"error": "Session not found"}), 404
+
+        session = res.data[0]
+        feedbacks = session.get("feedbacks") or []
+        questions = session.get("questions") or []
+        responses = session.get("responses") or []
+        resume_text = session.get("resume_text") or ""
+
+        scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
+        overall_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+        # Calculate Grade
+        if overall_score >= 9.0:
+            grade = "S"
+        elif overall_score >= 8.0:
+            grade = "A"
+        elif overall_score >= 7.0:
+            grade = "B"
+        elif overall_score >= 5.0:
+            grade = "C"
+        elif overall_score >= 4.0:
+            grade = "D"
+        else:
+            grade = "F"
+
+        # Update DB
+        supabase.table("sessions").update({
+            "final_score": overall_score,
+            "final_grade": grade,
+            "active": False,
+            "final_report": "Generating your report…",
+            "scores": scores
+        }).eq("session_id", session_id).execute()
+
+        # Start thread to generate report in background
+        threading.Thread(
+            target=generate_final_report_async,
+            args=(session_id, resume_text, questions, responses, feedbacks),
+            daemon=True
+        ).start()
+
+        return jsonify({
+            "overall_score": overall_score,
+            "grade": grade,
+            "report": "Generating your report…"
+        }), 200
+
+    except Exception as e:
+        print(f"End interview error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/save-recording", methods=["POST"])
+def save_recording():
+    try:
+        # Check if multipart form data file upload
+        if "video" in request.files:
+            file = request.files["video"]
+            session_id = request.form.get("session_id")
+            if not session_id:
+                return jsonify({"error": "session_id is required"}), 400
+            
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "webm"
+            filename = f"recording_{session_id}.{ext}"
+            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            file.save(filepath)
+        else:
+            # Fallback to JSON Base64
+            data = request.get_json() or {}
+            session_id = data.get("session_id")
+            video_b64 = data.get("video_base64")
+            mime_type = data.get("mime_type", "video/webm")
+
+            if not session_id or not video_b64:
+                return jsonify({"error": "session_id and video_base64/file are required"}), 400
+
+            file_data = base64.b64decode(video_b64)
+            ext = mime_type.split("/")[-1] if "/" in mime_type else "webm"
+            if ";" in ext:
+                ext = ext.split(";")[0]
+            filename = f"recording_{session_id}.{ext}"
+            filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
+            with open(filepath, "wb") as f:
+                f.write(file_data)
+
+        # Update DB recording_path
+        supabase.table("sessions").update({"recording_path": filepath}).eq("session_id", session_id).execute()
+
+        return jsonify({"message": "Recording saved successfully", "path": filepath}), 200
+    except Exception as e:
+        print(f"Save recording error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/session-report/<session_id>", methods=["GET"])
+def session_report(session_id):
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+    try:
+        res = supabase.table("sessions").select("final_report").eq("session_id", session_id).execute()
+        if not res or not res.data:
+            return jsonify({"error": "Session not found"}), 404
+        row = res.data[0]
+        return jsonify({"final_report": row.get("final_report") or "Generating your report..."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/history/<user_id>", methods=["GET"])
+def get_user_history(user_id):
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    try:
+        res = supabase.table("sessions").select("*") \
+            .eq("user_id", user_id).order("created_at", desc=True).execute()
+        
+        sessions = res.data or []
+        
+        for session in sessions:
+            feedbacks = session.get("feedbacks") or []
+            if not session.get("scores") and feedbacks:
+                session["scores"] = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
+            
+            if (session.get("final_score") is None) and feedbacks:
+                scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
+                session["final_score"] = round(sum(scores) / len(scores), 1) if scores else 0
+                
+            if not session.get("final_grade") and session.get("final_score") is not None:
+                fs = session["final_score"]
+                if fs >= 9.0: session["final_grade"] = "S"
+                elif fs >= 8.0: session["final_grade"] = "A"
+                elif fs >= 7.0: session["final_grade"] = "B"
+                elif fs >= 5.0: session["final_grade"] = "C"
+                elif fs >= 4.0: session["final_grade"] = "D"
+                else: session["final_grade"] = "F"
+                
+        return jsonify(sessions), 200
+    except Exception as e:
+        print(f"Get history error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/recording/<session_id>", methods=["GET"])
+def get_recording_file(session_id):
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+    try:
+        from flask import send_from_directory
+        # Check if the file recording_session_id.webm exists in UPLOAD_FOLDER
+        filename = f"recording_{session_id}.webm"
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        if not os.path.exists(filepath):
+            found = False
+            for ext in ["mp4", "webm", "ogg"]:
+                filename = f"recording_{session_id}.{ext}"
+                filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                if os.path.exists(filepath):
+                    found = True
+                    break
+            if not found:
+                return jsonify({"error": "Recording not found"}), 404
+                
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/session/<session_id>", methods=["DELETE"])
+def delete_session(session_id):
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+    try:
+        # Retrieve session first to get recording_path
+        res = supabase.table("sessions").select("recording_path").eq("session_id", session_id).execute()
+        if res and res.data:
+            rec_path = res.data[0].get("recording_path")
+            if rec_path and os.path.exists(rec_path):
+                try:
+                    os.remove(rec_path)
+                except Exception as ex:
+                    print(f"Error removing recording file: {ex}")
+
+        # Delete session from database
+        supabase.table("sessions").delete().eq("session_id", session_id).execute()
+        return jsonify({"message": "Session deleted successfully"}), 200
+    except Exception as e:
+        print(f"Delete session error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/session/bulk-delete", methods=["POST"])
+def bulk_delete_sessions():
+    data = request.get_json() or {}
+    session_ids = data.get("session_ids") or []
+    if not session_ids:
+        return jsonify({"error": "No session_ids provided"}), 400
+    try:
+        # Retrieve sessions first to get recording_paths
+        res = supabase.table("sessions").select("recording_path").in_("session_id", session_ids).execute()
+        if res and res.data:
+            for row in res.data:
+                rec_path = row.get("recording_path")
+                if rec_path and os.path.exists(rec_path):
+                    try:
+                        os.remove(rec_path)
+                    except Exception as ex:
+                        print(f"Error removing recording file: {ex}")
+
+        # Delete sessions from database
+        supabase.table("sessions").delete().in_("session_id", session_ids).execute()
+        return jsonify({"message": f"{len(session_ids)} sessions deleted successfully"}), 200
+    except Exception as e:
+        print(f"Bulk delete error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/history/<user_id>", methods=["DELETE"])
+def clear_user_history(user_id):
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    try:
+        # Retrieve all sessions to delete their files
+        res = supabase.table("sessions").select("recording_path").eq("user_id", user_id).execute()
+        if res and res.data:
+            for row in res.data:
+                rec_path = row.get("recording_path")
+                if rec_path and os.path.exists(rec_path):
+                    try:
+                        os.remove(rec_path)
+                    except Exception as ex:
+                        print(f"Error removing recording file: {ex}")
+
+        # Delete all sessions for this user from database
+        supabase.table("sessions").delete().eq("user_id", user_id).execute()
+        return jsonify({"message": "All interview history cleared successfully"}), 200
+    except Exception as e:
+        print(f"Clear history error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

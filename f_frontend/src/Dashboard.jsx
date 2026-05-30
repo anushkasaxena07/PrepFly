@@ -44,6 +44,281 @@ const GradeBadge = ({ grade, size = 36 }) => {
   );
 };
 
+// ── Custom SVG Charts for Performance Analytics ─────────────────────────────
+const ScoreTrendChart = ({ sessions }) => {
+  if (!sessions || sessions.length === 0) return null;
+  
+  const sorted = [...sessions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  
+  const width = 500;
+  const height = 220;
+  const paddingX = 40;
+  const paddingY = 30;
+  
+  const chartWidth = width - paddingX * 2;
+  const chartHeight = height - paddingY * 2;
+  
+  const data = sorted.map((s, idx) => {
+    const sc = s.scores || [];
+    const avg = s.final_score ?? (sc.length ? sc.reduce((a,b)=>a+b,0)/sc.length : 0);
+    return {
+      label: `I${idx + 1}`,
+      score: parseFloat(avg) || 0,
+      date: new Date(s.created_at).toLocaleDateString()
+    };
+  });
+  
+  const points = data.map((d, i) => {
+    const x = data.length > 1
+      ? paddingX + (i / (data.length - 1)) * chartWidth
+      : paddingX + chartWidth / 2;
+    const y = paddingY + chartHeight - (d.score / 10) * chartHeight;
+    return { x, y, score: d.score, label: d.label, date: d.date };
+  });
+  
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaPath = points.length > 0
+    ? `${linePath} L ${points[points.length - 1].x} ${paddingY + chartHeight} L ${points[0].x} ${paddingY + chartHeight} Z`
+    : '';
+
+  return (
+    <div style={{ width: "100%", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 700, color: "#e8edf8" }}>Overall Score Trend</h4>
+        <span style={{ fontSize: 11, color: "#7a8ba8" }}>{data.length} interviews</span>
+      </div>
+      <div style={{ position: "relative", width: "100%" }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+          <defs>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#00e5c3" />
+              <stop offset="100%" stopColor="#00b8ff" />
+            </linearGradient>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#00e5c3" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#00e5c3" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          
+          {[0, 2.5, 5, 7.5, 10].map((val, idx) => {
+            const y = paddingY + chartHeight - (val / 10) * chartHeight;
+            return (
+              <g key={idx} opacity="0.3">
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(255,255,255,0.15)" strokeDasharray="3,3" />
+                <text x={paddingX - 10} y={y + 4} fill="#7a8ba8" fontSize="10" textAnchor="end" fontWeight="500">{val}</text>
+              </g>
+            );
+          })}
+          
+          {points.length > 0 && (
+            <path d={areaPath} fill="url(#areaGrad)" />
+          )}
+          
+          {points.length > 0 && (
+            <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+          
+          {points.map((p, idx) => (
+            <g key={idx} style={{ cursor: "pointer" }}>
+              <circle cx={p.x} cy={p.y} r="5" fill="#080c14" stroke="#00e5c3" strokeWidth="3" />
+              <title>{`Interview ${idx+1}\nScore: ${p.score}/10\nDate: ${p.date}`}</title>
+            </g>
+          ))}
+          
+          {points.map((p, idx) => (
+            <text key={idx} x={p.x} y={height - 8} fill="#7a8ba8" fontSize="9" textAnchor="middle" fontWeight="600">
+              {p.label}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+const QuestionBarChart = ({ sessions }) => {
+  if (!sessions || sessions.length === 0) return null;
+  
+  const qSums = [0, 0, 0, 0, 0];
+  const qCounts = [0, 0, 0, 0, 0];
+  
+  sessions.forEach(s => {
+    const sc = s.scores || [];
+    sc.forEach((score, idx) => {
+      if (idx < 5) {
+        qSums[idx] += score;
+        qCounts[idx] += 1;
+      }
+    });
+  });
+  
+  const qAverages = qSums.map((sum, idx) => {
+    const count = qCounts[idx];
+    return count > 0 ? parseFloat((sum / count).toFixed(1)) : 0;
+  });
+  
+  const width = 500;
+  const height = 220;
+  const paddingX = 40;
+  const paddingY = 30;
+  const chartWidth = width - paddingX * 2;
+  const chartHeight = height - paddingY * 2;
+  const barWidth = 32;
+  
+  return (
+    <div style={{ width: "100%", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h4 style={{ fontSize: 13, fontWeight: 700, color: "#e8edf8" }}>Confidence Progression</h4>
+        <span style={{ fontSize: 11, color: "#7a8ba8" }}>Average by Question</span>
+      </div>
+      <div style={{ position: "relative", width: "100%" }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+          {[0, 2.5, 5, 7.5, 10].map((val, idx) => {
+            const y = paddingY + chartHeight - (val / 10) * chartHeight;
+            return (
+              <g key={idx} opacity="0.3">
+                <line x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="rgba(255,255,255,0.15)" strokeDasharray="3,3" />
+                <text x={paddingX - 10} y={y + 4} fill="#7a8ba8" fontSize="10" textAnchor="end" fontWeight="500">{val}</text>
+              </g>
+            );
+          })}
+          
+          {qAverages.map((avg, idx) => {
+            const x = paddingX + (idx / 4) * (chartWidth - barWidth);
+            const barHeight = (avg / 10) * chartHeight;
+            const y = paddingY + chartHeight - barHeight;
+            const isZero = avg === 0;
+            const color = avg >= 8 ? "#00e5c3" : avg >= 6 ? "#00b8ff" : avg >= 4 ? "#f59e0b" : "#ff4f6a";
+            
+            return (
+              <g key={idx}>
+                {!isZero && (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={barHeight}
+                    fill={color}
+                    opacity="0.8"
+                    rx="4"
+                    ry="4"
+                    style={{ transition: "all 0.3s ease" }}
+                  />
+                )}
+                <text x={x + barWidth / 2} y={y - 8} fill={color} fontSize="11" fontWeight="700" textAnchor="middle">
+                  {avg > 0 ? avg : "—"}
+                </text>
+                <text x={x + barWidth / 2} y={height - 8} fill="#7a8ba8" fontSize="10" textAnchor="middle" fontWeight="600">
+                  {`Q${idx + 1}`}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+const GradePieChart = ({ sessions }) => {
+  if (!sessions || sessions.length === 0) return null;
+  
+  const counts = { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 };
+  let total = 0;
+  
+  sessions.forEach(s => {
+    if (s.final_grade && counts[s.final_grade] !== undefined) {
+      counts[s.final_grade]++;
+      total++;
+    }
+  });
+  
+  if (total === 0) {
+    sessions.forEach(s => {
+      const sc = s.scores || [];
+      const avg = s.final_score ?? (sc.length ? sc.reduce((a,b)=>a+b,0)/sc.length : 0);
+      let g = "F";
+      if (avg >= 9.0) g = "S";
+      else if (avg >= 8.0) g = "A";
+      else if (avg >= 7.0) g = "B";
+      else if (avg >= 5.0) g = "C";
+      else if (avg >= 4.0) g = "D";
+      counts[g]++;
+      total++;
+    });
+  }
+  
+  const grades = [
+    { name: "S", label: "Expert (S)", color: "#ffd700", count: counts.S },
+    { name: "A", label: "Advanced (A)", color: "#00e5c3", count: counts.A },
+    { name: "B", label: "Proficient (B)", color: "#00b8ff", count: counts.B },
+    { name: "C", label: "Intermediate (C)", color: "#f59e0b", count: counts.C },
+    { name: "D", label: "Novice (D)", color: "#f97316", count: counts.D },
+    { name: "F", label: "Beginner (F)", color: "#ff4f6a", count: counts.F },
+  ].filter(g => g.count > 0);
+  
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  let accumulatedPercent = 0;
+  
+  return (
+    <div style={{ width: "100%", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 18, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 700, color: "#e8edf8" }}>Grade Distribution</h4>
+          <span style={{ fontSize: 11, color: "#7a8ba8" }}>Overall standing</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "center", marginTop: 10 }}>
+          <div style={{ position: "relative", width: 110, height: 110, flexShrink: 0 }}>
+            <svg width="100%" height="100%" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="12" />
+              {grades.map((g, idx) => {
+                const percent = g.count / total;
+                const strokeLength = percent * circumference;
+                const strokeOffset = circumference - (accumulatedPercent * circumference);
+                accumulatedPercent += percent;
+                
+                return (
+                  <circle
+                    key={idx}
+                    cx="60"
+                    cy="60"
+                    r={radius}
+                    fill="none"
+                    stroke={g.color}
+                    strokeWidth="12"
+                    strokeDasharray={`${strokeLength} ${circumference}`}
+                    strokeDashoffset={strokeOffset}
+                    transform="rotate(-90 60 60)"
+                    strokeLinecap="round"
+                    style={{ transition: "stroke-dashoffset 0.5s ease" }}
+                  />
+                );
+              })}
+            </svg>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "#e8edf8", lineHeight: 1.1 }}>{total}</span>
+              <span style={{ fontSize: 8, color: "#7a8ba8", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total</span>
+            </div>
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 110 }}>
+            {grades.map((g, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: g.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "#b8c8d8", flex: 1, whiteSpace: "nowrap" }}>{g.name}-Grade</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#e8edf8" }}>
+                  {g.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── PDF Generator (pure client-side, no library needed) ────────────────────
 const generatePDF = (session) => {
   const { questions = [], responses = [], feedbacks = [], scores = [],
@@ -93,7 +368,11 @@ const generatePDF = (session) => {
     </div>
   </div>
   <div class="section-title">Question-by-Question Breakdown</div>
-  ${questions.map((q, i) => `
+  ${questions.map((q, i) => {
+    const feedbackText = feedbacks[i]
+      ? (typeof feedbacks[i] === "object" ? feedbacks[i].feedback : feedbacks[i])
+      : "—";
+    return `
     <div class="qa-card">
       <div class="q-label">Question ${i+1}</div>
       <div class="q-text">${q}</div>
@@ -101,9 +380,10 @@ const generatePDF = (session) => {
       <div class="a-label">Your Answer</div>
       <div class="a-text">"${responses[i] || "No answer recorded"}"</div>
       <div class="f-label">Feedback</div>
-      <div class="f-text">${feedbacks[i] || "—"}</div>
+      <div class="f-text">${feedbackText}</div>
     </div>
-  `).join("")}
+    `;
+  }).join("")}
   <div class="footer">Generated by InterviewAI · ${new Date().toLocaleString()}</div>
   </body></html>`;
 
@@ -155,13 +435,24 @@ const SessionModal = ({ session, onClose }) => {
               {` · ${questions.length} questions`}
             </div>
           </div>
-          <button onClick={() => generatePDF(session)} style={{
-            marginLeft:"auto", background:"linear-gradient(135deg,#00e5c3,#00b8ff)",
-            border:"none", borderRadius:10, padding:"9px 18px", color:"#050d14",
-            fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:7,
-          }}>
-            <span>↓</span> PDF Report
-          </button>
+          <div style={{ marginLeft:"auto", display:"flex", gap:10 }}>
+            {session.recording_path && (
+              <a href={`${BACKEND_URL}/recording/${session.session_id}`} download style={{
+                textDecoration:"none", background:"rgba(124,58,237,0.15)",
+                border:"1px solid rgba(124,58,237,0.4)", borderRadius:10, padding:"9px 18px", color:"#a78bfa",
+                fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:7,
+              }}>
+                <span>🎬</span> Video
+              </a>
+            )}
+            <button onClick={() => generatePDF(session)} style={{
+              background:"linear-gradient(135deg,#00e5c3,#00b8ff)",
+              border:"none", borderRadius:10, padding:"9px 18px", color:"#050d14",
+              fontWeight:700, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:7,
+            }}>
+              <span>↓</span> PDF Report
+            </button>
+          </div>
         </div>
 
         {/* Final report */}
@@ -214,7 +505,9 @@ const SessionModal = ({ session, onClose }) => {
             {feedbacks[i] && (
               <>
                 <div style={{ fontSize:10, fontWeight:700, color:"#00e5c3", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Feedback</div>
-                <div style={{ fontSize:13, color:"#9ab0c8", lineHeight:1.8, whiteSpace:"pre-wrap" }}>{feedbacks[i]}</div>
+                <div style={{ fontSize:13, color:"#9ab0c8", lineHeight:1.8, whiteSpace:"pre-wrap" }}>
+                  {typeof feedbacks[i] === "object" ? feedbacks[i].feedback : feedbacks[i]}
+                </div>
               </>
             )}
           </div>
@@ -235,6 +528,7 @@ export default function Dashboard() {
   const [resumeUploaded, setResumeUploaded] = useState(false);
   const [resumeFile, setResumeFile]         = useState(null);
   const [formSubmitted, setFormSubmitted]   = useState(false);
+  const [skipResume, setSkipResume]         = useState(false);
   const [sessionId, setSessionId]           = useState(null);
   const [jobDetails, setJobDetails]         = useState({ role:"", tools:"", experience:"" });
   const [user, setUser]                     = useState({ name:"", email:"", avatar:"", _id:"" });
@@ -244,6 +538,8 @@ export default function Dashboard() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [activeTab, setActiveTab]           = useState("setup"); // "setup" | "history"
   const [selectedSession, setSelectedSession] = useState(null);
+  const [selectMode, setSelectMode]         = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
 
   // ── Init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -269,14 +565,21 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Load history when tab switches
+  // Load history on mount or when user id is available
   useEffect(() => {
-    if (activeTab === "history" && user._id) loadHistory();
-  }, [activeTab, user._id]);
+    if (user._id) loadHistory();
+  }, [user._id]);
+
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedSessionIds([]);
+  }, [activeTab]);
 
   const loadHistory = async () => {
     if (!user._id) return;
     setHistoryLoading(true);
+    setSelectMode(false);
+    setSelectedSessionIds([]);
     try {
       const res  = await fetch(`${BACKEND_URL}/history/${user._id}`);
       const data = await res.json();
@@ -289,6 +592,70 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => { localStorage.clear(); navigate("/"); };
+
+  const handleDeleteSession = async (sessId) => {
+    if (!window.confirm("Are you sure you want to permanently delete this interview session? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/session/${sessId}`, { method: "DELETE" });
+      if (res.ok) {
+        setHistory(prev => prev.filter(s => s.session_id !== sessId));
+      } else {
+        alert("Failed to delete session.");
+      }
+    } catch {
+      alert("Error deleting session.");
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete all your interview history? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/history/${user._id}`, { method: "DELETE" });
+      if (res.ok) {
+        setHistory([]);
+        alert("All interview history has been cleared!");
+      } else {
+        alert("Failed to clear history.");
+      }
+    } catch {
+      alert("Error clearing history.");
+    }
+  };
+
+  const handleToggleSelectSession = (sessId) => {
+    setSelectedSessionIds(prev => 
+      prev.includes(sessId) ? prev.filter(id => id !== sessId) : [...prev, sessId]
+    );
+  };
+
+  const handleSelectAllSessions = () => {
+    if (selectedSessionIds.length === history.length) {
+      setSelectedSessionIds([]);
+    } else {
+      setSelectedSessionIds(history.map(s => s.session_id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedSessionIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to permanently delete the ${selectedSessionIds.length} selected session(s)? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/session/bulk-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_ids: selectedSessionIds })
+      });
+      if (res.ok) {
+        setHistory(prev => prev.filter(s => !selectedSessionIds.includes(s.session_id)));
+        setSelectedSessionIds([]);
+        setSelectMode(false);
+      } else {
+        alert("Failed to delete selected sessions.");
+      }
+    } catch {
+      alert("Error deleting selected sessions.");
+    }
+  };
 
   const handleFileChange = (e) => { const f = e.target.files?.[0]; if (f) setResumeFile(f); };
 
@@ -313,9 +680,40 @@ export default function Dashboard() {
     else alert("Please fill out all job details.");
   };
 
+  const handleBeginInterview = async () => {
+    if (skipResume && !resumeUploaded) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/create-session-no-resume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: user._id,
+            role: jobDetails.role,
+            tools: jobDetails.tools,
+            experience: jobDetails.experience
+          })
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          alert(errData.error || "Failed to create session.");
+          return;
+        }
+        const data = await res.json();
+        if (data.session_id) {
+          localStorage.setItem("session_id", data.session_id);
+          navigate("/interview");
+        }
+      } catch {
+        alert("Error connecting to server. Please try again.");
+      }
+    } else {
+      navigate("/interview");
+    }
+  };
+
   const displayName = user.name ? user.name.split(" ")[0] : user.email ? user.email.split("@")[0] : "Candidate";
   const initials    = user.name ? user.name.split(" ").map(n=>n[0]).join("").toUpperCase().slice(0,2) : (user.email?.[0]||"U").toUpperCase();
-  const isReady     = resumeUploaded && formSubmitted;
+  const isReady     = (resumeUploaded || skipResume) && formSubmitted;
 
   // ── History stats ─────────────────────────────────────────────────────────
   const completedSessions = history.filter(s => !s.active);
@@ -470,6 +868,29 @@ export default function Dashboard() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
         .loading-spin { width:20px; height:20px; border:2px solid rgba(0,229,195,.2); border-top-color:#00e5c3; border-radius:50%; animation:spin 0.8s linear infinite; margin:40px auto; }
         @keyframes spin { to{transform:rotate(360deg)} }
+
+        /* ── Performance Dashboard ── */
+        .perf-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+        .perf-grid-3 { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:20px; margin-bottom:24px; }
+        @media(max-width:1024px){ .perf-grid-3 { grid-template-columns:1fr 1fr; } }
+        @media(max-width:768px){ .perf-grid-3 { grid-template-columns:1fr; } }
+        .perf-insight-card { background:rgba(12,18,35,.8); border:1px solid rgba(255,255,255,.07); border-radius:20px; padding:20px; }
+        .perf-insight-title { font-size:14px; font-weight:700; color:#e8edf8; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+        .perf-insight-icon { color:#00e5c3; }
+        .perf-list { list-style:none; display:flex; flex-direction:column; gap:10px; }
+        .perf-list-item { display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#b8c8d8; line-height:1.5; }
+        .perf-bullet-check { color:#00e5c3; flex-shrink:0; font-weight:bold; }
+        .perf-bullet-warn { color:#ff4f6a; flex-shrink:0; font-weight:bold; }
+        .perf-bullet-tip { color:#00b8ff; flex-shrink:0; font-weight:bold; }
+        
+        .perf-advice-card { background:linear-gradient(135deg,rgba(0,229,195,.08),rgba(0,184,255,.04)); border:1px solid rgba(0,229,195,.2); border-radius:20px; padding:22px; margin-bottom:24px; display:flex; gap:18px; align-items:center; }
+        @media(max-width:600px){ .perf-advice-card { flex-direction:column; text-align:center; align-items:center; } }
+        .perf-advice-avatar { width:64px; height:64px; border-radius:50%; background:rgba(0,229,195,.15); border:2px solid rgba(0,229,195,.4); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+        .perf-advice-text h4 { font-size:14px; font-weight:800; color:#00e5c3; margin-bottom:6px; }
+        .perf-advice-text p { font-size:13px; color:#b8c8d8; line-height:1.7; }
+        
+        .perf-empty-state { text-align:center; padding:48px 24px; border:1px dashed rgba(255,255,255,0.1); border-radius:24px; background:rgba(255,255,255,0.01); }
+        .perf-empty-state .icon { font-size:40px; margin-bottom:12px; }
       `}</style>
 
       <div className="db-root">
@@ -570,18 +991,18 @@ export default function Dashboard() {
               <div className="cta-card">
                 <div>
                   <h3>Ready to start your interview?</h3>
-                  <p>Your AI interviewer Hana will ask questions based on your resume.</p>
+                  <p>Your AI interviewer Hana will ask questions based on your resume or job details.</p>
                   <div className="status-row">
                     <div className={`status-dot ${isReady?"ready":""}`} />
                     <span className="status-text">
-                      {!resumeUploaded && !formSubmitted && "Upload resume & fill job details to unlock"}
-                      {resumeUploaded && !formSubmitted && "Now fill in your job details"}
-                      {!resumeUploaded && formSubmitted && "Now upload your resume"}
+                      {!resumeUploaded && !skipResume && !formSubmitted && "Upload resume (or select Job Details mode) & fill job details to unlock"}
+                      {(resumeUploaded || skipResume) && !formSubmitted && "Now fill in your job details"}
+                      {!(resumeUploaded || skipResume) && formSubmitted && "Now upload your resume or select 'Job Details only' below"}
                       {isReady && "All set — you're ready to go! 🎌"}
                     </span>
                   </div>
                 </div>
-                <button className="start-btn" onClick={() => navigate("/interview")} disabled={!isReady}>
+                <button className="start-btn" onClick={handleBeginInterview} disabled={!isReady}>
                   Begin Interview
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </button>
@@ -590,17 +1011,23 @@ export default function Dashboard() {
               {/* Setup grid */}
               <div className="setup-grid">
                 {/* Resume upload */}
-                <div className={`glass ${resumeUploaded?"":" pulse"}`}>
+                <div className={`glass ${resumeUploaded || skipResume ? "" : " pulse"}`}>
                   <div className="card-title">
                     <div className="card-title-icon">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
                     Upload Resume
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "#7a8ba8", fontWeight: 500, background: "rgba(255,255,255,0.04)", padding: "2px 8px", borderRadius: 10 }}>Optional</span>
                   </div>
                   {resumeUploaded ? (
                     <div className="upload-badge">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                       {resumeFile?.name || "Resume uploaded"}
+                    </div>
+                  ) : skipResume ? (
+                    <div className="upload-badge" style={{ background: "rgba(0,184,255,0.08)", borderColor: "rgba(0,184,255,0.25)", color: "#00b8ff" }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                      Job Details Mode (No Resume)
                     </div>
                   ) : (
                     <div className="upload-area">
@@ -612,7 +1039,7 @@ export default function Dashboard() {
                       <p>{resumeFile ? "Ready to upload" : "PDF, DOC, or DOCX · max 10 MB"}</p>
                     </div>
                   )}
-                  {!resumeUploaded && (
+                  {!resumeUploaded && !skipResume && (
                     <button className="btn-primary" onClick={uploadResume} disabled={!resumeFile}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
                       Upload Resume
@@ -621,6 +1048,25 @@ export default function Dashboard() {
                   {resumeUploaded && (
                     <button className="btn-ghost" onClick={()=>{setResumeUploaded(false);setResumeFile(null);}}>Replace File</button>
                   )}
+                  
+                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <input 
+                      type="checkbox" 
+                      id="skipResume" 
+                      checked={skipResume}
+                      disabled={resumeUploaded}
+                      onChange={(e) => {
+                        setSkipResume(e.target.checked);
+                        if (e.target.checked) {
+                          setResumeFile(null);
+                        }
+                      }}
+                      style={{ width: 16, height: 16, accentColor: "#00e5c3", cursor: "pointer" }}
+                    />
+                    <label htmlFor="skipResume" style={{ fontSize: 12, color: "#b8c8d8", cursor: "pointer", fontWeight: 500, userSelect: "none" }}>
+                      Interview using Job Details only (no resume)
+                    </label>
+                  </div>
                 </div>
 
                 {/* Job details */}
@@ -656,24 +1102,152 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Interview Tracks */}
-              <div className="section-hdr">
-                <h3>Interview Tracks</h3>
-                <span>{interviewRoles.length} tracks available</span>
+              {/* Performance Analytics Dashboard */}
+              <div className="section-hdr" style={{ marginTop: 28, marginBottom: 16 }}>
+                <h3>Performance Analytics</h3>
+                <span>Detailed Insights</span>
               </div>
-              <div className="tracks-grid">
-                {interviewRoles.map((item, i) => (
-                  <div className="track-card" key={i} onClick={() => navigate("/interview")}>
-                    <div className={`track-badge badge-${item.badge}`}>{item.label}</div>
-                    <h3>{item.name}</h3>
-                    <p>{item.desc}</p>
-                    <div className="track-footer">
-                      <span className="track-meta">~{item.time}</span>
-                      <span className="track-btn">Start <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
+
+              {completedSessions.length === 0 ? (
+                <div className="perf-empty-state">
+                  <div className="icon">📈</div>
+                  <h4 style={{ fontSize: 16, fontWeight: 700, color: "#e8edf8", marginBottom: 6 }}>Analytics Pending</h4>
+                  <p style={{ fontSize: 13, color: "#7a8ba8", maxWidth: 440, margin: "0 auto 18px", lineHeight: 1.6 }}>
+                    Complete your first AI-driven interview session to unlock trend tracking, question-by-question metrics, strengths assessment, and custom advice.
+                  </p>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12, color: "#00e5c3", background: "rgba(0,229,195,0.07)", border: "1px solid rgba(0,229,195,0.2)", borderRadius: 20, padding: "6px 14px" }}>
+                      🎯 Personalised questions
+                    </div>
+                    <div style={{ fontSize: 12, color: "#00b8ff", background: "rgba(0,184,255,0.07)", border: "1px solid rgba(0,184,255,0.2)", borderRadius: 20, padding: "6px 14px" }}>
+                      🎥 Webcam/Voice optional
+                    </div>
+                    <div style={{ fontSize: 12, color: "#a78bfa", background: "rgba(124,58,237,0.07)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 20, padding: "6px 14px" }}>
+                      🎌 Interactive feedback
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (() => {
+                const strengthsList = [];
+                const improvementsList = [];
+                const tipsList = [];
+                
+                completedSessions.forEach(s => {
+                  const feeds = s.feedbacks || [];
+                  feeds.forEach(f => {
+                    if (typeof f === 'object' && f !== null) {
+                      if (f.strength) strengthsList.push(f.strength);
+                      if (f.improvement) improvementsList.push(f.improvement);
+                      if (f.tip) tipsList.push(f.tip);
+                    } else if (typeof f === 'string') {
+                      const lines = f.split('\n');
+                      lines.forEach(l => {
+                        if (l.toLowerCase().includes("strength:")) {
+                          strengthsList.push(l.replace(/^(✅\s*)?Strength:\s*/i, '').trim());
+                        } else if (l.toLowerCase().includes("improve:") || l.toLowerCase().includes("improvement:")) {
+                          improvementsList.push(l.replace(/^(⚠️\s*)?Improve:\s*/i, '').trim());
+                        } else if (l.toLowerCase().includes("tip:")) {
+                          tipsList.push(l.replace(/^(💡\s*)?Tip:\s*/i, '').trim());
+                        }
+                      });
+                    }
+                  });
+                });
+                
+                const finalStrengths = [...new Set(strengthsList)].reverse().slice(0, 3);
+                const finalImprovements = [...new Set(improvementsList)].reverse().slice(0, 3);
+                const finalTips = [...new Set(tipsList)].reverse().slice(0, 3);
+                
+                const displayStrengths = finalStrengths.length > 0 ? finalStrengths : [
+                  "Exhibits a good initial attempt to explain candidate background.",
+                  "Willingness to detail project context and toolsets used.",
+                  "Displays structured technical communication when describing experiences."
+                ];
+                
+                const displayImprovements = finalImprovements.length > 0 ? finalImprovements : [
+                  "Focus on structure: use the STAR method to describe actions and metrics.",
+                  "Remember to specify time and space complexity for algorithmic solutions.",
+                  "Provide more precise technical tradeoffs when selecting database tools."
+                ];
+                
+                const displayTips = finalTips.length > 0 ? finalTips : [
+                  "Explain the 'why' behind architectural decisions, not just the 'what'.",
+                  "Keep your answers concise; try to finish within 1.5 to 2 minutes.",
+                  "Ask clarifying questions to ensure your solution targets the root problem."
+                ];
+
+                let adviceTitle = "Hana's Preparing Your Strategy";
+                let adviceBody = "Complete an interview to receive custom actionable advice from your interviewer Hana.";
+                if (avgOverall !== null) {
+                  const scoreVal = parseFloat(avgOverall);
+                  if (scoreVal >= 8.5) {
+                    adviceTitle = "Hana's Evaluation: Elite Performance! 🌸";
+                    adviceBody = "Hana is highly impressed! Your technical depth and overall answers are outstanding. To achieve absolute perfection, focus on polishing delivery speed and explaining complex architectural edge cases.";
+                  } else if (scoreVal >= 7.0) {
+                    adviceTitle = "Hana's Evaluation: Strong Foundation! 🎌";
+                    adviceBody = "You are doing great! Your answers are clear and detailed, but there is room for improvement. Consistently apply the STAR framework (Situation, Task, Action, Result) and state clear quantitative metrics.";
+                  } else {
+                    adviceTitle = "Hana's Evaluation: Let's Level Up! ⚡";
+                    adviceBody = "Keep practicing! Focus on explaining time/space complexities and organizing your thoughts before speaking. Try writing down 2-3 key talking points on paper before answering Hana.";
+                  }
+                }
+
+                return (
+                  <>
+                    <div className="perf-grid-3">
+                      <ScoreTrendChart sessions={completedSessions} />
+                      <QuestionBarChart sessions={completedSessions} />
+                      <GradePieChart sessions={completedSessions} />
+                    </div>
+
+                    <div className="perf-advice-card">
+                      <div className="perf-advice-avatar">🎌</div>
+                      <div className="perf-advice-text">
+                        <h4>{adviceTitle}</h4>
+                        <p>{adviceBody}</p>
+                      </div>
+                    </div>
+
+                    <div className="perf-grid">
+                      <div className="perf-insight-card">
+                        <div className="perf-insight-title">
+                          <span className="perf-insight-icon">✅</span>
+                          Key Strengths
+                        </div>
+                        <ul className="perf-list">
+                          {displayStrengths.map((str, idx) => (
+                            <li className="perf-list-item" key={idx}>
+                              <span className="perf-bullet-check">✓</span>
+                              <span>{str}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="perf-insight-card">
+                        <div className="perf-insight-title">
+                          <span className="perf-insight-icon" style={{ color: "#ff4f6a" }}>⚠️</span>
+                          Focus Areas & Tips
+                        </div>
+                        <ul className="perf-list">
+                          {displayImprovements.map((imp, idx) => (
+                            <li className="perf-list-item" key={idx}>
+                              <span className="perf-bullet-warn">!</span>
+                              <span>{imp}</span>
+                            </li>
+                          ))}
+                          {displayTips.slice(0, 1).map((tipText, idx) => (
+                            <li className="perf-list-item" key={idx + 3}>
+                              <span className="perf-bullet-tip">💡</span>
+                              <span>{tipText}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
 
@@ -712,7 +1286,25 @@ export default function Dashboard() {
                   {/* Session list */}
                   <div className="section-hdr" style={{marginBottom:14}}>
                     <h3>All Sessions</h3>
-                    <button onClick={loadHistory} style={{fontSize:12,color:"#7a8ba8",background:"none",border:"none",cursor:"pointer"}}>↻ Refresh</button>
+                    <div style={{ display:"flex", gap:15, alignItems:"center" }}>
+                      {!selectMode ? (
+                        <>
+                          <button onClick={() => setSelectMode(true)} style={{fontSize:12,color:"#00e5c3",background:"none",border:"none",cursor:"pointer",fontWeight:600}}>☑ Select</button>
+                          <button onClick={loadHistory} style={{fontSize:12,color:"#7a8ba8",background:"none",border:"none",cursor:"pointer"}}>↻ Refresh</button>
+                          <button onClick={handleDeleteAll} style={{fontSize:12,color:"#ff4f6a",background:"none",border:"none",cursor:"pointer",fontWeight:600}}>🗑 Clear History</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={handleSelectAllSessions} style={{fontSize:12,color:"#00b8ff",background:"none",border:"none",cursor:"pointer",fontWeight:600}}>
+                            {selectedSessionIds.length === history.length ? "☐ Deselect All" : "☑ Select All"}
+                          </button>
+                          <button onClick={handleDeleteSelected} disabled={selectedSessionIds.length === 0} style={{fontSize:12,color:selectedSessionIds.length === 0 ? "#4a5a72" : "#ff4f6a",background:"none",border:"none",cursor:selectedSessionIds.length === 0 ? "not-allowed" : "pointer",fontWeight:600}}>
+                            🗑 Delete Selected ({selectedSessionIds.length})
+                          </button>
+                          <button onClick={() => { setSelectMode(false); setSelectedSessionIds([]); }} style={{fontSize:12,color:"#7a8ba8",background:"none",border:"none",cursor:"pointer"}}>Cancel</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="session-list">
                     {history.map((s, i) => {
@@ -720,65 +1312,112 @@ export default function Dashboard() {
                       const avg = s.final_score ?? (sc.length ? (sc.reduce((a,b)=>a+b,0)/sc.length).toFixed(1) : null);
                       const pct = avg ? (avg/10)*100 : 0;
                       const barColor = pct>=80?"#00e5c3":pct>=60?"#00b8ff":pct>=40?"#f59e0b":"#ff4f6a";
+                      const isChecked = selectedSessionIds.includes(s.session_id);
                       return (
-                        <div className="sess-card" key={s.session_id || i}>
-                          <div className="sess-top">
-                            {s.final_grade && <GradeBadge grade={s.final_grade} />}
-                            <div className="sess-info">
-                              <div className="sess-date">{s.created_at ? new Date(s.created_at).toLocaleString() : "Unknown date"}</div>
-                              <div className="sess-meta">
-                                {s.questions?.length || 0} questions
-                                {avg ? ` · Score ${avg}/10` : ""}
-                              </div>
-                            </div>
-                            {s.active
-                              ? <span className="active-badge"><span className="active-dot"/>In Progress</span>
-                              : avg && <ScorePill score={parseFloat(avg)} />
+                        <div 
+                          className="sess-card" 
+                          key={s.session_id || i}
+                          style={{
+                            display: "flex",
+                            gap: 16,
+                            alignItems: "stretch",
+                            borderColor: isChecked ? "rgba(0, 229, 195, 0.4)" : "rgba(255, 255, 255, 0.07)",
+                            background: isChecked ? "rgba(0, 229, 195, 0.03)" : "rgba(12, 18, 35, 0.8)",
+                            cursor: selectMode ? "pointer" : "default"
+                          }}
+                          onClick={() => {
+                            if (selectMode) {
+                              handleToggleSelectSession(s.session_id);
                             }
-                          </div>
-
-                          {/* Score bar */}
-                          {avg && (
-                            <div className="score-bar-wrap" style={{marginBottom:12}}>
-                              <div style={{fontSize:11,color:"#7a8ba8",minWidth:28}}>0</div>
-                              <div className="score-bar-bg">
-                                <div className="score-bar-fill" style={{width:`${pct}%`,background:`linear-gradient(90deg,${barColor},${barColor}99)`}} />
+                          }}
+                        >
+                          {selectMode && (
+                            <div style={{ display: "flex", alignItems: "center", paddingRight: 4, userSelect: "none" }} onClick={(e) => e.stopPropagation()}>
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => handleToggleSelectSession(s.session_id)}
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  accentColor: "#00e5c3",
+                                  cursor: "pointer"
+                                }}
+                              />
+                            </div>
+                          )}
+                          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                            <div className="sess-top">
+                              {s.final_grade && <GradeBadge grade={s.final_grade} />}
+                              <div className="sess-info">
+                                <div className="sess-date">{s.created_at ? new Date(s.created_at).toLocaleString() : "Unknown date"}</div>
+                                <div className="sess-meta">
+                                  {s.questions?.length || 0} questions
+                                  {avg ? ` · Score ${avg}/10` : ""}
+                                </div>
                               </div>
-                              <div style={{fontSize:11,color:"#7a8ba8",minWidth:20}}>10</div>
+                              {s.active
+                                ? <span className="active-badge"><span className="active-dot"/>In Progress</span>
+                                : avg && <ScorePill score={parseFloat(avg)} />
+                              }
                             </div>
-                          )}
 
-                          {/* Per-question mini scores */}
-                          {sc.length > 0 && (
-                            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
-                              {sc.map((score,qi) => {
-                                const c = score>=8?"#00e5c3":score>=6?"#00b8ff":score>=4?"#f59e0b":"#ff4f6a";
-                                return (
-                                  <span key={qi} style={{fontSize:11,fontWeight:700,background:`${c}14`,border:`1px solid ${c}33`,borderRadius:8,padding:"2px 8px",color:c}}>
-                                    Q{qi+1}: {score}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Action buttons */}
-                          <div className="sess-actions">
-                            <button className="act-btn act-view" onClick={()=>setSelectedSession(s)}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                              View Report
-                            </button>
-                            {!s.active && (
-                              <button className="act-btn act-pdf" onClick={()=>generatePDF(s)}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                                Download PDF
-                              </button>
+                            {/* Score bar */}
+                            {avg && (
+                              <div className="score-bar-wrap" style={{marginBottom:12}}>
+                                <div style={{fontSize:11,color:"#7a8ba8",minWidth:28}}>0</div>
+                                <div className="score-bar-bg">
+                                  <div className="score-bar-fill" style={{width:`${pct}%`,background:`linear-gradient(90deg,${barColor},${barColor}99)`}} />
+                                </div>
+                                <div style={{fontSize:11,color:"#7a8ba8",minWidth:20}}>10</div>
+                              </div>
                             )}
-                            {s.active && (
-                              <button className="act-btn" style={{background:"rgba(245,158,11,.1)",color:"#f59e0b",border:"1px solid rgba(245,158,11,.25)"}}
-                                onClick={()=>{localStorage.setItem("session_id",s.session_id);navigate("/interview");}}>
-                                ▶ Resume
-                              </button>
+
+                            {/* Per-question mini scores */}
+                            {sc.length > 0 && (
+                              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+                                {sc.map((score,qi) => {
+                                  const c = score>=8?"#00e5c3":score>=6?"#00b8ff":score>=4?"#f59e0b":"#ff4f6a";
+                                  return (
+                                    <span key={qi} style={{fontSize:11,fontWeight:700,background:`${c}14`,border:`1px solid ${c}33`,borderRadius:8,padding:"2px 8px",color:c}}>
+                                      Q{qi+1}: {score}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Action buttons */}
+                            {!selectMode && (
+                              <div className="sess-actions">
+                                <button className="act-btn act-view" onClick={()=>setSelectedSession(s)}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                  View Report
+                                </button>
+                                {!s.active && (
+                                  <button className="act-btn act-pdf" onClick={()=>generatePDF(s)}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                    Download PDF
+                                  </button>
+                                )}
+                                {s.recording_path && (
+                                  <a className="act-btn act-pdf" href={`${BACKEND_URL}/recording/${s.session_id}`} download style={{ textDecoration:"none", background:"rgba(124,58,237,0.12)", color:"#a78bfa", border:"1px solid rgba(124,58,237,0.25)" }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                    Download Video
+                                  </a>
+                                )}
+                                {s.active && (
+                                  <button className="act-btn" style={{background:"rgba(245,158,11,.1)",color:"#f59e0b",border:"1px solid rgba(245,158,11,.25)"}}
+                                    onClick={()=>{localStorage.setItem("session_id",s.session_id);navigate("/interview");}}>
+                                    ▶ Resume
+                                  </button>
+                                )}
+                                <button className="act-btn" style={{ background:"rgba(255,79,106,0.1)", color:"#ff4f6a", border:"1px solid rgba(255,79,106,0.22)", marginLeft:"auto" }}
+                                  onClick={() => handleDeleteSession(s.session_id)}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                  Delete
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>

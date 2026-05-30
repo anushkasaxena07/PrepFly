@@ -219,6 +219,8 @@ const InterviewPage = () => {
   const [inputMode, setInputMode]           = useState("voice"); // "voice" | "text"
   const mediaRecorderRef = useRef(null);
   const audioChunksRef   = useRef([]);
+  const recognitionRef   = useRef(null);
+  const webSpeechTranscriptRef = useRef("");
 
   // ── Video (candidate webcam) ───────────────────────────────────────────
   const videoRef             = useRef(null);
@@ -230,6 +232,23 @@ const InterviewPage = () => {
   const currentAudioRef = useRef(null);
   const speechQueue     = useRef([]);
   const isAudioPlaying  = useRef(false);
+  const speechSpeedRef  = useRef(1.5);
+  const [speechSpeed, setSpeechSpeed] = useState(() => {
+    const stored = localStorage.getItem("speechSpeed");
+    const val = stored ? Number(stored) : 1.5;
+    speechSpeedRef.current = val;
+    return val;
+  });
+
+  const handleSpeedChange = (speed) => {
+    setSpeechSpeed(speed);
+    speechSpeedRef.current = speed;
+    localStorage.setItem("speechSpeed", speed.toString());
+    if (currentAudioRef.current) {
+      currentAudioRef.current.playbackRate = speed;
+      currentAudioRef.current.defaultPlaybackRate = speed;
+    }
+  };
 
   // ── Menu ───────────────────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
@@ -261,8 +280,21 @@ const InterviewPage = () => {
       videoStreamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
-      // Start recording the full session
-      const recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+      // Start recording the full session with browser compatibility fallbacks
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
+      } catch (e) {
+        try {
+          recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+        } catch (e2) {
+          try {
+            recorder = new MediaRecorder(stream, { mimeType: "video/mp4" });
+          } catch (e3) {
+            recorder = new MediaRecorder(stream);
+          }
+        }
+      }
       recorder.ondataavailable = e => { if (e.data.size > 0) sessionChunksRef.current.push(e.data); };
       recorder.start(3000); // collect every 3s
       sessionRecorderRef.current = recorder;
@@ -281,8 +313,8 @@ const InterviewPage = () => {
   };
 
   // ── Audio / TTS ────────────────────────────────────────────────────────
-  const playSpeech = useCallback((text) => {
-    speechQueue.current.push(text);
+  const playSpeech = useCallback((text, onStartCallback) => {
+    speechQueue.current.push({ text, onStart: onStartCallback });
     if (!isAudioPlaying.current) playNextInQueue();
   }, []);
 
@@ -292,7 +324,8 @@ const InterviewPage = () => {
       setIsHanaTalking(false);
       return;
     }
-    const nextText = speechQueue.current.shift();
+    const item = speechQueue.current.shift();
+    const nextText = item.text;
     isAudioPlaying.current = true;
     setIsHanaTalking(true);
 
@@ -304,8 +337,15 @@ const InterviewPage = () => {
       .then(res => res.blob())
       .then(blob => {
         const audio = new Audio(URL.createObjectURL(blob));
+        audio.defaultPlaybackRate = speechSpeedRef.current;
+        audio.playbackRate = speechSpeedRef.current;
         currentAudioRef.current = audio;
+        
+        // Trigger callback if provided (e.g. to show text)
+        if (item.onStart) item.onStart();
+        
         audio.play();
+        audio.playbackRate = speechSpeedRef.current;
         audio.onended = () => {
           isAudioPlaying.current = false;
           setIsHanaTalking(false);
@@ -313,6 +353,7 @@ const InterviewPage = () => {
         };
       })
       .catch(() => {
+        if (item.onStart) item.onStart(); // Fallback to show text even if audio fails
         isAudioPlaying.current = false;
         setIsHanaTalking(false);
         playNextInQueue();
@@ -321,6 +362,44 @@ const InterviewPage = () => {
 
   // ── Voice recording ────────────────────────────────────────────────────
   const startRecording = async () => {
+    webSpeechTranscriptRef.current = "";
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let webSpeechActive = false;
+    
+    if (SpeechRecognition) {
+      try {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = "en-US";
+        
+        rec.onstart = () => {
+          setHanaStatus("Listening... Speak now! 🎙️");
+        };
+        
+        rec.onresult = (e) => {
+          let transcript = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            transcript += e.results[i][0].transcript;
+          }
+          if (transcript) {
+            setResponse(transcript);
+            webSpeechTranscriptRef.current = transcript;
+          }
+        };
+        
+        rec.onerror = (err) => {
+          console.warn("Web Speech API recognition error:", err);
+        };
+        
+        rec.start();
+        recognitionRef.current = rec;
+        webSpeechActive = true;
+      } catch (err) {
+        console.warn("Could not start Web Speech Recognition:", err);
+      }
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -328,18 +407,34 @@ const InterviewPage = () => {
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data);
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        await transcribeAudio(blob);
+        
+        if (!webSpeechTranscriptRef.current.trim()) {
+          const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          await transcribeAudio(blob);
+        } else {
+          setHanaStatus("Got it! Review and submit when ready.");
+        }
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
+      if (!webSpeechActive) {
+        setHanaStatus("Recording audio...");
+      }
     } catch (err) {
-      alert("Microphone access denied. Please allow microphone and try again.");
+      if (!webSpeechActive) {
+        alert("Microphone access denied. Please allow microphone and try again.");
+      }
     }
   };
 
   const stopRecording = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) { /* ignore */ }
+      recognitionRef.current = null;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -348,29 +443,35 @@ const InterviewPage = () => {
 
   const transcribeAudio = async (blob) => {
     setIsTranscribing(true);
-    setHanaStatus("Listening to your answer...");
+    setHanaStatus("Transcribing audio (backend fallback)...");
     try {
-      const arrayBuffer = await blob.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-      const b64 = btoa(binary);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const base64data = reader.result;
+          const b64 = base64data.split(",")[1];
 
-      const res  = await fetch(`${BACKEND_URL}/speech-to-text`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audio_base64: b64, mime_type: "audio/webm" }),
-      });
-      const data = await res.json();
-      if (data.transcript) {
-        setResponse(data.transcript);
-        setHanaStatus("Got it! Review and submit when ready.");
-      } else {
-        setHanaStatus("Couldn't catch that. Try again or type your answer.");
-      }
+          const res  = await fetch(`${BACKEND_URL}/speech-to-text`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audio_base64: b64, mime_type: "audio/webm" }),
+          });
+          const data = await res.json();
+          if (data.transcript) {
+            setResponse(data.transcript);
+            setHanaStatus("Got it! Review and submit when ready.");
+          } else {
+            setHanaStatus("Couldn't catch that. Try again or type your answer.");
+          }
+        } catch {
+          setHanaStatus("Transcription failed. Please type your answer.");
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+      reader.readAsDataURL(blob);
     } catch {
       setHanaStatus("Transcription failed. Please type your answer.");
-    } finally {
       setIsTranscribing(false);
     }
   };
@@ -385,7 +486,8 @@ const InterviewPage = () => {
     setResponse("");
 
     try {
-      const res  = await fetch(`${BACKEND_URL}/next`, {
+      const endpoint = questionNumber === 0 ? "/start-interview" : "/next";
+      const res  = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId }),
@@ -393,14 +495,18 @@ const InterviewPage = () => {
       const data = await res.json();
 
       if (data.question) {
-        setQuestion(data.question);
-        setQuestionNumber(data.question_number || questionNumber + 1);
-        setIsHanaThinking(false);
-        setHanaStatus("Asking you a question...");
-        playSpeech(data.question);
-        setTimeout(() => setHanaStatus("Your turn to answer!"), 2000);
-      } else if (data.message === "Interview complete") {
-        setInterviewComplete(true);
+        setIsHanaThinking(true);
+        setHanaStatus("Hana is preparing your question...");
+        
+        playSpeech(data.question, () => {
+          setQuestion(data.question);
+          setQuestionNumber(data.question_number || questionNumber + 1);
+          setIsHanaThinking(false);
+          setHanaStatus("Asking you a question...");
+          setTimeout(() => setHanaStatus("Your turn to answer!"), 2000);
+        });
+      } else if (data.message === "Interview complete" || data.done) {
+        endInterview();
       }
     } catch {
       setIsHanaThinking(false);
@@ -414,29 +520,48 @@ const InterviewPage = () => {
     setHanaStatus("Evaluating your answer...");
 
     try {
-      const res  = await fetch(`${BACKEND_URL}/response`, {
+      const res  = await fetch(`${BACKEND_URL}/next`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, response }),
+        body: JSON.stringify({ session_id: sessionId, answer: response }),
       });
       const data = await res.json();
 
       if (res.ok) {
-        setFeedback(data);
-        setAllFeedbacks(prev => [...prev, {
-          question,
-          response,
-          feedback: data.feedback,
-          score: data.score,
-        }]);
-        setShowNext(true);
-        setResponse("");
-        setIsHanaThinking(false);
-        setHanaStatus(`Score: ${data.score}/10 — ${data.score >= 7 ? "Great job!" : "Keep going!"}`);
-        playSpeech(data.score >= 7
-          ? `Good answer! You scored ${data.score} out of 10.`
-          : `Thanks for answering. You scored ${data.score} out of 10. Let me give you some feedback.`
-        );
+        if (data.done) {
+          const feedbackObj = data.final_feedback || {};
+          setFeedback(feedbackObj);
+          setAllFeedbacks(prev => [...prev, {
+            question,
+            response,
+            feedback: feedbackObj.feedback || "Good attempt.",
+            score: feedbackObj.score || 0,
+          }]);
+          setShowNext(true);
+          setResponse("");
+          setIsHanaThinking(false);
+          const scoreVal = feedbackObj.score || 0;
+          setHanaStatus(`Interview complete! Final score: ${scoreVal}/10`);
+          playSpeech(`Thanks for completing the interview! You scored ${scoreVal} out of 10 on the final question.`);
+        } else {
+          const feedbackObj = data.feedback || {};
+          setFeedback(feedbackObj);
+          setAllFeedbacks(prev => [...prev, {
+            question,
+            response,
+            feedback: feedbackObj.feedback || "Good attempt.",
+            score: feedbackObj.score || 0,
+          }]);
+          setShowNext(true);
+          setResponse("");
+          setIsHanaThinking(false);
+          const scoreVal = feedbackObj.score || 0;
+          setHanaStatus(`Score: ${scoreVal}/10 — ${scoreVal >= 7 ? "Great job!" : "Keep going!"}`);
+          playSpeech(scoreVal >= 7
+            ? `Good answer! You scored ${scoreVal} out of 10.`
+            : `Thanks for answering. You scored ${scoreVal} out of 10. Let me give you some feedback.`
+          );
+        }
       } else {
         setIsHanaThinking(false);
         setHanaStatus("Error submitting. Try again.");
@@ -516,20 +641,20 @@ const InterviewPage = () => {
     if (sessionChunksRef.current.length > 0) {
       localVideoBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
       setVideoBlob(localVideoBlob);
-      // Upload to backend in background — don't await
+      // Upload to backend in background using FormData (no size limit, more efficient!)
       (async () => {
         try {
-          if (localVideoBlob.size < 4 * 1024 * 1024) {
-            const ab    = await localVideoBlob.arrayBuffer();
-            const bytes = new Uint8Array(ab);
-            let bin = ""; const cs = 8192;
-            for (let i = 0; i < bytes.length; i += cs) bin += String.fromCharCode(...bytes.subarray(i, i + cs));
-            await fetch(`${BACKEND_URL}/save-recording`, {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ session_id: sessionId, video_base64: btoa(bin), mime_type: "video/webm" }),
-            });
-          }
-        } catch { /* best-effort */ }
+          const fd = new FormData();
+          fd.append("video", localVideoBlob, `recording_${sessionId}.webm`);
+          fd.append("session_id", sessionId);
+
+          await fetch(`${BACKEND_URL}/save-recording`, {
+            method: "POST",
+            body: fd,
+          });
+        } catch (e) {
+          console.warn("Background recording upload failed:", e);
+        }
       })();
     }
 
@@ -682,6 +807,40 @@ const InterviewPage = () => {
           border-radius: 20px; padding: 6px 14px;
           font-size: 12px; color: #00e5c3; font-weight: 500;
           min-height: 32px; text-align: center;
+        }
+
+        /* ── Voice Speed control ── */
+        .iv-speed-control {
+          display: flex; flex-direction: column; gap: 8px; width: 100%;
+          margin: 4px 0 8px; padding: 12px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.05);
+          border-radius: 16px;
+        }
+        .iv-speed-header {
+          display: flex; justify-content: space-between; align-items: center;
+          font-size: 10px; color: #7a8ba8; font-weight: 600;
+          text-transform: uppercase; letter-spacing: 0.08em;
+        }
+        .iv-speed-current {
+          color: #00e5c3; font-weight: 700;
+        }
+        .iv-speed-buttons {
+          display: flex; gap: 6px; width: 100%;
+        }
+        .iv-speed-btn {
+          flex: 1; padding: 6px 4px; border-radius: 8px; border: 1px solid transparent;
+          font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer;
+          color: #7a8ba8; background: rgba(255,255,255,0.03);
+          transition: all 0.2s ease;
+        }
+        .iv-speed-btn:hover {
+          background: rgba(255,255,255,0.07); color: #e8edf8;
+        }
+        .iv-speed-btn.active {
+          background: rgba(0,229,195,0.15); color: #00e5c3;
+          border-color: rgba(0,229,195,0.3);
+          box-shadow: 0 0 10px rgba(0,229,195,0.15);
         }
 
         /* ── Question box ── */
@@ -978,6 +1137,25 @@ const InterviewPage = () => {
                 <div className="iv-status-chip">
                   <AudioWave active={isHanaTalking} />
                   <span>{hanaStatus}</span>
+                </div>
+
+                {/* Voice Speed Control */}
+                <div className="iv-speed-control">
+                  <div className="iv-speed-header">
+                    <span>Voice Speed</span>
+                    <span className="iv-speed-current">{speechSpeed}x</span>
+                  </div>
+                  <div className="iv-speed-buttons">
+                    {[1.0, 1.25, 1.5, 1.75, 2.0].map(speed => (
+                      <button
+                        key={speed}
+                        className={`iv-speed-btn ${speechSpeed === speed ? "active" : ""}`}
+                        onClick={() => handleSpeedChange(speed)}
+                      >
+                        {speed}x
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {question && (
