@@ -9,3 +9,4 @@ gTTS
 python-dotenv
 werkzeug
 requests
+gunicorn

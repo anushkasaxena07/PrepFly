@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-const BACKEND_URL = "http://localhost:5000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 const interviewRoles = [
   { name: "Software Developer",   desc: "Core CS fundamentals, algorithms, system design, and problem solving.",       badge: "teal",   label: "General",    time: "45 min" },

@@ -75,7 +75,8 @@ const Profile = () => {
   const handleSave = async () => {
     setLoading(true); setError(null);
     try {
-      const res = await axios.put("http://localhost:5000/update-profile", {
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const res = await axios.put(`${BACKEND_URL}/update-profile`, {
         user_id: user._id, ...user,
       });
       localStorage.setItem("user", JSON.stringify(user));

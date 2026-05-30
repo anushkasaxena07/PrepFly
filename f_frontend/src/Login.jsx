@@ -3,7 +3,7 @@ import axios from "axios";
 import "./Login.css";
 import { useNavigate } from "react-router-dom";
 
-const API = "http://localhost:5000";
+const API = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 // ─── screens the user can be on ───────────────────────────────────────────────

@@ -27,8 +27,19 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# Allow localhost and any Vercel deployments, plus an optional custom FRONTEND_URL from environment variables
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    r"https://.*\.vercel\.app"
+]
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 CORS(app, resources={r"/*": {
-    "origins": ["http://localhost:5173", "http://localhost:5174"],
+    "origins": allowed_origins,
     "supports_credentials": True
 }})
 
@@ -1330,4 +1341,5 @@ def health():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.getenv("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port)
