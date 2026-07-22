@@ -354,6 +354,7 @@ class SQLiteSupabaseMock:
             ("name", "TEXT"),
             ("type", "TEXT"),
             ("subscription_status", "TEXT"),
+            ("subscription_plan", "TEXT"),
             ("trial_start", "TEXT"),
             ("trial_end", "TEXT"),
             ("subscription_start", "TEXT"),
@@ -1150,4 +1151,3 @@ try:
     SQLiteSupabaseMock()
 except Exception as e:
     print("Auto DB init notice:", e)
-
