@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+import StudentFeedbackForm from "./components/StudentFeedbackForm";
+
 /* ─── Small SVG icons ────────────────────────────────────────── */
 const Icon = ({ d, size = 15 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -25,9 +27,27 @@ const fields = [
   { key: "role",  label: "Job Role",     icon: <BriefIcon />, type: "text",  placeholder: "Software Engineer" },
 ];
 
-/* ─── Main Component ─────────────────────────────────────────── */
-const Profile = () => {
+import SubscriptionPage from "./components/subscription/SubscriptionPage";
+
+const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "info" }) => {
   const navigate = useNavigate();
+  const [profileSubTab, setProfileSubTab] = useState(initialSubTab);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setProfileSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
+  const handleBack = () => {
+    if (typeof onBackToDashboard === 'function') {
+      onBackToDashboard();
+    } else if (typeof setActiveTab === 'function') {
+      setActiveTab("dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  };
   const [user, setUser]         = useState({ name: "", email: "", phone: "", role: "", avatar: "" });
   const [preview, setPreview]   = useState("");
   const [loading, setLoading]   = useState(false);
@@ -35,6 +55,8 @@ const Profile = () => {
   const [error, setError]       = useState(null);
   const [isEditing, setIsEditing] = useState(true);
   const [dragOver, setDragOver] = useState(false);
+
+  const [stats, setStats] = useState({ interviews: 0, avgScore: "—", sessions: 0 });
 
   useEffect(() => {
     try {
@@ -50,6 +72,30 @@ const Profile = () => {
       }
     } catch { /* silent */ }
   }, []);
+
+  useEffect(() => {
+    const userId = user?._id || user?.id || user?.user_id;
+    if (userId) {
+      const fetchStats = async () => {
+        try {
+          const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+          const res = await axios.get(`${BACKEND_URL}/user-stats/${userId}`);
+          if (res.status === 200) {
+            const data = res.data;
+            const totalSessions = (data.interviews?.total || 0) + (data.coding?.total || 0) + (data.speech?.total || 0) + (data.resume?.total || 0);
+            setStats({
+              interviews: data.interviews?.total || 0,
+              avgScore: data.interviews?.avg_score ? data.interviews.avg_score.toFixed(1) : "—",
+              sessions: totalSessions
+            });
+          }
+        } catch (e) {
+          console.error("Failed to fetch user stats in profile:", e);
+        }
+      };
+      fetchStats();
+    }
+  }, [user?._id, user?.id, user?.user_id]);
 
   const processImage = (file) => {
     if (!file) return;
@@ -103,17 +149,11 @@ const Profile = () => {
 
       {/* ── Navbar ─────────────────────────────────────────────── */}
       <nav className="pr-navbar">
-        <div className="pr-brand">
-          <div className="pr-brand-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" fill="currentColor" opacity="0.9"/>
-              <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="pr-brand-name">InterviewAI</span>
+        <div className="pr-brand" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 12px rgba(0,196,167,0.4)" }} />
+          <span className="pr-brand-name" style={{ fontSize: "19px", fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Prep<span style={{ color: "#00c4a7" }}>Fly</span></span>
         </div>
-        <button className="pr-back-btn" onClick={() => navigate("/dashboard")}>
+        <button className="pr-back-btn" onClick={handleBack}>
           <BackIcon /> Back to Dashboard
         </button>
       </nav>
@@ -123,16 +163,51 @@ const Profile = () => {
 
         {/* Page title */}
         <div className="pr-page-header">
-          <h2 className="pr-page-title">My Profile</h2>
-          <p className="pr-page-sub">Manage your personal information and preferences.</p>
+          <h2 className="pr-page-title">My Profile & Membership</h2>
+          <p className="pr-page-sub">Manage your personal information, preferences, and SaaS subscription.</p>
         </div>
 
-        <div className="pr-layout">
+        {/* Profile Sub Tabs */}
+        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px", position: "relative", zIndex: 10 }}>
+          <button 
+            type="button"
+            className={`btn btn-sm ${profileSubTab === "info" ? "btn-cyan" : "btn-ghost"}`} 
+            onClick={() => setProfileSubTab("info")}
+            style={{ fontWeight: 800, padding: "8px 16px", cursor: "pointer" }}
+          >
+            👤 Personal Details
+          </button>
+          <button 
+            type="button"
+            className={`btn btn-sm ${profileSubTab === "subscription" ? "btn-primary" : "btn-ghost"}`} 
+            onClick={() => setProfileSubTab("subscription")}
+            style={{ fontWeight: 800, padding: "8px 16px", background: profileSubTab === "subscription" ? "linear-gradient(135deg, #7c4fe0, #00c4a7)" : "transparent", borderColor: "rgba(155,109,255,0.3)", cursor: "pointer" }}
+          >
+            👑 Subscription
+          </button>
+          <button 
+            type="button"
+            className={`btn btn-sm ${profileSubTab === "feedback" ? "btn-cyan" : "btn-ghost"}`} 
+            onClick={() => setProfileSubTab("feedback")}
+            style={{ fontWeight: 800, padding: "8px 16px", cursor: "pointer" }}
+          >
+            💬 Send Feedback
+          </button>
+        </div>
 
-          {/* ── Left: Avatar card ──────────────────────────────── */}
+        {profileSubTab === "subscription" && (
+          <SubscriptionPage apiFetch={apiFetch} user={user} />
+        )}
+
+        {profileSubTab === "feedback" && (
+          <StudentFeedbackForm role="Student" />
+        )}
+
+        {(profileSubTab === "info" || (!["subscription", "feedback"].includes(profileSubTab))) && (
+          <div className="pr-layout">
+
           <div className="pr-side">
             <div className="pr-glass-card pr-avatar-card">
-              {/* Drop zone */}
               <div
                 className={`pr-avatar-zone ${dragOver ? "pr-avatar-zone--over" : ""}`}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -171,26 +246,24 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Quick stats */}
             <div className="pr-glass-card pr-stats-card">
               <div className="pr-stat">
-                <div className="pr-stat-value">0</div>
+                <div className="pr-stat-value">{stats.interviews}</div>
                 <div className="pr-stat-label">Interviews</div>
               </div>
               <div className="pr-stat-divider" />
               <div className="pr-stat">
-                <div className="pr-stat-value">—</div>
+                <div className="pr-stat-value">{stats.avgScore}</div>
                 <div className="pr-stat-label">Avg Score</div>
               </div>
               <div className="pr-stat-divider" />
               <div className="pr-stat">
-                <div className="pr-stat-value">0</div>
+                <div className="pr-stat-value">{stats.sessions}</div>
                 <div className="pr-stat-label">Sessions</div>
               </div>
             </div>
           </div>
 
-          {/* ── Right: Form card ───────────────────────────────── */}
           <div className="pr-main">
             <div className="pr-glass-card">
 
@@ -288,6 +361,7 @@ const Profile = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
     </>
   );

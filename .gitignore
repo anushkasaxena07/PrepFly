@@ -30,4 +30,7 @@ build/
 *.log
 
 # Local uploads and recordings
-f_backend/uploads/
+f_backend/uploads/
+
+local_db.sqlite
+*.sqlite

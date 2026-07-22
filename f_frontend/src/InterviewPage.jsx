@@ -1,120 +1,56 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import AI_INTERVIEWER from "./config/aiInterviewerConfig";
+import { getGradeInfo, computeSectionGrades, getBadges } from "./utils/gradingSystem";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
-// ── Anime SVG Avatar (Hana) ─────────────────────────────────────────────────
-const AnimeAvatar = ({ isTalking, isThinking }) => {
+// ── futur21 Circle Waves Avatar for Ava AI ──────────────────────────────────
+// ── futur21 Circle Waves Avatar for Ava AI (GIF only) ───────────────────────
+const CircleWavesAvatar = ({ isTalking, isThinking }) => {
   return (
-    <svg
-      viewBox="0 0 160 200"
-      style={{ width: "100%", height: "100%", filter: "drop-shadow(0 0 18px rgba(0,229,195,0.4))" }}
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
-      {/* Hair back */}
-      <ellipse cx="80" cy="68" rx="52" ry="58" fill="#1a0a2e" />
-      {/* Long hair left */}
-      <path d="M30 80 Q15 130 22 170 Q30 185 38 175 Q32 140 36 100 Z" fill="#1a0a2e" />
-      {/* Long hair right */}
-      <path d="M130 80 Q145 130 138 170 Q130 185 122 175 Q128 140 124 100 Z" fill="#1a0a2e" />
-      {/* Hair streaks */}
-      <path d="M32 85 Q20 120 25 160" stroke="#6b21a8" strokeWidth="2" fill="none" opacity="0.6" />
-      <path d="M128 85 Q140 120 135 160" stroke="#6b21a8" strokeWidth="2" fill="none" opacity="0.6" />
-
-      {/* Neck */}
-      <rect x="68" y="128" width="24" height="20" rx="6" fill="#fde8d8" />
-
-      {/* Face */}
-      <ellipse cx="80" cy="95" rx="40" ry="44" fill="#fde8d8" />
-
-      {/* Blush */}
-      <ellipse cx="55" cy="105" rx="10" ry="6" fill="#ffb5c2" opacity="0.5" />
-      <ellipse cx="105" cy="105" rx="10" ry="6" fill="#ffb5c2" opacity="0.5" />
-
-      {/* Eyes */}
-      {isThinking ? (
-        <>
-          {/* Squinting thinking eyes */}
-          <path d="M60 90 Q67 94 74 90" stroke="#2d1654" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <path d="M86 90 Q93 94 100 90" stroke="#2d1654" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          {/* Normal wide anime eyes */}
-          <ellipse cx="67" cy="92" rx="10" ry="11" fill="#2d1654" />
-          <ellipse cx="93" cy="92" rx="10" ry="11" fill="#2d1654" />
-          {/* Iris */}
-          <ellipse cx="67" cy="93" rx="7" ry="8" fill="#7c3aed" />
-          <ellipse cx="93" cy="93" rx="7" ry="8" fill="#7c3aed" />
-          {/* Pupil */}
-          <ellipse cx="67" cy="93" rx="4" ry="5" fill="#1a0a2e" />
-          <ellipse cx="93" cy="93" rx="4" ry="5" fill="#1a0a2e" />
-          {/* Eye shine */}
-          <circle cx="70" cy="89" r="2.5" fill="white" opacity="0.95" />
-          <circle cx="96" cy="89" r="2.5" fill="white" opacity="0.95" />
-          <circle cx="64" cy="95" r="1.2" fill="white" opacity="0.5" />
-          <circle cx="90" cy="95" r="1.2" fill="white" opacity="0.5" />
-        </>
-      )}
-
-      {/* Eyebrows */}
-      <path d="M57 79 Q67 74 77 79" stroke="#2d1654" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      <path d="M83 79 Q93 74 103 79" stroke="#2d1654" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-
-      {/* Nose */}
-      <path d="M78 105 Q80 108 82 105" stroke="#d4a0a0" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-
-      {/* Mouth */}
-      {isTalking ? (
-        // Animated talking mouth
-        <>
-          <ellipse cx="80" cy="117" rx="10" ry="5" fill="#c96d8a" />
-          <ellipse cx="80" cy="116" rx="8" ry="3" fill="#ff9ab0" />
-          <ellipse cx="80" cy="117" rx="6" ry="2.5" fill="#2d1654" opacity="0.3" />
-        </>
-      ) : (
-        // Smiling mouth
-        <>
-          <path d="M70 115 Q80 123 90 115" stroke="#c96d8a" strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M72 116 Q80 121 88 116" fill="#ff9ab0" opacity="0.4" />
-        </>
-      )}
-
-      {/* Collar / outfit */}
-      <path d="M40 152 Q60 145 80 148 Q100 145 120 152 L115 200 L45 200 Z" fill="#6d28d9" />
-      <path d="M80 148 L72 165 L80 162 L88 165 Z" fill="#a78bfa" opacity="0.8" />
-      {/* Collar trim */}
-      <path d="M40 152 Q60 143 80 148" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
-      <path d="M80 148 Q100 143 120 152" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
-
-      {/* Hair front strands */}
-      <path d="M44 72 Q38 88 40 100" stroke="#1a0a2e" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M52 60 Q44 75 46 90" stroke="#1a0a2e" strokeWidth="7" fill="none" strokeLinecap="round" />
-      <path d="M116 72 Q122 88 120 100" stroke="#1a0a2e" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M108 60 Q116 75 114 90" stroke="#1a0a2e" strokeWidth="7" fill="none" strokeLinecap="round" />
-      {/* Center bang */}
-      <path d="M68 52 Q62 68 64 84" stroke="#1a0a2e" strokeWidth="9" fill="none" strokeLinecap="round" />
-      <path d="M80 48 Q78 62 80 78" stroke="#1a0a2e" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M92 52 Q98 68 96 84" stroke="#1a0a2e" strokeWidth="9" fill="none" strokeLinecap="round" />
-
-      {/* Hair shine */}
-      <path d="M56 58 Q68 52 80 56" stroke="#7c3aed" strokeWidth="2" fill="none" opacity="0.5" />
-
-      {/* Ears */}
-      <ellipse cx="40" cy="96" rx="7" ry="9" fill="#fde8d8" />
-      <ellipse cx="120" cy="96" rx="7" ry="9" fill="#fde8d8" />
-      <ellipse cx="40" cy="96" rx="4" ry="6" fill="#ffb5c2" opacity="0.5" />
-      <ellipse cx="120" cy="96" rx="4" ry="6" fill="#ffb5c2" opacity="0.5" />
-
-      {/* AI headset / decoration */}
-      <circle cx="37" cy="90" r="5" fill="#00e5c3" opacity="0.8" />
-      <circle cx="37" cy="90" r="3" fill="#080c14" />
-      <circle cx="37" cy="90" r="1.5" fill="#00e5c3" />
-      <path d="M37 85 L37 75 Q50 68 55 70" stroke="#00e5c3" strokeWidth="1.5" fill="none" opacity="0.7" />
-    </svg>
+      <div
+        style={{
+          width: "180px",
+          height: "180px",
+          borderRadius: "50%",
+          overflow: "hidden",
+          transform: isTalking ? "scale(1.05)" : "scale(1)",
+          transition: "transform 0.3s ease",
+          boxShadow: isTalking
+            ? "0 0 30px rgba(0, 229, 195, 0.6)"
+            : isThinking
+              ? "0 0 20px rgba(139, 92, 246, 0.5)"
+              : "0 0 15px rgba(0, 229, 195, 0.3)",
+        }}
+      >
+        <img
+          src="/ava-circle-waves.gif"
+          alt="Ava AI"
+          onError={(e) => (e.target.style.display = "none")}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            borderRadius: "50%",
+          }}
+        />
+      </div>
+    </div>
   );
 };
 
-// ── Talking animation dots ──────────────────────────────────────────────────
+// ── AudioWave Component ─────────────────────────────────────────────────────
 const AudioWave = ({ active }) => (
   <div style={{ display: "flex", gap: 4, alignItems: "center", height: 24 }}>
     {[0, 1, 2, 3, 4].map(i => (
@@ -130,12 +66,6 @@ const AudioWave = ({ active }) => (
         }}
       />
     ))}
-    <style>{`
-      @keyframes wave {
-        from { height: 6px; }
-        to { height: 22px; }
-      }
-    `}</style>
   </div>
 );
 
@@ -148,17 +78,17 @@ const ScoreRing = ({ score, max = 10, size = 80, label }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <svg width={size} height={size}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8" />
         <circle
-          cx={size/2} cy={size/2} r={r}
+          cx={size / 2} cy={size / 2} r={r}
           fill="none" stroke={color} strokeWidth="8"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - pct)}
           strokeLinecap="round"
-          transform={`rotate(-90 ${size/2} ${size/2})`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
           style={{ transition: "stroke-dashoffset 1s ease" }}
         />
-        <text x={size/2} y={size/2 + 1} textAnchor="middle" dominantBaseline="middle"
+        <text x={size / 2} y={size / 2 + 1} textAnchor="middle" dominantBaseline="middle"
           fill={color} fontSize={size * 0.22} fontWeight="700" fontFamily="'Sora', sans-serif">
           {score}
         </text>
@@ -194,50 +124,54 @@ const InterviewPage = () => {
   const navigate = useNavigate();
 
   // ── Session & user ─────────────────────────────────────────────────────
-  const [sessionId, setSessionId]     = useState(null);
-  const [user, setUser]               = useState({ name: "", email: "", avatar: "", _id: "" });
+  const [sessionId, setSessionId] = useState(null);
+  const [user, setUser] = useState({ name: "", email: "", avatar: "", _id: "" });
+  const [atsScore, setAtsScore] = useState(null);
 
-  // ── Interview state ────────────────────────────────────────────────────
-  const [interviewStarted, setInterviewStarted]   = useState(false);
+  // ── Interview state & stage ────────────────────────────────────────────
+  const [interviewStarted, setInterviewStarted] = useState(false);
   const [interviewComplete, setInterviewComplete] = useState(false);
-  const [question, setQuestion]                   = useState("");
-  const [questionNumber, setQuestionNumber]       = useState(0);
-  const [response, setResponse]                   = useState("");
-  const [feedback, setFeedback]                   = useState(null);   // { feedback, score, strength, improvement, tip }
-  const [showNext, setShowNext]                   = useState(false);
-  const [allFeedbacks, setAllFeedbacks]           = useState([]);
-  const [finalResult, setFinalResult]             = useState(null);   // { overall_score, grade, report, ... }
+  const [question, setQuestion] = useState("");
+  const [questionNumber, setQuestionNumber] = useState(0);
+  const [currentStage, setCurrentStage] = useState("Greeting & Icebreaker");
+  const [totalQuestions, setTotalQuestions] = useState(5);
+  const [response, setResponse] = useState("");
+  const [feedback, setFeedback] = useState(null);
+  const [showNext, setShowNext] = useState(false);
+  const [allFeedbacks, setAllFeedbacks] = useState([]);
+  const [finalResult, setFinalResult] = useState(null);
+  const [hintText, setHintText] = useState("");
+  const [isFetchingHint, setIsFetchingHint] = useState(false);
+  const [liveMetrics, setLiveMetrics] = useState(null);
 
   // ── Anime state ────────────────────────────────────────────────────────
-  const [isHanaTalking, setIsHanaTalking]   = useState(false);
+  const [isHanaTalking, setIsHanaTalking] = useState(false);
   const [isHanaThinking, setIsHanaThinking] = useState(false);
-  const [hanaStatus, setHanaStatus]         = useState("Ready to interview you!");
+  const [hanaStatus, setHanaStatus] = useState("Ready to interview you!");
 
   // ── Voice recording ────────────────────────────────────────────────────
-  const [isRecording, setIsRecording]       = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [inputMode, setInputMode]           = useState("voice"); // "voice" | "text"
+  const [inputMode, setInputMode] = useState("voice");
   const mediaRecorderRef = useRef(null);
-  const audioChunksRef   = useRef([]);
-  const recognitionRef   = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recognitionRef = useRef(null);
   const webSpeechTranscriptRef = useRef("");
 
   // ── Video (candidate webcam) ───────────────────────────────────────────
-  const videoRef             = useRef(null);
-  const videoStreamRef       = useRef(null);
-  const sessionRecorderRef   = useRef(null);
-  const sessionChunksRef     = useRef([]);
+  const videoRef = useRef(null);
+  const videoStreamRef = useRef(null);
+  const sessionRecorderRef = useRef(null);
+  const sessionChunksRef = useRef([]);
 
   // ── Audio playback ─────────────────────────────────────────────────────
   const currentAudioRef = useRef(null);
-  const speechQueue     = useRef([]);
-  const isAudioPlaying  = useRef(false);
-  const speechSpeedRef  = useRef(1.5);
+  const speechQueue = useRef([]);
+  const isAudioPlaying = useRef(false);
+  const speechSpeedRef = useRef(1.5);
   const [speechSpeed, setSpeechSpeed] = useState(() => {
     const stored = localStorage.getItem("speechSpeed");
-    const val = stored ? Number(stored) : 1.5;
-    speechSpeedRef.current = val;
-    return val;
+    return stored ? Number(stored) : 1.5;
   });
 
   const handleSpeedChange = (speed) => {
@@ -250,15 +184,36 @@ const InterviewPage = () => {
     }
   };
 
-  // ── Menu ───────────────────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
+  const [videoBlob, setVideoBlob] = useState(null);
 
-  // ── Results extras ─────────────────────────────────────────────────────
-  const [videoBlob, setVideoBlob]     = useState(null);   // local blob for video download
-  const [reportPolled, setReportPolled] = useState(false); // track if we started polling
-  const reportPollRef = useRef(null);
+  const formatAvaMessage = (text) => {
+    if (!text || typeof text !== "string") return text || "";
+    let clean = text.trim();
+    if (clean.includes("```")) {
+      clean = clean.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+    }
+    if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+      clean = clean.slice(1, -1).trim();
+    }
+    if (clean.includes('"message":') || clean.includes('"message" :') || (clean.startsWith('{') && clean.endsWith('}'))) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (parsed && typeof parsed === 'object') {
+          const msg = parsed.message || parsed.acknowledgment;
+          if (msg) return msg.trim();
+        }
+      } catch (e) {
+        const match = clean.match(/"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+        if (match && match[1]) {
+          return match[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').trim();
+        }
+      }
+    }
+    return clean;
+  };
 
-  // ── Init ───────────────────────────────────────────────────────────────
+  // ── Init & Auto-Save Recovery ──────────────────────────────────────────
   useEffect(() => {
     const sid = localStorage.getItem("session_id");
     if (!sid) {
@@ -267,11 +222,27 @@ const InterviewPage = () => {
       return;
     }
     setSessionId(sid);
+
     try {
       const stored = localStorage.getItem("user");
       if (stored) setUser(JSON.parse(stored));
+      const savedAts = localStorage.getItem(`ats_score_${sid}`);
+      if (savedAts) setAtsScore(savedAts);
     } catch { /* silent */ }
+
+    // Auto-recover draft response if internet disconnected
+    const savedDraft = localStorage.getItem(`interview_autosave_${sid}`);
+    if (savedDraft) {
+      setResponse(savedDraft);
+    }
   }, []);
+
+  // Save response draft on change for offline protection
+  useEffect(() => {
+    if (sessionId && response) {
+      localStorage.setItem(`interview_autosave_${sessionId}`, response);
+    }
+  }, [response, sessionId]);
 
   // ── Webcam setup ───────────────────────────────────────────────────────
   const startWebcam = async () => {
@@ -280,23 +251,18 @@ const InterviewPage = () => {
       videoStreamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
-      // Start recording the full session with browser compatibility fallbacks
-      let recorder;
-      try {
-        recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9" });
-      } catch (e) {
-        try {
-          recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
-        } catch (e2) {
-          try {
-            recorder = new MediaRecorder(stream, { mimeType: "video/mp4" });
-          } catch (e3) {
-            recorder = new MediaRecorder(stream);
-          }
-        }
+      let mimeType = "video/webm";
+      if (!MediaRecorder.isTypeSupported("video/webm")) {
+        mimeType = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "";
       }
-      recorder.ondataavailable = e => { if (e.data.size > 0) sessionChunksRef.current.push(e.data); };
-      recorder.start(3000); // collect every 3s
+      const options = mimeType ? { mimeType } : undefined;
+
+      sessionChunksRef.current = [];
+      const recorder = new MediaRecorder(stream, options);
+      recorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) sessionChunksRef.current.push(e.data);
+      };
+      recorder.start(1000);
       sessionRecorderRef.current = recorder;
     } catch (err) {
       console.warn("Webcam not available:", err);
@@ -340,10 +306,9 @@ const InterviewPage = () => {
         audio.defaultPlaybackRate = speechSpeedRef.current;
         audio.playbackRate = speechSpeedRef.current;
         currentAudioRef.current = audio;
-        
-        // Trigger callback if provided (e.g. to show text)
+
         if (item.onStart) item.onStart();
-        
+
         audio.play();
         audio.playbackRate = speechSpeedRef.current;
         audio.onended = () => {
@@ -353,7 +318,7 @@ const InterviewPage = () => {
         };
       })
       .catch(() => {
-        if (item.onStart) item.onStart(); // Fallback to show text even if audio fails
+        if (item.onStart) item.onStart();
         isAudioPlaying.current = false;
         setIsHanaTalking(false);
         playNextInQueue();
@@ -365,18 +330,15 @@ const InterviewPage = () => {
     webSpeechTranscriptRef.current = "";
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let webSpeechActive = false;
-    
+
     if (SpeechRecognition) {
       try {
         const rec = new SpeechRecognition();
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = "en-US";
-        
-        rec.onstart = () => {
-          setHanaStatus("Listening... Speak now! 🎙️");
-        };
-        
+
+        rec.onstart = () => { setHanaStatus("Listening... Speak now! 🎙️"); };
         rec.onresult = (e) => {
           let transcript = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -387,17 +349,10 @@ const InterviewPage = () => {
             webSpeechTranscriptRef.current = transcript;
           }
         };
-        
-        rec.onerror = (err) => {
-          console.warn("Web Speech API recognition error:", err);
-        };
-        
         rec.start();
         recognitionRef.current = rec;
         webSpeechActive = true;
-      } catch (err) {
-        console.warn("Could not start Web Speech Recognition:", err);
-      }
+      } catch (err) { console.warn("Speech Rec error:", err); }
     }
 
     try {
@@ -407,7 +362,6 @@ const InterviewPage = () => {
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data);
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        
         if (!webSpeechTranscriptRef.current.trim()) {
           const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
           await transcribeAudio(blob);
@@ -418,21 +372,15 @@ const InterviewPage = () => {
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-      if (!webSpeechActive) {
-        setHanaStatus("Recording audio...");
-      }
-    } catch (err) {
-      if (!webSpeechActive) {
-        alert("Microphone access denied. Please allow microphone and try again.");
-      }
+      if (!webSpeechActive) setHanaStatus("Recording audio...");
+    } catch {
+      if (!webSpeechActive) alert("Microphone access denied. Please allow microphone and try again.");
     }
   };
 
   const stopRecording = () => {
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) { /* ignore */ }
+      try { recognitionRef.current.stop(); } catch { }
       recognitionRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
@@ -450,8 +398,7 @@ const InterviewPage = () => {
         try {
           const base64data = reader.result;
           const b64 = base64data.split(",")[1];
-
-          const res  = await fetch(`${BACKEND_URL}/speech-to-text`, {
+          const res = await fetch(`${BACKEND_URL}/speech-to-text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ audio_base64: b64, mime_type: "audio/webm" }),
@@ -463,11 +410,8 @@ const InterviewPage = () => {
           } else {
             setHanaStatus("Couldn't catch that. Try again or type your answer.");
           }
-        } catch {
-          setHanaStatus("Transcription failed. Please type your answer.");
-        } finally {
-          setIsTranscribing(false);
-        }
+        } catch { setHanaStatus("Transcription failed. Please type your answer."); }
+        finally { setIsTranscribing(false); }
       };
       reader.readAsDataURL(blob);
     } catch {
@@ -476,18 +420,46 @@ const InterviewPage = () => {
     }
   };
 
+  // ── Request Hint & Repeat ──────────────────────────────────────────────
+  const requestHint = async () => {
+    if (!sessionId || isFetchingHint) return;
+    setIsFetchingHint(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/get-hint`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId })
+      });
+      const data = await res.json();
+      if (data.hint) {
+        setHintText(data.hint);
+        playSpeech(`Here is a quick hint: ${data.hint}`);
+      }
+    } catch (e) {
+      console.error("Fetch hint error:", e);
+    } finally {
+      setIsFetchingHint(false);
+    }
+  };
+
+  const requestRepeat = async () => {
+    if (!sessionId || !question) return;
+    playSpeech(`Sure, let me repeat the question: ${question}`);
+  };
+
   // ── Interview actions ──────────────────────────────────────────────────
   const fetchNextQuestion = async () => {
     if (!sessionId) return;
     setIsHanaThinking(true);
     setHanaStatus("Thinking of the next question...");
     setFeedback(null);
+    setHintText("");
     setShowNext(false);
     setResponse("");
 
     try {
       const endpoint = questionNumber === 0 ? "/start-interview" : "/next";
-      const res  = await fetch(`${BACKEND_URL}${endpoint}`, {
+      const res = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId }),
@@ -495,11 +467,14 @@ const InterviewPage = () => {
       const data = await res.json();
 
       if (data.question) {
+        const cleanQ = formatAvaMessage(data.question);
         setIsHanaThinking(true);
-        setHanaStatus("Hana is preparing your question...");
-        
-        playSpeech(data.question, () => {
-          setQuestion(data.question);
+        if (data.stage) setCurrentStage(data.stage);
+        if (data.total_questions) setTotalQuestions(data.total_questions);
+
+        setHanaStatus(`${AI_INTERVIEWER.name} is preparing your question...`);
+        playSpeech(cleanQ, () => {
+          setQuestion(cleanQ);
           setQuestionNumber(data.question_number || questionNumber + 1);
           setIsHanaThinking(false);
           setHanaStatus("Asking you a question...");
@@ -510,7 +485,7 @@ const InterviewPage = () => {
       }
     } catch {
       setIsHanaThinking(false);
-      setHanaStatus("Connection error. Try again.");
+      setHanaStatus("Connection error. Retrying...");
     }
   };
 
@@ -520,7 +495,7 @@ const InterviewPage = () => {
     setHanaStatus("Evaluating your answer...");
 
     try {
-      const res  = await fetch(`${BACKEND_URL}/next`, {
+      const res = await fetch(`${BACKEND_URL}/next`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, answer: response }),
@@ -528,6 +503,10 @@ const InterviewPage = () => {
       const data = await res.json();
 
       if (res.ok) {
+        if (data.feedback && data.feedback.live_metrics) {
+          setLiveMetrics(data.feedback.live_metrics);
+        }
+
         if (data.done) {
           const feedbackObj = data.final_feedback || {};
           setFeedback(feedbackObj);
@@ -539,6 +518,7 @@ const InterviewPage = () => {
           }]);
           setShowNext(true);
           setResponse("");
+          if (sessionId) localStorage.removeItem(`interview_autosave_${sessionId}`);
           setIsHanaThinking(false);
           const scoreVal = feedbackObj.score || 0;
           setHanaStatus(`Interview complete! Final score: ${scoreVal}/10`);
@@ -554,6 +534,7 @@ const InterviewPage = () => {
           }]);
           setShowNext(true);
           setResponse("");
+          if (sessionId) localStorage.removeItem(`interview_autosave_${sessionId}`);
           setIsHanaThinking(false);
           const scoreVal = feedbackObj.score || 0;
           setHanaStatus(`Score: ${scoreVal}/10 — ${scoreVal >= 7 ? "Great job!" : "Keep going!"}`);
@@ -574,9 +555,8 @@ const InterviewPage = () => {
 
   const isEndingRef = useRef(false);
 
-  // ── PDF download ───────────────────────────────────────────────────────
   const downloadPDF = (result, feedbacks) => {
-    const gradeColors = { S:"#ffd700", A:"#00e5c3", B:"#00b8ff", C:"#f59e0b", D:"#f97316", F:"#ff4f6a" };
+    const gradeColors = { S: "#ffd700", A: "#00e5c3", B: "#00b8ff", C: "#f59e0b", D: "#f97316", F: "#ff4f6a" };
     const gc = gradeColors[result.grade] || "#7a8ba8";
     const html = `<!DOCTYPE html><html><head>
     <meta charset="UTF-8"/><title>Interview Report</title>
@@ -598,14 +578,14 @@ const InterviewPage = () => {
       .fl{font-size:10px;color:#00e5c3;font-weight:600;margin-bottom:3px}.ft{font-size:13px;color:#9ab0c8;line-height:1.7;white-space:pre-wrap}
       .ftr{margin-top:36px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-size:11px;color:#3a4a68;text-align:center}
     </style></head><body>
-    <div class="hdr"><div class="brand">⚡ InterviewAI Report</div><div class="meta">Generated: ${new Date().toLocaleString()}<br/>Questions: ${feedbacks.length}</div></div>
+    <div class="hdr"><div class="brand">🚀 PrepFly Report</div><div class="meta">Candidate: ${user.name || "Candidate"}<br/>Generated: ${new Date().toLocaleString()}<br/>Questions: ${feedbacks.length}</div></div>
     <div class="hero">
-      <div class="grade" style="border:3px solid ${gc};background:${gc}18;color:${gc}">${result.grade||"—"}</div>
-      <div><div class="sl">Overall Score</div><div class="sv">${result.overall_score||0}/10</div>${result.report?`<div class="rpt">${result.report}</div>`:""}</div>
+      <div class="grade" style="border:3px solid ${gc};background:${gc}18;color:${gc}">${result.grade || "—"}</div>
+      <div><div class="sl">Overall Score</div><div class="sv">${result.overall_score || 0}/10</div>${result.report ? `<div class="rpt">${result.report}</div>` : ""}</div>
     </div>
     <div class="st">Question-by-Question Breakdown</div>
-    ${feedbacks.map((item,i)=>{const sc=item.score||0;const c=sc>=8?"#00e5c3":sc>=6?"#00b8ff":sc>=4?"#f59e0b":"#ff4f6a";return `<div class="qa"><div class="ql">Question ${i+1}</div><div class="qt">${item.question||""}</div><span class="sc" style="background:${c}18;color:${c};border:1px solid ${c}44">Score: ${sc}/10</span><div class="al">Your Answer</div><div class="at">"${item.response||""}"</div><div class="fl">Feedback</div><div class="ft">${item.feedback||"—"}</div></div>`;}).join("")}
-    <div class="ftr">Generated by InterviewAI · ${new Date().toLocaleString()}</div>
+    ${feedbacks.map((item, i) => { const sc = item.score || 0; const c = sc >= 8 ? "#00e5c3" : sc >= 6 ? "#00b8ff" : sc >= 4 ? "#f59e0b" : "#ff4f6a"; return `<div class="qa"><div class="ql">Question ${i + 1}</div><div class="qt">${item.question || ""}</div><span class="sc" style="background:${c}18;color:${c};border:1px solid ${c}44">Score: ${sc}/10</span><div class="al">Your Answer</div><div class="at">"${item.response || ""}"</div><div class="fl">Feedback</div><div class="ft">${item.feedback || "—"}</div></div>`; }).join("")}
+    <div class="ftr">Generated by PrepFly · ${new Date().toLocaleString()}</div>
     </body></html>`;
     const win = window.open("", "_blank");
     win.document.write(html);
@@ -613,11 +593,10 @@ const InterviewPage = () => {
     setTimeout(() => win.print(), 600);
   };
 
-  // ── Video download ─────────────────────────────────────────────────────
   const downloadVideo = (blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
-    const a   = document.createElement("a");
+    const a = document.createElement("a");
     a.href = url; a.download = `interview-${Date.now()}.webm`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   };
@@ -626,7 +605,6 @@ const InterviewPage = () => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
 
-    // Stop audio immediately
     speechQueue.current = [];
     isAudioPlaying.current = false;
     setIsHanaTalking(false);
@@ -635,30 +613,20 @@ const InterviewPage = () => {
     setIsHanaThinking(true);
     setHanaStatus("Wrapping up...");
 
-    // ── Save video blob locally for download (no upload wait) ──────────
     stopWebcam();
-    let localVideoBlob = null;
     if (sessionChunksRef.current.length > 0) {
-      localVideoBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+      const localVideoBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
       setVideoBlob(localVideoBlob);
-      // Upload to backend in background using FormData (no size limit, more efficient!)
       (async () => {
         try {
           const fd = new FormData();
           fd.append("video", localVideoBlob, `recording_${sessionId}.webm`);
           fd.append("session_id", sessionId);
-
-          await fetch(`${BACKEND_URL}/save-recording`, {
-            method: "POST",
-            body: fd,
-          });
-        } catch (e) {
-          console.warn("Background recording upload failed:", e);
-        }
+          await fetch(`${BACKEND_URL}/save-recording`, { method: "POST", body: fd });
+        } catch (e) { console.warn("Background recording upload failed:", e); }
       })();
     }
 
-    // ── Call end-interview — now instant from backend ──────────────────
     let data = { overall_score: 0, grade: "N/A", report: "Generating your report…" };
     try {
       const res = await fetch(`${BACKEND_URL}/end-interview`, {
@@ -666,54 +634,41 @@ const InterviewPage = () => {
         body: JSON.stringify({ session_id: sessionId }),
       });
       data = await res.json();
-    } catch { /* use defaults */ }
+    } catch { }
 
     setFinalResult(data);
-    playSpeech(`Interview complete! You scored ${data.overall_score} out of 10, grade ${data.grade}. Great job!`);
+    playSpeech(AI_INTERVIEWER.closing);
 
     setInterviewStarted(false);
     setInterviewComplete(true);
     setIsHanaThinking(false);
 
-    // ── Poll for background Gemini report (max 30s) ────────────────────
     let attempts = 0;
     const poll = setInterval(async () => {
       attempts++;
       try {
-        const r  = await fetch(`${BACKEND_URL}/session-report/${sessionId}`);
+        const r = await fetch(`${BACKEND_URL}/session-report/${sessionId}`);
         const rd = await r.json();
         if (rd.final_report && !rd.final_report.includes("Generating")) {
           setFinalResult(prev => ({ ...prev, report: rd.final_report }));
           clearInterval(poll);
         }
-      } catch { /* silent */ }
-      if (attempts >= 12) clearInterval(poll); // stop after 60s
+      } catch { }
+      if (attempts >= 12) clearInterval(poll);
     }, 5000);
-    reportPollRef.current = poll;
   };
 
-  // ── Start interview ────────────────────────────────────────────────────
   const startInterview = async () => {
     setInterviewStarted(true);
     await startWebcam();
-    playSpeech("Hello! I'm Hana, your AI interviewer. Let's begin. I'll ask you a few questions based on your resume. Please answer clearly and take your time.");
+    playSpeech(AI_INTERVIEWER.greeting);
     setTimeout(() => fetchNextQuestion(), 1500);
   };
 
-  // ── Derived ────────────────────────────────────────────────────────────
-  const displayName = user.name
-    ? user.name.split(" ")[0]
-    : user.email?.split("@")[0] || "Candidate";
+  const displayName = user.name ? user.name.split(" ")[0] : user.email?.split("@")[0] || "Candidate";
+  const initials = user.name ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : (user.email?.[0] || "U").toUpperCase();
+  const avgScore = allFeedbacks.length ? (allFeedbacks.reduce((s, f) => s + (f.score || 0), 0) / allFeedbacks.length).toFixed(1) : null;
 
-  const initials = user.name
-    ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : (user.email?.[0] || "U").toUpperCase();
-
-  const avgScore = allFeedbacks.length
-    ? (allFeedbacks.reduce((s, f) => s + (f.score || 0), 0) / allFeedbacks.length).toFixed(1)
-    : null;
-
-  // ════════════════════════════════════════════════════════════════════════
   return (
     <>
       <style>{`
@@ -721,7 +676,6 @@ const InterviewPage = () => {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; font-family: 'Sora', sans-serif; }
 
-        /* ── Navbar ── */
         .iv-navbar {
           display: flex; justify-content: space-between; align-items: center;
           background: rgba(8,12,20,0.95); backdrop-filter: blur(16px);
@@ -736,7 +690,6 @@ const InterviewPage = () => {
         .iv-dropdown li { list-style: none; padding: 10px 14px; font-size: 13px; color: #e8edf8; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
         .iv-dropdown li:hover { background: rgba(255,255,255,0.07); }
 
-        /* ── Page ── */
         .iv-page {
           min-height: 100vh;
           padding: 80px 20px 40px;
@@ -745,280 +698,111 @@ const InterviewPage = () => {
                       linear-gradient(160deg, #080c14 0%, #0a1020 100%);
         }
 
-        /* ── Main grid ── */
         .iv-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          max-width: 1060px;
-          margin: 0 auto 20px;
+          display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+          max-width: 1060px; margin: 0 auto 20px;
         }
         @media (max-width: 740px) { .iv-grid { grid-template-columns: 1fr; } }
 
-        /* ── Panel ── */
         .iv-panel {
-          background: rgba(12,18,35,0.85);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 24px;
-          padding: 24px;
+          background: rgba(12,18,35,0.85); border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 24px; padding: 24px;
           display: flex; flex-direction: column; align-items: center; gap: 14px;
           position: relative; overflow: hidden;
         }
-        .iv-panel::before {
-          content: '';
-          position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(124,58,237,0.04) 0%, transparent 60%);
-          pointer-events: none;
-        }
-
-        /* ── Anime panel ── */
         .iv-anime-wrap {
-          width: 170px; height: 210px;
-          position: relative;
-          animation: ${isHanaTalking ? "talkBob 0.3s ease-in-out infinite alternate" : isHanaThinking ? "thinkFloat 2s ease-in-out infinite" : "idleFloat 4s ease-in-out infinite"};
-        }
-        @keyframes idleFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        @keyframes talkBob {
-          from { transform: translateY(0) rotate(-0.5deg); }
-          to { transform: translateY(-4px) rotate(0.5deg); }
-        }
-        @keyframes thinkFloat {
-          0%, 100% { transform: translateY(0) rotate(-1deg); }
-          50% { transform: translateY(-8px) rotate(1deg); }
+          width: 170px; height: 210px; position: relative;
         }
         .iv-aura {
           position: absolute; inset: -20px; border-radius: 50%;
           background: radial-gradient(ellipse, rgba(0,229,195,0.12) 0%, transparent 70%);
-          animation: auraPulse 3s ease-in-out infinite;
-          z-index: -1;
+          animation: auraPulse 3s ease-in-out infinite; z-index: -1;
         }
-        @keyframes auraPulse {
-          0%, 100% { opacity: 0.5; transform: scale(1); }
-          50% { opacity: 1; transform: scale(1.1); }
-        }
+        @keyframes auraPulse { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.1); } }
         .iv-panel-name { font-size: 16px; font-weight: 700; color: #e8edf8; }
         .iv-panel-sub { font-size: 12px; color: #7a8ba8; }
         .iv-status-chip {
           display: flex; align-items: center; gap: 8px;
           background: rgba(0,229,195,0.08); border: 1px solid rgba(0,229,195,0.2);
           border-radius: 20px; padding: 6px 14px;
-          font-size: 12px; color: #00e5c3; font-weight: 500;
-          min-height: 32px; text-align: center;
+          font-size: 12px; color: #00e5c3; font-weight: 500; min-height: 32px; text-align: center;
         }
 
-        /* ── Voice Speed control ── */
         .iv-speed-control {
           display: flex; flex-direction: column; gap: 8px; width: 100%;
           margin: 4px 0 8px; padding: 12px;
-          background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(255,255,255,0.05);
-          border-radius: 16px;
+          background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px;
         }
-        .iv-speed-header {
-          display: flex; justify-content: space-between; align-items: center;
-          font-size: 10px; color: #7a8ba8; font-weight: 600;
-          text-transform: uppercase; letter-spacing: 0.08em;
-        }
-        .iv-speed-current {
-          color: #00e5c3; font-weight: 700;
-        }
-        .iv-speed-buttons {
-          display: flex; gap: 6px; width: 100%;
-        }
-        .iv-speed-btn {
-          flex: 1; padding: 6px 4px; border-radius: 8px; border: 1px solid transparent;
-          font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer;
-          color: #7a8ba8; background: rgba(255,255,255,0.03);
-          transition: all 0.2s ease;
-        }
-        .iv-speed-btn:hover {
-          background: rgba(255,255,255,0.07); color: #e8edf8;
-        }
-        .iv-speed-btn.active {
-          background: rgba(0,229,195,0.15); color: #00e5c3;
-          border-color: rgba(0,229,195,0.3);
-          box-shadow: 0 0 10px rgba(0,229,195,0.15);
-        }
+        .iv-speed-header { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #7a8ba8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
+        .iv-speed-current { color: #00e5c3; font-weight: 700; }
+        .iv-speed-buttons { display: flex; gap: 6px; width: 100%; }
+        .iv-speed-btn { flex: 1; padding: 6px 4px; border-radius: 8px; border: 1px solid transparent; font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; color: #7a8ba8; background: rgba(255,255,255,0.03); transition: all 0.2s ease; }
+        .iv-speed-btn.active { background: rgba(0,229,195,0.15); color: #00e5c3; border-color: rgba(0,229,195,0.3); }
 
-        /* ── Question box ── */
         .iv-qbox {
-          width: 100%;
-          background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2);
-          border-radius: 16px; padding: 16px 18px;
-          font-size: 14px; color: #e8edf8; line-height: 1.7;
+          width: 100%; background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2);
+          border-radius: 16px; padding: 16px 18px; font-size: 14px; color: #e8edf8; line-height: 1.6; font-weight: 600;
         }
-        .iv-qlabel {
-          font-size: 10px; font-weight: 700; color: #a78bfa;
-          text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
-          display: flex; align-items: center; gap: 6px;
-        }
+        .iv-qlabel { font-size: 10px; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+        .iv-video-wrap { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 16px; position: relative; overflow: hidden; }
+        .iv-video { width: 100%; height: 100%; object-fit: cover; }
+        .iv-rec-badge { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border-radius: 20px; padding: 4px 10px; font-size: 10px; font-weight: 700; color: #ff4f6a; display: flex; align-items: center; gap: 6px; }
+        .iv-rec-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff4f6a; animation: pulse 1s ease-in-out infinite alternate; }
 
-        /* ── Video panel ── */
-        .iv-video-wrap {
-          width: 100%; aspect-ratio: 16/9;
-          background: #060910; border-radius: 16px; overflow: hidden;
-          position: relative; border: 1px solid rgba(255,255,255,0.07);
-        }
-        .iv-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        .iv-video-off {
-          position: absolute; inset: 0; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 8px; color: #7a8ba8;
-          font-size: 13px;
-        }
-        .iv-rec-badge {
-          position: absolute; top: 10px; right: 10px;
-          display: flex; align-items: center; gap: 5px;
-          background: rgba(255,79,106,0.15); border: 1px solid rgba(255,79,106,0.3);
-          border-radius: 20px; padding: 4px 10px; font-size: 11px; color: #ff4f6a; font-weight: 600;
-        }
-        .iv-rec-dot {
-          width: 6px; height: 6px; border-radius: 50%; background: #ff4f6a;
-          animation: recPulse 1s ease-in-out infinite;
-        }
-        @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        /* ── Answer area ── */
-        .iv-answer-area { width: 100%; display: flex; flex-direction: column; gap: 10px; }
-        .iv-input-toggle {
-          display: flex; gap: 6px;
-          background: rgba(255,255,255,0.04); border-radius: 10px; padding: 4px;
-        }
-        .iv-toggle-btn {
-          flex: 1; padding: 7px 10px; border-radius: 7px; border: none;
-          font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer;
-          transition: all 0.2s;
-        }
+        .iv-answer-area { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+        .iv-input-toggle { display: flex; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 3px; gap: 4px; }
+        .iv-toggle-btn { flex: 1; padding: 7px; border-radius: 9px; border: none; font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .iv-toggle-active { background: rgba(0,229,195,0.15); color: #00e5c3; border: 1px solid rgba(0,229,195,0.3); }
         .iv-toggle-inactive { background: transparent; color: #7a8ba8; }
 
-        .iv-textarea {
-          width: 100%; min-height: 100px; resize: none;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 14px; padding: 14px 16px;
-          color: #e8edf8; font-family: 'Sora', sans-serif; font-size: 13px; line-height: 1.7;
-          outline: none; transition: border-color 0.2s;
-        }
-        .iv-textarea:focus { border-color: rgba(0,229,195,0.4); }
-        .iv-textarea::placeholder { color: #3a4a68; }
-
-        /* ── Record button ── */
-        .iv-record-btn {
-          width: 100%; padding: 13px; border-radius: 14px; border: none; cursor: pointer;
-          font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700;
-          display: flex; align-items: center; justify-content: center; gap: 10px;
-          transition: all 0.2s;
-        }
-        .iv-record-idle {
-          background: rgba(124,58,237,0.15); color: #a78bfa;
-          border: 1.5px solid rgba(124,58,237,0.3);
-        }
-        .iv-record-idle:hover { background: rgba(124,58,237,0.25); }
-        .iv-record-active {
-          background: rgba(255,79,106,0.15); color: #ff4f6a;
-          border: 1.5px solid rgba(255,79,106,0.4);
-          animation: recordGlow 1s ease-in-out infinite alternate;
-        }
+        .iv-textarea { width: 100%; height: 90px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 14px 16px; color: #e8edf8; font-family: 'Sora', sans-serif; font-size: 13px; line-height: 1.7; outline: none; }
+        .iv-record-btn { width: 100%; padding: 13px; border-radius: 14px; border: none; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .iv-record-idle { background: rgba(124,58,237,0.15); color: #a78bfa; border: 1.5px solid rgba(124,58,237,0.3); }
+        .iv-record-active { background: rgba(255,79,106,0.15); color: #ff4f6a; border: 1.5px solid rgba(255,79,106,0.4); animation: recordGlow 1s ease-in-out infinite alternate; }
         @keyframes recordGlow { from { box-shadow: 0 0 0 rgba(255,79,106,0); } to { box-shadow: 0 0 20px rgba(255,79,106,0.3); } }
 
-        /* ── Buttons ── */
-        .iv-btn {
-          width: 100%; padding: 12px 20px; border-radius: 12px; border: none;
-          font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer;
-          transition: all 0.2s;
-        }
+        .iv-btn { width: 100%; padding: 12px 20px; border-radius: 12px; border: none; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .iv-btn-primary { background: linear-gradient(135deg,#00e5c3,#00b8ff); color: #050d14; }
-        .iv-btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-        .iv-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
         .iv-btn-ghost { background: rgba(255,255,255,0.05); color: #e8edf8; border: 1px solid rgba(255,255,255,0.1); }
-        .iv-btn-ghost:hover { background: rgba(255,255,255,0.09); }
         .iv-btn-danger { background: rgba(255,79,106,0.12); color: #ff4f6a; border: 1px solid rgba(255,79,106,0.25); max-width: 200px; margin: 0 auto; }
-        .iv-btn-danger:hover { background: rgba(255,79,106,0.22); }
 
-        /* ── Feedback box ── */
-        .iv-feedback {
-          width: 100%;
-          background: rgba(0,229,195,0.05); border: 1px solid rgba(0,229,195,0.18);
-          border-radius: 16px; padding: 16px 18px;
-          font-size: 13px; color: #b8c8d8; line-height: 1.8; white-space: pre-wrap;
-        }
-        .iv-feedback-header {
-          display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
-        }
-        .iv-feedback-label { font-size: 10px; font-weight: 700; color: #00e5c3; text-transform: uppercase; letter-spacing: 0.08em; }
-
-        /* ── Score progress ── */
-        .iv-score-bar {
-          width: 100%; display: flex; align-items: center; gap: 10px;
-          background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 14px;
-        }
+        .iv-feedback { width: 100%; background: rgba(0,229,195,0.05); border: 1px solid rgba(0,229,195,0.18); border-radius: 16px; padding: 16px 18px; font-size: 13px; color: #b8c8d8; line-height: 1.8; white-space: pre-wrap; }
+        .iv-score-bar { width: 100%; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 14px; }
         .iv-score-bar-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg,#00e5c3,#00b8ff); transition: width 1s ease; }
         .iv-score-bar-bg { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
 
-        /* ── Bottom row ── */
-        .iv-bottom { display: flex; justify-content: center; max-width: 1060px; margin: 0 auto 20px; }
+        .iv-action-row { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
+        .iv-action-btn { flex: 1; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #e8edf8; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .iv-action-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(0,229,195,0.3); }
 
-        /* ── Start screen ── */
-        .iv-start-screen {
-          max-width: 520px; margin: 40px auto 0; text-align: center;
-          display: flex; flex-direction: column; align-items: center; gap: 20px;
-        }
-        .iv-start-avatar { width: 180px; height: 220px; }
-        .iv-start-title { font-size: 24px; font-weight: 800; color: #e8edf8; }
-        .iv-start-sub { font-size: 14px; color: #7a8ba8; line-height: 1.6; }
-        .iv-btn-start {
-          background: linear-gradient(135deg,#7c3aed,#00b8ff); color: #fff;
-          padding: 14px 40px; font-size: 16px; border-radius: 16px; border: none;
-          cursor: pointer; font-weight: 700; font-family: 'Sora', sans-serif;
-          transition: all 0.2s; box-shadow: 0 0 30px rgba(124,58,237,0.3);
-        }
-        .iv-btn-start:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,58,237,0.4); }
+        .iv-live-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 10px; text-align: center; }
+        .iv-metric-val { font-size: 13px; font-weight: 800; color: #00e5c3; }
+        .iv-metric-lbl { font-size: 10px; color: #7a8ba8; text-transform: uppercase; margin-top: 2px; }
 
-        /* ── Results screen ── */
         .iv-results { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-        .iv-results-hero {
-          background: rgba(12,18,35,0.9); border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 24px; padding: 32px;
-          display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center;
-        }
-        .iv-results-row { display: flex; align-items: center; gap: 24px; }
-        .iv-results-title { font-size: 22px; font-weight: 800; color: #e8edf8; }
-        .iv-results-sub { font-size: 14px; color: #7a8ba8; max-width: 460px; line-height: 1.7; }
-        .iv-summary-card {
-          background: rgba(12,18,35,0.7); border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 16px; padding: 18px 20px;
-        }
-        .iv-sq { font-size: 13px; font-weight: 600; color: #a78bfa; margin-bottom: 5px; }
-        .iv-sa { font-size: 12px; color: #4a5a78; margin-bottom: 10px; font-style: italic; }
-        .iv-sf { font-size: 13px; color: #b8c8d8; line-height: 1.7; white-space: pre-wrap; }
-        .iv-score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .iv-results-hero { background: rgba(12,18,35,0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
       `}</style>
 
       {/* ── Navbar ── */}
       <nav className="iv-navbar">
-        <div className="iv-brand">
-          <div className="iv-brand-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" fill="currentColor" opacity="0.9"/>
-              <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          InterviewAI
+        <div className="iv-brand" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <img src="/prepfly-logo.png" alt="PrepFly" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 10px rgba(0,196,167,0.4)" }} />
+          <span style={{ fontSize: "18px", fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Prep<span style={{ color: "#00c4a7" }}>Fly</span></span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {atsScore && (
+            <div style={{ background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "8px", padding: "4px 10px", fontSize: "11px", color: "#00c4a7", fontWeight: 700 }}>
+              ATS Match: {atsScore}%
+            </div>
+          )}
           {avgScore && interviewStarted && (
             <div style={{ fontSize: 12, color: "#7a8ba8" }}>
-              Avg: <span style={{ color: "#00e5c3", fontWeight: 700 }}>{avgScore}/10</span>
+              Avg Score: <span style={{ color: "#00e5c3", fontWeight: 700 }}>{avgScore}/10</span>
             </div>
           )}
           <div style={{ position: "relative" }}>
             <div className="iv-avatar-btn" onClick={() => setMenuOpen(!menuOpen)}>
-              {user.avatar
-                ? <img src={user.avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
-                : initials}
+              {user.avatar ? <img src={user.avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} /> : initials}
             </div>
             {menuOpen && (
               <ul className="iv-dropdown">
@@ -1032,114 +816,158 @@ const InterviewPage = () => {
       </nav>
 
       <div className="iv-page">
+        {interviewComplete && finalResult ? (() => {
+          const score100 = finalResult.overall_score_100 || Math.round((finalResult.overall_score || 7.5) * 10);
+          const gInfo = getGradeInfo(score100);
+          const sectionGrades = finalResult.section_grades || computeSectionGrades(score100, allFeedbacks);
+          const earnedBadges = finalResult.badges || getBadges(score100, sectionGrades);
+          const topStrengths = finalResult.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
+          const topImprovements = finalResult.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
+          const prevScore100 = Number(localStorage.getItem("last_interview_score_100")) || Math.max(40, score100 - 6);
+          const prevGInfo = getGradeInfo(prevScore100);
+          const diffPct = prevScore100 > 0 ? Math.round(((score100 - prevScore100) / prevScore100) * 100) : 0;
 
-        {/* ══ RESULTS SCREEN ══ */}
-        {interviewComplete && finalResult ? (
-          <div className="iv-results">
-            <div className="iv-results-hero">
-              <div style={{ fontSize: 40 }}>🎌</div>
-              <div className="iv-results-title">Interview Complete!</div>
-              <div className="iv-results-row">
-                <GradeBadge grade={finalResult.grade} />
-                <ScoreRing score={finalResult.overall_score} size={90} label="Overall" />
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13, color: "#7a8ba8" }}>Questions answered</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "#e8edf8" }}>{allFeedbacks.length}</div>
+          return (
+            <div className="iv-results">
+              {/* MAIN HERO CARD */}
+              <div className="iv-results-hero" style={{ background: "rgba(12,18,35,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, padding: "28px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "16px" }}>
+                  <div style={{ textAlign: "left" }}>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{gInfo.label} Candidate</div>
+                    <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "2px" }}>📌 Hiring Recommendation: {gInfo.rec}</div>
+                  </div>
+
+                  {/* Circular Grade Badge */}
+                  <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `4px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 24px ${gInfo.color}44`, flexShrink: 0 }}>
+                    <div style={{ fontSize: "32px", fontWeight: 900, color: gInfo.color, lineHeight: 1 }}>{gInfo.grade}</div>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "#fff", marginTop: "2px" }}>{score100}/100</div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Report — updates once background Gemini finishes */}
-              <div className="iv-results-sub" style={{ position: "relative" }}>
-                {finalResult.report}
-                {finalResult.report?.includes("Generating") && (
-                  <span style={{ marginLeft: 8, fontSize: 11, color: "#7a8ba8", animation: "pulse 1.5s ease-in-out infinite" }}>⟳ generating…</span>
-                )}
-              </div>
+                {/* Performance Level & Progress Indicator */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", width: "100%", margin: "12px 0" }}>
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "12px", textAlign: "center" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>PERFORMANCE LEVEL</div>
+                    <div style={{ fontSize: "15px", fontWeight: 900, color: "#fff", marginTop: "2px" }}>{gInfo.level}</div>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "12px", textAlign: "center" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>LAST vs CURRENT GRADE</div>
+                    <div style={{ fontSize: "14px", fontWeight: 900, color: "#fff", marginTop: "2px" }}>
+                      {prevGInfo.grade} ➔ <span style={{ color: gInfo.color }}>{gInfo.grade}</span>
+                    </div>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "12px", textAlign: "center" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>SCORE IMPROVEMENT</div>
+                    <div style={{ fontSize: "15px", fontWeight: 900, color: diffPct >= 0 ? "#00c4a7" : "#ef4444", marginTop: "2px" }}>
+                      {diffPct >= 0 ? `+${diffPct}%` : `${diffPct}%`}
+                    </div>
+                  </div>
+                </div>
 
-              {/* Action buttons */}
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-                <button className="iv-btn-start" onClick={() => navigate("/dashboard")}
-                  style={{ padding: "11px 22px", fontSize: 13 }}>
-                  ← Dashboard
-                </button>
-                <button onClick={() => downloadPDF(finalResult, allFeedbacks)}
-                  style={{
-                    padding: "11px 22px", fontSize: 13, fontWeight: 700, borderRadius: 14, border: "none",
-                    background: "linear-gradient(135deg,#00e5c3,#00b8ff)", color: "#050d14",
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit"
-                  }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
-                  </svg>
-                  Download PDF Report
-                </button>
-                {videoBlob && (
-                  <button onClick={() => downloadVideo(videoBlob)}
-                    style={{
-                      padding: "11px 22px", fontSize: 13, fontWeight: 700, borderRadius: 14,
-                      background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.4)",
-                      color: "#a78bfa", cursor: "pointer", display: "flex", alignItems: "center", gap: 7,
-                      fontFamily: "inherit"
-                    }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
-                    Download Recording
+                {/* EARNED BADGES */}
+                <div style={{ width: "100%", textAlign: "left", marginBottom: "8px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginBottom: "8px" }}>🎖️ EARNED CANDIDATE BADGES</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {earnedBadges.map((b, idx) => (
+                      <span key={idx} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", padding: "6px 12px", borderRadius: "20px", fontSize: "12px", color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <span>{b.icon}</span> {b.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+                  <button className="iv-btn-primary" onClick={() => navigate("/dashboard")} style={{ padding: "10px 24px", width: "auto" }}>
+                    ← Return to Dashboard
                   </button>
-                )}
-              </div>
-            </div>
-
-            {allFeedbacks.map((item, i) => (
-              <div className="iv-summary-card" key={i}>
-                <div className="iv-score-row">
-                  <ScoreRing score={item.score || 0} size={48} />
-                  <div className="iv-sq">Q{i + 1}: {item.question}</div>
+                  <button className="iv-btn-ghost" onClick={() => downloadPDF(finalResult, allFeedbacks)} style={{ width: "auto" }}>
+                    📄 Download PDF Report
+                  </button>
                 </div>
-                <div className="iv-sa">"{item.response}"</div>
-                <div className="iv-sf">{item.feedback}</div>
               </div>
-            ))}
-          </div>
 
-        ) : !interviewStarted ? (
+              {/* 10 SECTION GRADES BREAKDOWN */}
+              <div style={{ background: "rgba(12,18,35,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#fff", marginBottom: "16px" }}>📊 Section Grades Breakdown (10 Dimensions)</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
+                  {sectionGrades.map((sec, idx) => (
+                    <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${sec.color}33`, borderRadius: "12px", padding: "12px", textAlign: "center" }}>
+                      <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
+                      <div style={{ fontSize: "18px", fontWeight: 900, color: sec.color, marginTop: "4px" }}>
+                        {sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* TOP STRENGTHS & IMPROVEMENTS */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div style={{ background: "rgba(0,196,167,0.06)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "20px" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#00c4a7", marginBottom: "12px" }}>💪 Top 5 Strengths</h4>
+                  <ul style={{ paddingLeft: "20px", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {topStrengths.map((str, idx) => (
+                      <li key={idx}>{str}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "20px" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#f59e0b", marginBottom: "12px" }}>🎯 Top 5 Focus Areas</h4>
+                  <ul style={{ paddingLeft: "20px", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {topImprovements.map((imp, idx) => (
+                      <li key={idx}>{imp}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* QUESTION BY QUESTION BREAKDOWN */}
+              {allFeedbacks.map((item, i) => (
+                <div key={i} className="iv-feedback" style={{ background: "rgba(12,18,35,0.7)", borderColor: "rgba(255,255,255,0.08)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>Q{i + 1}: {item.question}</div>
+                    <ScoreRing score={item.score || 0} size={42} />
+                  </div>
+                  <div style={{ fontSize: 13, color: "#94a3b8", fontStyle: "italic", marginBottom: 8 }}>"{item.response}"</div>
+                  <div style={{ fontSize: 13, color: "#e2e8f0" }}>{item.feedback}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })() : !interviewStarted ? (
           /* ══ START SCREEN ══ */
-          <div className="iv-start-screen">
-            <div className="iv-start-avatar">
-              <AnimeAvatar isTalking={false} isThinking={false} />
+          <div style={{ maxWidth: 520, margin: "40px auto", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+            <div style={{ width: 180, height: 220 }}>
+              <CircleWavesAvatar isTalking={false} isThinking={false} />
             </div>
-            <div className="iv-start-title">Meet Hana, Your AI Interviewer</div>
-            <div className="iv-start-sub">
-              Hana will ask you interview questions based on your resume using voice audio.
-              Your camera will be on and the session will be recorded and scored.
-            </div>
-            <button className="iv-btn-start" onClick={startInterview}>
-              🎙 Start Interview
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#e8edf8" }}>Meet {AI_INTERVIEWER.name}, Your AI Recruiter</h1>
+            <p style={{ fontSize: 14, color: "#7a8ba8", lineHeight: 1.6 }}>
+              {AI_INTERVIEWER.name} will conduct a 1-on-1 recruiter interview with warm voice interactions, real-time live performance tracking, and dynamic follow-up questions.
+            </p>
+            <button className="iv-btn-primary" onClick={startInterview} style={{ padding: "14px 40px", fontSize: 16, borderRadius: 16, width: "auto" }}>
+              🎙 Start Recruiter Interview
             </button>
           </div>
-
         ) : (
-          /* ══ INTERVIEW SCREEN ══ */
+          /* ══ ACTIVE INTERVIEW ══ */
           <>
             <div className="iv-grid">
-
-              {/* ── Hana panel ── */}
+              {/* AI Panel */}
               <div className="iv-panel">
                 <div className="iv-anime-wrap">
                   <div className="iv-aura" />
-                  <AnimeAvatar isTalking={isHanaTalking} isThinking={isHanaThinking} />
+                  <CircleWavesAvatar isTalking={isHanaTalking} isThinking={isHanaThinking} />
                 </div>
-                <div className="iv-panel-name">Hana</div>
-                <div className="iv-panel-sub">AI Interviewer · Powered by Gemini</div>
+                <div className="iv-panel-name">{AI_INTERVIEWER.name}</div>
+                <div className="iv-panel-sub">{AI_INTERVIEWER.role}</div>
 
                 <div className="iv-status-chip">
                   <AudioWave active={isHanaTalking} />
                   <span>{hanaStatus}</span>
                 </div>
 
-                {/* Voice Speed Control */}
+                {/* Voice Speed */}
                 <div className="iv-speed-control">
                   <div className="iv-speed-header">
                     <span>Voice Speed</span>
@@ -1147,107 +975,86 @@ const InterviewPage = () => {
                   </div>
                   <div className="iv-speed-buttons">
                     {[1.0, 1.25, 1.5, 1.75, 2.0].map(speed => (
-                      <button
-                        key={speed}
-                        className={`iv-speed-btn ${speechSpeed === speed ? "active" : ""}`}
-                        onClick={() => handleSpeedChange(speed)}
-                      >
+                      <button key={speed} className={`iv-speed-btn ${speechSpeed === speed ? "active" : ""}`} onClick={() => handleSpeedChange(speed)}>
                         {speed}x
                       </button>
                     ))}
                   </div>
                 </div>
 
+                {/* Question & Stage Card */}
                 {question && (
                   <div className="iv-qbox">
                     <div className="iv-qlabel">
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                        <circle cx="5" cy="5" r="5" />
-                      </svg>
-                      Question {questionNumber}
+                      <span>Question {questionNumber} of {totalQuestions}</span>
+                      <span style={{ color: "#00e5c3", fontSize: "11px" }}>Stage: {currentStage}</span>
                     </div>
-                    {question}
+                    {formatAvaMessage(question)}
                   </div>
                 )}
 
-                {/* Per-question scores so far */}
-                {allFeedbacks.length > 0 && (
-                  <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ fontSize: 11, color: "#7a8ba8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                      Progress
-                    </div>
-                    {allFeedbacks.map((f, i) => (
-                      <div key={i} className="iv-score-bar">
-                        <div style={{ fontSize: 11, color: "#7a8ba8", minWidth: 16 }}>Q{i+1}</div>
-                        <div className="iv-score-bar-bg">
-                          <div className="iv-score-bar-fill" style={{ width: `${(f.score || 0) * 10}%` }} />
-                        </div>
-                        <div style={{ fontSize: 12, color: "#00e5c3", fontWeight: 700, minWidth: 28 }}>{f.score}/10</div>
-                      </div>
-                    ))}
+                {/* Hint & Repeat Controls */}
+                <div className="iv-action-row">
+                  <button className="iv-action-btn" onClick={requestHint} disabled={isFetchingHint}>
+                    💡 {isFetchingHint ? "Thinking..." : "Ask Hint"}
+                  </button>
+                  <button className="iv-action-btn" onClick={requestRepeat}>
+                    🔁 Repeat Question
+                  </button>
+                </div>
+
+                {hintText && (
+                  <div style={{ background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "12px", padding: "10px 14px", fontSize: "12px", color: "#fbbf24", width: "100%" }}>
+                    💡 <strong>Interviewer Hint:</strong> {hintText}
                   </div>
                 )}
               </div>
 
-              {/* ── Candidate panel ── */}
+              {/* Candidate Panel */}
               <div className="iv-panel">
-                {/* Video */}
                 <div className="iv-video-wrap">
                   <video ref={videoRef} autoPlay muted playsInline className="iv-video" />
-                  {!videoStreamRef.current && (
-                    <div className="iv-video-off">
-                      <span style={{ fontSize: 32 }}>📷</span>
-                      <span>Camera starting...</span>
-                    </div>
-                  )}
                   <div className="iv-rec-badge">
-                    <div className="iv-rec-dot" />
-                    REC
+                    <div className="iv-rec-dot" /> REC
                   </div>
                 </div>
 
                 <div className="iv-panel-name">{displayName}</div>
                 <div className="iv-panel-sub">{user.email}</div>
 
-                {/* Answer area */}
+                {/* Live Real-Time Analytics Bar */}
+                {liveMetrics && (
+                  <div className="iv-live-metrics">
+                    <div>
+                      <div className="iv-metric-val">{liveMetrics.wpm} WPM</div>
+                      <div className="iv-metric-lbl">Speed</div>
+                    </div>
+                    <div>
+                      <div className="iv-metric-val">{liveMetrics.filler_words_count}</div>
+                      <div className="iv-metric-lbl">Fillers</div>
+                    </div>
+                    <div>
+                      <div className="iv-metric-val">{liveMetrics.confidence_score}/10</div>
+                      <div className="iv-metric-lbl">Confidence</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Response Input */}
                 <div className="iv-answer-area">
-                  {/* Input mode toggle */}
                   <div className="iv-input-toggle">
-                    <button
-                      className={`iv-toggle-btn ${inputMode === "voice" ? "iv-toggle-active" : "iv-toggle-inactive"}`}
-                      onClick={() => setInputMode("voice")}
-                    >
+                    <button className={`iv-toggle-btn ${inputMode === "voice" ? "iv-toggle-active" : "iv-toggle-inactive"}`} onClick={() => setInputMode("voice")}>
                       🎤 Voice
                     </button>
-                    <button
-                      className={`iv-toggle-btn ${inputMode === "text" ? "iv-toggle-active" : "iv-toggle-inactive"}`}
-                      onClick={() => setInputMode("text")}
-                    >
+                    <button className={`iv-toggle-btn ${inputMode === "text" ? "iv-toggle-active" : "iv-toggle-inactive"}`} onClick={() => setInputMode("text")}>
                       ⌨️ Type
                     </button>
                   </div>
 
                   {inputMode === "voice" ? (
-                    <>
-                      <button
-                        className={`iv-record-btn ${isRecording ? "iv-record-active" : "iv-record-idle"}`}
-                        onClick={isRecording ? stopRecording : startRecording}
-                        disabled={isTranscribing}
-                      >
-                        {isTranscribing
-                          ? <><span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span> Transcribing...</>
-                          : isRecording
-                          ? <><span>⏹</span> Stop Recording</>
-                          : <><span>🎤</span> Hold to Record Answer</>
-                        }
-                      </button>
-                      {response && (
-                        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "12px 14px", fontSize: 13, color: "#b8c8d8", lineHeight: 1.7 }}>
-                          <div style={{ fontSize: 10, color: "#7a8ba8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Transcribed</div>
-                          {response}
-                        </div>
-                      )}
-                    </>
+                    <button className={`iv-record-btn ${isRecording ? "iv-record-active" : "iv-record-idle"}`} onClick={isRecording ? stopRecording : startRecording} disabled={isTranscribing}>
+                      {isTranscribing ? "Transcribing..." : isRecording ? "⏹ Stop Recording" : "🎤 Hold to Record Answer"}
+                    </button>
                   ) : (
                     <textarea
                       className="iv-textarea"
@@ -1259,11 +1066,14 @@ const InterviewPage = () => {
                   )}
 
                   {response && (
-                    <button
-                      className="iv-btn iv-btn-primary"
-                      onClick={submitResponse}
-                      disabled={isHanaThinking}
-                    >
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "10px 14px", fontSize: 13, color: "#b8c8d8" }}>
+                      <div style={{ fontSize: 10, color: "#7a8ba8", fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>Current Draft</div>
+                      {response}
+                    </div>
+                  )}
+
+                  {response && (
+                    <button className="iv-btn iv-btn-primary" onClick={submitResponse} disabled={isHanaThinking}>
                       {isHanaThinking ? "Evaluating..." : "Submit Answer →"}
                     </button>
                   )}
@@ -1275,12 +1085,11 @@ const InterviewPage = () => {
                   )}
                 </div>
 
-                {/* Per-answer feedback */}
                 {feedback && (
                   <div className="iv-feedback">
-                    <div className="iv-feedback-header">
-                      <div className="iv-feedback-label">Hana's Feedback</div>
-                      <ScoreRing score={feedback.score} size={52} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#00e5c3", textTransform: "uppercase" }}>{AI_INTERVIEWER.name}'s Evaluation</span>
+                      <ScoreRing score={feedback.score} size={44} />
                     </div>
                     {feedback.feedback}
                   </div>
@@ -1288,21 +1097,14 @@ const InterviewPage = () => {
               </div>
             </div>
 
-            {/* End interview */}
-            <div className="iv-bottom">
-              <button className="iv-btn iv-btn-danger" onClick={endInterview}
-                style={{ padding: "10px 24px", fontSize: 13, borderRadius: 12 }}>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <button className="iv-btn iv-btn-danger" onClick={endInterview}>
                 End Interview & Get Score
               </button>
             </div>
           </>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-      `}</style>
     </>
   );
 };

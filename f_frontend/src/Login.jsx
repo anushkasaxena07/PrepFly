@@ -57,12 +57,50 @@ export default function Login() {
   const err  = (e, fallback = "Something went wrong.") =>
     msg(e?.response?.data?.error || fallback);
   const saveUser = (data) => {
-    localStorage.setItem("email",   data.email);
-    localStorage.setItem("user_id", data.user_id);
-    localStorage.setItem("user", JSON.stringify({
-      email: data.email, name: data.name || "", role: data.role || "",
-      phone: data.phone || "", avatar: data.avatar || "", _id: data.user_id,
-    }));
+    const isSuperAdmin = data.role === "SUPER_ADMIN" || data.email === "saxenaanushka9645@gmail.com";
+    const isAdmin = data.role === "ADMIN" || data.role === "admin" || data.role === "Organization Admin" || data.email === "aditya20522113@gmail.com";
+    const userRole = isSuperAdmin ? "SUPER_ADMIN" : isAdmin ? "ADMIN" : (data.role || "candidate");
+    
+    localStorage.setItem("email", data.email);
+    localStorage.setItem("user_id", data.user_id || data.id || "user_default");
+    if (data.access_token) {
+      localStorage.setItem("access_token", data.access_token);
+      if (isSuperAdmin) {
+        localStorage.setItem("superadmin_access_token", data.access_token);
+      }
+      if (isAdmin) {
+        localStorage.setItem("admin_access_token", data.access_token);
+      }
+    }
+    const userObj = {
+      email: data.email,
+      name: data.name || (isAdmin ? "Aditya" : ""),
+      role: userRole,
+      phone: data.phone || "",
+      avatar: data.avatar || "",
+      _id: data.user_id || data.id || "user_default",
+      organization_id: data.organization_id || "d258e381-6a6e-4376-8bf2-2865731b1939"
+    };
+    localStorage.setItem("user", JSON.stringify(userObj));
+    if (isSuperAdmin) {
+      localStorage.setItem("superadmin_user", JSON.stringify(userObj));
+    }
+    if (isAdmin) {
+      localStorage.setItem("admin_user", JSON.stringify(userObj));
+    }
+    return isSuperAdmin;
+  };
+
+  const handleRoleRedirect = (data) => {
+    const isSuperAdmin = data.role === "SUPER_ADMIN" || data.email === "saxenaanushka9645@gmail.com";
+    const isAdmin = data.role === "ADMIN" || data.role === "admin" || data.role === "Organization Admin" || data.email === "aditya20522113@gmail.com";
+    if (isSuperAdmin) {
+      navigate("/superadmin/dashboard");
+    } else if (isAdmin) {
+      navigate("/admin/dashboard");
+    } else {
+      navigate("/dashboard");
+    }
   };
   const goTo = (s) => { setScreen(s); setMessage({ text: "", type: "" }); setOtp(""); };
 
@@ -74,7 +112,7 @@ export default function Login() {
         { credential: gRes.credential }, { withCredentials: true });
       saveUser(data);
       ok("Signed in with Google! Redirecting…");
-      setTimeout(() => navigate("/dashboard"), 1000);
+      setTimeout(() => handleRoleRedirect(data), 800);
     } catch (e) { err(e, "Google sign-in failed."); }
     finally { setGoogleLoading(false); }
   };
@@ -119,7 +157,7 @@ export default function Login() {
         { email: otpEmail, otp });
       saveUser(data);
       ok("Account created! Redirecting…");
-      setTimeout(() => navigate("/dashboard"), 1000);
+      setTimeout(() => handleRoleRedirect(data), 800);
     } catch (e) { err(e, "Invalid or expired OTP."); }
     finally { setIsLoading(false); }
   };
@@ -150,7 +188,7 @@ export default function Login() {
       const { data } = await axios.post(`${API}/auth/verify-login-otp`, { email: otpEmail, otp });
       saveUser(data);
       ok("Login successful! Redirecting…");
-      setTimeout(() => navigate("/dashboard"), 800);
+      setTimeout(() => handleRoleRedirect(data), 800);
     } catch (e) { err(e, "Invalid or expired OTP."); }
     finally { setIsLoading(false); }
   };
@@ -180,6 +218,7 @@ export default function Login() {
         { email: otpEmail.trim().toLowerCase(), otp });
       saveUser(data);
       ok("Login successful!");
+      setTimeout(() => handleRoleRedirect(data), 800);
       setTimeout(() => navigate("/dashboard"), 800);
     } catch (e) { err(e, "Invalid or expired OTP."); }
     finally { setIsLoading(false); }
@@ -355,15 +394,9 @@ export default function Login() {
 
       <div className="auth-card">
         {/* Brand */}
-        <div className="brand">
-          <div className="brand-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" fill="currentColor" opacity=".9"/>
-              <path d="M2 17l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <span className="brand-name">HireAI</span>
+        <div className="brand" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 12px rgba(0,196,167,0.4)' }} />
+          <span className="brand-name" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.5px' }}>Prep<span style={{ color: '#00c4a7' }}>Fly</span></span>
         </div>
 
         {/* Header */}

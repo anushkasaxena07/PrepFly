@@ -9,4 +9,6 @@ gTTS
 python-dotenv
 werkzeug
 requests
-gunicorn
+gunicorn
+openpyxl
+razorpay

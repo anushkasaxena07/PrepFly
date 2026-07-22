@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="futurGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00e5c3" stop-opacity="1" />
+      <stop offset="45%" stop-color="#00b8ff" stop-opacity="0.8" />
+      <stop offset="85%" stop-color="#7c3aed" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#050811" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e5c3" />
+      <stop offset="50%" stop-color="#00b8ff" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <style>
+    .wave { transform-origin: 200px 200px; animation: expandWave 2.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite; }
+    .w1 { animation-delay: 0s; stroke: #00e5c3; }
+    .w2 { animation-delay: 0.6s; stroke: #00b8ff; }
+    .w3 { animation-delay: 1.2s; stroke: #8b5cf6; }
+    .w4 { animation-delay: 1.8s; stroke: #ec4899; }
+    
+    .spinR1 { transform-origin: 200px 200px; animation: spinC 12s linear infinite; }
+    .spinR2 { transform-origin: 200px 200px; animation: spinCC 16s linear infinite; }
+    .corePulse { transform-origin: 200px 200px; animation: pulseGlow 1.8s ease-in-out infinite; }
+
+    @keyframes expandWave {
+      0% { transform: scale(0.4); opacity: 1; stroke-width: 4px; }
+      100% { transform: scale(1.6); opacity: 0; stroke-width: 1px; }
+    }
+    @keyframes spinC { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes spinCC { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px #00e5c3); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 40px #00b8ff); }
+    }
+  </style>
+
+  <rect width="400" height="400" fill="#050811" />
+
+  <!-- Concentric Expanding Waves by futur21 -->
+  <circle class="wave w1" cx="200" cy="200" r="120" fill="none" />
+  <circle class="wave w2" cx="200" cy="200" r="120" fill="none" />
+  <circle class="wave w3" cx="200" cy="200" r="120" fill="none" />
+  <circle class="wave w4" cx="200" cy="200" r="120" fill="none" />
+
+  <!-- Rotating Orb Spectrum Rings -->
+  <g class="spinR1">
+    <circle cx="200" cy="200" r="160" fill="none" stroke="rgba(0,229,195,0.4)" stroke-width="2" stroke-dasharray="12 18" />
+    <circle cx="200" cy="200" r="135" fill="none" stroke="rgba(0,184,255,0.5)" stroke-width="1.5" stroke-dasharray="24 12" />
+  </g>
+
+  <g class="spinR2">
+    <circle cx="200" cy="200" r="110" fill="none" stroke="rgba(139,92,246,0.6)" stroke-width="2" stroke-dasharray="8 8" />
+  </g>
+
+  <!-- Central Glowing Orb -->
+  <circle class="corePulse" cx="200" cy="200" r="75" fill="url(#futurGlow)" filter="url(#glow)" />
+  <circle class="corePulse" cx="200" cy="200" r="35" fill="#ffffff" />
+  <text x="200" y="208" font-family="sans-serif" font-size="24" text-anchor="middle" fill="#050811">🤖</text>
+</svg>
