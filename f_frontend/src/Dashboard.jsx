@@ -120,6 +120,7 @@ export default function Dashboard() {
   const score100 = rawAvg !== null ? Math.min(100, Math.max(0, Math.round(Number(rawAvg) * 10))) : null;
   const gradeInfo = score100 !== null ? getGradeInfo(score100) : null;
   const userGrade = gradeInfo ? `Grade ${gradeInfo.grade}` : (userStats?.has_data || history.length > 0 ? "Grade B" : "Newbie");
+  const displayStreak = userStats?.streak_days ?? userStats?.streak ?? 0;
 
   const isLoggedIn = () => {
     return !!localStorage.getItem("access_token") || !!user?._id || !!user?.email || !!user?.name;
