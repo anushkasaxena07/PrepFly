@@ -495,6 +495,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to process answer");
 
+      if (data.message === "Repeating question") {
+        setIsAvaThinking(false);
+        setCaptionText("Repeating question... Speak when ready!");
+        playAvaSpeech(data.next_question);
+        return;
+      }
+
       if (data.feedback) {
         setAllFeedbacks(prev => [...prev, data.feedback]);
       }

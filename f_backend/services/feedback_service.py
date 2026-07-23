@@ -12,6 +12,101 @@ def classify_question_type(question: str, category: str = "") -> str:
         return "HR"
     return "Technical"
 
+
+def generate_dynamic_single_fallback(question, answer, q_type):
+    ans_clean = answer.strip()
+    ans_lower = ans_clean.lower()
+    q_lower = question.lower()
+    
+    word_count = len(ans_clean.split())
+    
+    # Analyze keyword overlap to see if they address the question
+    stop_words = {"what", "how", "why", "who", "which", "when", "where", "the", "a", "an", "is", "are", "was", "were", "to", "in", "of", "on", "for", "with", "about", "your", "you", "me", "tell"}
+    q_words = [w.strip("?,.()\"'") for w in q_lower.split() if w.strip("?,.()\"'") not in stop_words]
+    matched_words = [w for w in q_words if len(w) > 3 and w in ans_lower]
+    
+    base_accuracy = 50
+    if word_count > 30:
+        base_accuracy = 80
+    elif word_count > 15:
+        base_accuracy = 70
+    elif word_count > 6:
+        base_accuracy = 60
+        
+    match_bonus = min(20, len(matched_words) * 5)
+    acc_score = min(95, base_accuracy + match_bonus)
+    
+    if any(skip in ans_lower for skip in ["don't know", "don't remember", "skip", "no idea", "not sure", "pardon"]):
+        acc_score = 30
+        correctness = "Incorrect"
+        quality = "Poor"
+    elif acc_score >= 80:
+        correctness = "Correct"
+        quality = "Very Good"
+    elif acc_score >= 65:
+        correctness = "Partially Correct"
+        quality = "Good"
+    else:
+        correctness = "Partially Correct"
+        quality = "Average"
+        
+    score_10 = round(acc_score / 10.0, 1)
+    
+    if correctness == "Incorrect" or word_count < 5:
+        strength = "Attempted to respond to the prompt."
+        improvement = "Provide a more complete response using technical definitions and concrete examples."
+        tip = "Explain your thought process step-by-step even if you don't know the exact syntax."
+        summary = "Minimal response provided."
+    else:
+        if matched_words:
+            strength = f"Mentioned key prompt concepts ({', '.join(matched_words[:3])}) clearly."
+        else:
+            strength = "Expressed ideas with appropriate length and structure."
+            
+        improvement = f"Elaborate on implementation details, edge cases, and optimization trade-offs for {q_type} concepts."
+        tip = "Discuss time/space complexity tradeoffs and real-world system applications."
+        summary = f"Good initial understanding of {q_type} question. Answered with {word_count} words."
+
+    feedback_str = f"✅ Strength: {strength}\n⚠️ Improve: {improvement}\n💡 Tip: {tip}\n📌 Quality: {quality} ({acc_score}/100)"
+    
+    metrics = {
+        "communication": min(10.0, score_10 + 0.5),
+        "confidence": min(10.0, score_10 if word_count > 10 else score_10 - 1.0),
+        "technical_knowledge": score_10,
+        "resume_understanding": score_10,
+        "project_explanation": score_10,
+        "problem_solving": score_10,
+        "behavioral": score_10,
+        "leadership": score_10
+    }
+    
+    return {
+        "feedback": feedback_str,
+        "score": score_10,
+        "accuracy_score": acc_score,
+        "correctness": correctness,
+        "answer_quality": quality,
+        "question_type": q_type,
+        "strength": strength,
+        "improvement": improvement,
+        "tip": tip,
+        "summary": summary,
+        "evidence": f"Candidate response: '{ans_clean[:60]}...'",
+        "technical_accuracy": "Addressed core concepts" if matched_words else "High-level response",
+        "completeness": "Provided details" if word_count > 20 else "Somewhat incomplete",
+        "depth": "Advanced" if word_count > 35 else "Intermediate" if word_count > 15 else "Introductory",
+        "communication_analysis": "Fluent and structured",
+        "problem_solving_analysis": "Good logical progression" if word_count > 20 else "Average approach",
+        "follow_up_question": f"Can you elaborate on the {matched_words[0]} aspect?" if matched_words else "Can you describe a specific example where you applied this?",
+        "ideal_answer": f"A comprehensive response defining the core architecture, trade-offs, and examples for {question}.",
+        "what_was_correct": f"Addressed prompt concepts: {', '.join(matched_words)}" if matched_words else "Attempted explanation",
+        "what_was_incorrect": "Needs more architectural elaboration" if word_count > 15 else "Response was too brief",
+        "what_to_add": "Concrete performance and scalability specifications",
+        "common_mistakes": ["Omitted edge cases"] if word_count > 15 else ["Answer too brief"],
+        "metrics": metrics
+    }
+
+
 def evaluate_response_comprehensive(resume_text, question, answer, chat_model, question_index=1, category=""):
     ai_name = AI_INTERVIEWER["name"]
     q_type = classify_question_type(question, category)
@@ -177,28 +272,7 @@ Return ONLY valid JSON:
 
     except Exception as e:
         print("Feedback comprehensive evaluation notice:", e)
-        return {
-            "feedback": "✅ Strength: Addressed core concepts.\n⚠️ Improve: Elaborate with edge cases and trade-offs.\n💡 Tip: Use STAR method.",
-            "score": 7.0,
-            "accuracy_score": 70,
-            "correctness": "Partially Correct",
-            "answer_quality": "Average",
-            "question_type": q_type,
-            "strength": "Addressed core concepts",
-            "improvement": "Elaborate with edge cases and trade-offs",
-            "tip": "Use STAR method",
-            "summary": "Satisfactory response provided.",
-            "metrics": {
-                "communication": 7.0,
-                "confidence": 7.0,
-                "technical_knowledge": 7.0,
-                "resume_understanding": 7.0,
-                "project_explanation": 7.0,
-                "problem_solving": 7.0,
-                "behavioral": 7.0,
-                "leadership": 7.0
-            }
-        }
+        return generate_dynamic_single_fallback(question, answer, q_type)
 
 
 def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model):
@@ -342,13 +416,63 @@ Transcript:
         print("End-of-interview report generation notice:", e)
         total_questions = len(questions) if questions else 1
         completion_ratio = valid_count / total_questions
+        
+        # Build dynamic strengths and weaknesses based on actual responses
+        valid_indices = []
+        poor_indices = []
+        for i, ans in enumerate(responses or []):
+            ans_clean = str(ans).strip().lower()
+            if len(ans_clean) < 25 or any(skip in ans_clean for skip in ["don't know", "don't remember", "skip", "no idea", "not sure", "pardon"]):
+                poor_indices.append(i)
+            else:
+                valid_indices.append(i)
+
+        dyn_strengths = []
+        if valid_indices:
+            longest_idx = max(valid_indices, key=lambda idx: len(responses[idx]))
+            longest_ans = responses[longest_idx]
+            truncated_ans = longest_ans[:60] + "..." if len(longest_ans) > 60 else longest_ans
+            
+            tech_keywords = ["database", "react", "python", "component", "state", "function", "complexity", "array", "algorithm", "design", "class", "method"]
+            found_keywords = [kw for kw in tech_keywords if kw in longest_ans.lower()]
+            
+            if found_keywords:
+                dyn_strengths.append({
+                    "title": f"Technical vocabulary usage ({', '.join(found_keywords[:3])})",
+                    "evidence": f"Candidate demonstrated relevant concepts in Turn {longest_idx+1}: '{truncated_ans}'"
+                })
+            else:
+                dyn_strengths.append({
+                    "title": "Detailed answer articulation",
+                    "evidence": f"Provided a descriptive response in Turn {longest_idx+1}: '{truncated_ans}'"
+                })
+        else:
+            dyn_strengths.append({
+                "title": "Conversational engagement",
+                "evidence": "Candidate attempted to respond to the interviewer's prompts."
+            })
+
+        dyn_weaknesses = []
+        if poor_indices:
+            brief_idx = poor_indices[0]
+            brief_ans = responses[brief_idx] if brief_idx < len(responses) else "empty response"
+            dyn_weaknesses.append({
+                "title": "Brief or incomplete technical explanation",
+                "evidence": f"Candidate gave a short or skipped answer in Turn {brief_idx+1}: '{brief_ans}'"
+            })
+        else:
+            dyn_weaknesses.append({
+                "title": "Elaboration on complex trade-offs",
+                "evidence": "Explanations were correct but could benefit from deeper discussions of architectural alternatives."
+            })
+
         overall_score = round(78 * completion_ratio)
         if overall_score < 10:
             overall_score = 10
 
         fallback = {
             "overall_score": overall_score,
-            "recommendation": "Neutral",
+            "recommendation": "Neutral" if overall_score >= 50 else "Reject",
             "confidence": "Medium",
             "dimensions": [
                 {"name": "Communication", "score": round(75 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Provided responses to some questions."]},
@@ -362,12 +486,8 @@ Transcript:
                 {"name": "Grammar", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Correct English usage."]},
                 {"name": "Vocabulary", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Used standard technical terminology."]}
             ],
-            "strengths": [
-                {"title": "Core concept understanding", "evidence": "Demonstrated technical details in answering questions."}
-            ],
-            "weaknesses": [
-                {"title": "Lack of detail", "evidence": "Some explanations lacked depth and specific examples."}
-            ]
+            "strengths": dyn_strengths,
+            "weaknesses": dyn_weaknesses
         }
         return enrich_report_with_grading(fallback)
 

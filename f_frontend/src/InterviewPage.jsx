@@ -504,6 +504,12 @@ const InterviewPage = () => {
       const data = await res.json();
 
       if (res.ok) {
+        if (data.message === "Repeating question") {
+          setIsAvaThinking(false);
+          setAvaStatus("Repeating question... Speak or type when ready!");
+          playSpeech(data.next_question);
+          return;
+        }
         if (data.feedback && data.feedback.live_metrics) {
           setLiveMetrics(data.feedback.live_metrics);
         }

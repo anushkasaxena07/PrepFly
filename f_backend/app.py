@@ -1183,12 +1183,23 @@ def next_question():
         current_q = questions[-1] if questions else "Tell me about yourself."
 
         # Handle "Repeat" request
-        if answer.lower() in ["repeat", "can you repeat the question", "pardon"]:
+        ans_clean = answer.lower().strip()
+        is_repeat = any(kw in ans_clean for kw in ["repeat", "pardon", "didn't hear", "say that again", "say again", "could you repeat", "can you repeat"])
+        if is_repeat:
             curr_stage = get_current_stage(question_index)
             return jsonify({
                 "message": "Repeating question",
                 "done": False,
-                "feedback": {"feedback": "ℹ️ Repeating previous question.", "score": 7},
+                "feedback": {
+                    "feedback": "ℹ️ Repeating previous question.",
+                    "score": 7.0,
+                    "accuracy_score": 70,
+                    "correctness": "Partially Correct",
+                    "strength": "Requested repetition",
+                    "improvement": "None",
+                    "tip": "Focus on the question prompt",
+                    "summary": "Repetition requested."
+                },
                 "next_question": current_q,
                 "question_number": question_index,
                 "stage": curr_stage,
@@ -1357,8 +1368,13 @@ def speech_to_text():
             
         return jsonify({"transcript": transcript}), 200
     except Exception as e:
-        print(f"[WARNING] Speech-to-text error: {e}")
-        return jsonify({"error": f"Transcription service unavailable: {str(e)}"}), 500
+        err_msg = str(e)
+        print(f"[WARNING] Speech-to-text error: {err_msg}")
+        if "RESOURCE_EXHAUSTED" in err_msg or "429" in err_msg:
+            detail = "Gemini API quota or rate limit exceeded. Please check billing or try again in a few minutes."
+        else:
+            detail = f"Transcription service unavailable: {err_msg}"
+        return jsonify({"detail": detail}), 500
 
 
 @app.route("/text-to-speech", methods=["POST"])
@@ -7539,6 +7555,14 @@ def superadmin_activity_logs():
             continue
         if status_filter and status_filter != "All" and stat != status_filter:
             continue
+
+        # Apply date range filtering
+        created_at_str = l.get("created_at") or ""
+        if date_range_filter and date_range_filter != "All":
+            if date_range_filter == "Today" and t_today not in created_at_str:
+                continue
+            elif date_range_filter == "Yesterday" and t_yesterday not in created_at_str:
+                continue
 
         if search_query:
             match = (search_query in l.get("id", "").lower() or
