@@ -135,6 +135,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [step, setStep] = useState("resume_upload");
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
   const [selectedType, setSelectedType] = useState(null);
+  const [selectedEvidenceDimension, setSelectedEvidenceDimension] = useState(null);
   
   // Non-Resume Form State
   const [roleTitle, setRoleTitle] = useState("Software Engineer");
@@ -205,6 +206,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     } catch (err) {
       console.warn("Camera setup error:", err);
     }
+  };
+
+  const showDeviceSettings = () => {
+    const videoLabel = mediaStreamRef.current?.getVideoTracks()[0]?.label || "Default Camera";
+    const audioLabel = mediaStreamRef.current?.getAudioTracks()[0]?.label || "Default Microphone";
+    alert(`Selected Capture Devices:\n\n📷 Camera: ${videoLabel}\n🎙️ Microphone: ${audioLabel}\n\nUsing system-default selection.`);
   };
 
   useEffect(() => {
@@ -736,17 +743,52 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px", marginBottom: "32px" }}>
               {/* Left: Camera Preview */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "20px", overflow: "hidden", position: "relative", height: "320px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <video ref={videoRefDevice} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <video ref={videoRefDevice} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraOn ? "block" : "none" }} />
+                
+                {!cameraOn && (
+                  <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
+                      {user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
+                  </div>
+                )}
                 
                 {/* Floating Controls */}
-                <div style={{ position: "absolute", bottom: "16px", display: "flex", gap: "12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)" }}>
-                  <button onClick={() => setCameraOn(!cameraOn)} style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}>
+                <div style={{ position: "absolute", bottom: "16px", display: "flex", gap: "12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
+                  <button 
+                    onClick={() => {
+                      const next = !cameraOn;
+                      setCameraOn(next);
+                      if (mediaStreamRef.current) {
+                        mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = next);
+                      }
+                    }} 
+                    style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
+                    title={cameraOn ? "Mute Camera" : "Unmute Camera"}
+                  >
                     {cameraOn ? "📷" : "🚫"}
                   </button>
-                  <button onClick={() => setMicOn(!micOn)} style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}>
+                  <button 
+                    onClick={() => {
+                      const next = !micOn;
+                      setMicOn(next);
+                      if (mediaStreamRef.current) {
+                        mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = next);
+                      }
+                    }} 
+                    style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
+                    title={micOn ? "Mute Microphone" : "Unmute Microphone"}
+                  >
                     {micOn ? "🎙️" : "🔇"}
                   </button>
-                  <button style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}>⚙️</button>
+                  <button 
+                    onClick={showDeviceSettings} 
+                    style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
+                    title="Device Settings"
+                  >
+                    ⚙️
+                  </button>
                 </div>
               </div>
 
@@ -844,11 +886,50 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               
               {/* LEFT 50%: CANDIDATE LIVE WEBCAM VIDEO */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "24px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <video ref={videoRefCall} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <video ref={videoRefCall} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraOn ? "block" : "none" }} />
                 
-                <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00c4a7" }}></span>
+                {!cameraOn && (
+                  <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
+                      {user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                    </div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
+                  </div>
+                )}
+                
+                <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px", zIndex: 10 }}>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: cameraOn ? "#00c4a7" : "#ef4444" }}></span>
                   🎥 {user?.name ? user.name.split(' ')[0] : 'Candidate'} (You)
+                </div>
+
+                {/* Floating Media Controls Overlay */}
+                <div style={{ position: "absolute", bottom: "16px", right: "16px", display: "flex", gap: "10px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
+                  <button 
+                    onClick={() => {
+                      const next = !cameraOn;
+                      setCameraOn(next);
+                      if (mediaStreamRef.current) {
+                        mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = next);
+                      }
+                    }} 
+                    style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title={cameraOn ? "Mute Camera" : "Unmute Camera"}
+                  >
+                    {cameraOn ? "📷" : "🚫"}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const next = !micOn;
+                      setMicOn(next);
+                      if (mediaStreamRef.current) {
+                        mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = next);
+                      }
+                    }} 
+                    style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title={micOn ? "Mute Microphone" : "Unmute Microphone"}
+                  >
+                    {micOn ? "🎙️" : "🔇"}
+                  </button>
                 </div>
               </div>
 
@@ -928,35 +1009,114 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
               {/* SECTION GRADES */}
               <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
-                <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#fff", marginBottom: "14px" }}>📊 Section Grades Breakdown (10 Dimensions)</h4>
+                <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#fff", marginBottom: "4px" }}>📊 Section Grades Breakdown (10 Dimensions)</h4>
+                <p style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "14px" }}>Click on any dimension card below to view detailed FAANG-style behavioral evidence.</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
-                  {sectionGrades.map((sec, idx) => (
-                    <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${sec.color}33`, borderRadius: "12px", padding: "10px", textAlign: "center" }}>
-                      <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                      <div style={{ fontSize: "16px", fontWeight: 900, color: sec.color, marginTop: "2px" }}>
-                        {sec.score} <span style={{ fontSize: "11px", opacity: 0.8 }}>({sec.grade})</span>
+                  {sectionGrades.map((sec, idx) => {
+                    const isSelected = selectedEvidenceDimension?.name === sec.name;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
+                        style={{ 
+                          background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
+                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${sec.color}33`, 
+                          borderRadius: "12px", 
+                          padding: "10px", 
+                          textAlign: "center",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          transform: isSelected ? "scale(1.03)" : "none"
+                        }}
+                      >
+                        <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
+                        <div style={{ fontSize: "16px", fontWeight: 900, color: sec.color, marginTop: "2px" }}>
+                          {sec.score} <span style={{ fontSize: "11px", opacity: 0.8 }}>({sec.grade})</span>
+                        </div>
+                        <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
+                          {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                {/* Evidence Viewer Panel */}
+                {selectedEvidenceDimension && (
+                  <div style={{ 
+                    marginTop: "20px", 
+                    background: "rgba(255,255,255,0.015)", 
+                    border: `1.5px solid ${selectedEvidenceDimension.color}44`, 
+                    borderRadius: "12px", 
+                    padding: "16px",
+                    textAlign: "left"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
+                        🔍 Evidence Log: {selectedEvidenceDimension.name} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
+                      </div>
+                      <span style={{ 
+                        background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)", 
+                        color: selectedEvidenceDimension.color, 
+                        fontSize: "10px", 
+                        fontWeight: 800,
+                        padding: "2px 8px",
+                        borderRadius: "20px",
+                        border: `1px solid ${selectedEvidenceDimension.color}33`
+                      }}>
+                        Confidence: {selectedEvidenceDimension.evidence_level || "Medium"}
+                      </span>
+                    </div>
+
+                    {selectedEvidenceDimension.evidence && selectedEvidenceDimension.evidence.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#cbd5e1", lineHeight: "1.7" }}>
+                        {selectedEvidenceDimension.evidence.map((point, pIdx) => (
+                          <li key={pIdx} style={{ marginBottom: "6px" }}>{point}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>
+                        No specific transcript evidence recorded for this dimension.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* TOP STRENGTHS & IMPROVEMENTS */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px", textAlign: "left" }}>
                 <div style={{ background: "rgba(0,196,167,0.06)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7", marginBottom: "10px" }}>💪 Top 5 Strengths</h4>
-                  <ul style={{ paddingLeft: "18px", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
-                    {topStrengths.map((str, idx) => (
-                      <li key={idx}>{str}</li>
-                    ))}
+                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7", marginBottom: "10px" }}>💪 Top Strengths</h4>
+                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {reportData.strengths && reportData.strengths.length > 0 && typeof reportData.strengths[0] === 'object' ? (
+                      reportData.strengths.map((str, idx) => (
+                        <li key={idx} style={{ marginBottom: "10px" }}>
+                          <strong style={{ color: "#fff", display: "block", fontSize: "12px" }}>✅ {str.title}</strong>
+                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", paddingLeft: "14px", marginTop: "2px" }}>↳ Evidence: {str.evidence}</span>
+                        </li>
+                      ))
+                    ) : (
+                      topStrengths.map((str, idx) => (
+                        <li key={idx} style={{ marginBottom: "4px" }}>✅ {str}</li>
+                      ))
+                    )}
                   </ul>
                 </div>
                 <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#f59e0b", marginBottom: "10px" }}>🎯 Top 5 Focus Areas</h4>
-                  <ul style={{ paddingLeft: "18px", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
-                    {topImprovements.map((imp, idx) => (
-                      <li key={idx}>{imp}</li>
-                    ))}
+                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#f59e0b", marginBottom: "10px" }}>🎯 Focus Areas & Weaknesses</h4>
+                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {reportData.weaknesses && reportData.weaknesses.length > 0 && typeof reportData.weaknesses[0] === 'object' ? (
+                      reportData.weaknesses.map((imp, idx) => (
+                        <li key={idx} style={{ marginBottom: "10px" }}>
+                          <strong style={{ color: "#fff", display: "block", fontSize: "12px" }}>⚠️ {imp.title}</strong>
+                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", paddingLeft: "14px", marginTop: "2px" }}>↳ Evidence: {imp.evidence}</span>
+                        </li>
+                      ))
+                    ) : (
+                      topImprovements.map((imp, idx) => (
+                        <li key={idx} style={{ marginBottom: "4px" }}>⚠️ {imp}</li>
+                      ))
+                    )}
                   </ul>
                 </div>
               </div>

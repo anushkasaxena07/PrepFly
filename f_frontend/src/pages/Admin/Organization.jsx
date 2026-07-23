@@ -27,9 +27,13 @@ export default function Organization() {
   const handleSave = async () => {
     try {
       await updateAdminOrganization(org);
+      localStorage.setItem("admin_organization", JSON.stringify(org));
       setIsEditing(false);
-      setToast("Organization profile updated!");
-      setTimeout(() => setToast(""), 4000);
+      setToast("Organization profile updated! Reloading to apply changes...");
+      setTimeout(() => {
+        setToast("");
+        window.location.reload();
+      }, 1500);
     } catch (e) {
       alert("Failed to update organization");
     }

@@ -16,13 +16,17 @@ const getHeaders = (isSuperAdmin = false) => {
 };
 
 export const submitFeedback = async (data, isSuperAdmin = false) => {
+  const payload = {
+    ...data,
+    submitted_by: data.submitted_by || localStorage.getItem("user_id") || "usr_guest"
+  };
   const res = await fetch(`${BACKEND_URL}/api/feedback`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...getHeaders(isSuperAdmin)
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(payload)
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

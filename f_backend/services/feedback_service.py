@@ -214,24 +214,25 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
     # 2. Programmatically return a zero-score F-grade report if there are zero valid answers
     if valid_count == 0:
         f_report = {
-            "overall_score": 0,
-            "technical_score": 0,
-            "communication_score": 0,
-            "confidence_score": 0,
-            "fluency_score": 0,
-            "problem_solving_score": 0,
-            "strengths": ["None identified"],
-            "weaknesses": ["No responses were recorded for the interview questions."],
-            "mistakes": [],
-            "improvement_suggestions": ["Please complete the interview and provide verbal or text responses to the questions."],
-            "ideal_answers": [],
-            "transcript_analytics": {
-                "words_per_minute": 0,
-                "filler_word_count": {},
-                "confidence_trend": "flat",
-                "topic_performance": [{"topic": track or "Core Technical", "score": 0}]
-            },
-            "learning_roadmap": ["Complete the interview to receive a study guide."]
+            "overall_score": 0.0,
+            "recommendation": "Strong Reject",
+            "confidence": "Low",
+            "dimensions": [
+                {"name": "Communication", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Technical Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Problem Solving", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Confidence", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Behavioral Skills", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Resume Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Project Explanation", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Leadership", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Grammar", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
+                {"name": "Vocabulary", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]}
+            ],
+            "strengths": [],
+            "weaknesses": [
+                {"title": "No response recorded", "evidence": "Candidate did not answer any questions."}
+            ]
         }
         return enrich_report_with_grading(f_report)
 
@@ -241,36 +242,87 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
         full_transcript_lines.append(f"Turn {idx+1}:\nInterviewer: {q}\nCandidate: {ans}\n")
     full_transcript = "\n".join(full_transcript_lines)
 
-    prompt = f"""You are an expert interview evaluator. Below is a full transcript of a mock interview for the role of {role or 'Software Engineer'} ({track or 'Resume Based'}, {difficulty or 'Medium'}, {experience_level or '1-3 Years'}).
+    prompt = f"""You are an experienced Senior Software Engineering Interviewer with over 15 years of hiring experience at FAANG (Google, Microsoft, Amazon) and top product companies.
+
+Your job is NOT to be encouraging or motivational.
+Your job is to objectively evaluate the candidate based ONLY on observable evidence from the transcript.
+
+RULES:
+1. Never assume skills.
+2. Never hallucinate strengths.
+3. Never invent weaknesses.
+4. Never reward missing answers.
+5. Never infer technical knowledge without proof.
+6. Every score MUST be supported by evidence from the transcript.
+7. If evidence is insufficient, return null for score and "N/A" for grade instead of estimating.
+8. If the candidate skips a question, says "I don't know", remains silent, or provides an irrelevant response, do not fabricate scores (assign score null, grade "N/A", evidence_level "NONE", reason "Not enough evidence").
+9. Use the transcript, coding performance, and candidate responses as your ONLY sources.
 
 Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code blocks, no commentary) in this exact schema:
 
 {{
-  "overall_score": 85,
-  "technical_score": 88,
-  "communication_score": 82,
-  "confidence_score": 80,
-  "fluency_score": 85,
-  "problem_solving_score": 86,
-  "strengths": ["Clear technical articulation of architecture choice", "Good explanation of database concurrency control", "Strong problem-solving approach to scaling constraints"],
-  "weaknesses": ["Could elaborate more on distributed edge case handling", "Occasional filler phrases like 'um'", "Should details process scheduling more specifically"],
-  "mistakes": [{{"question": "Q text", "issue": "Specific gap", "correct_approach": "Optimal solution"}}],
-  "improvement_suggestions": ["Practice STAR framework for project background", "Prepare deep-dives on system thread pool details"],
-  "ideal_answers": [{{"question": "Q text", "ideal_answer": "Sample top answer"}}],
-  "transcript_analytics": {{
-    "words_per_minute": 135,
-    "filler_word_count": {{"um": 2, "like": 3, "you_know": 1}},
-    "confidence_trend": "stable",
-    "topic_performance": [{{"topic": "{track or 'Core Technical'}", "score": 85}}]
-  }},
-  "learning_roadmap": ["Deep dive into system scalability", "Brush up on graph algorithms"]
+  "overall_score": 82,
+  "recommendation": "Hire | Strong Hire | Leaning Hire | Neutral | Leaning Reject | Reject | Strong Reject",
+  "confidence": "High | Medium | Low",
+  "dimensions": [
+    {{
+      "name": "Communication",
+      "score": 85,
+      "grade": "A",
+      "evidence_level": "HIGH",
+      "evidence": [
+        "Answered all questions clearly with logical sequencing.",
+        "Candidate did not use vague words or filler phrases."
+      ]
+    }},
+    {{
+      "name": "Technical Knowledge",
+      "score": null,
+      "grade": "N/A",
+      "evidence_level": "NONE",
+      "evidence": [
+        "Not enough evidence. Technical questions were skipped or not answered."
+      ]
+    }}
+  ],
+  "strengths": [
+    {{
+      "title": "Strong algorithm explanation",
+      "evidence": "Explained HashMap optimization and time complexity during Question 2."
+    }}
+  ],
+  "weaknesses": [
+    {{
+      "title": "Missed edge cases",
+      "evidence": "Did not discuss duplicate values or empty array handling in Question 2."
+    }}
+  ]
 }}
 
-CRITICAL EVALUATION RULES:
-1. If a candidate skips a question, leaves it blank, or says they don't know, you must deduct points.
-2. If the candidate failed to answer any technical content, their scores MUST be close to 0 and their grade must be F.
-3. Scale the scores strictly and proportionally based on their actual responses.
-4. Generate EXACTLY 3 to 5 strengths and weaknesses (focus areas) tailored strictly to the candidate's actual responses in the transcript (avoid general boilerplate lists).
+You MUST generate evaluation entries for exactly these 10 dimensions in this order:
+1. Communication
+2. Technical Knowledge
+3. Problem Solving
+4. Confidence
+5. Behavioral Skills
+6. Resume Knowledge
+7. Project Explanation
+8. Leadership
+9. Grammar
+10. Vocabulary
+
+EVALUATION METHODOLOGY RULES:
+- Communication: Evaluate ONLY if candidate actually communicated. Look for clarity, flow, conciseness, relevance. Accent or native language do NOT impact score.
+- Technical Knowledge: Score ONLY if technical explanations exist. Look for correct concepts, terminology, depth, tradeoffs. Never assume knowledge.
+- Problem Solving: Evaluate ONLY if candidate attempted solving a problem. Look for approach, complexity, optimization.
+- Leadership: Only evaluate when candidate discusses projects, internships or teamwork (ownership, decision making).
+- Confidence: Evaluate from observable behaviour only (hesitation, pauses, speaking pace).
+- Grammar: Ignore minor mistakes caused by speech recognition.
+- Vocabulary: Evaluate technical terminology and word precision.
+- Resume Knowledge: Evaluate ONLY if interviewer asked about resume.
+- Behavioral Skills: Evaluate ONLY from behavioral questions (Situation, Task, Action, Result).
+- Strengths: Must be mentioned multiple times, supported by transcript, score > 80, and confidence HIGH. Else, do not list it.
+- Weaknesses: Must have specific transcript/question evidence.
 
 Transcript:
 {full_transcript}"""
@@ -296,30 +348,84 @@ Transcript:
 
         fallback = {
             "overall_score": overall_score,
-            "technical_score": round(80 * completion_ratio),
-            "communication_score": round(75 * completion_ratio),
-            "confidence_score": round(78 * completion_ratio),
-            "fluency_score": round(80 * completion_ratio),
-            "problem_solving_score": round(76 * completion_ratio),
-            "strengths": ["Demonstrated foundational domain understanding", "Clear verbal responses"],
-            "weaknesses": ["Candidate did not provide responses for all questions"],
-            "mistakes": [],
-            "improvement_suggestions": ["Elaborate on technical trade-offs", "Attempt all questions in the interview rounds"],
-            "ideal_answers": [],
-            "transcript_analytics": {
-                "words_per_minute": 120,
-                "filler_word_count": {},
-                "confidence_trend": "stable",
-                "topic_performance": [{"topic": track or "Core Technical", "score": overall_score}]
-            },
-            "learning_roadmap": ["Review mock interview basics and structure technical explanations"]
+            "recommendation": "Neutral",
+            "confidence": "Medium",
+            "dimensions": [
+                {"name": "Communication", "score": round(75 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Provided responses to some questions."]},
+                {"name": "Technical Knowledge", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Answered technical prompts."]},
+                {"name": "Problem Solving", "score": round(76 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Attempted questions."]},
+                {"name": "Confidence", "score": round(78 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Moderate vocal hesitation."]},
+                {"name": "Behavioral Skills", "score": round(75 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Structured STAR responses."]},
+                {"name": "Resume Knowledge", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Familiar with basic resume items."]},
+                {"name": "Project Explanation", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Basic high-level architecture details."]},
+                {"name": "Leadership", "score": round(70 * completion_ratio), "grade": "C", "evidence_level": "MEDIUM", "evidence": ["Discussed teamwork."]},
+                {"name": "Grammar", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Correct English usage."]},
+                {"name": "Vocabulary", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Used standard technical terminology."]}
+            ],
+            "strengths": [
+                {"title": "Core concept understanding", "evidence": "Demonstrated technical details in answering questions."}
+            ],
+            "weaknesses": [
+                {"title": "Lack of detail", "evidence": "Some explanations lacked depth and specific examples."}
+            ]
         }
         return enrich_report_with_grading(fallback)
 
 def enrich_report_with_grading(report: dict) -> dict:
     from services.grading_service import calculate_grade_info, compute_section_grades, award_badges
     
-    score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
+    # Check if dimensions are present in report
+    if "dimensions" in report and isinstance(report["dimensions"], list):
+        sections = []
+        valid_scores = []
+        for d in report["dimensions"]:
+            d_name = d.get("name")
+            d_score = d.get("score")
+            
+            # check if score is None/null
+            if d_score is None or str(d_score).strip().lower() in ("null", "none") or d.get("evidence_level") == "NONE" or d.get("grade") == "N/A":
+                sec_grade = "N/A"
+                sec_color = "#7a8ba8"
+                sec_bg = "rgba(122, 139, 168, 0.15)"
+                sec_label = "Not Enough Evidence"
+                score_val = None
+            else:
+                try:
+                    score_val = float(d_score)
+                    valid_scores.append(score_val)
+                    sec_info = calculate_grade_info(score_val)
+                    sec_grade = sec_info["grade"]
+                    sec_color = sec_info["color"]
+                    sec_bg = sec_info["bgColor"]
+                    sec_label = sec_info["label"]
+                except:
+                    sec_grade = "N/A"
+                    sec_color = "#7a8ba8"
+                    sec_bg = "rgba(122, 139, 168, 0.15)"
+                    sec_label = "Not Enough Evidence"
+                    score_val = None
+            
+            sections.append({
+                "name": d_name,
+                "score": int(score_val) if score_val is not None else "N/A",
+                "grade": sec_grade,
+                "color": sec_color,
+                "bgColor": sec_bg,
+                "label": sec_label,
+                "evidence_level": d.get("evidence_level", "NONE"),
+                "evidence": d.get("evidence", [])
+            })
+        
+        report["section_grades"] = sections
+        
+        # Calculate overall score dynamically from dimensions if valid_scores is present
+        if valid_scores:
+            score = round(sum(valid_scores) / len(valid_scores))
+        else:
+            score = 0
+    else:
+        score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
+
     g_info = calculate_grade_info(score)
 
     report["overall_score"] = g_info["score"]
@@ -327,36 +433,47 @@ def enrich_report_with_grading(report: dict) -> dict:
     report["overall_grade"] = g_info["grade"]
     report["grade_label"] = g_info["label"]
     report["grade_color"] = g_info["color"]
-    report["hiring_recommendation"] = g_info["rec"]
+    report["hiring_recommendation"] = report.get("recommendation") or g_info["rec"]
     report["performance_level"] = g_info["level"]
 
-    sections = compute_section_grades([], {"clarity": report.get("communication_score", 80), "wpm": report.get("transcript_analytics", {}).get("words_per_minute", 135)})
-    
-    if score == 0:
-        for sec in sections:
-            sec["score"] = 0
-            sec["grade"] = "F"
-            sec["color"] = "#991b1b"
-            sec["bgColor"] = "rgba(153, 27, 27, 0.15)"
-            sec["label"] = "Significant Improvement Required"
-        report["badges"] = []
+    if "section_grades" not in report:
+        sections = compute_section_grades([], {"clarity": report.get("communication_score", 80), "wpm": report.get("transcript_analytics", {}).get("words_per_minute", 135)})
+        if score == 0:
+            for sec in sections:
+                sec["score"] = 0
+                sec["grade"] = "F"
+                sec["color"] = "#991b1b"
+                sec["bgColor"] = "rgba(153, 27, 27, 0.15)"
+                sec["label"] = "Significant Improvement Required"
+            report["badges"] = []
+        else:
+            report["badges"] = award_badges(score, sections)
+        report["section_grades"] = sections
     else:
-        report["badges"] = award_badges(score, sections)
-        
-    report["section_grades"] = sections
+        if score == 0:
+            report["badges"] = []
+        else:
+            report["badges"] = award_badges(score, report["section_grades"])
 
+    # Backwards compatibility for strengths and weaknesses
     strengths = report.get("strengths") or []
-    if not strengths:
-        strengths = ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"]
-    report["top_strengths"] = strengths
+    if strengths and isinstance(strengths[0], dict):
+        report["top_strengths"] = [f"{s.get('title')}: {s.get('evidence')}" for s in strengths if isinstance(s, dict)]
+    else:
+        if not strengths:
+            strengths = ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"]
+        report["top_strengths"] = strengths
 
-    improvements = report.get("improvement_suggestions") or report.get("weaknesses") or []
-    if not improvements:
-        improvements = ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"]
-    report["top_improvements"] = improvements
+    improvements = report.get("weaknesses") or report.get("improvement_suggestions") or []
+    if improvements and isinstance(improvements[0], dict):
+        report["top_improvements"] = [f"{w.get('title')}: {w.get('evidence')}" for w in improvements if isinstance(w, dict)]
+    else:
+        if not improvements:
+            improvements = ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"]
+        report["top_improvements"] = improvements
 
     if not report.get("ai_summary"):
-        report["ai_summary"] = f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, {g_info['score']}/100) with solid domain understanding. Based on this evaluation, the candidate is {g_info['rec'].lower()}."
+        report["ai_summary"] = f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, {g_info['score']}/100). Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}."
 
     return report
 

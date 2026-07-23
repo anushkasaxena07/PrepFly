@@ -69,6 +69,24 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
   }, [remoteStream, remoteVideoRef.current]);
 
+  const bindLocalVideo = (element) => {
+    if (element) {
+      localVideoRef.current = element;
+      if (mediaStreamRef.current) {
+        element.srcObject = mediaStreamRef.current;
+      }
+    }
+  };
+
+  const bindRemoteVideo = (element) => {
+    if (element) {
+      remoteVideoRef.current = element;
+      if (remoteStream) {
+        element.srcObject = remoteStream;
+      }
+    }
+  };
+
   // Load history, active rooms & check for auto-join shareable link
   useEffect(() => {
     fetchActiveRooms();
@@ -334,6 +352,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const initRTCPeerConnection = (stream) => {
     if (peerConnectionRef.current) return;
 
+    const remoteStreamInstance = new MediaStream();
+
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
     });
@@ -343,9 +363,23 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      if (event.streams[0]) {
-        setRemoteStream(event.streams[0]);
+      const incomingStream = event.streams[0];
+      if (incomingStream) {
+        incomingStream.getTracks().forEach(track => {
+          try {
+            remoteStreamInstance.addTrack(track);
+          } catch (e) {}
+        });
+      } else if (event.track) {
+        try {
+          remoteStreamInstance.addTrack(event.track);
+        } catch (e) {}
       }
+      
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamInstance;
+      }
+      setRemoteStream(new MediaStream(remoteStreamInstance.getTracks()));
     };
 
     pc.onicecandidate = (event) => {
@@ -1172,7 +1206,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 justifyContent: "center"
               }}>
                 <video 
-                  ref={localVideoRef} 
+                  ref={bindLocalVideo} 
                   autoPlay 
                   playsInline 
                   muted 
@@ -1189,8 +1223,21 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                   </div>
                 )}
 
-                <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700}}>
+                <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, zIndex: 10}}>
                   {userName} (You) {micMuted ? "🎤 Muted" : "🎙 Active"}
+                </div>
+
+                {/* Floating Media Controls Overlay */}
+                <div style={{ position: "absolute", bottom: "12px", right: "12px", display: "flex", gap: "8px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
+                  <button onClick={toggleCamera} style={{ background: cameraOff ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={cameraOff ? "Turn Camera On" : "Turn Camera Off"}>
+                    {cameraOff ? "🚫" : "📷"}
+                  </button>
+                  <button onClick={toggleMic} style={{ background: micMuted ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={micMuted ? "Unmute Mic" : "Mute Mic"}>
+                    {micMuted ? "🔇" : "🎙️"}
+                  </button>
+                  <button onClick={toggleScreenShare} style={{ background: isScreenSharing ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
+                    🖥️
+                  </button>
                 </div>
               </div>
 
@@ -1208,7 +1255,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 height: "100%"
               }}>
                 <video 
-                  ref={remoteVideoRef} 
+                  ref={bindRemoteVideo} 
                   autoPlay 
                   playsInline 
                   style={{

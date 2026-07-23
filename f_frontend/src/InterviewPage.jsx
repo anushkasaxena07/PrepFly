@@ -147,6 +147,7 @@ const InterviewPage = () => {
   // ── Ava state ────────────────────────────────────────────────────────
   const [isAvaTalking, setIsAvaTalking] = useState(false);
   const [isAvaThinking, setIsAvaThinking] = useState(false);
+  const [selectedEvidenceDimension, setSelectedEvidenceDimension] = useState(null);
   const [avaStatus, setAvaStatus] = useState("Ready to interview you!");
 
   // ── Voice recording ────────────────────────────────────────────────────
@@ -898,35 +899,114 @@ const InterviewPage = () => {
 
               {/* 10 SECTION GRADES BREAKDOWN */}
               <div style={{ background: "rgba(12,18,35,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#fff", marginBottom: "16px" }}>📊 Section Grades Breakdown (10 Dimensions)</h3>
+                <h3 style={{ fontSize: "15px", fontWeight: 900, color: "#fff", marginBottom: "4px" }}>📊 Section Grades Breakdown (10 Dimensions)</h3>
+                <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "16px" }}>Click on any dimension card below to view detailed FAANG-style behavioral evidence.</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
-                  {sectionGrades.map((sec, idx) => (
-                    <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${sec.color}33`, borderRadius: "12px", padding: "12px", textAlign: "center" }}>
-                      <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                      <div style={{ fontSize: "18px", fontWeight: 900, color: sec.color, marginTop: "4px" }}>
-                        {sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span>
+                  {sectionGrades.map((sec, idx) => {
+                    const isSelected = selectedEvidenceDimension?.name === sec.name;
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
+                        style={{ 
+                          background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
+                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${sec.color}33`, 
+                          borderRadius: "12px", 
+                          padding: "12px", 
+                          textAlign: "center",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          transform: isSelected ? "scale(1.03)" : "none"
+                        }}
+                      >
+                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
+                        <div style={{ fontSize: "18px", fontWeight: 900, color: sec.color, marginTop: "4px" }}>
+                          {sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span>
+                        </div>
+                        <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
+                          {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+
+                {/* Evidence Viewer Panel */}
+                {selectedEvidenceDimension && (
+                  <div style={{ 
+                    marginTop: "20px", 
+                    background: "rgba(255,255,255,0.015)", 
+                    border: `1.5px solid ${selectedEvidenceDimension.color}44`, 
+                    borderRadius: "12px", 
+                    padding: "16px",
+                    textAlign: "left"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
+                        🔍 Evidence Log: {selectedEvidenceDimension.name} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
+                      </div>
+                      <span style={{ 
+                        background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)", 
+                        color: selectedEvidenceDimension.color, 
+                        fontSize: "10px", 
+                        fontWeight: 800,
+                        padding: "2px 8px",
+                        borderRadius: "20px",
+                        border: `1px solid ${selectedEvidenceDimension.color}33`
+                      }}>
+                        Confidence: {selectedEvidenceDimension.evidence_level || "Medium"}
+                      </span>
+                    </div>
+
+                    {selectedEvidenceDimension.evidence && selectedEvidenceDimension.evidence.length > 0 ? (
+                      <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#cbd5e1", lineHeight: "1.7" }}>
+                        {selectedEvidenceDimension.evidence.map((point, pIdx) => (
+                          <li key={pIdx} style={{ marginBottom: "6px" }}>{point}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>
+                        No specific transcript evidence recorded for this dimension.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* TOP STRENGTHS & IMPROVEMENTS */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                 <div style={{ background: "rgba(0,196,167,0.06)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "20px" }}>
-                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#00c4a7", marginBottom: "12px" }}>💪 Top 5 Strengths</h4>
-                  <ul style={{ paddingLeft: "20px", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
-                    {topStrengths.map((str, idx) => (
-                      <li key={idx}>{str}</li>
-                    ))}
+                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#00c4a7", marginBottom: "12px" }}>💪 Top Strengths</h4>
+                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {finalResult.strengths && finalResult.strengths.length > 0 && typeof finalResult.strengths[0] === 'object' ? (
+                      finalResult.strengths.map((str, idx) => (
+                        <li key={idx} style={{ marginBottom: "12px" }}>
+                          <strong style={{ color: "#fff", display: "block", fontSize: "13px" }}>✅ {str.title}</strong>
+                          <span style={{ fontSize: "12px", color: "#94a3b8", display: "block", paddingLeft: "16px", marginTop: "2px" }}>↳ Evidence: {str.evidence}</span>
+                        </li>
+                      ))
+                    ) : (
+                      topStrengths.map((str, idx) => (
+                        <li key={idx} style={{ marginBottom: "6px" }}>✅ {str}</li>
+                      ))
+                    )}
                   </ul>
                 </div>
                 <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "20px" }}>
-                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#f59e0b", marginBottom: "12px" }}>🎯 Top 5 Focus Areas</h4>
-                  <ul style={{ paddingLeft: "20px", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
-                    {topImprovements.map((imp, idx) => (
-                      <li key={idx}>{imp}</li>
-                    ))}
+                  <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#f59e0b", marginBottom: "12px" }}>🎯 Focus Areas & Weaknesses</h4>
+                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "13px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                    {finalResult.weaknesses && finalResult.weaknesses.length > 0 && typeof finalResult.weaknesses[0] === 'object' ? (
+                      finalResult.weaknesses.map((imp, idx) => (
+                        <li key={idx} style={{ marginBottom: "12px" }}>
+                          <strong style={{ color: "#fff", display: "block", fontSize: "13px" }}>⚠️ {imp.title}</strong>
+                          <span style={{ fontSize: "12px", color: "#94a3b8", display: "block", paddingLeft: "16px", marginTop: "2px" }}>↳ Evidence: {imp.evidence}</span>
+                        </li>
+                      ))
+                    ) : (
+                      topImprovements.map((imp, idx) => (
+                        <li key={idx} style={{ marginBottom: "6px" }}>⚠️ {imp}</li>
+                      ))
+                    )}
                   </ul>
                 </div>
               </div>

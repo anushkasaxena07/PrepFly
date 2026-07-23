@@ -644,7 +644,11 @@ def update_profile():
     if "phone" in data:
         payload["phone"] = data["phone"]
     if "role" in data:
-        payload["role"] = data["role"]
+        target_role = data["role"]
+        if target_role in ["SUPER_ADMIN", "Super Admin", "Organization Admin", "Admin", "admin", "College Admin"]:
+            if not verify_super_admin():
+                return jsonify({"error": "Unauthorized: Only Super Admin can assign Super Admin or Admin roles"}), 403
+        payload["role"] = target_role
     if "avatar" in data:
         payload["avatar"] = data["avatar"]
     if "email" in data and data["email"]:
@@ -1353,10 +1357,8 @@ def speech_to_text():
             
         return jsonify({"transcript": transcript}), 200
     except Exception as e:
-        print(f"[WARNING] Speech-to-text error: {e}. Falling back to default audio transcription.")
-        # Return a high-quality realistic transcript fallback
-        fallback_transcript = "I believe the best approach for this problem would be to use a hash map. This gives us O(n) time complexity instead of the brute force O(n²) which is not optimal. For edge cases, I would handle empty arrays, negative target sums, and duplicate values carefully to ensure robustness."
-        return jsonify({"transcript": fallback_transcript}), 200
+        print(f"[WARNING] Speech-to-text error: {e}")
+        return jsonify({"error": f"Transcription service unavailable: {str(e)}"}), 500
 
 
 @app.route("/text-to-speech", methods=["POST"])
@@ -5786,8 +5788,8 @@ def get_user_notifications():
         print("Fetch SA notifications notice:", e)
 
     try:
-        # 2. Fetch Org Admin announcements for this org
-        org_res = supabase.table("notifications").select("*").eq("organization_id", org_id).execute()
+        # 2. Fetch Org Admin announcements for this org (exclude feedback notifications from broadcasts)
+        org_res = supabase.table("notifications").select("*").eq("organization_id", org_id).neq("sender_type", "FEEDBACK_SYSTEM").execute()
         if org_res and org_res.data:
             import json
             for n in org_res.data:

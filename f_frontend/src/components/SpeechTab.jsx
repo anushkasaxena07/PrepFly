@@ -152,6 +152,14 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
 
       const duration = (Date.now() - recordStartRef.current) / 1000;
       durationRef.current = duration;
+
+      if (duration < 1.2) {
+        setTranscript("Recording was too short. Please speak clearly into your microphone.");
+        setRecStatus("Recording too short. Please try again.");
+        setRecStatusColor("var(--red)");
+        return;
+      }
+
       const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
 
       setRecStatus(`Recording saved (${duration.toFixed(1)}s). Transcribing...`);
