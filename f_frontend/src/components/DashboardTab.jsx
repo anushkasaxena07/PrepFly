@@ -80,7 +80,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
   const insights = [];
   if (latestFeedback) {
     insights.push({
-      type: "hana",
+      type: "ava",
       title: "Latest Interview Performance",
       desc: `Your last mock question response scored ${latestFeedback.score}/10. Strength: "${latestFeedback.strength}". Improvement: "${latestFeedback.improvement}".`,
       cta: "Practice AI Interview →",
@@ -189,11 +189,11 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
             <div className="hero-top">
               <div>
                 <div className="hero-greeting">👋 {getTimeBasedGreeting()}</div>
-                <h1 className="hero-name">Welcome back, <span>{userName}</span></h1>
+                <h1 className="hero-name">Welcome Back, <span>{userName}</span></h1>
                 <p className="hero-sub">{hasData ? `You have completed ${displayTotal} practice sessions so far. Keep practicing!` : `Your AI coach is ready. You're on a ${displayStreak}-day streak — keep it going!`}</p>
               </div>
               <div className="hero-actions">
-                <button className="btn btn-primary" onClick={() => setActiveTab('hana')}>▶ Start Mock Interview</button>
+                <button className="btn btn-primary" onClick={() => setActiveTab('ava')}>▶ Start Mock Interview</button>
                 <button className="btn btn-ghost" onClick={() => setActiveTab('coding')}>💻 Resume Practice</button>
               </div>
             </div>
@@ -304,10 +304,10 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                   <div className="continue-pct" style={{color:"var(--blue)"}}>{codingAccuracy}%</div>
                   <div className="continue-arrow">›</div>
                 </div>
-                <div className="continue-card" onClick={() => setActiveTab('hana')} tabIndex="0" role="button">
+                <div className="continue-card" onClick={() => setActiveTab('ava')} tabIndex="0" role="button">
                   <div className="continue-thumb" style={{background:"rgba(155,109,255,0.1)",border:"1px solid rgba(155,109,255,0.2)"}}>🤖</div>
                   <div className="continue-info">
-                    <div className="continue-title">Hana AI Interview Coach</div>
+                    <div className="continue-title">Ava AI Interview Coach</div>
                     <div className="continue-meta">Adaptive voice mock interview sessions</div>
                     <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(10, displayReadiness)}%`, "--p-start":"#9b6dff", "--p-end":"#00f0c8"}}></div></div>
                   </div>

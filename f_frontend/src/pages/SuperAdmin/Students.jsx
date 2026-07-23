@@ -274,7 +274,7 @@ export default function Students() {
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MOCK INTERVIEWS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>4,820</div>
-          <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>🎙️ Hana Sessions</div>
+          <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>🎙️ Ava Sessions</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>

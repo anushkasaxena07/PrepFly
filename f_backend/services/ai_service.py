@@ -200,44 +200,52 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
     except Exception as e:
         print(f"Dynamic question generation notice ({e}), selecting phase-appropriate question:")
 
-        # Pick non-repeating track-appropriate fallback
-        if "HR" in cat_clean or "BEHAVIORAL" in cat_clean:
-            track_fallbacks = [
-                "Tell me about a situation where you had a disagreement with a teammate or project lead. How did you resolve it?",
-                "Describe a time when a project deadline was unexpectedly moved up. How did you prioritize and deliver?",
-                "Tell me about a time when you received constructive feedback. What steps did you take to improve?"
-            ]
-        elif "DSA" in cat_clean or "ALGORITHM" in cat_clean:
-            track_fallbacks = [
-                "How would you design a data structure that supports insert, delete, and getRandom in O(1) time complexity?",
-                "Explain how you would detect a cycle in a directed graph or linked list, and what space complexity it requires.",
-                "Compare Dynamic Programming and Greedy approaches — when would a greedy choice fail for an optimization problem?"
-            ]
-        elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
-            track_fallbacks = [
-                "How would you design a scalable rate limiting service for an API handling 100k requests per second?",
-                "Explain database sharding vs partitioning, and how you prevent hot spots in distributed storage.",
-                "How do message queues like Kafka ensure message ordering and fault tolerance in microservices?"
-            ]
-        elif "FUNDAMENTAL" in cat_clean or "CS" in cat_clean or "CORE" in cat_clean:
-            track_fallbacks = [
-                "What is the difference between a process and a thread, and how does the OS handle context switching?",
-                "Explain the difference between TCP and UDP, and why video streaming might prefer one over the other.",
-                "What are the ACID properties in database transactions, and how does Isolation prevent race conditions?"
-            ]
-        elif "MAANG" in cat_clean or "BIG TECH" in cat_clean:
-            track_fallbacks = [
-                "How would you design a globally distributed cache with sub-millisecond latency and multi-region consistency?",
-                "Describe how you would diagnose and mitigate a cascading failure in a microservices ecosystem during peak load."
-            ]
+        if question_index == 1:
+            fallback_choice = random.choice(PHASE_1_GREETINGS)
+        elif question_index == 2:
+            fallback_choice = random.choice(PHASE_2_ICEBREAKERS)
+        elif question_index == 3:
+            fallback_choice = random.choice(PHASE_3_TRANSITIONS)
         else:
-            track_fallbacks = [
-                "Tell me about the most complex technical project you've worked on, and the architectural trade-offs you made.",
-                "Looking back at your recent projects, what is one design decision you would implement differently today?"
-            ]
+            # Pick non-repeating track-appropriate fallback
+            if "HR" in cat_clean or "BEHAVIORAL" in cat_clean:
+                track_fallbacks = [
+                    "Tell me about a situation where you had a disagreement with a teammate or project lead. How did you resolve it?",
+                    "Describe a time when a project deadline was unexpectedly moved up. How did you prioritize and deliver?",
+                    "Tell me about a time when you received constructive feedback. What steps did you take to improve?"
+                ]
+            elif "DSA" in cat_clean or "ALGORITHM" in cat_clean:
+                track_fallbacks = [
+                    "How would you design a data structure that supports insert, delete, and getRandom in O(1) time complexity?",
+                    "Explain how you would detect a cycle in a directed graph or linked list, and what space complexity it requires.",
+                    "Compare Dynamic Programming and Greedy approaches — when would a greedy choice fail for an optimization problem?"
+                ]
+            elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
+                track_fallbacks = [
+                    "How would you design a scalable rate limiting service for an API handling 100k requests per second?",
+                    "Explain database sharding vs partitioning, and how you prevent hot spots in distributed storage.",
+                    "How do message queues like Kafka ensure message ordering and fault tolerance in microservices?"
+                ]
+            elif "FUNDAMENTAL" in cat_clean or "CS" in cat_clean or "CORE" in cat_clean:
+                track_fallbacks = [
+                    "What is the difference between a process and a thread, and how does the OS handle context switching?",
+                    "Explain the difference between TCP and UDP, and why video streaming might prefer one over the other.",
+                    "What are the ACID properties in database transactions, and how does Isolation prevent race conditions?"
+                ]
+            elif "MAANG" in cat_clean or "BIG TECH" in cat_clean:
+                track_fallbacks = [
+                    "How would you design a globally distributed cache with sub-millisecond latency and multi-region consistency?",
+                    "Describe how you would diagnose and mitigate a cascading failure in a microservices ecosystem during peak load."
+                ]
+            else:
+                track_fallbacks = [
+                    "Tell me about the most complex technical project you've worked on, and the architectural trade-offs you made.",
+                    "Looking back at your recent projects, what is one design decision you would implement differently today?"
+                ]
 
-        available = [q for q in track_fallbacks if q not in previous_questions]
-        fallback_choice = random.choice(available) if available else track_fallbacks[0]
+            available = [q for q in track_fallbacks if q not in previous_questions]
+            fallback_choice = random.choice(available) if available else track_fallbacks[0]
+            
         return fallback_choice, stage_name, False
 
 def generate_hint(question, resume_text, chat_model):

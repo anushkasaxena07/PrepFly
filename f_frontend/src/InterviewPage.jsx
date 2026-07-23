@@ -144,10 +144,10 @@ const InterviewPage = () => {
   const [isFetchingHint, setIsFetchingHint] = useState(false);
   const [liveMetrics, setLiveMetrics] = useState(null);
 
-  // ── Anime state ────────────────────────────────────────────────────────
-  const [isHanaTalking, setIsHanaTalking] = useState(false);
-  const [isHanaThinking, setIsHanaThinking] = useState(false);
-  const [hanaStatus, setHanaStatus] = useState("Ready to interview you!");
+  // ── Ava state ────────────────────────────────────────────────────────
+  const [isAvaTalking, setIsAvaTalking] = useState(false);
+  const [isAvaThinking, setIsAvaThinking] = useState(false);
+  const [avaStatus, setAvaStatus] = useState("Ready to interview you!");
 
   // ── Voice recording ────────────────────────────────────────────────────
   const [isRecording, setIsRecording] = useState(false);
@@ -287,13 +287,13 @@ const InterviewPage = () => {
   const playNextInQueue = () => {
     if (!speechQueue.current.length) {
       isAudioPlaying.current = false;
-      setIsHanaTalking(false);
+      setIsAvaTalking(false);
       return;
     }
     const item = speechQueue.current.shift();
     const nextText = item.text;
     isAudioPlaying.current = true;
-    setIsHanaTalking(true);
+    setIsAvaTalking(true);
 
     fetch(`${BACKEND_URL}/text-to-speech`, {
       method: "POST",
@@ -313,14 +313,14 @@ const InterviewPage = () => {
         audio.playbackRate = speechSpeedRef.current;
         audio.onended = () => {
           isAudioPlaying.current = false;
-          setIsHanaTalking(false);
+          setIsAvaTalking(false);
           playNextInQueue();
         };
       })
       .catch(() => {
         if (item.onStart) item.onStart();
         isAudioPlaying.current = false;
-        setIsHanaTalking(false);
+        setIsAvaTalking(false);
         playNextInQueue();
       });
   };
@@ -338,7 +338,7 @@ const InterviewPage = () => {
         rec.interimResults = true;
         rec.lang = "en-US";
 
-        rec.onstart = () => { setHanaStatus("Listening... Speak now! 🎙️"); };
+        rec.onstart = () => { setAvaStatus("Listening... Speak now! 🎙️"); };
         rec.onresult = (e) => {
           let transcript = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -366,13 +366,13 @@ const InterviewPage = () => {
           const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
           await transcribeAudio(blob);
         } else {
-          setHanaStatus("Got it! Review and submit when ready.");
+          setAvaStatus("Got it! Review and submit when ready.");
         }
       };
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-      if (!webSpeechActive) setHanaStatus("Recording audio...");
+      if (!webSpeechActive) setAvaStatus("Recording audio...");
     } catch {
       if (!webSpeechActive) alert("Microphone access denied. Please allow microphone and try again.");
     }
@@ -391,7 +391,7 @@ const InterviewPage = () => {
 
   const transcribeAudio = async (blob) => {
     setIsTranscribing(true);
-    setHanaStatus("Transcribing audio (backend fallback)...");
+    setAvaStatus("Transcribing audio (backend fallback)...");
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -406,16 +406,16 @@ const InterviewPage = () => {
           const data = await res.json();
           if (data.transcript) {
             setResponse(data.transcript);
-            setHanaStatus("Got it! Review and submit when ready.");
+            setAvaStatus("Got it! Review and submit when ready.");
           } else {
-            setHanaStatus("Couldn't catch that. Try again or type your answer.");
+            setAvaStatus("Couldn't catch that. Try again or type your answer.");
           }
-        } catch { setHanaStatus("Transcription failed. Please type your answer."); }
+        } catch { setAvaStatus("Transcription failed. Please type your answer."); }
         finally { setIsTranscribing(false); }
       };
       reader.readAsDataURL(blob);
     } catch {
-      setHanaStatus("Transcription failed. Please type your answer.");
+      setAvaStatus("Transcription failed. Please type your answer.");
       setIsTranscribing(false);
     }
   };
@@ -450,8 +450,8 @@ const InterviewPage = () => {
   // ── Interview actions ──────────────────────────────────────────────────
   const fetchNextQuestion = async () => {
     if (!sessionId) return;
-    setIsHanaThinking(true);
-    setHanaStatus("Thinking of the next question...");
+    setIsAvaThinking(true);
+    setAvaStatus("Thinking of the next question...");
     setFeedback(null);
     setHintText("");
     setShowNext(false);
@@ -468,31 +468,31 @@ const InterviewPage = () => {
 
       if (data.question) {
         const cleanQ = formatAvaMessage(data.question);
-        setIsHanaThinking(true);
+        setIsAvaThinking(true);
         if (data.stage) setCurrentStage(data.stage);
         if (data.total_questions) setTotalQuestions(data.total_questions);
 
-        setHanaStatus(`${AI_INTERVIEWER.name} is preparing your question...`);
+        setAvaStatus(`${AI_INTERVIEWER.name} is preparing your question...`);
         playSpeech(cleanQ, () => {
           setQuestion(cleanQ);
           setQuestionNumber(data.question_number || questionNumber + 1);
-          setIsHanaThinking(false);
-          setHanaStatus("Asking you a question...");
-          setTimeout(() => setHanaStatus("Your turn to answer!"), 2000);
+          setIsAvaThinking(false);
+          setAvaStatus("Asking you a question...");
+          setTimeout(() => setAvaStatus("Your turn to answer!"), 2000);
         });
       } else if (data.message === "Interview complete" || data.done) {
         endInterview();
       }
     } catch {
-      setIsHanaThinking(false);
-      setHanaStatus("Connection error. Retrying...");
+      setIsAvaThinking(false);
+      setAvaStatus("Connection error. Retrying...");
     }
   };
 
   const submitResponse = async () => {
     if (!response.trim()) return alert("Please record or type your response first.");
-    setIsHanaThinking(true);
-    setHanaStatus("Evaluating your answer...");
+    setIsAvaThinking(true);
+    setAvaStatus("Evaluating your answer...");
 
     try {
       const res = await fetch(`${BACKEND_URL}/next`, {
@@ -519,9 +519,9 @@ const InterviewPage = () => {
           setShowNext(true);
           setResponse("");
           if (sessionId) localStorage.removeItem(`interview_autosave_${sessionId}`);
-          setIsHanaThinking(false);
+          setIsAvaThinking(false);
           const scoreVal = feedbackObj.score || 0;
-          setHanaStatus(`Interview complete! Final score: ${scoreVal}/10`);
+          setAvaStatus(`Interview complete! Final score: ${scoreVal}/10`);
           playSpeech(`Thanks for completing the interview! You scored ${scoreVal} out of 10 on the final question.`);
         } else {
           const feedbackObj = data.feedback || {};
@@ -535,21 +535,21 @@ const InterviewPage = () => {
           setShowNext(true);
           setResponse("");
           if (sessionId) localStorage.removeItem(`interview_autosave_${sessionId}`);
-          setIsHanaThinking(false);
+          setIsAvaThinking(false);
           const scoreVal = feedbackObj.score || 0;
-          setHanaStatus(`Score: ${scoreVal}/10 — ${scoreVal >= 7 ? "Great job!" : "Keep going!"}`);
+          setAvaStatus(`Score: ${scoreVal}/10 — ${scoreVal >= 7 ? "Great job!" : "Keep going!"}`);
           playSpeech(scoreVal >= 7
             ? `Good answer! You scored ${scoreVal} out of 10.`
             : `Thanks for answering. You scored ${scoreVal} out of 10. Let me give you some feedback.`
           );
         }
       } else {
-        setIsHanaThinking(false);
-        setHanaStatus("Error submitting. Try again.");
+        setIsAvaThinking(false);
+        setAvaStatus("Error submitting. Try again.");
       }
     } catch {
-      setIsHanaThinking(false);
-      setHanaStatus("Submission failed.");
+      setIsAvaThinking(false);
+      setAvaStatus("Submission failed.");
     }
   };
 
@@ -607,11 +607,11 @@ const InterviewPage = () => {
 
     speechQueue.current = [];
     isAudioPlaying.current = false;
-    setIsHanaTalking(false);
+    setIsAvaTalking(false);
     if (currentAudioRef.current) { currentAudioRef.current.pause(); currentAudioRef.current = null; }
 
-    setIsHanaThinking(true);
-    setHanaStatus("Wrapping up...");
+    setIsAvaThinking(true);
+    setAvaStatus("Wrapping up...");
 
     stopWebcam();
     if (sessionChunksRef.current.length > 0) {
@@ -641,7 +641,7 @@ const InterviewPage = () => {
 
     setInterviewStarted(false);
     setInterviewComplete(true);
-    setIsHanaThinking(false);
+    setIsAvaThinking(false);
 
     let attempts = 0;
     const poll = setInterval(async () => {
@@ -957,14 +957,14 @@ const InterviewPage = () => {
               <div className="iv-panel">
                 <div className="iv-anime-wrap">
                   <div className="iv-aura" />
-                  <CircleWavesAvatar isTalking={isHanaTalking} isThinking={isHanaThinking} />
+                  <CircleWavesAvatar isTalking={isAvaTalking} isThinking={isAvaThinking} />
                 </div>
                 <div className="iv-panel-name">{AI_INTERVIEWER.name}</div>
                 <div className="iv-panel-sub">{AI_INTERVIEWER.role}</div>
 
                 <div className="iv-status-chip">
-                  <AudioWave active={isHanaTalking} />
-                  <span>{hanaStatus}</span>
+                  <AudioWave active={isAvaTalking} />
+                  <span>{avaStatus}</span>
                 </div>
 
                 {/* Voice Speed */}
@@ -1073,8 +1073,8 @@ const InterviewPage = () => {
                   )}
 
                   {response && (
-                    <button className="iv-btn iv-btn-primary" onClick={submitResponse} disabled={isHanaThinking}>
-                      {isHanaThinking ? "Evaluating..." : "Submit Answer →"}
+                    <button className="iv-btn iv-btn-primary" onClick={submitResponse} disabled={isAvaThinking}>
+                      {isAvaThinking ? "Evaluating..." : "Submit Answer →"}
                     </button>
                   )}
 

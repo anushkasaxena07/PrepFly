@@ -575,7 +575,7 @@ export default function AIConfiguration() {
         {activePromptTab === 'interview' && (
           <div>
             <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", display: "block", marginBottom: "6px" }}>
-              SYSTEM INSTRUCTIONS FOR HANA (LIVE INTERVIEWER)
+              SYSTEM INSTRUCTIONS FOR AVA (LIVE INTERVIEWER)
             </label>
             <textarea
               rows={6}

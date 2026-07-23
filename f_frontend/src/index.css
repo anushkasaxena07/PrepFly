@@ -348,7 +348,7 @@ svg.main-chart text{font-family:'Cabinet Grotesk',sans-serif}
 .stagger>*:nth-child(4){animation-delay:.2s}
 .stagger>*:nth-child(5){animation-delay:.25s}
 .stagger>*:nth-child(6){animation-delay:.3s}
-/* ── HANA AI INTERVIEW WAVES ── */
+/* ── AVA AI INTERVIEW WAVES ── */
 .wave-bar{width:3px;height:5px;border-radius:1.5px;background:var(--red);animation:hwAnim 1s ease-in-out infinite}
 @keyframes hwAnim{0%,100%{transform:scaleY(1)}50%{transform:scaleY(3.5)}}
 .wave-bar:nth-child(2n){animation-delay:.15s}

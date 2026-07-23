@@ -1,10 +1,77 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const renderMarkdown = (text) => {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return lines.map((line, idx) => {
+    const trimmed = line.trim();
+    if (!trimmed) return <div key={idx} style={{ height: "6px" }} />;
+    
+    // Clean up em-dashes and en-dashes
+    let cleanLine = line
+      .replace(/—/g, "-")
+      .replace(/–/g, "-");
+
+    // Headers
+    if (cleanLine.startsWith("## ")) {
+      const headerText = cleanLine.replace("## ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h2 key={idx} style={{ fontSize: "14px", fontWeight: 800, marginTop: "10px", marginBottom: "4px", color: "var(--cyan)" }}>{headerText}</h2>;
+    }
+    if (cleanLine.startsWith("### ")) {
+      const headerText = cleanLine.replace("### ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "#fff" }}>{headerText}</h3>;
+    }
+
+    // Check if bullet point
+    let content = cleanLine;
+    let isBullet = false;
+    if (trimmed.startsWith("* ") || trimmed.startsWith("- ") || trimmed.startsWith("✅ ") || trimmed.startsWith("📈 ") || trimmed.startsWith("💡 ")) {
+      isBullet = true;
+      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
+        content = trimmed.substring(2);
+      } else {
+        content = trimmed; // keep the emoji prefix like ✅, 📈, 💡
+      }
+    }
+
+    // Parse bold text like **something**
+    const parts = [];
+    let lastIndex = 0;
+    const regex = /\*\*(.*?)\*\*/g;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      parts.push(<strong key={match.index} style={{ color: "var(--cyan)", fontWeight: 700 }}>{match[1]}</strong>);
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    const displayContent = parts.length > 0 ? parts : content;
+
+    if (isBullet) {
+      return (
+        <div key={idx} style={{ display: "flex", gap: "6px", paddingLeft: "4px", marginBottom: "6px", alignItems: "flex-start" }}>
+          {!trimmed.startsWith("✅") && !trimmed.startsWith("📈") && !trimmed.startsWith("💡") && (
+            <span style={{ color: "var(--cyan)" }}>•</span>
+          )}
+          <span style={{ flex: 1 }}>{displayContent}</span>
+        </div>
+      );
+    }
+
+    return <p key={idx} style={{ margin: "0 0 6px 0" }}>{displayContent}</p>;
+  });
+};
+
 export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recStatus, setRecStatus] = useState("Click to start recording");
   const [recStatusColor, setRecStatusColor] = useState("var(--text2)");
-  const [transcript, setTranscript] = useState("Your speech will appear here in real-time as you speak...");
+  const [transcript, setTranscript] = useState("");
   const [metrics, setMetrics] = useState({ confidence: "—", pace: "—", fillers: "—", score: "—" });
   const [tone, setTone] = useState(null);
   const [aiFeedback, setAiFeedback] = useState("Analyze your speech to get detailed AI coaching tips.");
@@ -112,8 +179,8 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           setRecStatus("Transcription complete. Click Analyze to get AI feedback.");
           setRecStatusColor("var(--cyan)");
         } catch(e) {
-          setTranscript("Transcription failed: " + e.message + "\n\nYou can paste your transcript manually below.");
-          setRecStatus("Transcription failed. Paste transcript manually.");
+          setTranscript("Transcription failed: " + e.message + ". Please try speaking again.");
+          setRecStatus("Transcription failed. Please try speaking again.");
           setRecStatusColor("var(--red)");
         }
       } else {
@@ -137,7 +204,7 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
     const rawText = transcript.trim();
     const forbidden = ['Your speech will appear', '⏳', 'Transcribing', 'Transcription failed'];
     if (!rawText || forbidden.some(s => rawText.startsWith(s))) {
-      setRecStatus("Please record or paste a transcript first.");
+      setRecStatus("Please record a transcript first.");
       setRecStatusColor("var(--red)");
       return;
     }
@@ -148,9 +215,10 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
 
     if (isLoggedIn()) {
       try {
+        const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
         const res = await apiFetch('/api/speech/analyze', {
           method: 'POST',
-          body: JSON.stringify({ transcript: rawText, duration_seconds: durationRef.current, user_id: user?._id || user?.user_id })
+          body: JSON.stringify({ transcript: rawText, duration_seconds: durationRef.current, user_id: resolvedUserId })
         });
         const d = await res.json();
         if (res.ok) {
@@ -244,15 +312,16 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
               {recStatus}
             </div>
             <div className="sec-sub fw7 mb8">
-              Live Transcript <span className="text-xs text-muted" style={{fontWeight:400}}>(editable — paste manually if needed)</span>
+              Live Transcript
             </div>
             
             <textarea 
               className="transcript-area" 
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
-              style={{width: '100%', resize: 'vertical', border: '1px solid var(--border)', outline: 'none', background: 'rgba(0,0,0,0.2)', color: 'var(--text2)', borderRadius: '12px', padding: '14px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.8', minHeight: '90px'}}
-              placeholder="Your speech will appear here..."
+              readOnly={isRecording}
+              style={{width: '100%', resize: 'vertical', border: '1px solid var(--border)', outline: 'none', background: 'rgba(255,255,255,0.02)', color: 'var(--text2)', borderRadius: '12px', padding: '14px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.8', minHeight: '90px', cursor: isRecording ? 'not-allowed' : 'text'}}
+              placeholder={isRecording ? "Listening and transcribing your speech..." : "Your speech will appear here."}
             />
             
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:"14px"}} onClick={analyzeTranscript}>
@@ -297,7 +366,7 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
             <div className="card" style={{flex:1}}>
               <div style={{fontSize:"14px",fontWeight:800,marginBottom:"10px"}}>AI Feedback</div>
               <div id="speech-feedback" className="text-sm" style={{color:"#b0c0d8",lineHeight:"1.7"}}>
-                {aiFeedback}
+                {renderMarkdown(aiFeedback)}
               </div>
             </div>
           </div>

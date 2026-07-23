@@ -111,9 +111,9 @@ Expected JSON Schema:
   "email": "string",
   "phone": "string",
   "skills": ["string"],
-  "projects": [{"title": "string", "tech_stack": ["string"], "description": "string"}],
-  "experience": [{"role": "string", "company": "string", "duration": "string", "key_achievements": ["string"]}],
-  "education": [{"degree": "string", "institution": "string", "year": "string"}],
+  "projects": [{{"title": "string", "tech_stack": ["string"], "description": "string"}}],
+  "experience": [{{"role": "string", "company": "string", "duration": "string", "key_achievements": ["string"]}}],
+  "education": [{{"degree": "string", "institution": "string", "year": "string"}}],
   "ats_score": 75,
   "missing_info": ["string"]
 }}"""

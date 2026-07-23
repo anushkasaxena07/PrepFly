@@ -194,6 +194,15 @@ export const deleteAdminQuestion = async (qId) => {
   throw new Error("Failed to delete question");
 };
 
+export const giveAdminQuestion = async (qId) => {
+  const res = await adminFetch(`/admin/question-bank/give/${qId}`, {
+    method: "POST"
+  });
+  if (res.ok) return await res.json();
+  const data = await res.json().catch(() => ({}));
+  throw new Error(data.error || "Failed to give question to students");
+};
+
 
 export const getAdminReports = async () => {
   const res = await adminFetch("/admin/reports");

@@ -241,6 +241,10 @@ CREATE TABLE IF NOT EXISTS question_bank (
                 category TEXT,
                 difficulty TEXT,
                 solution TEXT,
+                description TEXT,
+                starter_code TEXT,
+                test_cases TEXT,
+                constraints TEXT,
                 created_at TEXT
             );
 

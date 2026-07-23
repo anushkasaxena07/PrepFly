@@ -80,6 +80,148 @@ SELECT * FROM table_name;
 `
 };
 
+const getDynamicStarterCode = (problem, targetLang) => {
+  if (!problem) return "";
+  
+  // 1. Check if problem already has starter_code for the language
+  let starter = problem.starter_code || {};
+  if (typeof starter === 'string') {
+    try { starter = JSON.parse(starter); } catch(e) { starter = {}; }
+  }
+  if (starter[targetLang]) {
+    return starter[targetLang];
+  }
+  
+  // 2. Derive function name from problem_id slug or title
+  let slug = problem.problem_id || "solution";
+  if (slug.includes("_")) {
+    slug = slug.split("_")[0];
+  }
+  const words = slug.replace(/[^a-zA-Z0-9]/g, " ").trim().split(/\s+/);
+  
+  const camelName = words.map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+  const snakeName = words.map(w => w.toLowerCase()).join("_");
+  const pascalName = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+  
+  const isParentheses = slug.includes("parentheses");
+  
+  switch (targetLang) {
+    case "python":
+      return isParentheses 
+        ? `def ${snakeName}(s: str) -> bool:\n    # Write your code here\n    pass\n`
+        : `def ${snakeName}(nums: list[int], target: int) -> list[int]:\n    # Write your code here\n    pass\n`;
+    case "javascript":
+      return isParentheses
+        ? `function ${camelName}(s) {\n    // Write your code here\n    \n}\n`
+        : `function ${camelName}(nums, target) {\n    // Write your code here\n    \n}\n`;
+    case "typescript":
+      return isParentheses
+        ? `function ${camelName}(s: string): boolean {\n    // Write your code here\n    return false;\n}\n`
+        : `function ${camelName}(nums: number[], target: number): number[] {\n    // Write your code here\n    return [];\n}\n`;
+    case "java":
+      return isParentheses
+        ? `class Solution {\n    public boolean ${camelName}(String s) {\n        // Write your code here\n        return false;\n    }\n}\n`
+        : `class Solution {\n    public int[] ${camelName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+    case "cpp":
+      return isParentheses
+        ? `#include <string>\nusing namespace std;\n\nclass Solution {\npublic:\n    bool ${camelName}(string s) {\n        // Write your code here\n        return false;\n    }\n};\n`
+        : `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<int> ${camelName}(vector<int>& nums, int target) {\n        // Write your code here\n        return {};\n    }\n};\n`;
+    case "csharp":
+      return isParentheses
+        ? `public class Solution {\n    public bool ${pascalName}(string s) {\n        // Write your code here\n        return false;\n    }\n}\n`
+        : `public class Solution {\n    public int[] ${pascalName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+    default:
+      return defaultCodeTemplates[targetLang] || "";
+  }
+};
+
+const renderMarkdown = (text) => {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return lines.map((line, idx) => {
+    const trimmed = line.trim();
+    
+    // Filter out common raw JSON brackets or prompt leaks
+    if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[{" || trimmed === "}]" || trimmed === '"' || trimmed === "'") {
+      return null;
+    }
+    const lowerLine = trimmed.toLowerCase();
+    if (
+      lowerLine.startsWith("return only") || 
+      lowerLine.startsWith("expected json") || 
+      lowerLine.startsWith("return a json") ||
+      lowerLine.includes("preamble") ||
+      lowerLine.includes("markdown codeblock") ||
+      (lowerLine.includes("time_complexity") && lowerLine.includes("string")) ||
+      (lowerLine.includes("space_complexity") && lowerLine.includes("string")) ||
+      (lowerLine.includes("ai_review") && lowerLine.includes("string"))
+    ) {
+      return null;
+    }
+
+    // Clean up em-dashes and en-dashes from headers and content
+    let cleanLine = line
+      .replace(/—/g, "-")
+      .replace(/–/g, "-");
+
+    // Headers
+    if (cleanLine.startsWith("## ")) {
+      const headerText = cleanLine.replace("## ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h2 key={idx} style={{ fontSize: "15px", fontWeight: 800, marginTop: "12px", marginBottom: "6px", color: "var(--cyan)" }}>{headerText}</h2>;
+    }
+    if (cleanLine.startsWith("### ")) {
+      const headerText = cleanLine.replace("### ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "10px", marginBottom: "4px", color: "#fff" }}>{headerText}</h3>;
+    }
+    if (cleanLine.startsWith("#### ")) {
+      const headerText = cleanLine.replace("#### ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h4 key={idx} style={{ fontSize: "12px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "var(--purple)" }}>{headerText}</h4>;
+    }
+    
+    // Check if bullet point (supporting *, -, and dashes)
+    let content = cleanLine;
+    let isBullet = false;
+    const cleanTrimmed = cleanLine.trim();
+    if (cleanTrimmed.startsWith("* ") || cleanTrimmed.startsWith("- ")) {
+      isBullet = true;
+      content = cleanTrimmed.substring(2);
+    }
+    
+    // Parse bold text like **something**
+    const parts = [];
+    let lastIndex = 0;
+    const regex = /\*\*(.*?)\*\*/g;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      parts.push(<strong key={match.index} style={{ color: "var(--cyan)", fontWeight: 700 }}>{match[1]}</strong>);
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+    
+    const displayContent = parts.length > 0 ? parts : content;
+    
+    if (isBullet) {
+      return (
+        <div key={idx} style={{ display: "flex", gap: "6px", paddingLeft: "12px", marginBottom: "4px" }}>
+          <span style={{ color: "var(--cyan)" }}>•</span>
+          <div>{displayContent}</div>
+        </div>
+      );
+    }
+    
+    return (
+      <div key={idx} style={{ marginBottom: "6px" }}>
+        {displayContent}
+      </div>
+    );
+  });
+};
+
 export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const [lang, setLang] = useState("python");
   const [code, setCode] = useState(defaultCodeTemplates.python);
@@ -92,6 +234,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const [aiReview, setAiReview] = useState("Run your code to get AI feedback on time complexity, space complexity, and edge cases.");
   const [hintBox, setHintBox] = useState("Click below to get a hint from your AI coach.");
   const [hintIdx, setHintIdx] = useState(0);
+  const [testCaseResults, setTestCaseResults] = useState(null);
 
   // --- Coding Room and Sheet Upload States ---
   const [problems, setProblems] = useState([]);
@@ -122,11 +265,22 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
-        setProblems(data.problems || []);
+        const problemsList = data.problems || [];
+        setProblems(problemsList);
         
-        // Auto-select standard problem if none active
-        if (!currentProblem && data.problems && data.problems.length > 0) {
-          const twoSum = data.problems.find(p => p.problem_id === "two-sum") || data.problems[0];
+        // Auto-select standard problem or assigned question
+        const pendingPid = localStorage.getItem("selected_problem_id");
+        if (pendingPid) {
+          const found = problemsList.find(p => p.problem_id === pendingPid);
+          if (found) {
+            selectProblem(found);
+            localStorage.removeItem("selected_problem_id");
+            return;
+          }
+        }
+
+        if (!currentProblem && problemsList.length > 0) {
+          const twoSum = problemsList.find(p => p.problem_id === "two-sum") || problemsList[0];
           selectProblem(twoSum);
         }
       }
@@ -154,7 +308,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     try {
       const payload = {
         room_id: roomId,
-        user_id: user?._id || user?.user_id || "anonymous_user",
+        user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "anonymous_user",
         cursor: getCursorPosition()
       };
 
@@ -202,13 +356,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setHintIdx(0);
     setHintBox("Click below to get a hint from your AI coach.");
     
-    // Load starter code
-    let starter = problem.starter_code || {};
-    if (typeof starter === 'string') {
-      try { starter = JSON.parse(starter); } catch(e) { starter = {}; }
-    }
-    
-    const template = starter[lang] || starter["python"] || "";
+    // Load starter code using getDynamicStarterCode
+    const template = getDynamicStarterCode(problem, lang);
     setCode(template);
   };
 
@@ -248,7 +397,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const res = await apiFetch('/api/coding/room/create', {
         method: 'POST',
         body: JSON.stringify({
-          user_id: user?._id || user?.user_id || "interviewer_user",
+          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "interviewer_user",
           user_name: user?.name || "Interviewer",
           problem_id: currentProblem?.problem_id,
           sheet_id: selectedSheetId
@@ -276,7 +425,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         method: 'POST',
         body: JSON.stringify({
           room_id: rId,
-          user_id: user?._id || user?.user_id || "candidate_user",
+          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "candidate_user",
           user_name: user?.name || "Candidate",
           role: user?.role || "candidate"
         })
@@ -318,7 +467,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     
     const formData = new FormData();
     formData.append("sheet", file);
-    formData.append("user_id", user?._id || user?.user_id || "recruiter");
+    formData.append("user_id", user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "recruiter");
     
     try {
       const res = await apiFetch('/api/coding/upload-sheet', {
@@ -354,12 +503,18 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const handleLangChange = (newLang) => {
     setLang(newLang);
     if (currentProblem) {
-      let starter = currentProblem.starter_code || {};
-      if (typeof starter === 'string') {
-        try { starter = JSON.parse(starter); } catch(e) { starter = {}; }
-      }
-      setCode(starter[newLang] || defaultCodeTemplates[newLang] || "");
+      const template = getDynamicStarterCode(currentProblem, newLang);
+      setCode(template);
     }
+  };
+
+  const resetStarterCode = () => {
+    if (!currentProblem) {
+      setCode(defaultCodeTemplates[lang] || "");
+      return;
+    }
+    const template = getDynamicStarterCode(currentProblem, lang);
+    setCode(template);
   };
 
   const getHint = async () => {
@@ -389,6 +544,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setTimeComplexity("—");
     setSpaceComplexity("—");
     setTestPass("—");
+    setTestCaseResults(null);
     setTestPassColor("var(--text2)");
     setAiReview("Analyzing logic...");
 
@@ -399,15 +555,16 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           language: lang,
           code: code,
           problem_id: currentProblem?.problem_id || 'two-sum',
-          user_id: user?._id || user?.user_id
+          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id")
         })
       });
       const d = await res.json();
       if (res.ok) {
+        setTestCaseResults(d.results || []);
         if (d.stderr) {
           setConsoleColor('var(--red)');
           setConsoleOut(`Error:\n${d.stderr}`);
-          setTestPass("0/3");
+          setTestPass(`0/${d.total || 3}`);
           setTestPassColor('var(--red)');
           setAiReview(d.ai_review || "Code runner execution failed due to runtime exception.");
         } else {
@@ -420,10 +577,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           setAiReview(d.ai_review || 'No AI feedback generated.');
         }
       } else {
+        setTestCaseResults([]);
         setConsoleColor('var(--red)');
         setConsoleOut('Error: ' + (d.error || 'Execution sandbox error'));
       }
     } catch(e) {
+      setTestCaseResults([]);
       setConsoleColor('var(--red)');
       setConsoleOut('Execution error: Network connection timeout.');
     }
@@ -473,10 +632,16 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               
               {/* Question Sheet Uploader */}
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-                <label className="btn btn-cyan btn-sm" style={{ cursor: "pointer", margin: 0 }}>
+                <label htmlFor="coding-sheet-upload" className="btn btn-cyan btn-sm" style={{ cursor: "pointer", margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}>
                   📂 Upload Sheet
-                  <input type="file" style={{ display: "none" }} accept=".pdf,.doc,.docx,.xlsx,.csv,.txt,.md,.json" onChange={handleSheetUpload} />
                 </label>
+                <input 
+                  id="coding-sheet-upload"
+                  type="file" 
+                  style={{ display: "none" }} 
+                  accept=".pdf,.doc,.docx,.xlsx,.csv,.txt,.md,.json" 
+                  onChange={handleSheetUpload} 
+                />
                 {isUploading && <span style={{ fontSize: "11px", color: "var(--cyan)" }}>Parsing...</span>}
                 {uploadError && <span style={{ fontSize: "11px", color: "var(--red)" }} title={uploadError}>⚠️ Error</span>}
               </div>
@@ -649,7 +814,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <option value="sql" style={{ background: "#0c1220", color: "#f0f4fd" }}>SQL</option>
               </select>
               <div className="flex gap8">
-                <button className="btn btn-ghost btn-sm" onClick={() => setCode(defaultCodeTemplates[lang] || "")}>Reset Starter</button>
+                <button className="btn btn-ghost btn-sm" onClick={resetStarterCode}>Reset Starter</button>
                 <button className="btn btn-primary btn-sm" onClick={runCode}>▶ Run Code</button>
               </div>
             </div>
@@ -682,10 +847,63 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
             </div>
             
+            {/* Detailed Test Cases Outcome */}
+            {testCaseResults && testCaseResults.length > 0 && (
+              <div className="card-sm" style={{
+                background: "rgba(255,255,255,0.01)",
+                borderColor: "rgba(255,255,255,0.05)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+                maxHeight: "180px",
+                overflowY: "auto",
+                padding: "14px 18px",
+                marginTop: "4px"
+              }}>
+                {/* Sample Tests */}
+                {testCaseResults.some(tc => !tc.is_hidden) && (
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--cyan)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>Sample Tests</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {testCaseResults.filter(tc => !tc.is_hidden).map((tc, idx) => (
+                        <div key={`sample-${idx}`} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#b0c0d8" }}>
+                          <span style={{ color: tc.passed ? "#00d68f" : "var(--red)", fontWeight: "bold" }}>{tc.passed ? "✔" : "✘"}</span>
+                          <span>Test Case {idx + 1}</span>
+                          <span style={{ marginLeft: "auto", fontSize: "10px", color: "var(--text3)" }}>
+                            {tc.passed ? `Passed [${tc.time_ms ? tc.time_ms.toFixed(1) : 0}ms]` : "Failed"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hidden Tests */}
+                {testCaseResults.some(tc => tc.is_hidden) && (
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", marginTop: "4px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--purple)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>Hidden Tests</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#b0c0d8" }}>
+                      <span style={{ 
+                        color: testCaseResults.filter(tc => tc.is_hidden).every(tc => tc.passed) ? "#00d68f" : "var(--red)", 
+                        fontWeight: "bold" 
+                      }}>
+                        {testCaseResults.filter(tc => tc.is_hidden).every(tc => tc.passed) ? "✔" : "✘"}
+                      </span>
+                      <span>
+                        {testCaseResults.filter(tc => tc.is_hidden && tc.passed).length} / {testCaseResults.filter(tc => tc.is_hidden).length} Hidden Tests Passed
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* AI Review Tab */}
             <div className="card-sm" style={{background:"rgba(0,240,200,0.03)", borderColor:"rgba(0,240,200,0.13)", flex: 1, overflowY: "auto", maxHeight: "180px"}}>
               <div className="sec-sub fw7 mb8">AI Code Review</div>
-              <div id="ai-review" className="text-sm" style={{color:"#b0c0d8", lineHeight:"1.6", whiteSpace: "pre-wrap"}}>{aiReview}</div>
+              <div id="ai-review" className="text-sm" style={{color:"#b0c0d8", lineHeight:"1.6", whiteSpace: "pre-wrap"}}>
+                {renderMarkdown(aiReview)}
+              </div>
             </div>
 
             {/* Complexity and test indicators */}

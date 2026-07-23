@@ -44,7 +44,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
         // If the backend has a specific PDF endpoint, let's hit that, else fallback.
         // Wait, backend app.py has: @app.route("/upload", methods=["POST"])
         setResumeText(data.resume_text || data.text || "");
-        setStatusMsg(`✅ PDF extracted (${data.page_count || '?'} pages). Review text below, then click Score.`);
+        const pagesText = data.page_count ? ` (${data.page_count} pages)` : "";
+        setStatusMsg(`✅ Resume text extracted${pagesText}. Review text below, then click Score.`);
         setStatusColor("var(--cyan)");
       } catch(err) {
         setStatusMsg("❌ Upload failed: " + err.message + " — please paste your resume text manually.");
@@ -68,15 +69,16 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       return;
     }
 
-    setStatusMsg("⏳ Scoring with Gemini AI...");
+    setStatusMsg("⏳ Scoring...");
     setStatusColor("var(--text2)");
     setIsScoring(true);
 
     if (isLoggedIn()) {
       try {
+        const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
         const res = await apiFetch('/api/resume/score', {
           method: 'POST',
-          body: JSON.stringify({ resume_text: resumeText, job_description: jdText, user_id: user?._id || user?.user_id })
+          body: JSON.stringify({ resume_text: resumeText, job_description: jdText, user_id: resolvedUserId })
         });
         const data = await res.json();
         if (res.ok) {
@@ -89,7 +91,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
           throw new Error(data.detail || 'Scoring failed');
         }
       } catch(err) {
-        setStatusMsg("❌ AI scoring failed: " + err.message + " — showing local estimate instead.");
+        setStatusMsg("❌ Scoring failed: " + err.message + " — showing local estimate instead.");
         setStatusColor("var(--red)");
       }
     }
@@ -99,7 +101,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       const demoScore = 60 + Math.floor(Math.random() * 30);
       const generatedResults = buildDemoResumeResult(resumeText, jdText, demoScore);
       setResults(generatedResults);
-      setStatusMsg(isLoggedIn() ? "" : "⚠️ Demo mode — log in for real Gemini scoring.");
+      setStatusMsg(isLoggedIn() ? "" : "⚠️ Demo mode — log in for real scoring.");
       setStatusColor("var(--text2)");
       setIsScoring(false);
       scrollToResults();

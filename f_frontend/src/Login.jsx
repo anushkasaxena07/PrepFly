@@ -374,7 +374,7 @@ export default function Login() {
 
   /* ── screen meta ── */
   const screenMeta = {
-    login:            { title: "Welcome back",           sub: "Sign in to continue your journey" },
+    login:            { title: "Welcome Back",           sub: "Sign in to continue your journey" },
     signup:           { title: "Create account",         sub: "Start building something great today" },
     "login-otp":      { title: "Check your email",       sub: "Enter the code we just sent you" },
     "signup-otp":     { title: "Verify your email",      sub: "One last step to activate your account" },

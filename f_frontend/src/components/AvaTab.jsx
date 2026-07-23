@@ -43,7 +43,94 @@ const CircleWavesAvatar = ({ isTalking, isThinking }) => {
   );
 };
 
-export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
+const renderMarkdown = (text) => {
+  if (!text) return null;
+  const lines = text.split("\n");
+  return lines.map((line, idx) => {
+    const trimmed = line.trim();
+    
+    // Filter out common raw JSON brackets or prompt leaks
+    if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[{" || trimmed === "}]" || trimmed === '"' || trimmed === "'") {
+      return null;
+    }
+    const lowerLine = trimmed.toLowerCase();
+    if (
+      lowerLine.startsWith("return only") || 
+      lowerLine.startsWith("expected json") || 
+      lowerLine.startsWith("return a json") ||
+      lowerLine.includes("preamble") ||
+      lowerLine.includes("markdown codeblock") ||
+      (lowerLine.includes("time_complexity") && lowerLine.includes("string")) ||
+      (lowerLine.includes("space_complexity") && lowerLine.includes("string")) ||
+      (lowerLine.includes("ai_review") && lowerLine.includes("string"))
+    ) {
+      return null;
+    }
+
+    // Clean up em-dashes and en-dashes from headers and content
+    let cleanLine = line
+      .replace(/—/g, "-")
+      .replace(/–/g, "-");
+
+    // Headers
+    if (cleanLine.startsWith("## ")) {
+      const headerText = cleanLine.replace("## ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h2 key={idx} style={{ fontSize: "15px", fontWeight: 800, marginTop: "12px", marginBottom: "6px", color: "#00e5c3" }}>{headerText}</h2>;
+    }
+    if (cleanLine.startsWith("### ")) {
+      const headerText = cleanLine.replace("### ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "10px", marginBottom: "4px", color: "#fff" }}>{headerText}</h3>;
+    }
+    if (cleanLine.startsWith("#### ")) {
+      const headerText = cleanLine.replace("#### ", "").replace(/^[-—–\s]+/, "").trim();
+      return <h4 key={idx} style={{ fontSize: "12px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "#a78bfa" }}>{headerText}</h4>;
+    }
+    
+    // Check if bullet point (supporting *, -, and dashes)
+    let content = cleanLine;
+    let isBullet = false;
+    const cleanTrimmed = cleanLine.trim();
+    if (cleanTrimmed.startsWith("* ") || cleanTrimmed.startsWith("- ")) {
+      isBullet = true;
+      content = cleanTrimmed.substring(2);
+    }
+    
+    // Parse bold text like **something**
+    const parts = [];
+    let lastIndex = 0;
+    const regex = /\*\*(.*?)\*\*/g;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      parts.push(<strong key={match.index} style={{ color: "#00e5c3", fontWeight: 700 }}>{match[1]}</strong>);
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+    
+    const displayContent = parts.length > 0 ? parts : content;
+    
+    if (isBullet) {
+      return (
+        <div key={idx} style={{ display: "flex", gap: "6px", paddingLeft: "12px", marginBottom: "4px" }}>
+          <span style={{ color: "#00e5c3" }}>•</span>
+          <div>{displayContent}</div>
+        </div>
+      );
+    }
+    
+    return (
+      <div key={idx} style={{ marginBottom: "6px" }}>
+        {displayContent}
+      </div>
+    );
+  });
+};
+
+export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   // Steps: "resume_upload" -> "type_selection" -> "device_check" -> "loading" -> "live_call" -> "report"
   const [step, setStep] = useState("resume_upload");
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
@@ -90,8 +177,8 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [answer, setAnswer] = useState("");
   const [captionText, setCaptionText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isHanaTalking, setIsHanaTalking] = useState(false);
-  const [isHanaThinking, setIsHanaThinking] = useState(false);
+  const [isAvaTalking, setIsAvaTalking] = useState(false);
+  const [isAvaThinking, setIsAvaThinking] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
   const [reportData, setReportData] = useState(null);
 
@@ -185,10 +272,11 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
       let activeSessionId = null;
       const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
+      const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
       if (setupMode === "resume" && resumeFile) {
         const formData = new FormData();
         formData.append("resume", resumeFile);
-        if (user?._id) formData.append("user_id", user._id);
+        if (resolvedUserId) formData.append("user_id", resolvedUserId);
         const token = localStorage.getItem("access_token");
 
         const res = await fetch(`${BACKEND_URL}/upload`, {
@@ -204,7 +292,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
         const res = await apiFetch("/create-session-no-resume", {
           method: "POST",
           body: JSON.stringify({
-            user_id: user?._id || null,
+            user_id: resolvedUserId || null,
             role: roleTitle || ((selectedType?.name || "Technical") + " Software Engineer"),
             tools: roleTools || "Algorithms, System Design, React, Python",
             experience: "1-3 Years",
@@ -243,9 +331,9 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-  // Play TTS & streaming live captions with Web Speech API fallback
+  // Play Ava speech
   const playAvaSpeech = (text) => {
-    setIsHanaTalking(true);
+    setIsAvaTalking(true);
 
     // Strip markdown formatting symbols for natural vocal speech and accurate captions
     const cleanedText = (text || "")
@@ -261,15 +349,25 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
     const getNaturalVoice = () => {
       if (!('speechSynthesis' in window)) return null;
       const voices = window.speechSynthesis.getVoices();
-      return (
-        voices.find(v => (v.name.includes("Natural") || v.name.includes("Online")) && v.lang.startsWith("en")) ||
-        voices.find(v => v.name.includes("Google US English") || v.name.includes("Google UK English Female")) ||
-        voices.find(v => v.name.includes("Jenny") || v.name.includes("Aria") || v.name.includes("Zira") || v.name.includes("Siri")) ||
-        voices.find(v => v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Victoria") || v.name.includes("Serena")) ||
-        voices.find(v => v.lang.startsWith("en-US") && (v.name.toLowerCase().includes("female") || v.name.includes("Google"))) ||
-        voices.find(v => v.lang.startsWith("en")) ||
-        voices[0]
-      );
+      
+      // Prioritize modern high-quality female natural voices
+      const femaleKeywords = ["jenny", "aria", "samantha", "zira", "google us english", "female", "siri", "victoria", "karen", "serena", "online"];
+      
+      // 1. Exact match for popular female natural/online voices
+      for (const keyword of femaleKeywords) {
+        const found = voices.find(v => v.name.toLowerCase().includes(keyword) && v.lang.startsWith("en"));
+        if (found) return found;
+      }
+      
+      // 2. Any English female voice
+      const anyFemale = voices.find(v => v.name.toLowerCase().includes("female") && v.lang.startsWith("en"));
+      if (anyFemale) return anyFemale;
+      
+      // 3. Fallback to any English voice
+      const anyEnglish = voices.find(v => v.lang.startsWith("en"));
+      if (anyEnglish) return anyEnglish;
+      
+      return voices[0] || null;
     };
 
     const speakWithWebSpeech = () => {
@@ -284,22 +382,22 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
         utterance.rate = 0.96; // Human natural cadence
         utterance.pitch = 1.03; // Warm natural vocal pitch
         utterance.onend = () => {
-          setIsHanaTalking(false);
+          setIsAvaTalking(false);
           startVoiceRecognition();
         };
         utterance.onerror = () => {
-          setIsHanaTalking(false);
+          setIsAvaTalking(false);
           startVoiceRecognition();
         };
         window.speechSynthesis.speak(utterance);
       } else {
-        setIsHanaTalking(false);
+        setIsAvaTalking(false);
         startVoiceRecognition();
       }
     };
 
-    // If browser supports high-quality SpeechSynthesis voices, use WebSpeech for ultra-smooth voice!
-    if ('speechSynthesis' in window && window.speechSynthesis.getVoices().length > 0) {
+    // If browser supports SpeechSynthesis, use WebSpeech for ultra-smooth voice!
+    if ('speechSynthesis' in window) {
       speakWithWebSpeech();
       return;
     }
@@ -319,7 +417,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
         currentAudioRef.current = audio;
         audio.play().catch(() => speakWithWebSpeech());
         audio.onended = () => {
-          setIsHanaTalking(false);
+          setIsAvaTalking(false);
           startVoiceRecognition();
         };
         audio.onerror = () => speakWithWebSpeech();
@@ -373,7 +471,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
   const submitAnswerAndNext = async () => {
     stopVoiceRecognition();
     if (!answer.trim()) return alert("Please speak your answer first.");
-    setIsHanaThinking(true);
+    setIsAvaThinking(true);
     setCaptionText("Evaluating your response...");
 
     try {
@@ -394,7 +492,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
         setAllFeedbacks(prev => [...prev, data.feedback]);
       }
       setAnswer("");
-      setIsHanaThinking(false);
+      setIsAvaThinking(false);
 
       if (data.done) {
         endInterviewSession();
@@ -406,14 +504,14 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
       }
     } catch (err) {
       alert("Error: " + err.message);
-      setIsHanaThinking(false);
+      setIsAvaThinking(false);
     }
   };
 
   // End Interview & Generate Report
   const endInterviewSession = async () => {
     stopVoiceRecognition();
-    setIsHanaThinking(true);
+    setIsAvaThinking(true);
     setCaptionText("Compiling your comprehensive executive evaluation report...");
 
     try {
@@ -426,7 +524,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
 
       setReportData(data);
       setStep("report");
-      setIsHanaThinking(false);
+      setIsAvaThinking(false);
 
       // Poll background report if initial response is "Generating..."
       if (data.report && data.report.includes("Generating")) {
@@ -446,7 +544,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
       }
     } catch (err) {
       alert("Error generating report: " + err.message);
-      setIsHanaThinking(false);
+      setIsAvaThinking(false);
     }
   };
 
@@ -577,7 +675,17 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
             )}
 
             <div style={{ textAlign: "center", marginTop: "28px" }}>
-              <button onClick={() => setStep("type_selection")} style={{ padding: "14px 28px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} title="Continue to Track Selection">
+              <button 
+                onClick={() => {
+                  if (setupMode === "resume" && !resumeFile) {
+                    alert("Please upload your resume file (PDF/DOCX) first, or switch to Custom Topics Mode.");
+                    return;
+                  }
+                  setStep("type_selection");
+                }} 
+                style={{ padding: "14px 28px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} 
+                title="Continue to Track Selection"
+              >
                 Continue to Track Selection ➔
               </button>
             </div>
@@ -740,7 +848,7 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
                 
                 {/* Ava Concentric Waves Orb */}
                 <div style={{ width: "220px", height: "220px", position: "relative", margin: "10px 0" }}>
-                  <CircleWavesAvatar isTalking={isHanaTalking} isThinking={isHanaThinking} />
+                  <CircleWavesAvatar isTalking={isAvaTalking} isThinking={isAvaThinking} />
                 </div>
 
                 {/* Subtitles / Spoken Question */}
@@ -758,8 +866,8 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
                       {isSpeakingAnswer ? "🔴 Listening to your voice..." : "🎙️ Click to Speak Answer"}
                     </button>
                     
-                    <button onClick={submitAnswerAndNext} disabled={isHanaThinking} style={{ padding: "12px 24px", borderRadius: "14px", background: "#00c4a7", border: "none", color: "#000", fontWeight: 900, fontSize: "14px", cursor: "pointer" }}>
-                      {isHanaThinking ? "Evaluating..." : "Submit Spoken Answer →"}
+                    <button onClick={submitAnswerAndNext} disabled={isAvaThinking} style={{ padding: "12px 24px", borderRadius: "14px", background: "#00c4a7", border: "none", color: "#000", fontWeight: 900, fontSize: "14px", cursor: "pointer" }}>
+                      {isAvaThinking ? "Evaluating..." : "Submit Spoken Answer →"}
                     </button>
                   </div>
 
@@ -846,8 +954,8 @@ export default function HanaTab({ apiFetch, isLoggedIn, user = {} }) {
 
               {/* AI RECRUITER REPORT */}
               {reportData.report && !reportData.report.includes("Generating") && (
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", textAlign: "left", color: "#e2e8f0", lineHeight: "1.7", whiteSpace: "pre-wrap", marginBottom: "28px", fontSize: "13px" }}>
-                  {reportData.report}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", textAlign: "left", color: "#e2e8f0", lineHeight: "1.7", marginBottom: "28px", fontSize: "13px" }}>
+                  {renderMarkdown(reportData.report)}
                 </div>
               )}
 

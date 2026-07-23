@@ -202,6 +202,39 @@ Return ONLY valid JSON:
 
 
 def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model):
+    # 1. Count valid answers
+    valid_count = 0
+    for ans in (responses or []):
+        if ans and str(ans).strip():
+            clean_ans = str(ans).strip().lower().replace(".", "").replace(",", "").strip()
+            if clean_ans not in ("[no response recorded]", "skipped", "skip", "i don't know", "none", "no response", ""):
+                if len(clean_ans.split()) >= 2:
+                    valid_count += 1
+
+    # 2. Programmatically return a zero-score F-grade report if there are zero valid answers
+    if valid_count == 0:
+        f_report = {
+            "overall_score": 0,
+            "technical_score": 0,
+            "communication_score": 0,
+            "confidence_score": 0,
+            "fluency_score": 0,
+            "problem_solving_score": 0,
+            "strengths": ["None identified"],
+            "weaknesses": ["No responses were recorded for the interview questions."],
+            "mistakes": [],
+            "improvement_suggestions": ["Please complete the interview and provide verbal or text responses to the questions."],
+            "ideal_answers": [],
+            "transcript_analytics": {
+                "words_per_minute": 0,
+                "filler_word_count": {},
+                "confidence_trend": "flat",
+                "topic_performance": [{"topic": track or "Core Technical", "score": 0}]
+            },
+            "learning_roadmap": ["Complete the interview to receive a study guide."]
+        }
+        return enrich_report_with_grading(f_report)
+
     full_transcript_lines = []
     for idx, q in enumerate(questions or []):
         ans = responses[idx] if (responses and idx < len(responses)) else "[No response recorded]"
@@ -233,6 +266,11 @@ Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code block
   "learning_roadmap": ["Deep dive into system scalability", "Brush up on graph algorithms"]
 }}
 
+CRITICAL EVALUATION RULES:
+1. If a candidate skips a question, leaves it blank, or says they don't know, you must deduct points.
+2. If the candidate failed to answer any technical content, their scores MUST be close to 0 and their grade must be F.
+3. Scale the scores strictly and proportionally based on their actual responses.
+
 Transcript:
 {full_transcript}"""
 
@@ -249,25 +287,31 @@ Transcript:
         return enrich_report_with_grading(parsed)
     except Exception as e:
         print("End-of-interview report generation notice:", e)
+        total_questions = len(questions) if questions else 1
+        completion_ratio = valid_count / total_questions
+        overall_score = round(78 * completion_ratio)
+        if overall_score < 10:
+            overall_score = 10
+
         fallback = {
-            "overall_score": 78,
-            "technical_score": 80,
-            "communication_score": 75,
-            "confidence_score": 78,
-            "fluency_score": 80,
-            "problem_solving_score": 76,
-            "strengths": ["Demonstrated foundational domain understanding", "Clear verbal responses", "Structured explanation of technical concepts"],
-            "weaknesses": ["Could provide more quantified production metrics", "Should elaborate further on system trade-offs"],
+            "overall_score": overall_score,
+            "technical_score": round(80 * completion_ratio),
+            "communication_score": round(75 * completion_ratio),
+            "confidence_score": round(78 * completion_ratio),
+            "fluency_score": round(80 * completion_ratio),
+            "problem_solving_score": round(76 * completion_ratio),
+            "strengths": ["Demonstrated foundational domain understanding", "Clear verbal responses"],
+            "weaknesses": ["Candidate did not provide responses for all questions"],
             "mistakes": [],
-            "improvement_suggestions": ["Elaborate on trade-off analysis during technical rounds", "Reduce filler word usage during complex responses", "Use STAR framework for behavioral scenarios", "Structure responses with upfront summary", "Provide concrete benchmark metrics"],
+            "improvement_suggestions": ["Elaborate on technical trade-offs", "Attempt all questions in the interview rounds"],
             "ideal_answers": [],
             "transcript_analytics": {
-                "words_per_minute": 130,
-                "filler_word_count": {"um": 2, "like": 3, "you_know": 1},
-                "confidence_trend": "increasing",
-                "topic_performance": [{"topic": track or "Core Technical", "score": 80}]
+                "words_per_minute": 120,
+                "filler_word_count": {},
+                "confidence_trend": "stable",
+                "topic_performance": [{"topic": track or "Core Technical", "score": overall_score}]
             },
-            "learning_roadmap": ["Review system trade-offs and STAR behavioral storytelling"]
+            "learning_roadmap": ["Review mock interview basics and structure technical explanations"]
         }
         return enrich_report_with_grading(fallback)
 
@@ -286,8 +330,19 @@ def enrich_report_with_grading(report: dict) -> dict:
     report["performance_level"] = g_info["level"]
 
     sections = compute_section_grades([], {"clarity": report.get("communication_score", 80), "wpm": report.get("transcript_analytics", {}).get("words_per_minute", 135)})
+    
+    if score == 0:
+        for sec in sections:
+            sec["score"] = 0
+            sec["grade"] = "F"
+            sec["color"] = "#991b1b"
+            sec["bgColor"] = "rgba(153, 27, 27, 0.15)"
+            sec["label"] = "Significant Improvement Required"
+        report["badges"] = []
+    else:
+        report["badges"] = award_badges(score, sections)
+        
     report["section_grades"] = sections
-    report["badges"] = award_badges(score, sections)
 
     strengths = report.get("strengths") or []
     if len(strengths) < 5:

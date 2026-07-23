@@ -7,7 +7,7 @@ import DashboardTab from "./components/DashboardTab";
 import CodingTab from "./components/CodingTab";
 import SpeechTab from "./components/SpeechTab";
 import ResumeTab from "./components/ResumeTab";
-import HanaTab from "./components/HanaTab";
+import AvaTab from "./components/AvaTab";
 import InterviewsTab from "./components/InterviewsTab";
 import AnalyticsTab from "./components/AnalyticsTab";
 import Profile from "./profile";
@@ -27,6 +27,10 @@ export default function Dashboard() {
   const [settings, setSettings] = useState({ name: "Anushka", targetRole: "Super Admin Platform Lead", voiceEnabled: true, detailLevel: "High" });
   const [linkedInUrl, setLinkedInUrl] = useState(localStorage.getItem("linkedin_url") || "");
   const [linkedInSuccess, setLinkedInSuccess] = useState(false);
+  const [showPracticeModal, setShowPracticeModal] = useState(false);
+  const [practiceQuestion, setPracticeQuestion] = useState(null);
+  const [studentAnswer, setStudentAnswer] = useState("");
+  const [answerFeedback, setAnswerFeedback] = useState("");
 
   const notifRef = useRef(null);
   const profileRef = useRef(null);
@@ -164,7 +168,23 @@ export default function Dashboard() {
   const handleNotifClick = (notif) => {
     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
     setShowNotif(false);
-    if (notif.type) {
+
+    if (notif.type === "practice_question") {
+      try {
+        const qData = typeof notif.raw_message === "string" ? JSON.parse(notif.raw_message) : notif.raw_message;
+        if (qData.category === "Coding") {
+          localStorage.setItem("selected_problem_id", qData.question_id);
+          setActiveTab("coding");
+        } else {
+          setPracticeQuestion(qData);
+          setStudentAnswer("");
+          setAnswerFeedback("");
+          setShowPracticeModal(true);
+        }
+      } catch (e) {
+        console.error("Failed to parse question notification:", e);
+      }
+    } else if (notif.type) {
       setActiveTab(notif.type);
     }
   };
@@ -202,7 +222,7 @@ export default function Dashboard() {
           <button className={`nav-link ${activeTab === 'coding' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('coding')} disabled={isOrgExpired} role="tab">Coding</button>
           <button className={`nav-link ${activeTab === 'speech' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('speech')} disabled={isOrgExpired} role="tab">Speech AI</button>
           <button className={`nav-link ${activeTab === 'resume' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('resume')} disabled={isOrgExpired} role="tab">Resume AI</button>
-          <button className={`nav-link ${activeTab === 'hana' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('hana')} disabled={isOrgExpired} role="tab">AI Interview</button>
+          <button className={`nav-link ${activeTab === 'ava' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('ava')} disabled={isOrgExpired} role="tab">AI Interview</button>
           <button className={`nav-link ${activeTab === 'interviews' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('interviews')} disabled={isOrgExpired} role="tab">Interviews</button>
           <button className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('analytics')} disabled={isOrgExpired} role="tab">Analytics</button>
         </div>
@@ -369,7 +389,7 @@ export default function Dashboard() {
             {activeTab === "coding" && <CodingTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "speech" && <SpeechTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "resume" && <ResumeTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
-            {activeTab === "hana" && <HanaTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
+            {activeTab === "ava" && <AvaTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "interviews" && <InterviewsTab setActiveTab={setActiveTab} apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "analytics" && <AnalyticsTab user={user} history={history} userStats={userStats} />}
             {activeTab === "profile" && <Profile onBackToDashboard={() => setActiveTab("dashboard")} setActiveTab={setActiveTab} apiFetch={apiFetch} initialSubTab={profileInitialSubTab} />}
@@ -481,6 +501,74 @@ export default function Dashboard() {
                 <button className="btn btn-primary btn-sm" onClick={() => { setShowLinkedIn(false); setLinkedInSuccess(false); }}>Done</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {showPracticeModal && practiceQuestion && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+          <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "600px", width: "100%", color: "#fff", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <span className="pill pill-purple" style={{ fontSize: "10px", marginRight: "6px" }}>{practiceQuestion.category}</span>
+                <span className="pill pill-cyan" style={{ fontSize: "10px" }}>{practiceQuestion.difficulty}</span>
+                <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "6px 0 0 0" }}>🎯 Practice: {practiceQuestion.title}</h3>
+              </div>
+              <button onClick={() => setShowPracticeModal(false)} style={{ background: "none", border: "none", color: "var(--text2)", fontSize: "20px", cursor: "pointer" }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "13px" }}>
+              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "12px 16px", borderRadius: "10px", lineHeight: "1.5" }}>
+                <div style={{ fontWeight: 800, marginBottom: "4px", color: "var(--text2)" }}>Question Prompt</div>
+                <div style={{ color: "#fff", whiteSpace: "pre-line" }}>{practiceQuestion.description}</div>
+              </div>
+
+              {practiceQuestion.constraints && (
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", padding: "10px 14px", borderRadius: "8px", fontFamily: "monospace", fontSize: "11px", color: "var(--text2)" }}>
+                  <strong>Constraints:</strong> {practiceQuestion.constraints}
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: "block", fontWeight: 700, color: "var(--text2)", marginBottom: "6px" }}>Draft Your Answer</label>
+                <textarea 
+                  rows="5" 
+                  value={studentAnswer} 
+                  onChange={e => setStudentAnswer(e.target.value)} 
+                  placeholder="Type your explanation or structured answer here..." 
+                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px 14px", color: "#fff", lineHeight: "1.5", fontSize: "13px" }} 
+                />
+              </div>
+
+              {!answerFeedback ? (
+                <button 
+                  onClick={() => {
+                    if (!studentAnswer.trim()) {
+                      alert("Please draft your answer first!");
+                      return;
+                    }
+                    setAnswerFeedback("Compare your solution guide above with your drafted response. Pay close attention to key definitions, structure, and communication depth.");
+                  }} 
+                  className="btn btn-primary" 
+                  style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", fontWeight: 800, padding: "10px 0" }}
+                >
+                  📝 Submit & Compare with Model Answer
+                </button>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "4px" }}>
+                  <div style={{ background: "rgba(0, 196, 167, 0.08)", border: "1px solid rgba(0, 196, 167, 0.2)", padding: "12px 14px", borderRadius: "8px", color: "#00e1bf", fontSize: "12px", lineHeight: "1.4" }}>
+                    <strong>✅ Draft Submitted!</strong>
+                    <div>{answerFeedback}</div>
+                  </div>
+
+                  {practiceQuestion.solution && (
+                    <div style={{ background: "rgba(124, 79, 224, 0.08)", border: "1px solid rgba(124, 79, 224, 0.2)", padding: "14px", borderRadius: "10px", lineHeight: "1.5" }}>
+                      <div style={{ fontWeight: 800, color: "#c0a7ff", marginBottom: "6px" }}>💡 Model Solution / Answer Guide</div>
+                      <div style={{ color: "#fff", whiteSpace: "pre-line" }}>{practiceQuestion.solution}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

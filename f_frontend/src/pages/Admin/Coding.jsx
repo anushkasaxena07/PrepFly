@@ -14,6 +14,7 @@ export default function Coding() {
   // Test Case Editor Tab in Modal
   const [testCaseTab, setTestCaseTab] = useState('hidden'); // 'visible' | 'hidden'
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [templateLangTab, setTemplateLangTab] = useState('python');
 
   const [newTest, setNewTest] = useState({
     title: '',
@@ -40,6 +41,12 @@ export default function Coding() {
       { input: 'nums = [-10, 20, -30, 40], target = 10', output: '[0, 1]', description: 'Edge Case 6: Mixed sign values' },
       { input: 'nums = [100], target = 100', output: '[]', description: 'Edge Case 7: Single element boundary' }
     ],
+    starter_code: {
+      python: "def solve(nums, target):\n    # Write Python 3 code here\n    pass\n",
+      javascript: "function solve(nums, target) {\n    // Write JavaScript code here\n    \n}\n",
+      cpp: "class Solution {\npublic:\n    vector<int> solve(vector<int>& nums, int target) {\n        // Write C++ code here\n        return {};\n    }\n};\n",
+      java: "class Solution {\n    public int[] solve(int[] nums, int target) {\n        // Write Java code here\n        return new int[]{};\n    }\n}\n"
+    },
     constraints: 'Time: 2.0s | Memory: 256MB'
   });
 
@@ -77,6 +84,12 @@ export default function Coding() {
         sample_output: '[0, 1]',
         visible_test_cases: [],
         hidden_test_cases: [],
+        starter_code: {
+          python: "def solve(nums, target):\n    # Write Python 3 code here\n    pass\n",
+          javascript: "function solve(nums, target) {\n    // Write JavaScript code here\n    \n}\n",
+          cpp: "class Solution {\npublic:\n    vector<int> solve(vector<int>& nums, int target) {\n        // Write C++ code here\n        return {};\n    }\n};\n",
+          java: "class Solution {\n    public int[] solve(int[] nums, int target) {\n        // Write Java code here\n        return new int[]{};\n    }\n}\n"
+        },
         constraints: 'Time: 2.0s | Memory: 256MB'
       });
     } catch (e) {
@@ -431,6 +444,44 @@ export default function Coding() {
                   </button>
                 </div>
 
+              </div>
+
+              {/* STARTER CODE TEMPLATE */}
+              <div style={{ background: "rgba(0,240,200,0.03)", border: "1px solid rgba(0,240,200,0.15)", borderRadius: "12px", padding: "14px" }}>
+                <strong style={{ fontSize: "14px", color: "#fff", display: "block", marginBottom: "4px" }}>💻 Starter Code Template Editor</strong>
+                <div style={{ fontSize: "11px", color: "var(--text2)", marginBottom: "10px" }}>Set the initial code boilerplate candidates see when loading the problem in the IDE.</div>
+                
+                <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+                  {['python', 'javascript', 'cpp', 'java'].map(lang => (
+                    <button
+                      key={lang}
+                      type="button"
+                      onClick={() => setTemplateLangTab(lang)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        borderRadius: "6px",
+                        border: "none",
+                        cursor: "pointer",
+                        background: templateLangTab === lang ? "var(--cyan)" : "rgba(255,255,255,0.05)",
+                        color: templateLangTab === lang ? "#000" : "var(--text2)"
+                      }}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  rows="5"
+                  value={newTest.starter_code[templateLangTab] || ""}
+                  onChange={e => {
+                    const updatedStarter = { ...newTest.starter_code, [templateLangTab]: e.target.value };
+                    setNewTest({ ...newTest, starter_code: updatedStarter });
+                  }}
+                  placeholder={`Write the starter template code that candidates will see in the editor for ${templateLangTab}...`}
+                  style={{ width: "100%", background: "#141d30", fontFamily: "monospace", fontSize: "12px", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", resize: "vertical", lineHeight: "1.5" }}
+                />
               </div>
 
               {/* CONSTRAINTS */}

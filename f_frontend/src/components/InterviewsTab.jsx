@@ -37,19 +37,160 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const [inputMsg, setInputMsg] = useState("");
   const [sharedNotes, setSharedNotes] = useState("// Technical Interview Notes & System Design Outline\n- Candidate evaluated on Data Structures & Problem Solving\n- Solution complexity: O(N) Time, O(1) Space\n");
 
+  // AI Speech Assistant states
+  const [isSpeechAssistantActive, setIsSpeechAssistantActive] = useState(false);
+  const [fillerCount, setFillerCount] = useState(0);
+  const [detectedFillers, setDetectedFillers] = useState({});
+  const [speechTranscript, setSpeechTranscript] = useState("");
+  const [suggestedQuestion, setSuggestedQuestion] = useState("Can you explain how WebRTC manages NAT traversal with STUN/TURN servers?");
+  const recognitionRef = useRef(null);
+
   const localVideoRef = useRef(null);
   const mediaStreamRef = useRef(null);
 
   const userId = user?._id || user?.id || "user_guest";
   const userName = user?.full_name || user?.name || "Candidate";
 
-  // Load history & active rooms
+  // WebRTC Live video room states and refs
+  const [roomParticipants, setRoomParticipants] = useState([]);
+  const remoteVideoRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const sentOfferRef = useRef(false);
+  const syncIntervalRef = useRef(null);
+
+  // Load history, active rooms & check for auto-join shareable link
   useEffect(() => {
     fetchActiveRooms();
     if (isLoggedIn() && userId) {
       loadHistory();
     }
+
+    const params = new URLSearchParams(window.location.search);
+    const roomParam = params.get("room");
+    if (roomParam) {
+      setRoomCodeInput(roomParam.toUpperCase());
+      setTimeout(() => {
+        handleJoinRoom(roomParam);
+      }, 1000);
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
   }, [userId]);
+
+  // Dynamic suggested question from Gemini AI Coach
+  const generateDynamicSuggestedQuestion = async (text) => {
+    if (!text || !text.trim()) return;
+    try {
+      const res = await apiFetch('/api/webrtc/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestedQuestion(data.suggestion);
+      }
+    } catch (err) {
+      console.warn("AI Coach suggestion failed, using default fallback:", err);
+    }
+  };
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Web Speech API is not supported in this browser. Please use Google Chrome.");
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = 'en-US';
+
+    const fillersList = ['um', 'uh', 'like', 'actually', 'basically', 'so'];
+
+    rec.onstart = () => {
+      setIsSpeechAssistantActive(true);
+      setSpeechTranscript("Listening to microphone...");
+    };
+
+    rec.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      const latestText = finalTranscript || interimTranscript;
+      setSpeechTranscript(latestText);
+
+      const words = latestText.toLowerCase().split(/\s+/);
+      let count = 0;
+      const tracked = {};
+      
+      words.forEach(w => {
+        const cleanW = w.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g,"");
+        if (fillersList.includes(cleanW)) {
+          count++;
+          tracked[cleanW] = (tracked[cleanW] || 0) + 1;
+        }
+      });
+
+      setFillerCount(count);
+      setDetectedFillers(tracked);
+
+      if (finalTranscript) {
+        generateDynamicSuggestedQuestion(finalTranscript);
+      }
+    };
+
+    rec.onerror = (err) => {
+      console.warn("Speech Recognition notice/error:", err.error);
+    };
+
+    rec.onend = () => {
+      if (recognitionRef.current === rec) {
+        try {
+          rec.start();
+        } catch (e) {
+          setIsSpeechAssistantActive(false);
+        }
+      } else {
+        setIsSpeechAssistantActive(false);
+      }
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsSpeechAssistantActive(false);
+  };
+
+  const toggleSpeechAssistant = () => {
+    if (isSpeechAssistantActive) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  };
 
   const fetchActiveRooms = async () => {
     try {
@@ -139,6 +280,170 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
   };
 
+  // Sync room state, chat, and notes polling loop
+  useEffect(() => {
+    if (inCall && currentRoom) {
+      syncIntervalRef.current = setInterval(syncInterviewRoomState, 2000);
+      syncInterviewRoomState();
+    } else {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
+      }
+    };
+  }, [inCall, currentRoom]);
+
+  const getRemoteParticipantId = () => {
+    const remote = roomParticipants.find(p => p.user_id !== userId);
+    return remote ? remote.user_id : null;
+  };
+
+  const sendSignal = async (recipientId, signal) => {
+    try {
+      await apiFetch('/api/webrtc/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender_id: userId,
+          recipient_id: recipientId,
+          signal: signal
+        })
+      });
+    } catch (err) {
+      console.warn("Signal send failed:", err);
+    }
+  };
+
+  const initRTCPeerConnection = (stream) => {
+    if (peerConnectionRef.current) return;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+
+    if (stream) {
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    }
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current && event.streams[0]) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && currentRoom) {
+        const targetId = getRemoteParticipantId();
+        if (targetId) {
+          sendSignal(targetId, { type: "candidate", candidate: event.candidate });
+        }
+      }
+    };
+
+    peerConnectionRef.current = pc;
+  };
+
+  const syncInterviewRoomState = async () => {
+    if (!currentRoom) return;
+    try {
+      // 1. Poll room synchronization (chat, notes, participants)
+      const res = await apiFetch('/api/webrtc/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_code: currentRoom.room_code,
+          user_id: userId,
+          user_name: userName
+        })
+      });
+
+      let latestParticipants = [];
+      if (res.ok) {
+        const data = await res.json();
+        if (data.participants) {
+          latestParticipants = data.participants;
+          setRoomParticipants(data.participants);
+        }
+        if (data.chat_messages) {
+          setChatMessages(data.chat_messages);
+        }
+        if (data.shared_notes && data.shared_notes !== sharedNotes) {
+          const textarea = document.getElementById("interview-notes-textarea");
+          if (document.activeElement !== textarea) {
+            setSharedNotes(data.shared_notes);
+          }
+        }
+      }
+
+      // 2. WebRTC P2P signaling exchange
+      const signalRes = await apiFetch(`/api/webrtc/signals?user_id=${userId}`);
+      if (signalRes.ok) {
+        const signalData = await signalRes.json();
+        for (const sig of signalData.signals || []) {
+          const { sender_id, signal } = sig;
+          if (!peerConnectionRef.current) {
+            initRTCPeerConnection(mediaStreamRef.current);
+          }
+          const pc = peerConnectionRef.current;
+          if (signal.type === "offer") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            sendSignal(sender_id, answer);
+          } else if (signal.type === "answer") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal));
+          } else if (signal.type === "candidate") {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+            } catch (e) {
+              console.warn("Error adding ICE candidate:", e);
+            }
+          }
+        }
+      }
+
+      // 3. If host (interviewer) and remote candidate is detected, send WebRTC connection offer
+      const isHost = currentRoom.created_by === userId;
+      const remoteId = latestParticipants.find(p => p.user_id !== userId)?.user_id;
+      if (remoteId && isHost && !sentOfferRef.current) {
+        sentOfferRef.current = true;
+        initRTCPeerConnection(mediaStreamRef.current);
+        const pc = peerConnectionRef.current;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal(remoteId, offer);
+      }
+
+    } catch (err) {
+      console.warn("Interview room sync error:", err);
+    }
+  };
+
+  const handleNotesChange = async (val) => {
+    setSharedNotes(val);
+    if (!currentRoom) return;
+    try {
+      await apiFetch('/api/webrtc/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_code: currentRoom.room_code,
+          user_id: userId,
+          user_name: userName,
+          new_notes: val
+        })
+      });
+    } catch (err) {
+      console.warn(err);
+    }
+  };
+
   // Launch Video Room Overlay & request media stream
   const launchWebRTCVideoRoom = (roomData) => {
     setShowCodeModal(false);
@@ -155,6 +460,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
+          initRTCPeerConnection(stream);
         })
         .catch(err => {
           console.warn("Media devices stream warning:", err);
@@ -213,6 +519,20 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
     setInCall(false);
     setIsScreenSharing(false);
+    setRoomParticipants([]);
+    sentOfferRef.current = false;
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+    setIsSpeechAssistantActive(false);
 
     const roomData = currentRoom;
     setCurrentRoom(null);
@@ -735,18 +1055,34 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 overflow: "hidden",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center"
+                justifyContent: "center",
+                width: "100%",
+                height: "100%"
               }}>
-                <div style={{textAlign: "center"}}>
-                  <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #0e7a5e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, margin: "0 auto 12px"}}>
-                    P2P
+                <video 
+                  ref={remoteVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  style={{
+                    width: "100%", 
+                    height: "100%", 
+                    objectFit: "cover", 
+                    display: getRemoteParticipantId() ? "block" : "none"
+                  }}
+                />
+
+                {!getRemoteParticipantId() && (
+                  <div style={{textAlign: "center"}}>
+                    <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #0e7a5e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, margin: "0 auto 12px"}}>
+                      P2P
+                    </div>
+                    <div style={{fontSize: "14px", fontWeight: 700}}>Remote Peer / Candidate</div>
+                    <div style={{fontSize: "11px", color: "var(--cyan)", marginTop: "4px"}}>Waiting for Peer WebRTC Connection...</div>
                   </div>
-                  <div style={{fontSize: "14px", fontWeight: 700}}>Remote Peer / Candidate</div>
-                  <div style={{fontSize: "11px", color: "var(--cyan)", marginTop: "4px"}}>Waiting for Peer WebRTC Connection...</div>
-                </div>
+                )}
 
                 <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700}}>
-                  Peer Participant 🎙 Active
+                  {roomParticipants.find(p => p.user_id !== userId)?.name || "Remote Peer"} 🎙 Active
                 </div>
               </div>
             </div>
@@ -811,24 +1147,66 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                   <div style={{height: "100%", display: "flex", flexDirection: "column"}}>
                     <label style={{fontSize: "11px", fontWeight: 700, color: "var(--text2)", textTransform: "uppercase", marginBottom: "4px"}}>Collaborative Shared Notes</label>
                     <textarea 
+                      id="interview-notes-textarea"
                       className="form-input"
                       style={{flex: 1, fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5", resize: "none"}}
                       value={sharedNotes}
-                      onChange={(e) => setSharedNotes(e.target.value)}
+                      onChange={(e) => handleNotesChange(e.target.value)}
                     />
                   </div>
                 )}
 
                 {activeSubPanel === 'ai' && (
                   <div className="flex-col gap10 text-xs">
-                    <div style={{fontWeight: 800, color: "var(--cyan)", fontSize: "13px"}}>🤖 AI Real-Time Assistant</div>
-                    <div className="card-sm text-muted">
-                      Speech-to-text transcript analysis active. 0 filler words detected so far.
+                    <style>{`
+                      @keyframes pulse-red {
+                        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+                        70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+                        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+                      }
+                      .pulse-mic {
+                        animation: pulse-red 2s infinite;
+                      }
+                    `}</style>
+                    <div style={{fontWeight: 800, color: "var(--cyan)", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>
+                      <span>🤖 AI Real-Time Assistant</span>
+                      {isSpeechAssistantActive && (
+                        <span 
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            background: "var(--red)",
+                            display: "inline-block"
+                          }} 
+                          className="pulse-mic"
+                        />
+                      )}
                     </div>
-                    <div className="card-sm">
-                      <strong>Suggested Question:</strong> "Can you explain how WebRTC manages NAT traversal with STUN/TURN servers?"
+                    <div className="card-sm text-muted" style={{ lineHeight: "1.5" }}>
+                      Speech-to-text transcript analysis active. {fillerCount} filler words detected so far.
+                      {Object.keys(detectedFillers).length > 0 && (
+                        <div style={{ marginTop: "6px", color: "var(--orange)", fontSize: "10px", fontWeight: "bold" }}>
+                          Detected: {Object.entries(detectedFillers).map(([k, v]) => `"${k}" (${v}x)`).join(", ")}
+                        </div>
+                      )}
                     </div>
-                    <button className="btn btn-ghost btn-xs" onClick={() => alert("AI Speech transcription running in real-time.")}>🎙 Run Speech Diagnostic</button>
+                    {speechTranscript && (
+                      <div className="card-sm" style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.05)", fontStyle: "italic", maxHeight: "90px", overflowY: "auto", color: "var(--text2)", padding: "8px 12px" }}>
+                        "{speechTranscript}"
+                      </div>
+                    )}
+                    <div className="card-sm" style={{ borderLeft: "3px solid var(--cyan)", background: "rgba(0,240,200,0.02)" }}>
+                      <strong style={{ color: "var(--cyan)" }}>Suggested Question:</strong><br />
+                      <div style={{ marginTop: "4px", fontSize: "12px", color: "var(--text1)" }}>"{suggestedQuestion}"</div>
+                    </div>
+                    <button 
+                      className={`btn btn-xs ${isSpeechAssistantActive ? 'btn-purple' : 'btn-ghost'}`} 
+                      style={{ width: "100%", justifyContent: "center", gap: "6px" }}
+                      onClick={toggleSpeechAssistant}
+                    >
+                      {isSpeechAssistantActive ? "🛑 Stop Speech Diagnostic" : "🎙 Run Speech Diagnostic"}
+                    </button>
                   </div>
                 )}
               </div>

@@ -418,9 +418,20 @@ class SQLiteSupabaseMock:
                 category TEXT,
                 difficulty TEXT,
                 solution TEXT,
+                description TEXT,
+                starter_code TEXT,
+                test_cases TEXT,
+                constraints TEXT,
                 created_at TEXT
             )
         """)
+        # Run migrations for existing DBs
+        for col_name in ["description", "starter_code", "test_cases", "constraints"]:
+            try:
+                cursor.execute(f"ALTER TABLE question_bank ADD COLUMN {col_name} TEXT")
+            except sqlite3.OperationalError:
+                pass
+
 
         # 22. admin_interviews
         cursor.execute("""
