@@ -156,7 +156,7 @@ class SupabaseFallbackClient:
                         # Intercept sessions table write queries to bypass missing Supabase columns
                         if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
                             import json
-                            metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color"]
+                            metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color", "grade_label", "performance_level", "hiring_recommendation"]
                             
                             def process_dict(data):
                                 metadata = {}
@@ -195,7 +195,7 @@ class SupabaseFallbackClient:
                     # Intercept sessions table read queries to restore custom metadata fields
                     if self.table_name == "sessions" and hasattr(res, "data") and res.data:
                         import json
-                        metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color"]
+                        metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color", "grade_label", "performance_level", "hiring_recommendation"]
                         for row in res.data:
                             if isinstance(row, dict) and "storage_path" in row and row["storage_path"]:
                                 try:
@@ -1457,11 +1457,71 @@ def end_interview():
         responses = session.get("responses") or []
         resume_text = session.get("resume_text") or ""
 
+        # Check if candidate provided any valid responses
+        non_empty_responses = [r for r in responses if isinstance(r, str) and r.strip()]
+        valid_responses = []
+        for r in non_empty_responses:
+            clean = r.strip().lower().replace(".", "").replace(",", "").strip()
+            if clean not in ("[no response recorded]", "skipped", "skip", "i don't know", "none", "no response", ""):
+                if len(clean.split()) >= 2:
+                    valid_responses.append(r)
+
+        has_replied = len(valid_responses) > 0
+
+        from services.grading_service import calculate_grade_info
+
+        if not has_replied:
+            g_info = calculate_grade_info(0)
+            f_report = {
+                "overall_score": 0.0,
+                "overall_score_100": 0,
+                "grade": "F",
+                "overall_grade": "F",
+                "grade_label": "Significant Improvement Required",
+                "grade_color": "#991b1b",
+                "hiring_recommendation": "Strong Reject",
+                "performance_level": "Not Ready",
+                "section_grades": [
+                    {"name": "Communication", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Technical Knowledge", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Problem Solving", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Confidence", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Behavioral Skills", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Resume Knowledge", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Project Explanation", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Leadership", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Grammar", "score": 0, "grade": "F", "color": "#991b1b"},
+                    {"name": "Vocabulary", "score": 0, "grade": "F", "color": "#991b1b"}
+                ],
+                "top_strengths": ["None identified (no responses provided)"],
+                "top_improvements": ["Did not attempt questions during the mock interview. Speak or write answers to get evaluated."],
+                "report": "Candidate did not provide any responses to the interview questions. Evaluation is not possible.",
+                "badges": []
+            }
+            try:
+                import json
+                supabase.table("sessions").update({
+                    "final_score": 0.0,
+                    "final_score_100": 0,
+                    "final_grade": "F",
+                    "grade_label": "Significant Improvement Required",
+                    "grade_color": "#991b1b",
+                    "hiring_recommendation": "Strong Reject",
+                    "performance_level": "Not Ready",
+                    "active": False,
+                    "final_report": json.dumps(f_report),
+                    "report_json": f_report,
+                    "scores": []
+                }).eq("session_id", session_id).execute()
+            except Exception as e_db:
+                print("Session update notice:", e_db)
+            
+            return jsonify(f_report), 200
+
         scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
-        overall_score_10 = round(sum(scores) / len(scores), 1) if scores else 7.5
+        overall_score_10 = round(sum(scores) / len(scores), 1) if scores else 0.0
         overall_score_100 = round(overall_score_10 * 10)
         
-        from services.grading_service import calculate_grade_info
         g_info = calculate_grade_info(overall_score_100)
 
         # Update DB

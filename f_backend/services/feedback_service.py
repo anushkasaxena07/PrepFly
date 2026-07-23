@@ -319,7 +319,7 @@ Transcript:
 def enrich_report_with_grading(report: dict) -> dict:
     from services.grading_service import calculate_grade_info, compute_section_grades, award_badges
     
-    score = float(report.get("overall_score", 78))
+    score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
     g_info = calculate_grade_info(score)
 
     report["overall_score"] = g_info["score"]

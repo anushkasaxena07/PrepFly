@@ -79,8 +79,7 @@ def get_org_subscription_status(org_id):
         if trial_end_str:
             try:
                 t_end = datetime.fromisoformat(trial_end_str.replace("Z", ""))
-                diff = (t_end - now).total_seconds() / 86400.0
-                days_remaining = max(int(diff), 0)
+                days_remaining = max((t_end.date() - now.date()).days, 0)
                 if now > t_end:
                     sub_status = "EXPIRED"
                     current_plan = "Expired"
@@ -110,8 +109,7 @@ def get_org_subscription_status(org_id):
         if sub_expiry_str:
             try:
                 s_exp = datetime.fromisoformat(sub_expiry_str.replace("Z", ""))
-                diff = (s_exp - now).total_seconds() / 86400.0
-                days_remaining = max(int(diff), 0)
+                days_remaining = max((s_exp.date() - now.date()).days, 0)
                 if now > s_exp:
                     sub_status = "EXPIRED"
                     current_plan = "Expired"

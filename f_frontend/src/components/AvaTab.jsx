@@ -535,7 +535,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             const r = await apiFetch(`/session-report/${sessionId}`);
             const rd = await r.json();
             if (rd.final_report && !rd.final_report.includes("Generating")) {
-              setReportData(prev => ({ ...prev, report: rd.final_report }));
+              try {
+                const parsed = JSON.parse(rd.final_report);
+                setReportData(prev => ({
+                  ...prev,
+                  ...parsed,
+                  report: rd.final_report
+                }));
+              } catch (e) {
+                setReportData(prev => ({ ...prev, report: rd.final_report }));
+              }
               clearInterval(poll);
             }
           } catch {}

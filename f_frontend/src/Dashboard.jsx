@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [practiceQuestion, setPracticeQuestion] = useState(null);
   const [studentAnswer, setStudentAnswer] = useState("");
   const [answerFeedback, setAnswerFeedback] = useState("");
+  const [activeAnnouncement, setActiveAnnouncement] = useState(null);
 
   const notifRef = useRef(null);
   const profileRef = useRef(null);
@@ -184,8 +185,13 @@ export default function Dashboard() {
       } catch (e) {
         console.error("Failed to parse question notification:", e);
       }
+    } else if (notif.type === "system" || notif.type === "announcement") {
+      setActiveAnnouncement(notif);
     } else if (notif.type) {
-      setActiveTab(notif.type);
+      const validTabs = ["dashboard", "coding", "speech", "resume", "ava", "interviews", "analytics", "profile"];
+      if (validTabs.includes(notif.type)) {
+        setActiveTab(notif.type);
+      }
     }
   };
 
@@ -568,6 +574,32 @@ export default function Dashboard() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeAnnouncement && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+          <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "100%", color: "#fff", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <span>📢</span> Campus Alert / Announcement
+              </h3>
+              <button onClick={() => setActiveAnnouncement(null)} style={{ background: "none", border: "none", color: "var(--text2)", fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, color: "var(--cyan)" }}>{activeAnnouncement.title}</div>
+              <div style={{ fontSize: "11px", color: "var(--text3)", display: "flex", justifyContent: "space-between" }}>
+                <span>From: {activeAnnouncement.sender || "Platform Admin"}</span>
+                <span>Date: {activeAnnouncement.time ? (activeAnnouncement.time.includes("ago") || activeAnnouncement.time.includes("Yesterday") ? activeAnnouncement.time : new Date(activeAnnouncement.time).toLocaleDateString()) : "Recently"}</span>
+              </div>
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "12px", padding: "16px", fontSize: "13px", lineHeight: "1.6", color: "#e2e8f0", whiteSpace: "pre-wrap" }}>
+                {activeAnnouncement.desc}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button className="btn btn-primary btn-sm" onClick={() => setActiveAnnouncement(null)}>Close</button>
             </div>
           </div>
         </div>

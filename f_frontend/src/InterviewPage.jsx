@@ -650,7 +650,16 @@ const InterviewPage = () => {
         const r = await fetch(`${BACKEND_URL}/session-report/${sessionId}`);
         const rd = await r.json();
         if (rd.final_report && !rd.final_report.includes("Generating")) {
-          setFinalResult(prev => ({ ...prev, report: rd.final_report }));
+          try {
+            const parsed = JSON.parse(rd.final_report);
+            setFinalResult(prev => ({
+              ...prev,
+              ...parsed,
+              report: rd.final_report
+            }));
+          } catch (e) {
+            setFinalResult(prev => ({ ...prev, report: rd.final_report }));
+          }
           clearInterval(poll);
         }
       } catch { }
