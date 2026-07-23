@@ -70,11 +70,13 @@ app.register_blueprint(invoice_bp)
 app.register_blueprint(webhook_bp)
 
 # Allow localhost and any Vercel deployments, plus an optional custom FRONTEND_URL from environment variables
+import re
 allowed_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
-    r"https://.*\.vercel\.app"
+    "https://prepfly.vercel.app",
+    re.compile(r"^https://.*\.vercel\.app$")
 ]
 frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
@@ -151,6 +153,35 @@ class SupabaseFallbackClient:
                 
                 if callable(orig_attr):
                     def wrapped(*args, **kwargs):
+                        # Intercept sessions table write queries to bypass missing Supabase columns
+                        if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
+                            import json
+                            metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color"]
+                            
+                            def process_dict(data):
+                                metadata = {}
+                                for field in metadata_fields:
+                                    if field in data:
+                                        metadata[field] = data.pop(field)
+                                if metadata:
+                                    existing_meta = {}
+                                    if "storage_path" in data and data["storage_path"]:
+                                        try:
+                                            existing_meta = json.loads(data["storage_path"])
+                                            if not isinstance(existing_meta, dict):
+                                                existing_meta = {}
+                                        except Exception:
+                                            pass
+                                    existing_meta.update(metadata)
+                                    data["storage_path"] = json.dumps(existing_meta)
+                            
+                            if isinstance(args[0], dict):
+                                process_dict(args[0])
+                            elif isinstance(args[0], list):
+                                for item in args[0]:
+                                    if isinstance(item, dict):
+                                        process_dict(item)
+
                         next_real = orig_attr(*args, **kwargs)
                         next_local = local_attr(*args, **kwargs) if callable(local_attr) else self.local_builder
                         return RealBuilderWrapper(self.parent, self.table_name, next_real, next_local)
@@ -160,6 +191,22 @@ class SupabaseFallbackClient:
             def execute(self):
                 try:
                     res = self.real_builder.execute()
+                    
+                    # Intercept sessions table read queries to restore custom metadata fields
+                    if self.table_name == "sessions" and hasattr(res, "data") and res.data:
+                        import json
+                        metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color"]
+                        for row in res.data:
+                            if isinstance(row, dict) and "storage_path" in row and row["storage_path"]:
+                                try:
+                                    meta = json.loads(row["storage_path"])
+                                    if isinstance(meta, dict):
+                                        for field in metadata_fields:
+                                            if field in meta:
+                                                row[field] = meta[field]
+                                except Exception:
+                                    pass
+
                     if hasattr(res, "data") and not res.data:
                         try:
                             loc_res = self.local_builder.execute()
