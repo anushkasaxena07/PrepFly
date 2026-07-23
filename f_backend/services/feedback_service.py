@@ -252,10 +252,10 @@ Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code block
   "confidence_score": 80,
   "fluency_score": 85,
   "problem_solving_score": 86,
-  "strengths": ["Clear technical articulation", "Good architectural domain knowledge"],
-  "weaknesses": ["Could elaborate more on edge case handling", "Occasional filler phrases"],
+  "strengths": ["Clear technical articulation of architecture choice", "Good explanation of database concurrency control", "Strong problem-solving approach to scaling constraints"],
+  "weaknesses": ["Could elaborate more on distributed edge case handling", "Occasional filler phrases like 'um'", "Should details process scheduling more specifically"],
   "mistakes": [{{"question": "Q text", "issue": "Specific gap", "correct_approach": "Optimal solution"}}],
-  "improvement_suggestions": ["Practice STAR framework", "Prepare deep-dives on concurrency"],
+  "improvement_suggestions": ["Practice STAR framework for project background", "Prepare deep-dives on system thread pool details"],
   "ideal_answers": [{{"question": "Q text", "ideal_answer": "Sample top answer"}}],
   "transcript_analytics": {{
     "words_per_minute": 135,
@@ -270,6 +270,7 @@ CRITICAL EVALUATION RULES:
 1. If a candidate skips a question, leaves it blank, or says they don't know, you must deduct points.
 2. If the candidate failed to answer any technical content, their scores MUST be close to 0 and their grade must be F.
 3. Scale the scores strictly and proportionally based on their actual responses.
+4. Generate EXACTLY 3 to 5 strengths and weaknesses (focus areas) tailored strictly to the candidate's actual responses in the transcript (avoid general boilerplate lists).
 
 Transcript:
 {full_transcript}"""
@@ -345,20 +346,14 @@ def enrich_report_with_grading(report: dict) -> dict:
     report["section_grades"] = sections
 
     strengths = report.get("strengths") or []
-    if len(strengths) < 5:
-        defaults = ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"]
-        for d in defaults:
-            if d not in strengths and len(strengths) < 5:
-                strengths.append(d)
-    report["top_strengths"] = strengths[:5]
+    if not strengths:
+        strengths = ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"]
+    report["top_strengths"] = strengths
 
     improvements = report.get("improvement_suggestions") or report.get("weaknesses") or []
-    if len(improvements) < 5:
-        defaults = ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"]
-        for d in defaults:
-            if d not in improvements and len(improvements) < 5:
-                improvements.append(d)
-    report["top_improvements"] = improvements[:5]
+    if not improvements:
+        improvements = ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"]
+    report["top_improvements"] = improvements
 
     if not report.get("ai_summary"):
         report["ai_summary"] = f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, {g_info['score']}/100) with solid domain understanding. Based on this evaluation, the candidate is {g_info['rec'].lower()}."

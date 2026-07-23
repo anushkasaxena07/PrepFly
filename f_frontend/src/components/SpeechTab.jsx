@@ -164,12 +164,8 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
           formData.append('file', audioBlob, `recording.${ext}`);
 
-          // Custom fetch wrapper doesn't specify application/json header, allowing browser to set boundary
-          const token = localStorage.getItem('access_token');
-          const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-          const res = await fetch(`${BACKEND_URL}/speech-to-text`, {
+          const res = await apiFetch('/speech-to-text', {
             method: 'POST',
-            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
             body: formData
           });
 
@@ -263,7 +259,7 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
     const feedback = d.feedback || [];
     setAiFeedback(
       feedback.length > 0 
-        ? feedback.map((f, i) => <div key={i} style={{marginBottom: "7px"}}>{f}</div>)
+        ? feedback.join("\n")
         : "No feedback available."
     );
     setRecStatus("Analysis complete!");
@@ -318,9 +314,8 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
             <textarea 
               className="transcript-area" 
               value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-              readOnly={isRecording}
-              style={{width: '100%', resize: 'vertical', border: '1px solid var(--border)', outline: 'none', background: 'rgba(255,255,255,0.02)', color: 'var(--text2)', borderRadius: '12px', padding: '14px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.8', minHeight: '90px', cursor: isRecording ? 'not-allowed' : 'text'}}
+              readOnly={true}
+              style={{width: '100%', resize: 'vertical', border: '1px solid var(--border)', outline: 'none', background: 'rgba(255,255,255,0.02)', color: 'var(--text2)', borderRadius: '12px', padding: '14px', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.8', minHeight: '90px', cursor: 'default'}}
               placeholder={isRecording ? "Listening and transcribing your speech..." : "Your speech will appear here."}
             />
             

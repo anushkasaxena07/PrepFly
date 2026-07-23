@@ -43,6 +43,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const [detectedFillers, setDetectedFillers] = useState({});
   const [speechTranscript, setSpeechTranscript] = useState("");
   const [suggestedQuestion, setSuggestedQuestion] = useState("Can you explain how WebRTC manages NAT traversal with STUN/TURN servers?");
+  const [isPracticeMode, setIsPracticeMode] = useState(true);
   const recognitionRef = useRef(null);
 
   const localVideoRef = useRef(null);
@@ -53,10 +54,20 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
   // WebRTC Live video room states and refs
   const [roomParticipants, setRoomParticipants] = useState([]);
+  const [streamLoaded, setStreamLoaded] = useState(false);
+  const [remoteStream, setRemoteStream] = useState(null);
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const sentOfferRef = useRef(false);
   const syncIntervalRef = useRef(null);
+  const remoteParticipantIdRef = useRef(null);
+  const pendingIceCandidatesRef = useRef({});
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, remoteVideoRef.current]);
 
   // Load history, active rooms & check for auto-join shareable link
   useEffect(() => {
@@ -332,16 +343,21 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current && event.streams[0]) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      if (event.streams[0]) {
+        setRemoteStream(event.streams[0]);
       }
     };
 
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRoom) {
-        const targetId = getRemoteParticipantId();
+        const targetId = remoteParticipantIdRef.current;
         if (targetId) {
           sendSignal(targetId, { type: "candidate", candidate: event.candidate });
+        } else {
+          if (!pendingIceCandidatesRef.current[currentRoom.room_code]) {
+            pendingIceCandidatesRef.current[currentRoom.room_code] = [];
+          }
+          pendingIceCandidatesRef.current[currentRoom.room_code].push(event.candidate);
         }
       }
     };
@@ -369,6 +385,19 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         if (data.participants) {
           latestParticipants = data.participants;
           setRoomParticipants(data.participants);
+          
+          const remote = data.participants.find(p => p.user_id !== userId);
+          const remoteId = remote ? remote.user_id : null;
+          remoteParticipantIdRef.current = remoteId;
+          
+          // Flush pending candidates if we just found the peer
+          if (remoteId && pendingIceCandidatesRef.current[currentRoom.room_code]?.length > 0) {
+            const pending = pendingIceCandidatesRef.current[currentRoom.room_code];
+            pending.forEach(cand => {
+              sendSignal(remoteId, { type: "candidate", candidate: cand });
+            });
+            pendingIceCandidatesRef.current[currentRoom.room_code] = [];
+          }
         }
         if (data.chat_messages) {
           setChatMessages(data.chat_messages);
@@ -381,6 +410,9 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         }
       }
 
+      // If local media stream is not ready, defer WebRTC signaling to avoid race condition
+      if (!streamLoaded) return;
+
       // 2. WebRTC P2P signaling exchange
       const signalRes = await apiFetch(`/api/webrtc/signals?user_id=${userId}`);
       if (signalRes.ok) {
@@ -392,15 +424,48 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           }
           const pc = peerConnectionRef.current;
           if (signal.type === "offer") {
+            remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             sendSignal(sender_id, answer);
+
+            // Process queued remote candidates
+            if (pc.pendingRemoteCandidates) {
+              for (const cand of pc.pendingRemoteCandidates) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch (err) {
+                  console.warn("Failed to add queued remote candidate:", err);
+                }
+              }
+              pc.pendingRemoteCandidates = [];
+            }
           } else if (signal.type === "answer") {
+            remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
+
+            // Process queued remote candidates
+            if (pc.pendingRemoteCandidates) {
+              for (const cand of pc.pendingRemoteCandidates) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch (err) {
+                  console.warn("Failed to add queued remote candidate:", err);
+                }
+              }
+              pc.pendingRemoteCandidates = [];
+            }
           } else if (signal.type === "candidate") {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              if (pc.remoteDescription && pc.remoteDescription.type) {
+                await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+              } else {
+                if (!pc.pendingRemoteCandidates) {
+                  pc.pendingRemoteCandidates = [];
+                }
+                pc.pendingRemoteCandidates.push(signal.candidate);
+              }
             } catch (e) {
               console.warn("Error adding ICE candidate:", e);
             }
@@ -451,40 +516,87 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     setInCall(true);
     setMicMuted(!deviceMic);
     setCameraOff(!deviceCamera);
+    setStreamLoaded(false);
+    remoteParticipantIdRef.current = null;
+    setRemoteStream(null);
 
     // Prompt real webcam/mic stream if enabled
     if (deviceCamera || deviceMic) {
-      navigator.mediaDevices?.getUserMedia({ video: deviceCamera, audio: deviceMic })
+      // Always request both video and audio for robust P2P capabilities
+      navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
         .then(stream => {
           mediaStreamRef.current = stream;
+          // Apply initial toggle states
+          stream.getAudioTracks().forEach(track => {
+            track.enabled = deviceMic;
+          });
+          stream.getVideoTracks().forEach(track => {
+            track.enabled = deviceCamera;
+          });
           if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
           }
           initRTCPeerConnection(stream);
+          setStreamLoaded(true);
         })
         .catch(err => {
-          console.warn("Media devices stream warning:", err);
+          console.warn("Media devices full capture failed, trying fallback:", err);
+          // Fallback: try only audio or only video if one is missing/blocked
+          navigator.mediaDevices?.getUserMedia({ video: false, audio: true })
+            .then(stream => {
+              mediaStreamRef.current = stream;
+              stream.getAudioTracks().forEach(track => {
+                track.enabled = deviceMic;
+              });
+              if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+              }
+              initRTCPeerConnection(stream);
+              setStreamLoaded(true);
+            })
+            .catch(() => {
+              navigator.mediaDevices?.getUserMedia({ video: true, audio: false })
+                .then(stream => {
+                  mediaStreamRef.current = stream;
+                  stream.getVideoTracks().forEach(track => {
+                    track.enabled = deviceCamera;
+                  });
+                  if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                  }
+                  initRTCPeerConnection(stream);
+                  setStreamLoaded(true);
+                })
+                .catch(e => {
+                  console.warn("All media devices blocked/failed:", e);
+                  setStreamLoaded(true);
+                });
+            });
         });
+    } else {
+      setStreamLoaded(true); // Immediate connection without media
     }
   };
 
   // Control button toggles
   const toggleMic = () => {
+    const nextMuted = !micMuted;
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = micMuted;
+        track.enabled = !nextMuted;
       });
     }
-    setMicMuted(!micMuted);
+    setMicMuted(nextMuted);
   };
 
   const toggleCamera = () => {
+    const nextOff = !cameraOff;
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getVideoTracks().forEach(track => {
-        track.enabled = cameraOff;
+        track.enabled = !nextOff;
       });
     }
-    setCameraOff(!cameraOff);
+    setCameraOff(nextOff);
   };
 
   const toggleScreenShare = async () => {
@@ -495,8 +607,21 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           localVideoRef.current.srcObject = screenStream;
         }
         setIsScreenSharing(true);
-        screenStream.getVideoTracks()[0].onended = () => {
+
+        // Swap track in peer connection
+        const videoTrack = screenStream.getVideoTracks()[0];
+        const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+
+        videoTrack.onended = () => {
           setIsScreenSharing(false);
+          const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
+          const senderBack = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
+          if (senderBack && cameraTrack) {
+            senderBack.replaceTrack(cameraTrack);
+          }
           if (localVideoRef.current && mediaStreamRef.current) {
             localVideoRef.current.srcObject = mediaStreamRef.current;
           }
@@ -506,6 +631,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       }
     } else {
       setIsScreenSharing(false);
+      const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
+      const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && cameraTrack) {
+        sender.replaceTrack(cameraTrack);
+      }
       if (localVideoRef.current && mediaStreamRef.current) {
         localVideoRef.current.srcObject = mediaStreamRef.current;
       }
@@ -611,13 +741,31 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
   };
 
-  const handleSendMessage = () => {
-    if (!inputMsg.trim()) return;
-    setChatMessages(prev => [
-      ...prev,
-      { sender: userName, text: inputMsg.trim(), time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-    ]);
+  const handleSendMessage = async () => {
+    if (!inputMsg.trim() || !currentRoom) return;
+    const msgObj = {
+      sender: userName,
+      text: inputMsg.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    // Eagerly update local state
+    setChatMessages(prev => [...prev, msgObj]);
     setInputMsg("");
+    
+    try {
+      await apiFetch('/api/webrtc/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_code: currentRoom.room_code,
+          user_id: userId,
+          user_name: userName,
+          new_chat: msgObj
+        })
+      });
+    } catch (err) {
+      console.warn("Failed to sync chat message:", err);
+    }
   };
 
   const handleDeleteSession = async (sId) => {
@@ -1104,13 +1252,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 >
                   📄 Notes
                 </button>
-                <button 
-                  className={`btn btn-xs ${activeSubPanel === 'ai' ? 'btn-cyan' : 'btn-ghost'}`} 
-                  onClick={() => setActiveSubPanel('ai')}
-                  style={{flex: 1}}
-                >
-                  🤖 AI Coach
-                </button>
               </div>
 
               <div style={{flex: 1, padding: "12px", overflowY: "auto"}}>
@@ -1145,7 +1286,24 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
                 {activeSubPanel === 'notes' && (
                   <div style={{height: "100%", display: "flex", flexDirection: "column"}}>
-                    <label style={{fontSize: "11px", fontWeight: 700, color: "var(--text2)", textTransform: "uppercase", marginBottom: "4px"}}>Collaborative Shared Notes</label>
+                    <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
+                      <label style={{fontSize: "11px", fontWeight: 700, color: "var(--text2)", textTransform: "uppercase"}}>Collaborative Shared Notes</label>
+                      <button 
+                        className="btn btn-ghost btn-xs"
+                        style={{color: "var(--cyan)", borderColor: "rgba(0,240,200,0.3)", borderStyle: "solid", borderWidth: "1px", padding: "2px 8px", fontSize: "10px"}}
+                        onClick={() => {
+                          const element = document.createElement("a");
+                          const file = new Blob([sharedNotes], {type: 'text/plain'});
+                          element.href = URL.createObjectURL(file);
+                          element.download = `${currentRoom?.room_code || 'interview'}_notes.txt`;
+                          document.body.appendChild(element);
+                          element.click();
+                          document.body.removeChild(element);
+                        }}
+                      >
+                        📥 Download Notes
+                      </button>
+                    </div>
                     <textarea 
                       id="interview-notes-textarea"
                       className="form-input"
@@ -1153,60 +1311,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                       value={sharedNotes}
                       onChange={(e) => handleNotesChange(e.target.value)}
                     />
-                  </div>
-                )}
-
-                {activeSubPanel === 'ai' && (
-                  <div className="flex-col gap10 text-xs">
-                    <style>{`
-                      @keyframes pulse-red {
-                        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-                        70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-                        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-                      }
-                      .pulse-mic {
-                        animation: pulse-red 2s infinite;
-                      }
-                    `}</style>
-                    <div style={{fontWeight: 800, color: "var(--cyan)", fontSize: "13px", display: "flex", alignItems: "center", gap: "8px"}}>
-                      <span>🤖 AI Real-Time Assistant</span>
-                      {isSpeechAssistantActive && (
-                        <span 
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            background: "var(--red)",
-                            display: "inline-block"
-                          }} 
-                          className="pulse-mic"
-                        />
-                      )}
-                    </div>
-                    <div className="card-sm text-muted" style={{ lineHeight: "1.5" }}>
-                      Speech-to-text transcript analysis active. {fillerCount} filler words detected so far.
-                      {Object.keys(detectedFillers).length > 0 && (
-                        <div style={{ marginTop: "6px", color: "var(--orange)", fontSize: "10px", fontWeight: "bold" }}>
-                          Detected: {Object.entries(detectedFillers).map(([k, v]) => `"${k}" (${v}x)`).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                    {speechTranscript && (
-                      <div className="card-sm" style={{ background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.05)", fontStyle: "italic", maxHeight: "90px", overflowY: "auto", color: "var(--text2)", padding: "8px 12px" }}>
-                        "{speechTranscript}"
-                      </div>
-                    )}
-                    <div className="card-sm" style={{ borderLeft: "3px solid var(--cyan)", background: "rgba(0,240,200,0.02)" }}>
-                      <strong style={{ color: "var(--cyan)" }}>Suggested Question:</strong><br />
-                      <div style={{ marginTop: "4px", fontSize: "12px", color: "var(--text1)" }}>"{suggestedQuestion}"</div>
-                    </div>
-                    <button 
-                      className={`btn btn-xs ${isSpeechAssistantActive ? 'btn-purple' : 'btn-ghost'}`} 
-                      style={{ width: "100%", justifyContent: "center", gap: "6px" }}
-                      onClick={toggleSpeechAssistant}
-                    >
-                      {isSpeechAssistantActive ? "🛑 Stop Speech Diagnostic" : "🎙 Run Speech Diagnostic"}
-                    </button>
                   </div>
                 )}
               </div>

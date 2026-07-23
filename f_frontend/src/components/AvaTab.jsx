@@ -839,7 +839,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 
                 <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00c4a7" }}></span>
-                  🎥 Candidate (You)
+                  🎥 {user?.name ? user.name.split(' ')[0] : 'Candidate'} (You)
                 </div>
               </div>
 

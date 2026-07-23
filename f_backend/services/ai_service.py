@@ -54,7 +54,7 @@ def get_current_stage(question_index, total_questions=5):
     else:
         return "Phase 7: Natural Wrap-up"
 
-def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None):
+def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate"):
     previous_questions = previous_questions or []
     responses = responses or []
     is_no_resume = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
@@ -94,16 +94,11 @@ STRICT MANDATE: Ask high-bar algorithmic edge cases, production outage handling,
 STRICT MANDATE: Ask questions directly tied to candidate's past projects, achievements, employment history, and specific tech stack listed in their resume."""
 
     if question_index == 1:
-        if "HR" in cat_clean or "BEHAVIORAL" in cat_clean:
-            phase_guidance = "PHASE: GREETING & HR QUESTION 1. Give Ava's warm greeting (1-2 sentences), then ask an impactful STAR behavioral question."
-        elif "DSA" in cat_clean or "ALGORITHM" in cat_clean:
-            phase_guidance = "PHASE: GREETING & DSA QUESTION 1. Give Ava's warm greeting (1-2 sentences), then present a specific Data Structures or Algorithmic problem."
-        elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
-            phase_guidance = "PHASE: GREETING & SYSTEM DESIGN QUESTION 1. Give Ava's warm greeting (1-2 sentences), then present a System Design scenario."
-        else:
-            phase_guidance = "PHASE: GREETING & TECHNICAL QUESTION 1. Give Ava's warm greeting (1-2 sentences), then ask about their background or key project."
+        phase_guidance = f"PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate using their name ({candidate_name}), introduce yourself as Ava (AI Recruiter), and ask a casual, low-stakes icebreaker question (e.g. how their day is going, how they are feeling today, or if they are ready to begin). STRICT MANDATE: DO NOT ask any technical, coding, or interview questions on this first turn. Keep it friendly, welcoming, and purely conversational."
     elif question_index == 2:
-        phase_guidance = f"PHASE: RESUME & PROJECT DEEP DIVE. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge what they said, then probe deeper into their technical/project choices."
+        phase_guidance = f"PHASE: ICEBREAKER & BACKGROUND. Previous Candidate Answer: '{last_answer}'. React to what they said briefly and naturally (1 sentence), then ask about their background, what originally drew them to software engineering/development, or a general non-technical introductory question based on their resume/profile."
+    elif question_index == 3:
+        phase_guidance = f"PHASE: RESUME ANCHOR TRANSITION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition into their technical profile or core projects from the resume/profile. Ask them to describe a project they are proud of or their main tech stack."
     elif question_index >= 5:
         phase_guidance = f"PHASE: CLOSING / FINAL QUESTION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition towards closing or final high-level question."
     else:
@@ -118,7 +113,7 @@ STRICT MANDATE: Ask questions directly tied to candidate's past projects, achiev
         duration_minutes=20,
         resume_provided=resume_has_text,
         resume_data=resume_text[:2000] if resume_has_text else "None",
-        candidate_name="Candidate"
+        candidate_name=candidate_name
     )
 
     prompt = f"""{system_prompt}

@@ -40,6 +40,23 @@ from services.grading_service import calculate_grade_info
 
 load_dotenv()
 
+# Monkey-patch ChatGoogleGenerativeAI to convert list-structured response content into strings
+original_invoke = ChatGoogleGenerativeAI.invoke
+
+def patched_invoke(self, input, config=None, **kwargs):
+    response = original_invoke(self, input, config=config, **kwargs)
+    if hasattr(response, "content") and isinstance(response.content, list):
+        text_parts = []
+        for part in response.content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict) and "text" in part:
+                text_parts.append(part["text"])
+        response.content = "".join(text_parts)
+    return response
+
+ChatGoogleGenerativeAI.invoke = patched_invoke
+
 app = Flask(__name__)
 
 from payment import payment_bp
@@ -183,7 +200,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # ─── Gemini / LangChain ────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 chat_model = ChatGoogleGenerativeAI(
-    api_key=GEMINI_API_KEY, model="gemini-2.5-flash", temperature=0.6
+    api_key=GEMINI_API_KEY, model="gemini-3.5-flash", temperature=0.6
 )
 
 
@@ -1013,6 +1030,20 @@ def create_session_no_resume():
         return jsonify({"error": str(e)}), 500
 
 
+def get_candidate_name_for_session(session):
+    user_id = session.get("user_id")
+    if user_id:
+        try:
+            user_res = supabase.table("users").select("name").eq("id", user_id).execute()
+            if user_res and user_res.data:
+                name = user_res.data[0].get("name")
+                if name:
+                    return name.strip()
+        except Exception:
+            pass
+    return "Candidate"
+
+
 @app.route("/start-interview", methods=["POST"])
 def start_interview():
     data       = request.get_json() or {}
@@ -1028,13 +1059,15 @@ def start_interview():
             return jsonify({"error": "Session not found or already completed"}), 404
 
         session = res.data[0]
+        c_name = get_candidate_name_for_session(session)
         first_q, stage, _ = generate_dynamic_question(
             session.get("resume_text", ""),
             previous_questions=[],
             question_index=1,
             category=category or session.get("category"),
             difficulty=difficulty or session.get("difficulty"),
-            chat_model=chat_model
+            chat_model=chat_model,
+            candidate_name=c_name
         )
         questions = [first_q]
 
@@ -1079,10 +1112,11 @@ def next_question():
         responses      = session.get("responses") or []
         feedbacks      = session.get("feedbacks") or []
         question_index = session.get("question_index", 1)
+        c_name         = get_candidate_name_for_session(session)
 
         if not answer:
             if not questions:
-                first_q, stage, _ = generate_dynamic_question(resume_text, [], 1, category=category, difficulty=difficulty, chat_model=chat_model)
+                first_q, stage, _ = generate_dynamic_question(resume_text, [], 1, category=category, difficulty=difficulty, chat_model=chat_model, candidate_name=c_name)
                 questions = [first_q]
                 supabase.table("sessions").update({"questions": [first_q], "question_index": 1, "stage": stage}).eq("session_id", session_id).execute()
                 return jsonify({"question": first_q, "question_number": 1, "stage": stage, "total_questions": 5}), 200
@@ -1126,7 +1160,8 @@ def next_question():
                 category=category or session.get("category"),
                 difficulty=difficulty or session.get("difficulty"),
                 responses=responses,
-                chat_model=chat_model
+                chat_model=chat_model,
+                candidate_name=c_name
             )
             feedback = fut_fb.result()
             next_q, next_stage, is_followup = fut_q.result()
@@ -3392,7 +3427,7 @@ Please structure the evaluation report in markdown with these exact headings:
 
     report_text = ""
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-3.5-flash")
         res = model.generate_content(prompt)
         report_text = res.text.strip()
     except Exception as e:
@@ -6987,7 +7022,7 @@ def superadmin_ai_config():
         "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY", "sk-ant-demo-claude-35-key-4411"),
         "deepseek_api_key": os.getenv("DEEPSEEK_API_KEY", "sk-deepseek-demo-key-2211"),
         "elevenlabs_api_key": os.getenv("ELEVENLABS_API_KEY", "el-demo-voice-tts-key-7788"),
-        "primary_model": "gemini-1.5-flash",
+        "primary_model": "gemini-3.5-flash",
         "fallback_model": "gpt-4o-mini",
         "voice_model": "rachel_conversational",
         "temperature": 0.7,
@@ -7027,13 +7062,13 @@ def superadmin_test_ai_provider():
         try:
             import google.generativeai as genai
             genai.configure(api_key=key_to_use)
-            t_model = genai.GenerativeModel('gemini-1.5-flash')
+            t_model = genai.GenerativeModel('gemini-3.5-flash')
             response = t_model.generate_content("Respond with 'OK' if connected.")
             latency_ms = int((time.time() - start_t) * 1000)
             return jsonify({
                 "status": "Success",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-1.5-flash",
+                "model": model or "gemini-3.5-flash",
                 "latency_ms": latency_ms,
                 "message": f"Connection Verified! Returned HTTP 200 OK ({latency_ms}ms latency). Response: '{response.text.strip()}'"
             }), 200
@@ -7042,9 +7077,9 @@ def superadmin_test_ai_provider():
             return jsonify({
                 "status": "Success (Simulated Test Mode)",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-1.5-flash",
+                "model": model or "gemini-3.5-flash",
                 "latency_ms": max(145, latency_ms),
-                "message": f"Credentials formatted correctly. Endpoint reachable ({max(145, latency_ms)}ms latency). Gemini 1.5 Flash operational."
+                "message": f"Credentials formatted correctly. Endpoint reachable ({max(145, latency_ms)}ms latency). Gemini 3.5 Flash operational."
             }), 200
 
     elif provider == "openai":
@@ -7257,7 +7292,7 @@ def superadmin_activity_logs():
             "browser": "Chrome 126",
             "session_id": "SESS_SUPERADMIN_01",
             "investigation_status": "Resolved",
-            "investigation_notes": "Switched default fallback model to gemini-1.5-flash."
+            "investigation_notes": "Switched default fallback model to gemini-3.5-flash."
         },
         {
             "id": "LOG-2026-000484",

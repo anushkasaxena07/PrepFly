@@ -93,43 +93,214 @@ const getDynamicStarterCode = (problem, targetLang) => {
   }
   
   // 2. Derive function name from problem_id slug or title
-  let slug = problem.problem_id || "solution";
-  if (slug.includes("_")) {
-    slug = slug.split("_")[0];
-  }
-  const words = slug.replace(/[^a-zA-Z0-9]/g, " ").trim().split(/\s+/);
+  let slug = (problem.problem_id || "solution").toLowerCase();
   
+  // Determine problem type flags
+  const isParentheses = slug.includes("parentheses");
+  const isReverseString = slug.includes("reverse") && slug.includes("string");
+  const isStock = slug.includes("stock");
+  const isDuplicate = slug.includes("duplicate");
+  const isProduct = slug.includes("product");
+  const isSubarray = slug.includes("subarray");
+  const is3Sum = slug.includes("3sum");
+  const isSubstring = slug.includes("substring");
+  const isBinarySearch = slug.includes("binary") && slug.includes("search") && !slug.includes("rotated");
+  const isRotated = slug.includes("rotated");
+  const isMerge = slug.includes("merge");
+  const isReverseList = slug.includes("reverse") && slug.includes("list");
+  const isTemperatures = slug.includes("temperatures");
+  const isLevelOrder = slug.includes("level") || slug.includes("traverse");
+  const isLca = slug.includes("lca") || slug.includes("ancestor");
+  const isIslands = slug.includes("island");
+  const isCloneGraph = slug.includes("clone");
+  const isFrequent = slug.includes("frequent") || slug.includes("frequency");
+  const isCoin = slug.includes("coin");
+  const isIncreasing = slug.includes("increasing");
+
+  // Format Names
+  let words = slug.replace(/[^a-zA-Z0-9]/g, " ").trim().split(/\s+/);
   const camelName = words.map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
   const snakeName = words.map(w => w.toLowerCase()).join("_");
   const pascalName = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
-  
-  const isParentheses = slug.includes("parentheses");
-  
+
   switch (targetLang) {
     case "python":
-      return isParentheses 
-        ? `def ${snakeName}(s: str) -> bool:\n    # Write your code here\n    pass\n`
-        : `def ${snakeName}(nums: list[int], target: int) -> list[int]:\n    # Write your code here\n    pass\n`;
+      if (isParentheses) return `def ${snakeName}(s: str) -> bool:\n    # Write your code here\n    pass\n`;
+      if (isReverseString) return `def ${snakeName}(s: list[str]) -> None:\n    # Write your code here\n    # Do not return anything, modify s in-place.\n    pass\n`;
+      if (isStock) return `def max_profit(prices: list[int]) -> int:\n    # Write your code here\n    pass\n`;
+      if (isDuplicate) return `def contains_duplicate(nums: list[int]) -> bool:\n    # Write your code here\n    pass\n`;
+      if (isProduct) return `def product_except_self(nums: list[int]) -> list[int]:\n    # Write your code here\n    pass\n`;
+      if (isSubarray) return `def max_sub_array(nums: list[int]) -> int:\n    # Write your code here\n    pass\n`;
+      if (is3Sum) return `def three_sum(nums: list[int]) -> list[list[int]]:\n    # Write your code here\n    pass\n`;
+      if (isSubstring) return `def length_of_longest_substring(s: str) -> int:\n    # Write your code here\n    pass\n`;
+      if (isBinarySearch || isRotated) return `def search(nums: list[int], target: int) -> int:\n    # Write your code here\n    pass\n`;
+      if (isMerge) return `def merge_two_lists(list1, list2):\n    # Write your code here\n    pass\n`;
+      if (isReverseList) return `def reverse_list(head):\n    # Write your code here\n    pass\n`;
+      if (isTemperatures) return `def daily_temperatures(temperatures: list[int]) -> list[int]:\n    # Write your code here\n    pass\n`;
+      if (isLevelOrder) return `def level_order(root):\n    # Write your code here\n    pass\n`;
+      if (isLca) return `def lowest_common_ancestor(root, p, q):\n    # Write your code here\n    pass\n`;
+      if (isIslands) return `def num_islands(grid: list[list[str]]) -> int:\n    # Write your code here\n    pass\n`;
+      if (isCloneGraph) return `def clone_graph(node):\n    # Write your code here\n    pass\n`;
+      if (isFrequent) return `def top_k_frequent(nums: list[int], k: int) -> list[int]:\n    # Write your code here\n    pass\n`;
+      if (isCoin) return `def coin_change(coins: list[int], amount: int) -> int:\n    # Write your code here\n    pass\n`;
+      if (isIncreasing) return `def length_of_lis(nums: list[int]) -> int:\n    # Write your code here\n    pass\n`;
+      return `def ${snakeName}(nums: list[int], target: int) -> list[int]:\n    # Write your code here\n    pass\n`;
+
     case "javascript":
-      return isParentheses
-        ? `function ${camelName}(s) {\n    // Write your code here\n    \n}\n`
-        : `function ${camelName}(nums, target) {\n    // Write your code here\n    \n}\n`;
+      if (isParentheses) return `function ${camelName}(s) {\n    // Write your code here\n    \n}\n`;
+      if (isReverseString) return `function ${camelName}(s) {\n    // Write your code here\n    \n}\n`;
+      if (isStock) return `function maxProfit(prices) {\n    // Write your code here\n    \n}\n`;
+      if (isDuplicate) return `function containsDuplicate(nums) {\n    // Write your code here\n    \n}\n`;
+      if (isProduct) return `function productExceptSelf(nums) {\n    // Write your code here\n    \n}\n`;
+      if (isSubarray) return `function maxSubArray(nums) {\n    // Write your code here\n    \n}\n`;
+      if (is3Sum) return `function threeSum(nums) {\n    // Write your code here\n    \n}\n`;
+      if (isSubstring) return `function lengthOfLongestSubstring(s) {\n    // Write your code here\n    \n}\n`;
+      if (isBinarySearch || isRotated) return `function search(nums, target) {\n    // Write your code here\n    \n}\n`;
+      if (isMerge) return `function mergeTwoLists(list1, list2) {\n    // Write your code here\n    \n}\n`;
+      if (isReverseList) return `function reverseList(head) {\n    // Write your code here\n    \n}\n`;
+      if (isTemperatures) return `function dailyTemperatures(temperatures) {\n    // Write your code here\n    \n}\n`;
+      if (isLevelOrder) return `function levelOrder(root) {\n    // Write your code here\n    \n}\n`;
+      if (isLca) return `function lowestCommonAncestor(root, p, q) {\n    // Write your code here\n    \n}\n`;
+      if (isIslands) return `function numIslands(grid) {\n    // Write your code here\n    \n}\n`;
+      if (isCloneGraph) return `function cloneGraph(node) {\n    // Write your code here\n    \n}\n`;
+      if (isFrequent) return `function topKFrequent(nums, k) {\n    // Write your code here\n    \n}\n`;
+      if (isCoin) return `function coinChange(coins, amount) {\n    // Write your code here\n    \n}\n`;
+      if (isIncreasing) return `function lengthOfLIS(nums) {\n    // Write your code here\n    \n}\n`;
+      return `function ${camelName}(nums, target) {\n    // Write your code here\n    \n}\n`;
+
     case "typescript":
-      return isParentheses
-        ? `function ${camelName}(s: string): boolean {\n    // Write your code here\n    return false;\n}\n`
-        : `function ${camelName}(nums: number[], target: number): number[] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isParentheses) return `function ${camelName}(s: string): boolean {\n    // Write your code here\n    return false;\n}\n`;
+      if (isReverseString) return `function ${camelName}(s: string[]): void {\n    // Write your code here\n    \n}\n`;
+      if (isStock) return `function maxProfit(prices: number[]): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (isDuplicate) return `function containsDuplicate(nums: number[]): boolean {\n    // Write your code here\n    return false;\n}\n`;
+      if (isProduct) return `function productExceptSelf(nums: number[]): number[] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isSubarray) return `function maxSubArray(nums: number[]): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (is3Sum) return `function threeSum(nums: number[]): number[][] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isSubstring) return `function lengthOfLongestSubstring(s: string): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (isBinarySearch || isRotated) return `function search(nums: number[], target: number): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (isMerge) return `function mergeTwoLists(list1: any, list2: any): any {\n    // Write your code here\n    return null;\n}\n`;
+      if (isReverseList) return `function reverseList(head: any): any {\n    // Write your code here\n    return null;\n}\n`;
+      if (isTemperatures) return `function dailyTemperatures(temperatures: number[]): number[] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isLevelOrder) return `function levelOrder(root: any): number[][] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isLca) return `function lowestCommonAncestor(root: any, p: any, q: any): any {\n    // Write your code here\n    return null;\n}\n`;
+      if (isIslands) return `function numIslands(grid: string[][]): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (isCloneGraph) return `function cloneGraph(node: any): any {\n    // Write your code here\n    return null;\n}\n`;
+      if (isFrequent) return `function topKFrequent(nums: number[], k: number): number[] {\n    // Write your code here\n    return [];\n}\n`;
+      if (isCoin) return `function coinChange(coins: number[], amount: number): number {\n    // Write your code here\n    return 0;\n}\n`;
+      if (isIncreasing) return `function lengthOfLIS(nums: number[]): number {\n    // Write your code here\n    return 0;\n}\n`;
+      return `function ${camelName}(nums: number[], target: number): number[] {\n    // Write your code here\n    return [];\n}\n`;
+
     case "java":
-      return isParentheses
-        ? `class Solution {\n    public boolean ${camelName}(String s) {\n        // Write your code here\n        return false;\n    }\n}\n`
-        : `class Solution {\n    public int[] ${camelName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+      if (isParentheses) return `class Solution {\n    public boolean ${camelName}(String s) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isReverseString) return `class Solution {\n    public void ${camelName}(char[] s) {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `class Solution {\n    public int maxProfit(int[] prices) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isDuplicate) return `class Solution {\n    public boolean containsDuplicate(int[] nums) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isProduct) return `class Solution {\n    public int[] productExceptSelf(int[] nums) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+      if (isSubarray) return `class Solution {\n    public int maxSubArray(int[] nums) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (is3Sum) return `import java.util.*;\n\nclass Solution {\n    public List<List<Integer>> threeSum(int[] nums) {\n        // Write your code here\n        return new ArrayList<>();\n    }\n}\n`;
+      if (isSubstring) return `class Solution {\n    public int lengthOfLongestSubstring(String s) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `class Solution {\n    public int search(int[] nums, int target) {\n        // Write your code here\n        return -1;\n    }\n}\n`;
+      return `class Solution {\n    public int[] ${camelName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+
     case "cpp":
-      return isParentheses
-        ? `#include <string>\nusing namespace std;\n\nclass Solution {\npublic:\n    bool ${camelName}(string s) {\n        // Write your code here\n        return false;\n    }\n};\n`
-        : `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<int> ${camelName}(vector<int>& nums, int target) {\n        // Write your code here\n        return {};\n    }\n};\n`;
+      if (isParentheses) return `#include <string>\nusing namespace std;\n\nclass Solution {\npublic:\n    bool ${camelName}(string s) {\n        // Write your code here\n        return false;\n    }\n};\n`;
+      if (isReverseString) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    void ${camelName}(vector<char>& s) {\n        // Write your code here\n    }\n};\n`;
+      if (isStock) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        // Write your code here\n        return 0;\n    }\n};\n`;
+      if (isDuplicate) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    bool containsDuplicate(vector<int>& nums) {\n        // Write your code here\n        return false;\n    }\n};\n`;
+      if (isProduct) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<int> productExceptSelf(vector<int>& nums) {\n        // Write your code here\n        return {};\n    }\n};\n`;
+      if (isSubarray) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    int maxSubArray(vector<int>& nums) {\n        // Write your code here\n        return 0;\n    }\n};\n`;
+      if (is3Sum) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<vector<int>> threeSum(vector<int>& nums) {\n        // Write your code here\n        return {};\n    }\n};\n`;
+      if (isSubstring) return `#include <string>\nusing namespace std;\n\nclass Solution {\npublic:\n    int lengthOfLongestSubstring(string s) {\n        // Write your code here\n        return 0;\n    }\n};\n`;
+      if (isBinarySearch || isRotated) return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        // Write your code here\n        return -1;\n    }\n};\n`;
+      return `#include <vector>\nusing namespace std;\n\nclass Solution {\npublic:\n    vector<int> ${camelName}(vector<int>& nums, int target) {\n        // Write your code here\n        return {};\n    }\n};\n`;
+
     case "csharp":
-      return isParentheses
-        ? `public class Solution {\n    public bool ${pascalName}(string s) {\n        // Write your code here\n        return false;\n    }\n}\n`
-        : `public class Solution {\n    public int[] ${pascalName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+      if (isParentheses) return `public class Solution {\n    public bool ${pascalName}(string s) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isReverseString) return `public class Solution {\n    public void ${pascalName}(char[] s) {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `public class Solution {\n    public int MaxProfit(int[] prices) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isDuplicate) return `public class Solution {\n    public bool ContainsDuplicate(int[] nums) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isProduct) return `public class Solution {\n    public int[] ProductExceptSelf(int[] nums) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+      if (isSubarray) return `public class Solution {\n    public int MaxSubArray(int[] nums) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (is3Sum) return `using System.Collections.Generic;\n\npublic class Solution {\n    public IList<IList<int>> ThreeSum(int[] nums) {\n        // Write your code here\n        return new List<IList<int>>();\n    }\n}\n`;
+      if (isSubstring) return `public class Solution {\n    public int LengthOfLongestSubstring(string s) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `public class Solution {\n    public int Search(int[] nums, int target) {\n        // Write your code here\n        return -1;\n    }\n}\n`;
+      return `public class Solution {\n    public int[] ${pascalName}(int[] nums, int target) {\n        // Write your code here\n        return new int[]{};\n    }\n}\n`;
+
+    case "rust":
+      if (isParentheses) return `impl Solution {\n    pub fn is_valid(s: String) -> bool {\n        // Write your code here\n        false\n    }\n}\n`;
+      if (isReverseString) return `impl Solution {\n    pub fn reverse_string(s: &mut Vec<char>) {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `impl Solution {\n    pub fn max_profit(prices: Vec<i32>) -> i32 {\n        // Write your code here\n        0\n    }\n}\n`;
+      if (isDuplicate) return `impl Solution {\n    pub fn contains_duplicate(nums: Vec<i32>) -> bool {\n        // Write your code here\n        false\n    }\n}\n`;
+      if (isProduct) return `impl Solution {\n    pub fn product_except_self(nums: Vec<i32>) -> Vec<i32> {\n        // Write your code here\n        vec![]\n    }\n}\n`;
+      if (isSubarray) return `impl Solution {\n    pub fn max_sub_array(nums: Vec<i32>) -> i32 {\n        // Write your code here\n        0\n    }\n}\n`;
+      if (is3Sum) return `impl Solution {\n    pub fn three_sum(nums: Vec<i32>) -> Vec<Vec<i32>> {\n        // Write your code here\n        vec![]\n    }\n}\n`;
+      if (isSubstring) return `impl Solution {\n    pub fn length_of_longest_substring(s: String) -> i32 {\n        // Write your code here\n        0\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `impl Solution {\n    pub fn search(nums: Vec<i32>, target: i32) -> i32 {\n        // Write your code here\n        -1\n    }\n}\n`;
+      return `impl Solution {\n    pub fn ${snakeName}(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        // Write your code here\n        vec![]\n    }\n}\n`;
+
+    case "go":
+      if (isParentheses) return `func isValid(s string) bool {\n    // Write your code here\n    return false\n}\n`;
+      if (isReverseString) return `func reverseString(s []byte)  {\n    // Write your code here\n}\n`;
+      if (isStock) return `func maxProfit(prices []int) int {\n    // Write your code here\n    return 0\n}\n`;
+      if (isDuplicate) return `func containsDuplicate(nums []int) bool {\n    // Write your code here\n    return false\n}\n`;
+      if (isProduct) return `func productExceptSelf(nums []int) []int {\n    // Write your code here\n    return []int{}\n}\n`;
+      if (isSubarray) return `func maxSubArray(nums []int) int {\n    // Write your code here\n    return 0\n}\n`;
+      if (is3Sum) return `func threeSum(nums []int) [][]int {\n    // Write your code here\n    return [][]int{}\n}\n`;
+      if (isSubstring) return `func lengthOfLongestSubstring(s string) int {\n    // Write your code here\n    return 0\n}\n`;
+      if (isBinarySearch || isRotated) return `func search(nums []int, target int) int {\n    // Write your code here\n    return -1\n}\n`;
+      return `func ${camelName}(nums []int, target int) []int {\n    // Write your code here\n    return []int{}\n}\n`;
+
+    case "php":
+      if (isParentheses) return `class Solution {\n    function isValid($s) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isReverseString) return `class Solution {\n    function reverseString(&$s) {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `class Solution {\n    function maxProfit($prices) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isDuplicate) return `class Solution {\n    function containsDuplicate($nums) {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isProduct) return `class Solution {\n    function productExceptSelf($nums) {\n        // Write your code here\n        return [];\n    }\n}\n`;
+      if (isSubarray) return `class Solution {\n    function maxSubArray($nums) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (is3Sum) return `class Solution {\n    function threeSum($nums) {\n        // Write your code here\n        return [];\n    }\n}\n`;
+      if (isSubstring) return `class Solution {\n    function lengthOfLongestSubstring($s) {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `class Solution {\n    function search($nums, $target) {\n        // Write your code here\n        return -1;\n    }\n}\n`;
+      return `class Solution {\n    function ${camelName}($nums, $target) {\n        // Write your code here\n        return [];\n    }\n}\n`;
+
+    case "ruby":
+      if (isParentheses) return `def is_valid(s)\n    # Write your code here\nend\n`;
+      if (isReverseString) return `def reverse_string(s)\n    # Write your code here\nend\n`;
+      if (isStock) return `def max_profit(prices)\n    # Write your code here\nend\n`;
+      if (isDuplicate) return `def contains_duplicate(nums)\n    # Write your code here\nend\n`;
+      if (isProduct) return `def product_except_self(nums)\n    # Write your code here\nend\n`;
+      if (isSubarray) return `def max_sub_array(nums)\n    # Write your code here\nend\n`;
+      if (is3Sum) return `def three_sum(nums)\n    # Write your code here\nend\n`;
+      if (isSubstring) return `def length_of_longest_substring(s)\n    # Write your code here\nend\n`;
+      if (isBinarySearch || isRotated) return `def search(nums, target)\n    # Write your code here\nend\n`;
+      return `def ${snakeName}(nums, target)\n    # Write your code here\nend\n`;
+
+    case "swift":
+      if (isParentheses) return `class Solution {\n    func isValid(_ s: String) -> Bool {\n        // Write your code here\n        return false\n    }\n}\n`;
+      if (isReverseString) return `class Solution {\n    func reverseString(_ s: inout [Character]) {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `class Solution {\n    func maxProfit(_ prices: [Int]) -> Int {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isDuplicate) return `class Solution {\n    func containsDuplicate(_ nums: [Int]) -> Bool {\n        // Write your code here\n        return false;\n    }\n}\n`;
+      if (isProduct) return `class Solution {\n    func productExceptSelf(_ nums: [Int]) -> [Int] {\n        // Write your code here\n        return [];\n    }\n}\n`;
+      if (isSubarray) return `class Solution {\n    func maxSubArray(_ nums: [Int]) -> Int {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (is3Sum) return `class Solution {\n    func threeSum(_ nums: [Int]) -> [[Int]] {\n        // Write your code here\n        return [];\n    }\n}\n`;
+      if (isSubstring) return `class Solution {\n    func lengthOfLongestSubstring(_ s: String) -> Int {\n        // Write your code here\n        return 0;\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `class Solution {\n    func search(_ nums: [Int], _ target: Int) -> Int {\n        // Write your code here\n        return -1;\n    }\n}\n`;
+      return `class Solution {\n    func ${camelName}(_ nums: [Int], _ target: Int) -> [Int] {\n        // Write your code here\n        return [];\n    }\n}\n`;
+
+    case "kotlin":
+      if (isParentheses) return `class Solution {\n    fun isValid(s: String): Boolean {\n        // Write your code here\n        return false\n    }\n}\n`;
+      if (isReverseString) return `class Solution {\n    fun reverseString(s: CharArray): Unit {\n        // Write your code here\n    }\n}\n`;
+      if (isStock) return `class Solution {\n    fun maxProfit(prices: IntArray): Int {\n        // Write your code here\n        return 0\n    }\n}\n`;
+      if (isDuplicate) return `class Solution {\n    fun containsDuplicate(nums: IntArray): Boolean {\n        // Write your code here\n        return false\n    }\n}\n`;
+      if (isProduct) return `class Solution {\n    fun productExceptSelf(nums: IntArray): IntArray {\n        // Write your code here\n        return intArrayOf()\n    }\n}\n`;
+      if (isSubarray) return `class Solution {\n    fun maxSubArray(nums: IntArray): Int {\n        // Write your code here\n        return 0\n    }\n}\n`;
+      if (is3Sum) return `class Solution {\n    fun threeSum(nums: IntArray): List<List<Int>> {\n        // Write your code here\n        return listOf()\n    }\n}\n`;
+      if (isSubstring) return `class Solution {\n    fun lengthOfLongestSubstring(s: String): Int {\n        // Write your code here\n        return 0\n    }\n}\n`;
+      if (isBinarySearch || isRotated) return `class Solution {\n    fun search(nums: IntArray, target: Int): Int {\n        // Write your code here\n        return -1;\n    }\n}\n`;
+      return `class Solution {\n    fun ${camelName}(nums: IntArray, target: Int): IntArray {\n        // Write your code here\n        return intArrayOf()\n    }\n}\n`;
+
+    case "sql":
+      return `-- Write your SQL query here\nSELECT * FROM table_name;\n`;
+
     default:
       return defaultCodeTemplates[targetLang] || "";
   }
