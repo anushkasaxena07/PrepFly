@@ -62,6 +62,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const syncIntervalRef = useRef(null);
   const remoteParticipantIdRef = useRef(null);
   const pendingIceCandidatesRef = useRef({});
+  const [connectionStatus, setConnectionStatus] = useState("Disconnected");
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -106,10 +107,55 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     // Cleanup on unmount
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+        recognitionRef.current = null;
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(t => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current);
+        syncIntervalRef.current = null;
       }
     };
   }, [userId]);
+
+  // Prevent page leaving when inside a call
+  useEffect(() => {
+    if (!inCall) return;
+
+    // 1. Prevent beforeunload (refresh, close tab)
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // 2. Prevent browser back button (history manipulation)
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = (e) => {
+      const leave = window.confirm("Are you sure you want to leave the active interview call?\n\nLeaving will end the connection.");
+      if (!leave) {
+        window.history.pushState(null, "", window.location.href);
+      } else {
+        handleEndCall();
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [inCall, currentRoom]);
 
   // Dynamic suggested question from Gemini AI Coach
   const generateDynamicSuggestedQuestion = async (text) => {
@@ -352,6 +398,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const initRTCPeerConnection = (stream) => {
     if (peerConnectionRef.current) return;
 
+    console.log("Initializing RTCPeerConnection");
     const remoteStreamInstance = new MediaStream();
 
     const pc = new RTCPeerConnection({
@@ -359,31 +406,46 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     });
 
     if (stream) {
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+        console.log("Added local track to peer connection:", track.kind);
+      });
     }
 
     pc.ontrack = (event) => {
+      console.log("Remote Stream Received: track kind =", event.track.kind, "| enabled:", event.track.enabled, "| readyState:", event.track.readyState);
+
+      // Add incoming tracks directly to the shared remoteStreamInstance.
+      // Do NOT clone with new MediaStream() — the video element's srcObject
+      // must point to the same object we keep adding tracks into.
       const incomingStream = event.streams[0];
       if (incomingStream) {
         incomingStream.getTracks().forEach(track => {
-          try {
+          // Avoid duplicate tracks (ontrack can fire multiple times)
+          if (!remoteStreamInstance.getTracks().find(t => t.id === track.id)) {
             remoteStreamInstance.addTrack(track);
-          } catch (e) {}
+          }
         });
       } else if (event.track) {
-        try {
+        if (!remoteStreamInstance.getTracks().find(t => t.id === event.track.id)) {
           remoteStreamInstance.addTrack(event.track);
-        } catch (e) {}
+        }
       }
-      
-      if (remoteVideoRef.current) {
+
+      // Attach srcObject once (or re-attach if the element just mounted)
+      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStreamInstance) {
+        console.log("Attaching remoteStreamInstance to video element");
         remoteVideoRef.current.srcObject = remoteStreamInstance;
+        remoteVideoRef.current.play().catch(() => {});
       }
-      setRemoteStream(new MediaStream(remoteStreamInstance.getTracks()));
+
+      // Trigger React state update so the display:none guard re-evaluates
+      setRemoteStream(remoteStreamInstance);
     };
 
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRoom) {
+        console.log("ICE Candidate Generated");
         const targetId = remoteParticipantIdRef.current;
         if (targetId) {
           sendSignal(targetId, { type: "candidate", candidate: event.candidate });
@@ -394,6 +456,26 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           pendingIceCandidatesRef.current[currentRoom.room_code].push(event.candidate);
         }
       }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      console.log("ICE Connection State Change:", state);
+      if (state === "checking" || state === "disconnected") {
+        setConnectionStatus("Reconnecting...");
+      } else if (state === "connected" || state === "completed") {
+        setConnectionStatus("Connected");
+      } else if (state === "failed" || state === "closed") {
+        setConnectionStatus("Disconnected");
+      }
+    };
+    
+    pc.onconnectionstatechange = () => {
+      console.log("Peer Connection State Change:", pc.connectionState);
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log("Signaling State Change:", pc.signalingState);
     };
 
     peerConnectionRef.current = pc;
@@ -458,10 +540,12 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           }
           const pc = peerConnectionRef.current;
           if (signal.type === "offer") {
+            console.log("Offer Received");
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
+            console.log("Answer Created");
             sendSignal(sender_id, answer);
 
             // Process queued remote candidates
@@ -469,6 +553,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
               for (const cand of pc.pendingRemoteCandidates) {
                 try {
                   await pc.addIceCandidate(new RTCIceCandidate(cand));
+                  console.log("ICE Candidate Added from queue");
                 } catch (err) {
                   console.warn("Failed to add queued remote candidate:", err);
                 }
@@ -476,6 +561,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
               pc.pendingRemoteCandidates = [];
             }
           } else if (signal.type === "answer") {
+            console.log("Answer Received");
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
 
@@ -484,6 +570,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
               for (const cand of pc.pendingRemoteCandidates) {
                 try {
                   await pc.addIceCandidate(new RTCIceCandidate(cand));
+                  console.log("ICE Candidate Added from queue");
                 } catch (err) {
                   console.warn("Failed to add queued remote candidate:", err);
                 }
@@ -494,6 +581,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             try {
               if (pc.remoteDescription && pc.remoteDescription.type) {
                 await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                console.log("ICE Candidate Added");
               } else {
                 if (!pc.pendingRemoteCandidates) {
                   pc.pendingRemoteCandidates = [];
@@ -516,6 +604,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         const pc = peerConnectionRef.current;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        console.log("Offer Created");
         sendSignal(remoteId, offer);
       }
 
@@ -636,6 +725,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const toggleScreenShare = async () => {
     if (!isScreenSharing) {
       try {
+        console.log("Screen Share Started");
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
@@ -644,17 +734,35 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
         // Swap track in peer connection
         const videoTrack = screenStream.getVideoTracks()[0];
-        const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(videoTrack);
+        const pc = peerConnectionRef.current;
+        if (pc) {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            await sender.replaceTrack(videoTrack);
+          } else {
+            console.log("No pre-existing video sender. Adding screen share track to connection.");
+            pc.addTrack(videoTrack, screenStream);
+            // Renegotiate
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+            if (targetId) {
+              console.log("Sending renegotiation offer for screen share");
+              sendSignal(targetId, offer);
+            }
+          }
         }
 
-        videoTrack.onended = () => {
+        videoTrack.onended = async () => {
+          console.log("Screen Share Stopped");
           setIsScreenSharing(false);
           const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
-          const senderBack = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
-          if (senderBack && cameraTrack) {
-            senderBack.replaceTrack(cameraTrack);
+          const pcCurrent = peerConnectionRef.current;
+          if (pcCurrent) {
+            const senderBack = pcCurrent.getSenders().find(s => s.track?.kind === 'video');
+            if (senderBack && cameraTrack) {
+              await senderBack.replaceTrack(cameraTrack);
+            }
           }
           if (localVideoRef.current && mediaStreamRef.current) {
             localVideoRef.current.srcObject = mediaStreamRef.current;
@@ -664,11 +772,15 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         console.warn("Screen share cancelled:", err);
       }
     } else {
+      console.log("Screen Share Stopped");
       setIsScreenSharing(false);
       const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
-      const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
-      if (sender && cameraTrack) {
-        sender.replaceTrack(cameraTrack);
+      const pc = peerConnectionRef.current;
+      if (pc) {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender && cameraTrack) {
+          await sender.replaceTrack(cameraTrack);
+        }
       }
       if (localVideoRef.current && mediaStreamRef.current) {
         localVideoRef.current.srcObject = mediaStreamRef.current;
@@ -1262,22 +1374,67 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                     width: "100%", 
                     height: "100%", 
                     objectFit: "cover", 
-                    display: getRemoteParticipantId() ? "block" : "none"
+                    display: (remoteStream && remoteStream.getVideoTracks().length > 0) ? "block" : "none"
                   }}
                 />
 
-                {!getRemoteParticipantId() && (
-                  <div style={{textAlign: "center"}}>
-                    <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #0e7a5e)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, margin: "0 auto 12px"}}>
-                      P2P
+                {(!remoteParticipantIdRef.current || !remoteStream || remoteStream.getVideoTracks().length === 0) && (
+                  <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5}}>
+                    <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
+                      👤
                     </div>
-                    <div style={{fontSize: "14px", fontWeight: 700}}>Remote Peer / Candidate</div>
-                    <div style={{fontSize: "11px", color: "var(--cyan)", marginTop: "4px"}}>Waiting for Peer WebRTC Connection...</div>
+                    <div style={{fontSize: "14px", fontWeight: 800, color: "#fff"}}>
+                      {remoteStream && remoteStream.getVideoTracks().length > 0 ? "Video loading..." : "Waiting for video..."}
+                    </div>
+                    <div style={{fontSize: "11px", color: "var(--text2)", marginTop: "4px"}}>
+                      {!remoteParticipantIdRef.current ? "Waiting for peer to join room" : "Connecting media stream..."}
+                    </div>
+                  </div>
+                )}
+
+                {connectionStatus === "Reconnecting..." && (
+                  <div style={{
+                    position: "absolute",
+                    top: "12px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "rgba(245,158,11,0.85)",
+                    color: "#fff",
+                    padding: "6px 12px",
+                    borderRadius: "20px",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    zIndex: 10,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                  }}>
+                    ⚠ Reconnecting...
+                  </div>
+                )}
+
+                {connectionStatus === "Connected" && (
+                  <div style={{
+                    position: "absolute",
+                    top: "12px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "rgba(16,185,129,0.85)",
+                    color: "#fff",
+                    padding: "6px 12px",
+                    borderRadius: "20px",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    zIndex: 10,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                  }}>
+                    ✓ Connected
                   </div>
                 )}
 
                 <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700}}>
-                  {roomParticipants.find(p => p.user_id !== userId)?.name || "Remote Peer"} 🎙 Active
+                  {/* Show the remote peer's name — check both .name and .user_name since backend may use either */}
+                  {(roomParticipants.find(p => p.user_id !== userId)?.name ||
+                    roomParticipants.find(p => p.user_id !== userId)?.user_name ||
+                    "Remote Peer")} 🎙 Active
                 </div>
               </div>
             </div>

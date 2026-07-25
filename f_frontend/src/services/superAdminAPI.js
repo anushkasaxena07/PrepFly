@@ -5,7 +5,6 @@ export const superAdminFetch = async (endpoint, options = {}) => {
 
   const headers = {
     "Content-Type": "application/json",
-    "X-Super-Admin": "true",
     ...(options.headers || {})
   };
 

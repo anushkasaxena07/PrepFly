@@ -188,6 +188,20 @@ export default function Students() {
   const uniqueOrgs = Array.from(new Set(students.map(s => s.organization_name).filter(Boolean)));
   const uniqueDepts = Array.from(new Set(students.map(s => s.department).filter(Boolean)));
 
+  // ── Derived real stats ─────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const totalStudents     = students.length;
+  const premiumStudents   = students.filter(s => s.subscription === 'PREMIUM').length;
+  const freeStudents      = students.filter(s => !s.subscription || s.subscription === 'FREE').length;
+  const trialStudents     = students.filter(s => s.subscription === 'TRIAL').length;
+  const activeStudents    = students.filter(s => s.status === 'Active').length;
+  const inactiveStudents  = students.filter(s => s.status === 'Inactive' || s.status === 'At Risk').length;
+  const newToday          = students.filter(s => s.joined_at && s.joined_at.startsWith(today)).length;
+  const totalInterviews   = students.reduce((sum, s) => sum + (s.total_interviews || 0), 0);
+  const aiScores          = students.map(s => s.overall_ai_score).filter(v => v != null && v > 0);
+  const avgAiScore        = aiScores.length ? (aiScores.reduce((a,b) => a+b, 0) / aiScores.length).toFixed(1) : '—';
+  const placementReady    = students.filter(s => s.status === 'Active' && (s.total_interviews || 0) >= 3).length;
+
   if (loading) {
     return (
       <div style={{ color: "#ec4899", padding: "60px", textAlign: "center", fontWeight: 800 }}>
@@ -231,73 +245,73 @@ export default function Students() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px" }}>
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL STUDENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>1,420</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +24% YoY</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px", fontWeight: 700 }}>All registered users</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE STUDENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>1,280</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 90% Active DAU</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{activeStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● Active in last 7 days</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>NEW REGISTRATIONS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>+18 Today</div>
-          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>▲ +12% vs Yesterday</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>+{newToday} Today</div>
+          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Joined today</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PREMIUM STUDENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>480 Paid</div>
-          <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>⭐ 34% Paid Convert</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>{premiumStudents} Paid</div>
+          <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>⭐ {totalStudents > 0 ? Math.round(premiumStudents / totalStudents * 100) : 0}% Paid Convert</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>FREE PLAN STUDENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>800 Free</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{freeStudents} Free</div>
           <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px", fontWeight: 700 }}>Free Tier Accounts</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>STUDENTS IN TRIAL</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>140 Trial</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ 14-Day Free Access</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{trialStudents} Trial</div>
+          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ Trial Accounts</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RESUMES PARSED</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>1,240</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>📄 ATS Verified</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>📄 Registered users</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MOCK INTERVIEWS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>4,820</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{totalInterviews.toLocaleString()}</div>
           <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>🎙️ Ava Sessions</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>CODING ASSESSMENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>8,940</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>—</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>💻 Submissions</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVERAGE AI SCORE</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>8.8 / 10</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +0.4 pts benchmark</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{avgAiScore} / 10</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Across all interviews</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PLACEMENT READY</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>890 🎯</div>
-          <div style={{ fontSize: "10px", color: "#00c4a7", marginTop: "2px", fontWeight: 700 }}>Targeting Tier-1 Tech</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>{placementReady} 🎯</div>
+          <div style={{ fontSize: "10px", color: "#00c4a7", marginTop: "2px", fontWeight: 700 }}>Active + 3+ interviews</div>
         </div>
 
         <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>INACTIVE / AT RISK</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>45 Needs Action</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{inactiveStudents} Needs Action</div>
           <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>⚠️ Low Practice Activity</div>
         </div>
       </div>

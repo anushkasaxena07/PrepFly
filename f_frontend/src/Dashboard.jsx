@@ -19,6 +19,14 @@ export default function Dashboard() {
 
   // Navigation & panels active states
   const [activeTab, setActiveTab] = useState("dashboard");
+  const handleTabChange = (targetTab) => {
+    if (activeTab === targetTab) return;
+    if (activeTab === 'ava' || activeTab === 'interviews') {
+      const ok = window.confirm("Are you sure you want to leave the active interview page? Your progress may be lost.");
+      if (!ok) return;
+    }
+    setActiveTab(targetTab);
+  };
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -49,12 +57,26 @@ export default function Dashboard() {
     try {
       const stored = localStorage.getItem("user");
       if (stored) {
-        setUser({ ...JSON.parse(stored), role: "SUPER_ADMIN" });
+        setUser(JSON.parse(stored));
       } else {
-        const email = localStorage.getItem("email") || "saxenaanushka9645@gmail.com";
-        const user_id = localStorage.getItem("user_id") || "sa_anushka_01";
-        const name = localStorage.getItem("full_name") || "Anushka";
-        setUser({ name, email, avatar: name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0, 2), _id: user_id, role: "SUPER_ADMIN" });
+        let guestId = localStorage.getItem("guest_id");
+        let guestName = localStorage.getItem("guest_name");
+        if (!guestId) {
+          guestId = "guest_" + Math.random().toString(36).substring(2, 9);
+          guestName = "Guest_" + Math.floor(1000 + Math.random() * 9000);
+          localStorage.setItem("guest_id", guestId);
+          localStorage.setItem("guest_name", guestName);
+        }
+        const email = localStorage.getItem("email") || (guestId + "@prepfly.guest");
+        const user_id = localStorage.getItem("user_id") || guestId;
+        const name = localStorage.getItem("full_name") || guestName;
+        setUser({
+          name,
+          email,
+          avatar: name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0, 2),
+          _id: user_id,
+          role: "candidate"
+        });
       }
     } catch (e) {
       /* silent */
@@ -175,7 +197,7 @@ export default function Dashboard() {
         const qData = typeof notif.raw_message === "string" ? JSON.parse(notif.raw_message) : notif.raw_message;
         if (qData.category === "Coding") {
           localStorage.setItem("selected_problem_id", qData.question_id);
-          setActiveTab("coding");
+          handleTabChange("coding");
         } else {
           setPracticeQuestion(qData);
           setStudentAnswer("");
@@ -190,7 +212,7 @@ export default function Dashboard() {
     } else if (notif.type) {
       const validTabs = ["dashboard", "coding", "speech", "resume", "ava", "interviews", "analytics", "profile"];
       if (validTabs.includes(notif.type)) {
-        setActiveTab(notif.type);
+        handleTabChange(notif.type);
       }
     }
   };
@@ -224,13 +246,13 @@ export default function Dashboard() {
         </div>
 
         <div className="nav-center" role="tablist" aria-label="Page navigation">
-          <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('dashboard')} disabled={isOrgExpired} role="tab">Dashboard</button>
-          <button className={`nav-link ${activeTab === 'coding' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('coding')} disabled={isOrgExpired} role="tab">Coding</button>
-          <button className={`nav-link ${activeTab === 'speech' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('speech')} disabled={isOrgExpired} role="tab">Speech AI</button>
-          <button className={`nav-link ${activeTab === 'resume' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('resume')} disabled={isOrgExpired} role="tab">Resume AI</button>
-          <button className={`nav-link ${activeTab === 'ava' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('ava')} disabled={isOrgExpired} role="tab">AI Interview</button>
-          <button className={`nav-link ${activeTab === 'interviews' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('interviews')} disabled={isOrgExpired} role="tab">Interviews</button>
-          <button className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => !isOrgExpired && setActiveTab('analytics')} disabled={isOrgExpired} role="tab">Analytics</button>
+          <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('dashboard')} disabled={isOrgExpired} role="tab">Dashboard</button>
+          <button className={`nav-link ${activeTab === 'coding' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('coding')} disabled={isOrgExpired} role="tab">Coding</button>
+          <button className={`nav-link ${activeTab === 'speech' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('speech')} disabled={isOrgExpired} role="tab">Speech AI</button>
+          <button className={`nav-link ${activeTab === 'resume' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('resume')} disabled={isOrgExpired} role="tab">Resume AI</button>
+          <button className={`nav-link ${activeTab === 'ava' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('ava')} disabled={isOrgExpired} role="tab">AI Interview</button>
+          <button className={`nav-link ${activeTab === 'interviews' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('interviews')} disabled={isOrgExpired} role="tab">Interviews</button>
+          <button className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('analytics')} disabled={isOrgExpired} role="tab">Analytics</button>
         </div>
 
         <div className="nav-right">
@@ -324,7 +346,7 @@ export default function Dashboard() {
                 aria-label="User menu" 
                 role="button" 
                 tabIndex="0" 
-                onClick={(e) => { e.stopPropagation(); setActiveTab('profile'); setShowProfile(prev => !prev); }}
+                onClick={(e) => { e.stopPropagation(); handleTabChange('profile'); setShowProfile(prev => !prev); }}
                 style={{ overflow: "hidden", cursor: "pointer" }}
               >
                 {typeof user.avatar === 'string' && (user.avatar.startsWith('http') || user.avatar.startsWith('data:')) ? (
