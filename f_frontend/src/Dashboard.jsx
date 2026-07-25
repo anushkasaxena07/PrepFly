@@ -1,6 +1,7 @@
 import { getGradeInfo } from './utils/gradingSystem';
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchSubscriptionStatus } from './components/subscription/subscriptionAPI';
 
 // Modular tab components
 import DashboardTab from "./components/DashboardTab";

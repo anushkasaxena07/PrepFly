@@ -1651,6 +1651,7 @@ def generate_final_report_async(session_id, resume_text, questions, responses, f
             experience_level="1-3 Years",
             questions=questions,
             responses=responses,
+            feedbacks=feedbacks,  # pass per-answer scores and evidence
             chat_model=chat_model
         )
 
@@ -1662,26 +1663,37 @@ def generate_final_report_async(session_id, resume_text, questions, responses, f
     except Exception as e:
         print(f"Error generating final report asynchronously: {e}")
         try:
+            # Derive real scores from per-question feedbacks instead of hardcoding 80
+            scores_from_feedback = [f.get("score", 0) for f in (feedbacks or []) if isinstance(f, dict)]
+            real_overall = round(sum(scores_from_feedback) / len(scores_from_feedback) * 10) if scores_from_feedback else 50
+            real_overall = max(0, min(100, real_overall))
+
+            # Build per-question evidence for real weaknesses
+            real_improvements = []
+            for i, f in enumerate(feedbacks or []):
+                if isinstance(f, dict) and f.get("improvement"):
+                    q_label = questions[i][:60] + "..." if questions and i < len(questions) and len(questions[i]) > 60 else (questions[i] if questions and i < len(questions) else f"Question {i+1}")
+                    real_improvements.append(f"{f['improvement']} (Q{i+1}: {q_label})")
+            if not real_improvements:
+                real_improvements = ["Review your lowest-scoring answers above for specific improvement areas."]
+
+            real_strengths = []
+            for i, f in enumerate(feedbacks or []):
+                if isinstance(f, dict) and f.get("strength") and f.get("score", 0) >= 8:
+                    real_strengths.append(f"{f['strength']} (Q{i+1})")
+            if not real_strengths:
+                real_strengths = ["No high-confidence strengths identified — keep practicing."]
+
             fallback_report = {
-                "overall_score": 80,
-                "technical_score": 82,
-                "communication_score": 80,
-                "confidence_score": 78,
-                "fluency_score": 82,
-                "problem_solving_score": 78,
-                "strengths": ["Clear technical articulation", "Demonstrated foundational understanding"],
-                "weaknesses": ["Could elaborate on system trade-offs"],
-                "mistakes": [],
-                "improvement_suggestions": ["Use STAR framework for project explanations"],
-                "ideal_answers": [],
-                "transcript_analytics": {
-                    "words_per_minute": 130,
-                    "filler_word_count": {"um": 2, "like": 3, "you_know": 1},
-                    "confidence_trend": "stable",
-                    "topic_performance": [{"topic": "Technical", "score": 80}]
-                },
-                "learning_roadmap": ["Review system design principles"]
+                "overall_score": real_overall,
+                "recommendation": "Borderline" if real_overall >= 60 else "Reject",
+                "confidence": "Low",
+                "strengths": [{"title": s, "evidence": "Derived from per-answer scores."} for s in real_strengths],
+                "weaknesses": [{"title": w, "evidence": "Derived from per-answer scores."} for w in real_improvements],
+                "dimensions": []
             }
+            from services.feedback_service import enrich_report_with_grading
+            fallback_report = enrich_report_with_grading(fallback_report)
             supabase.table("sessions").update({"final_report": json.dumps(fallback_report), "report_json": fallback_report}).eq("session_id", session_id).execute()
         except:
             pass
@@ -3221,6 +3233,7 @@ def coding_room_sync():
     code = data.get("code")
     lang = data.get("lang")
     cursor = data.get("cursor")
+    output = data.get("output")  # Run output to broadcast to all participants
     
     if not room_id or not user_id:
         return jsonify({"error": "room_id and user_id are required"}), 400
@@ -3264,12 +3277,18 @@ def coding_room_sync():
         if lang is not None and lang != room["current_lang"]:
             update_data["current_lang"] = lang
             room["current_lang"] = lang
+
+        # Broadcast run output if provided
+        if output is not None:
+            update_data["current_output"] = output
+            room["current_output"] = output
             
         supabase.table("coding_rooms").update(update_data).eq("room_id", room_id).execute()
         
         return jsonify({
             "current_code": room["current_code"],
             "current_lang": room["current_lang"],
+            "current_output": room.get("current_output", ""),
             "participants": active_participants
         }), 200
         
@@ -3750,7 +3769,7 @@ def webrtc_generate_report():
             "Strong grasp of bias-variance trade-off and regularization techniques."
         ]
         cat_improvements = [
-            "Detail model deployment and monitoring strategies for real-time inference.",
+        "Detail model deployment and monitoring strategies for real-time inference.",
             "Discuss edge case data drift and automated retraining pipeline triggers."
         ]
     else:
@@ -3827,88 +3846,108 @@ Please structure the evaluation report in markdown with these exact headings:
 def resume_score():
     data = request.get_json() or {}
     user_id = data.get("user_id")
-    resume_text = data.get("resume_text", "")
-    job_description = data.get("job_description", "")
+    resume_text = data.get("resume_text", "").strip()
+    job_description = data.get("job_description", "").strip()
 
     if not resume_text or not job_description:
         return jsonify({"error": "resume_text and job_description are required"}), 400
 
-    prompt = f"""You are an expert technical recruiter and ATS scanner.
-Evaluate this resume text against the target job description.
+    # ── Step 1: Deterministic ATS engine — real numbers, zero AI guessing ────
+    from services.ats_engine import calculate_ats_match
+    ats = calculate_ats_match(resume_text, job_description)
 
-Resume:
-{resume_text}
+    final_score     = ats["ats_score"]
+    matched_skills  = ats["matched_skills"]
+    missing_skills  = ats["missing_skills"]
+    bonus_skills    = ats["bonus_skills"]
+    resume_years    = ats["resume_years"]
+    required_years  = ats["required_years"]
+    skill_match_pct = ats["skill_match_pct"]
+    keyword_overlap = ats["keyword_overlap_pct"]
+    experience_pct  = ats["experience_pct"]
 
-Job Description:
-{job_description}
+    # ── Step 2: LLM — write narrative ONLY, receives computed data as ground truth ─
+    narrative_prompt = (
+        "You are a senior technical recruiter reviewing an ATS analysis result.\n\n"
+        "COMPUTED ATS DATA (ground truth — do NOT change any numbers or invent skills):\n"
+        f"- Final ATS Score: {final_score}/100\n"
+        f"- Skill Match: {skill_match_pct}% ({ats['total_matched_skills']} of {ats['total_jd_skills']} required skills found)\n"
+        f"- Keyword Overlap: {keyword_overlap}%\n"
+        f"- Experience: Candidate has {resume_years if resume_years else 'unspecified'} years; role requires {required_years if required_years else 'unspecified'}\n"
+        f"- Matched Skills: {', '.join(matched_skills[:12]) or 'none detected'}\n"
+        f"- Missing Skills: {', '.join(missing_skills[:10]) or 'none'}\n"
+        f"- Bonus Skills (on resume but not required): {', '.join(bonus_skills[:6]) or 'none'}\n\n"
+        "Your task — write ONLY from the data above:\n"
+        "1. \"summary\": 2-sentence assessment referencing the actual score and top skill gaps.\n"
+        "2. \"suggestions\": Exactly 4 short actionable tips. Each must reference actual missing skills above.\n"
+        "3. \"bonus_note\": One sentence on whether bonus skills should be highlighted more.\n\n"
+        'Return ONLY valid JSON: {"summary": "...", "suggestions": ["...","...","...","..."], "bonus_note": "..."}'
+    )
 
-Provide a detailed ATS matching score and analysis.
-Return a JSON object with the following fields:
-- "ats_score": integer (0 to 100 matching score)
-- "overall_grade": string (one of 'S', 'A', 'B', 'C', 'D' based on score: >=90 is 'S', >=80 is 'A', >=65 is 'B', >=50 is 'C', else 'D')
-- "matched_keywords": list of strings (up to 12 keywords from the job description found in the resume)
-- "missing_keywords": list of strings (up to 8 keywords from the job description missing in the resume)
-- "skill_match": object containing:
-    - "Technical Skills": integer (0 to 100)
-    - "JD Keywords": integer (0 to 100)
-    - "Experience Depth": integer (0 to 100)
-    - "Tools & Frameworks": integer (0 to 100)
-    - "Domain Fit": integer (0 to 100)
-- "section_scores": object containing:
-    - "experience": integer (1 to 10 score)
-    - "skills": integer (1 to 10 score)
-    - "format": integer (1 to 10 score)
-    - "projects": integer (1 to 10 score)
-- "improvement_tips": list of strings (4 actionable tips for improving this resume relative to the JD)
-
-Return ONLY the raw JSON string, no markdown wrapper, no preamble."""
-
+    narrative = {}
     try:
-        raw_res = chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
-        result = parse_gemini_json(raw_res)
+        raw = chat_model.invoke([HumanMessage(content=narrative_prompt)]).content.strip()
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
+        narrative = json.loads(raw)
     except Exception as e:
-        print(f"Resume scoring error: {e}")
-        # Build fallback score
-        result = {
-            "ats_score": 75,
-            "overall_grade": "B",
-            "matched_keywords": ["Python", "React", "AWS"],
-            "missing_keywords": ["Docker", "Kubernetes"],
-            "skill_match": {
-                "Technical Skills": 78,
-                "JD Keywords": 72,
-                "Experience Depth": 80,
-                "Tools & Frameworks": 70,
-                "Domain Fit": 76
-            },
-            "section_scores": {
-                "experience": 8,
-                "skills": 7,
-                "format": 9,
-                "projects": 8
-            },
-            "improvement_tips": [
-                "Quantify your accomplishments.",
-                "Incorporate missing keywords like Docker and Kubernetes.",
-                "Highlight target stack on projects."
-            ]
+        print(f"Resume narrative notice: {e}")
+        gap_str = f"Missing key skills: {', '.join(missing_skills[:4])}." if missing_skills else "Good keyword coverage."
+        narrative = {
+            "summary": f"The resume scores {final_score}/100 against this job description. {gap_str}",
+            "suggestions": [
+                f"Add {', '.join(missing_skills[:3])} to your skills section." if missing_skills else "Core skills are well-matched.",
+                "Quantify achievements: '40% latency reduction' beats 'improved performance'.",
+                f"Experience: {'Meets requirement.' if experience_pct >= 100 else f'Role requires {required_years} yrs — emphasise depth.'}",
+                f"Highlight {', '.join(bonus_skills[:2])} more prominently." if bonus_skills else "Mirror the JD language more closely in your summary."
+            ],
+            "bonus_note": f"You have {len(bonus_skills)} additional skills not required — list them in an 'Additional Skills' section." if bonus_skills else ""
         }
 
-    # Save to database if user_id is provided
+    # ── Step 3: Assemble final response ──────────────────────────────────────
+    tips = list(narrative.get("suggestions", []))
+    if narrative.get("bonus_note") and bonus_skills:
+        tips = [narrative["bonus_note"]] + tips[:3]
+
+    result = {
+        "ats_score":        final_score,
+        "overall_grade":    ats["overall_grade"],
+        "matched_keywords": ats["matched_keywords"],
+        "missing_keywords": ats["missing_keywords"],
+        "bonus_skills":     bonus_skills[:8],
+        "skill_match":      ats["skill_match"],
+        "section_scores":   ats["section_scores"],
+        "improvement_tips": tips,
+        "ai_summary":       narrative.get("summary", ""),
+        "meta": {
+            "skill_match_pct":      skill_match_pct,
+            "keyword_overlap_pct":  keyword_overlap,
+            "experience_pct":       experience_pct,
+            "resume_years":         resume_years,
+            "required_years":       required_years,
+            "total_jd_skills":      ats["total_jd_skills"],
+            "total_matched_skills": ats["total_matched_skills"],
+            "engine": "deterministic_ats_v1"
+        }
+    }
+
+    # ── Step 4: Save to DB ────────────────────────────────────────────────────
     if user_id:
         try:
-            db_data = {
+            supabase.table("resume_scores").insert({
                 "user_id": user_id,
-                "resume_text": resume_text,
-                "job_description": job_description,
-                "score": result.get("ats_score", 0),
+                "resume_text": resume_text[:500],
+                "job_description": job_description[:500],
+                "score": final_score,
                 "details": result
-            }
-            supabase.table("resume_scores").insert(db_data).execute()
+            }).execute()
         except Exception as db_err:
-            print(f"Error saving resume score to DB: {db_err}")
+            print(f"Resume score DB save notice: {db_err}")
 
     return jsonify(result), 200
+
+
 
 
 @app.route("/api/speech/analyze", methods=["POST"])
@@ -5221,6 +5260,24 @@ def admin_coding_test_export_csv(test_id):
 
 
 
+# ── In-memory notification store ─────────────────────────────────────────────
+# Reliable fallback when the `notifications` Supabase table doesn't exist yet.
+# Survives for the lifetime of the process; cleared on restart.
+IN_MEMORY_NOTIFICATIONS = []
+
+def _push_notification(notif_dict):
+    """Insert into Supabase notifications table AND the in-memory fallback."""
+    global IN_MEMORY_NOTIFICATIONS
+    try:
+        supabase.table("notifications").insert(notif_dict).execute()
+    except Exception as e:
+        print(f"Supabase notifications insert notice (table may not exist): {e}")
+    # Always persist in memory regardless of DB status
+    IN_MEMORY_NOTIFICATIONS.insert(0, notif_dict)
+    if len(IN_MEMORY_NOTIFICATIONS) > 200:
+        IN_MEMORY_NOTIFICATIONS = IN_MEMORY_NOTIFICATIONS[:200]
+
+
 @app.route("/api/admin/question-bank", methods=["GET", "POST"])
 @app.route("/admin/question-bank", methods=["GET", "POST"])
 def admin_question_bank():
@@ -5246,7 +5303,37 @@ def admin_question_bank():
             supabase.table("question_bank").insert(new_q).execute()
         except Exception as e:
             print("Insert qbank notice:", e)
-        return jsonify({"message": "Question added to bank", "question": new_q}), 201
+
+        # ── Auto-notify all students in this org when admin adds a question ──
+        cat  = new_q["category"]
+        diff = new_q["difficulty"]
+        cat_emoji = {"Coding": "💻", "Technical": "⚙️", "HR": "🤝", "Behavioral": "🧠"}.get(cat, "📚")
+        notif_item = {
+            "id": f"notif_{uuid.uuid4().hex[:8]}",
+            "sender_type": "ADMIN",
+            "sender_name": "Organization Admin",
+            "organization_id": org_id,
+            "target_group": "All Students",
+            "title": f"🎯 New Practice Question: {new_q['title']}",
+            "message": json.dumps({
+                "question_id": q_id,
+                "title": new_q["title"],
+                "category": cat,
+                "difficulty": diff,
+                "description": new_q["description"] or new_q["title"],
+                "constraints": new_q["constraints"],
+                "starter_code": new_q["starter_code"],
+                "test_cases": new_q["test_cases"],
+                "solution": new_q["solution"]
+            }),
+            "target_dept": "All",
+            "target_sem": "All",
+            "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+            "read": 0
+        }
+        _push_notification(notif_item)
+
+        return jsonify({"message": "Question added to bank and students notified.", "question": new_q, "notification": notif_item}), 201
 
     questions = []
     try:
@@ -5369,7 +5456,7 @@ def admin_give_question(q_id):
             "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
             "read": 0
         }
-        supabase.table("notifications").insert(notif_item).execute()
+        _push_notification(notif_item)
         return jsonify({"message": "Question successfully assigned and notification dispatched to students.", "notification": notif_item}), 200
     except Exception as e:
         print("Give question error:", e)
@@ -5389,6 +5476,7 @@ GLOBAL_QUESTION_BANK = [
 @app.route("/superadmin/qbank", methods=["GET", "POST"])
 def superadmin_question_bank():
     global GLOBAL_QUESTION_BANK
+
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
@@ -6050,7 +6138,7 @@ def get_user_notifications():
         print("Fetch SA notifications notice:", e)
 
     try:
-        # 2. Fetch Org Admin announcements for this org (exclude feedback notifications from broadcasts)
+        # 2. Fetch Org Admin announcements for this org (from Supabase)
         org_res = supabase.table("notifications").select("*").eq("organization_id", org_id).neq("sender_type", "FEEDBACK_SYSTEM").execute()
         if org_res and org_res.data:
             import json
@@ -6059,8 +6147,6 @@ def get_user_notifications():
                 message_content = n.get("message") or ""
                 notif_type = "announcement"
                 desc = message_content
-                
-                # Check if it is a practice question
                 if title.startswith("🎯"):
                     notif_type = "practice_question"
                     try:
@@ -6068,7 +6154,6 @@ def get_user_notifications():
                         desc = f"Difficulty: {q_data.get('difficulty')} | Category: {q_data.get('category')}. Click to view details and practice."
                     except Exception:
                         pass
-                
                 notifications_list.append({
                     "id": n.get("id"),
                     "title": title if title.startswith("🎯") else f"📢 Campus Announcement: {title}",
@@ -6080,7 +6165,35 @@ def get_user_notifications():
                     "raw_message": message_content
                 })
     except Exception as e:
-        print("Fetch Org notifications notice:", e)
+        print("Fetch Org notifications (Supabase) notice:", e)
+
+    # 3. Merge in-memory notifications for this org (fallback when DB table missing)
+    existing_ids = {n["id"] for n in notifications_list}
+    for n in IN_MEMORY_NOTIFICATIONS:
+        if n.get("id") in existing_ids:
+            continue  # already in list from DB
+        if n.get("sender_type") == "SUPER_ADMIN" or n.get("organization_id") == org_id:
+            title = n.get("title") or ""
+            message_content = n.get("message") or ""
+            notif_type = "practice_question" if title.startswith("🎯") else "announcement"
+            desc = message_content
+            if notif_type == "practice_question":
+                try:
+                    q_data = json.loads(message_content)
+                    desc = f"Difficulty: {q_data.get('difficulty')} | Category: {q_data.get('category')}. Click to view details and practice."
+                except Exception:
+                    pass
+            notifications_list.append({
+                "id": n.get("id"),
+                "title": title,
+                "desc": desc,
+                "time": n.get("created_at") or "Recently",
+                "type": notif_type,
+                "sender": n.get("sender_name", "Organization Admin"),
+                "read": bool(n.get("read", 0)),
+                "raw_message": message_content
+            })
+            existing_ids.add(n.get("id"))
 
     if not notifications_list:
         notifications_list = [
@@ -6447,12 +6560,18 @@ def superadmin_dashboard_stats():
     users_all = []
     sessions_all = []
     try:
-        o_res = supabase.table("organization").select("*").execute()
-        if o_res and o_res.data: orgs = o_res.data
-        a_res = supabase.table("admin").select("*").execute()
-        if a_res and a_res.data: admins = a_res.data
-        # Use the `users` table — this is where all real registrations live
-        u_res = supabase.table("users").select("id,role,subscription,created_at").execute()
+        try:
+            o_res = supabase.table("organization").select("*").execute()
+            if o_res and o_res.data: orgs = o_res.data
+        except Exception:
+            pass  # organizations table may not exist yet
+        try:
+            a_res = supabase.table("admin").select("*").execute()
+            if a_res and a_res.data: admins = a_res.data
+        except Exception:
+            pass  # admin table may not exist yet
+        # Use the `users` table — subscription_plan is the correct column name
+        u_res = supabase.table("users").select("id,role,subscription_plan,created_at").execute()
         if u_res and u_res.data: users_all = u_res.data
         s_res = supabase.table("sessions").select("user_id,created_at").execute()
         if s_res and s_res.data: sessions_all = s_res.data
@@ -6465,9 +6584,9 @@ def superadmin_dashboard_stats():
 
     candidates = [u for u in users_all if u.get("role") not in ("ADMIN", "SUPER_ADMIN", "admin")]
     total_students = len(candidates)
-    premium_students = len([u for u in candidates if str(u.get("subscription", "")).upper() == "PREMIUM"])
-    free_students = len([u for u in candidates if str(u.get("subscription", "")).upper() in ("", "FREE", "NONE", "NULL") or not u.get("subscription")])
-    trial_students = len([u for u in candidates if str(u.get("subscription", "")).upper() == "TRIAL"])
+    premium_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() == "PREMIUM"])
+    free_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() in ("", "FREE", "NONE", "NULL") or not u.get("subscription_plan")])
+    trial_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() == "TRIAL"])
 
     # Active = had at least one session in the last 7 days
     active_user_ids = set(

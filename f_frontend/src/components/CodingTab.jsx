@@ -425,6 +425,42 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const isTypingRef = useRef(false);
   const syncIntervalRef = useRef(null);
 
+  // ── Reload persistence: restore roomId from sessionStorage on mount ──
+  useEffect(() => {
+    const savedRoomId = sessionStorage.getItem("coding_room_id");
+    if (savedRoomId) {
+      // Re-join the room to restore state
+      const savedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user";
+      const savedUserName = user?.name || localStorage.getItem("user_name") || "User";
+      apiFetch('/api/coding/room/join', {
+        method: 'POST',
+        body: JSON.stringify({
+          room_id: savedRoomId,
+          user_id: savedUserId,
+          user_name: savedUserName,
+          role: user?.role || "candidate"
+        })
+      }).then(res => res.ok ? res.json() : null).then(data => {
+        if (data) {
+          setRoomId(data.room_id);
+          if (data.problem) setCurrentProblem(data.problem);
+          if (data.current_code) setCode(data.current_code);
+          if (data.current_lang) setLang(data.current_lang);
+          if (data.participants) setRoomParticipants(data.participants);
+          if (data.current_output) {
+            setConsoleOut(data.current_output);
+            setConsoleColor("var(--text2)");
+          }
+          setConsoleOut(prev => data.current_output || prev);
+        }
+      }).catch(() => {
+        // Room expired or not found — clear stale sessionStorage
+        sessionStorage.removeItem("coding_room_id");
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 1. Fetch available problems on mount
   useEffect(() => {
     fetchProblems();
@@ -477,18 +513,20 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const syncRoomState = async () => {
     if (!roomId) return;
     try {
+      const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "anonymous_user";
+      const myUserName = user?.name || localStorage.getItem("user_name") || "User";
+      const timeSinceType = Date.now() - lastTypedRef.current;
+      const isTyping = isTypingRef.current || timeSinceType < 1500;
+
       const payload = {
         room_id: roomId,
-        user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "anonymous_user",
-        cursor: getCursorPosition()
+        user_id: myUserId,
+        user_name: myUserName,
+        cursor: getCursorPosition(),
+        // ── FIX Bug 2: ALWAYS send code so both users' changes propagate ──
+        code: code,
+        lang: lang,
       };
-
-      // Only send local code if we typed recently
-      const timeSinceType = Date.now() - lastTypedRef.current;
-      if (isTypingRef.current || timeSinceType < 2000) {
-        payload.code = code;
-        payload.lang = lang;
-      }
 
       const res = await apiFetch('/api/coding/room/sync', {
         method: 'POST',
@@ -499,19 +537,39 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         const data = await res.json();
         setRoomParticipants(data.participants || []);
         
-        // If not typing, and server has newer/different code, update editor
-        if (timeSinceType > 1500 && data.current_code !== code) {
+        // ── FIX Bug 2: Only RECEIVE (update editor) if WE are NOT actively typing ──
+        if (!isTyping && data.current_code !== code) {
           setCode(data.current_code);
-          isTypingRef.current = false;
         }
-        if (data.current_lang !== lang) {
+        if (data.current_lang && data.current_lang !== lang) {
           setLang(data.current_lang);
+        }
+        // ── FIX Bug 3: Receive run output from other participant ──
+        if (data.current_output && data.current_output !== consoleOut) {
+          setConsoleOut(data.current_output);
+          setConsoleColor("var(--text2)");
         }
       }
     } catch (err) {
       console.error("Room synchronization error:", err);
     }
   };
+
+  // Push run output to room so all participants see it
+  const pushOutputToRoom = async (outputText) => {
+    if (!roomId) return;
+    try {
+      await apiFetch('/api/coding/room/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          room_id: roomId,
+          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user",
+          output: outputText,
+        })
+      });
+    } catch (_) {}
+  };
+
 
   const getCursorPosition = () => {
     const area = document.getElementById("code-textarea");
@@ -565,11 +623,14 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   // 4. Room operations
   const createRoom = async () => {
     try {
+      const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "interviewer_user";
+      // ── FIX Bug 1: Read real name from localStorage not just user prop ──
+      const myUserName = user?.name || localStorage.getItem("user_name") || "Interviewer";
       const res = await apiFetch('/api/coding/room/create', {
         method: 'POST',
         body: JSON.stringify({
-          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "interviewer_user",
-          user_name: user?.name || "Interviewer",
+          user_id: myUserId,
+          user_name: myUserName,
           problem_id: currentProblem?.problem_id,
           sheet_id: selectedSheetId
         })
@@ -577,6 +638,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       if (res.ok) {
         const data = await res.json();
         setRoomId(data.room_id);
+        // ── FIX Bug 4: Persist room to sessionStorage so reload restores it ──
+        sessionStorage.setItem("coding_room_id", data.room_id);
         setCurrentProblem(data.problem);
         setCode(data.current_code);
         setLang(data.current_lang);
@@ -588,27 +651,37 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
+
   const joinRoom = async () => {
     const rId = joinRoomInput.trim().toUpperCase();
     if (!rId) return;
     try {
+      // ── FIX Bug 1: Read real name from localStorage not just user prop ──
+      const myUserName = user?.name || localStorage.getItem("user_name") || "Candidate";
+      const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "candidate_user";
       const res = await apiFetch('/api/coding/room/join', {
         method: 'POST',
         body: JSON.stringify({
           room_id: rId,
-          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "candidate_user",
-          user_name: user?.name || "Candidate",
+          user_id: myUserId,
+          user_name: myUserName,
           role: user?.role || "candidate"
         })
       });
       if (res.ok) {
         const data = await res.json();
         setRoomId(data.room_id);
+        // ── FIX Bug 4: Persist room to sessionStorage so reload restores it ──
+        sessionStorage.setItem("coding_room_id", data.room_id);
         setCurrentProblem(data.problem);
         setCode(data.current_code);
         setLang(data.current_lang);
         setRoomParticipants(data.participants);
-        setConsoleOut(`Successfully joined Room ${data.room_id}!`);
+        if (data.current_output) {
+          setConsoleOut(data.current_output);
+        } else {
+          setConsoleOut(`Successfully joined Room ${data.room_id}!`);
+        }
       } else {
         const err = await res.json();
         alert(err.error || "Room not found");
@@ -618,15 +691,19 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
+
   const leaveRoom = () => {
     setRoomId("");
     setRoomParticipants([]);
     setJoinRoomInput("");
+    // ── FIX Bug 4: Clear persisted room on explicit leave ──
+    sessionStorage.removeItem("coding_room_id");
     if (problems.length > 0) {
       selectProblem(problems[0]);
     }
     setConsoleOut("Left room. Local playground activated.");
   };
+
 
   // 5. Document Upload
   const handleSheetUpload = async (e) => {
@@ -719,6 +796,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setTestPassColor("var(--text2)");
     setAiReview("Analyzing logic...");
 
+    // ── FIX Bug 3: Push "running" state to room immediately ──
+    if (roomId) pushOutputToRoom("⏳ Partner running code...");
+
     try {
       const res = await apiFetch('/api/coding/submit', {
         method: 'POST',
@@ -732,25 +812,32 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const d = await res.json();
       if (res.ok) {
         setTestCaseResults(d.results || []);
+        let outputText;
         if (d.stderr) {
           setConsoleColor('var(--red)');
-          setConsoleOut(`Error:\n${d.stderr}`);
+          outputText = `Error:\n${d.stderr}`;
+          setConsoleOut(outputText);
           setTestPass(`0/${d.total || 3}`);
           setTestPassColor('var(--red)');
           setAiReview(d.ai_review || "Code runner execution failed due to runtime exception.");
         } else {
           setConsoleColor(d.passed === d.total ? '#00d68f' : 'var(--orange)');
-          setConsoleOut(d.stdout || 'Execution complete.');
+          outputText = d.stdout || 'Execution complete.';
+          setConsoleOut(outputText);
           setTimeComplexity(d.time_complexity || '—');
           setSpaceComplexity(d.space_complexity || '—');
           setTestPass(`${d.passed}/${d.total}`);
           setTestPassColor(d.passed === d.total ? 'var(--cyan)' : 'var(--orange)');
           setAiReview(d.ai_review || 'No AI feedback generated.');
         }
+        // ── FIX Bug 3: Broadcast final output to all room participants ──
+        if (roomId) pushOutputToRoom(outputText);
       } else {
         setTestCaseResults([]);
         setConsoleColor('var(--red)');
-        setConsoleOut('Error: ' + (d.error || 'Execution sandbox error'));
+        const errText = 'Error: ' + (d.error || 'Execution sandbox error');
+        setConsoleOut(errText);
+        if (roomId) pushOutputToRoom(errText);
       }
     } catch(e) {
       setTestCaseResults([]);
@@ -758,6 +845,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       setConsoleOut('Execution error: Network connection timeout.');
     }
   };
+
 
   return (
     <div id="page-coding" className="page active" role="tabpanel">
@@ -833,26 +921,36 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               {/* Connected participants list */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px" }}>
                 <div style={{display:"flex", gap:"-4px", marginRight: "6px"}}>
-                  {roomParticipants.map((p, idx) => (
-                    <div 
-                      key={p.user_id} 
-                      className="c-av" 
-                      style={{
-                        background: p.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
-                        border: p.active ? "2px solid var(--cyan)" : "2px solid transparent",
-                        color: "#fff",
-                        marginLeft: idx > 0 ? "-6px" : 0
-                      }}
-                      title={`${p.name} (${p.role}) - ${p.active ? 'Active' : 'Idle'}`}
-                    >
-                      {p.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
-                    </div>
-                  ))}
+                  {roomParticipants.map((p, idx) => {
+                    const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
+                    const isSelf = p.user_id === myId;
+                    return (
+                      <div 
+                        key={p.user_id} 
+                        className="c-av" 
+                        style={{
+                          background: p.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
+                          border: isSelf ? "2px solid #f59e0b" : p.active ? "2px solid var(--cyan)" : "2px solid transparent",
+                          color: "#fff",
+                          marginLeft: idx > 0 ? "-6px" : 0
+                        }}
+                        title={`${p.name}${isSelf ? ' (You)' : ''} · ${p.role} · ${p.active ? 'Active' : 'Idle'}`}
+                      >
+                        {(p.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
+                      </div>
+                    );
+                  })}
                 </div>
-                <span className="text-xs text-muted" style={{maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
-                  {roomParticipants.map(p => p.name).join(", ")} editing...
+                <span className="text-xs text-muted" style={{maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                  {(() => {
+                    const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
+                    const others = roomParticipants.filter(p => p.user_id !== myId && p.active);
+                    if (others.length === 0) return "You're the only one here";
+                    return `${others.map(p => p.name).join(", ")} also editing`;
+                  })()}
                 </span>
               </div>
+
 
               {/* Leave Room */}
               <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto", borderColor: "rgba(255,84,114,0.3)", color: "var(--red)" }} onClick={leaveRoom}>🚪 Leave Room</button>

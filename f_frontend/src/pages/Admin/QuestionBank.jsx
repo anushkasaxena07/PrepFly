@@ -51,10 +51,13 @@ export default function QuestionBank() {
         constraints: ''
       });
       fetchQuestions();
+      setToast("✅ Question added & students notified automatically!");
+      setTimeout(() => setToast(""), 4000);
     } catch (e) {
       alert("Failed to add question");
     }
   };
+
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();

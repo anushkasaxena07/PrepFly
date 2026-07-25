@@ -26,62 +26,56 @@ def calculate_grade_info(score_100: float) -> dict:
 
 def compute_section_grades(feedbacks: list, raw_metrics: dict = None) -> list:
     """
-    Computes deterministic scores and grades (0-100) for 10 core interview dimensions:
-    - Communication, Technical Knowledge, Problem Solving, Confidence, Behavioral Skills,
-      Resume Knowledge, Project Explanation, Leadership, Grammar, Vocabulary.
+    Computes deterministic scores and grades (0-100) for 10 core interview dimensions.
+    Uses per-question feedback metrics when available, otherwise falls back to base score.
     """
-    scores = {}
-    total_q = len(feedbacks) if feedbacks else 1
-
-    # Base question scores (scaled to 100)
-    avg_score_10 = sum([f.get("score", 7) for f in feedbacks]) / total_q if feedbacks else 7.5
-    base_100 = round(avg_score_10 * 10)
-
     raw_metrics = raw_metrics or {}
     wpm = raw_metrics.get("wpm", 135)
     clarity = raw_metrics.get("clarity", 85)
     pauses = raw_metrics.get("pause_count", 2)
     sentiment = raw_metrics.get("sentiment", "positive")
 
-    # 1. Communication
-    comm = min(100, max(40, base_100 + (10 if clarity >= 80 else -5) + (5 if 120 <= wpm <= 160 else 0)))
-    scores["Communication"] = comm
+    total_q = len(feedbacks) if feedbacks else 1
+    avg_score_10 = sum([f.get("score", 7) for f in feedbacks]) / total_q if feedbacks else 7.5
+    base_100 = round(avg_score_10 * 10)
 
-    # 2. Technical Knowledge
-    tech = min(100, max(40, base_100 + 4))
-    scores["Technical Knowledge"] = tech
+    # Extract per-dimension averages from feedbacks where the AI returned them
+    def avg_metric(key, fallback=None):
+        vals = []
+        for f in (feedbacks or []):
+            m = f.get("metrics", {})
+            v = m.get(key) if isinstance(m, dict) else None
+            if v is not None:
+                try:
+                    vals.append(float(v) * 10)  # metrics stored as 0-10, convert to 0-100
+                except Exception:
+                    pass
+        if vals:
+            return min(100, max(0, round(sum(vals) / len(vals))))
+        return fallback if fallback is not None else base_100
 
-    # 3. Problem Solving
-    ps = min(100, max(40, base_100 + (6 if base_100 >= 80 else -4)))
-    scores["Problem Solving"] = ps
-
-    # 4. Confidence
-    conf = min(100, max(40, base_100 + (8 if pauses <= 2 else -6) + (5 if sentiment == "positive" else 0)))
-    scores["Confidence"] = conf
-
-    # 5. Behavioral Skills
-    beh = min(100, max(40, base_100 - 2))
-    scores["Behavioral Skills"] = beh
-
-    # 6. Resume Knowledge
-    res_k = min(100, max(40, base_100 + 2))
-    scores["Resume Knowledge"] = res_k
-
-    # 7. Project Explanation
-    proj = min(100, max(40, base_100 + 5))
-    scores["Project Explanation"] = proj
-
-    # 8. Leadership
-    lead = min(100, max(40, base_100 - 3))
-    scores["Leadership"] = lead
-
-    # 9. Grammar
-    gram = min(100, max(40, 88 + (5 if clarity >= 85 else -5)))
-    scores["Grammar"] = gram
-
-    # 10. Vocabulary
-    vocab = min(100, max(40, 85 + (7 if tech >= 80 else 0)))
-    scores["Vocabulary"] = vocab
+    scores = {
+        # 1. Communication: from communication metric + speech clarity bonus
+        "Communication": min(100, max(0, avg_metric("communication", base_100) + (5 if clarity >= 80 else -5) + (3 if 110 <= wpm <= 165 else 0))),
+        # 2. Technical Knowledge: from technical_knowledge metric
+        "Technical Knowledge": avg_metric("technical_knowledge", base_100),
+        # 3. Problem Solving: from problem_solving metric
+        "Problem Solving": avg_metric("problem_solving", base_100),
+        # 4. Confidence: from confidence metric + pause penalty
+        "Confidence": min(100, max(0, avg_metric("confidence", base_100) + (5 if pauses <= 2 else -8) + (3 if sentiment == "positive" else 0))),
+        # 5. Behavioral Skills: from behavioral metric
+        "Behavioral Skills": avg_metric("behavioral", base_100),
+        # 6. Resume Knowledge: from resume_understanding metric
+        "Resume Knowledge": avg_metric("resume_understanding", base_100),
+        # 7. Project Explanation: from project_explanation metric
+        "Project Explanation": avg_metric("project_explanation", base_100),
+        # 8. Leadership: from leadership metric
+        "Leadership": avg_metric("leadership", base_100),
+        # 9. Grammar: based on clarity signal (not strongly penalized)
+        "Grammar": min(100, max(0, (88 if clarity >= 85 else 76) + (5 if sentiment == "positive" else 0))),
+        # 10. Vocabulary: from technical_knowledge as proxy for vocab richness
+        "Vocabulary": min(100, max(0, avg_metric("technical_knowledge", 82) + (3 if base_100 >= 80 else -3)))
+    }
 
     section_list = []
     for name, s_val in scores.items():
@@ -99,7 +93,7 @@ def compute_section_grades(feedbacks: list, raw_metrics: dict = None) -> list:
 
 def award_badges(overall_score: float, sections: list) -> list:
     badges = []
-    sec_dict = {s["name"]: s["score"] for s in sections}
+    sec_dict = {s["name"]: s.get("score") for s in sections if isinstance(s.get("score"), (int, float))}
 
     if sec_dict.get("Communication", 0) >= 88:
         badges.append({"name": "Excellent Communicator", "icon": "🗣️", "desc": "Masterful clarity and articulation"})
@@ -117,7 +111,9 @@ def award_badges(overall_score: float, sections: list) -> list:
         badges.append({"name": "Quick Learner", "icon": "⚡", "desc": "Adaptive candidate with high learning velocity"})
         badges.append({"name": "Creative Thinker", "icon": "💡", "desc": "Innovative problem formulation"})
 
-    if not badges:
+    # Only give "Promising Candidate" if score >= 60 and no other badge was earned
+    if not badges and overall_score >= 60:
         badges.append({"name": "Promising Candidate", "icon": "🌱", "desc": "Solid foundation ready for growth"})
 
+    # No badges at all if performance is too low — don't hand out participation trophies
     return badges

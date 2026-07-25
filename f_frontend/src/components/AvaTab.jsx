@@ -242,6 +242,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [step]);
 
+  // ── Navigation guard: warn before closing/refreshing during an active interview ──
+  useEffect(() => {
+    const isActiveSession = step === "live_call" || step === "loading";
+    if (!isActiveSession) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      // Modern browsers show their own message but require returnValue to be set
+      e.returnValue = "Your interview is in progress. Leaving now will end your session and your progress may be lost.";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [step]);
+
+
+
   const formatTimer = (secs) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;

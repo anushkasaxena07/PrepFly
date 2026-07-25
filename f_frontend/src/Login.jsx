@@ -32,6 +32,38 @@ export default function Login() {
   const [showNewPass, setShowNewPass]     = useState(false);
   const [otpCountdown, setOtpCountdown]   = useState(0);
   const navigate = useNavigate();
+  const googleInitRef = useRef(false);  // prevent re-initializing Google SDK on every click
+
+  /* ── Animated star canvas ── */
+  useEffect(() => {
+    const container = document.querySelector('.auth-root');
+    if (!container) return;
+    const stars = Array.from({ length: 55 }, (_, i) => {
+      const s = document.createElement('span');
+      s.style.cssText = [
+        'position:absolute',
+        `left:${Math.random() * 100}%`,
+        `top:${Math.random() * 100}%`,
+        `width:${Math.random() < 0.2 ? 2.5 : 1.5}px`,
+        `height:${Math.random() < 0.2 ? 2.5 : 1.5}px`,
+        'border-radius:50%',
+        `background:rgba(255,255,255,${(Math.random() * 0.35 + 0.1).toFixed(2)})`,
+        'pointer-events:none',
+        'z-index:0',
+        `animation:twinkle ${(Math.random() * 4 + 3).toFixed(1)}s ease-in-out ${(Math.random() * 5).toFixed(1)}s infinite alternate`
+      ].join(';');
+      return s;
+    });
+    // inject keyframes once
+    if (!document.getElementById('pf-twinkle-kf')) {
+      const st = document.createElement('style');
+      st.id = 'pf-twinkle-kf';
+      st.textContent = '@keyframes twinkle{0%{opacity:.15}100%{opacity:.8}}';
+      document.head.appendChild(st);
+    }
+    stars.forEach(s => container.appendChild(s));
+    return () => stars.forEach(s => s.remove());
+  }, []);
 
   /* ── OTP countdown ── */
   useEffect(() => {
@@ -120,7 +152,11 @@ export default function Login() {
   const handleGoogleLogin = () => {
     if (!window.google) { msg("Google SDK not loaded yet."); return; }
     if (!GOOGLE_CLIENT_ID) { msg("Google Client ID not configured."); return; }
-    window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCallback, ux_mode: "popup" });
+    // Only initialize once — re-initializing on every click causes the GSI_LOGGER warning
+    if (!googleInitRef.current) {
+      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCallback, ux_mode: "popup" });
+      googleInitRef.current = true;
+    }
     const c = document.getElementById("google-btn-hidden");
     if (c) {
       c.innerHTML = "";
@@ -395,8 +431,17 @@ export default function Login() {
       <div className="auth-card">
         {/* Brand */}
         <div className="brand" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 12px rgba(0,196,167,0.4)' }} />
-          <span className="brand-name" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.5px' }}>Prep<span style={{ color: '#00c4a7' }}>Fly</span></span>
+          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 14px rgba(99,102,241,0.5)' }} />
+          <div>
+            <span className="brand-name" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.5px', display: 'block' }}>
+              Prep<span style={{ background: 'linear-gradient(90deg,#2dd4bf,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Fly</span>
+            </span>
+            {(screen === 'login' || screen === 'signup') && (
+              <span style={{ fontSize: 9, letterSpacing: '2.4px', color: '#3d4668', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginTop: 1 }}>
+                Practice · Prepare · <span style={{ color: '#5eead4' }}>Fly</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Header */}

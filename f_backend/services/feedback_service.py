@@ -275,7 +275,7 @@ Return ONLY valid JSON:
         return generate_dynamic_single_fallback(question, answer, q_type)
 
 
-def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model):
+def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model, feedbacks=None):
     # 1. Count valid answers
     valid_count = 0
     for ans in (responses or []):
@@ -285,7 +285,7 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
                 if len(clean_ans.split()) >= 2:
                     valid_count += 1
 
-    # 2. Programmatically return a zero-score F-grade report if there are zero valid answers
+    # 2. Zero-score report if no valid answers
     if valid_count == 0:
         f_report = {
             "overall_score": 0.0,
@@ -310,16 +310,44 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
         }
         return enrich_report_with_grading(f_report)
 
+    # 3. Build annotated Q&A scorecard from per-question feedback already computed live
     full_transcript_lines = []
+    per_answer_scorecard_lines = []
+    feedbacks = feedbacks or []
+
     for idx, q in enumerate(questions or []):
         ans = responses[idx] if (responses and idx < len(responses)) else "[No response recorded]"
         full_transcript_lines.append(f"Turn {idx+1}:\nInterviewer: {q}\nCandidate: {ans}\n")
+
+        # Per-answer already-computed scores — feed these as ground truth to the final AI call
+        fb = feedbacks[idx] if idx < len(feedbacks) else {}
+        if isinstance(fb, dict) and fb:
+            q_score = fb.get("accuracy_score", fb.get("score", 0))
+            if isinstance(q_score, float) and q_score <= 10:
+                q_score = round(q_score * 10)  # convert 0-10 to 0-100
+            fb_evidence = fb.get("evidence", "")
+            fb_strength = fb.get("strength", "")
+            fb_improvement = fb.get("improvement", "")
+            fb_correctness = fb.get("correctness", "")
+            per_answer_scorecard_lines.append(
+                f"  Turn {idx+1} | Score: {q_score}/100 | Correctness: {fb_correctness}\n"
+                f"    Evidence: {fb_evidence}\n"
+                f"    Strength: {fb_strength}\n"
+                f"    Weakness: {fb_improvement}"
+            )
+        else:
+            per_answer_scorecard_lines.append(f"  Turn {idx+1} | No pre-scored feedback available")
+
     full_transcript = "\n".join(full_transcript_lines)
+    per_answer_scorecard = "\n".join(per_answer_scorecard_lines)
 
     prompt = f"""You are an experienced Senior Software Engineering Interviewer with over 15 years of hiring experience at FAANG (Google, Microsoft, Amazon) and top product companies.
 
 Your job is NOT to be encouraging or motivational.
 Your job is to objectively evaluate the candidate based ONLY on observable evidence from the transcript.
+
+PRE-SCORED PER-ANSWER DATA (computed in real-time, these scores are ground truth):
+{per_answer_scorecard}
 
 RULES:
 1. Never assume skills.
@@ -329,8 +357,9 @@ RULES:
 5. Never infer technical knowledge without proof.
 6. Every score MUST be supported by evidence from the transcript.
 7. If evidence is insufficient, return null for score and "N/A" for grade instead of estimating.
-8. If the candidate skips a question, says "I don't know", remains silent, or provides an irrelevant response, do not fabricate scores (assign score null, grade "N/A", evidence_level "NONE", reason "Not enough evidence").
-9. Use the transcript, coding performance, and candidate responses as your ONLY sources.
+8. If the candidate skips a question, says "I don't know", remains silent, or provides an irrelevant response, do not fabricate scores (assign score null, grade "N/A", evidence_level "NONE").
+9. Use the pre-scored per-answer data above, the transcript, and candidate responses as your ONLY sources.
+10. Your dimension scores MUST be consistent with the per-answer scores above. Do NOT assign a Communication score of 85 if Turn scores average below 70.
 
 Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code blocks, no commentary) in this exact schema:
 
@@ -396,7 +425,7 @@ EVALUATION METHODOLOGY RULES:
 - Resume Knowledge: Evaluate ONLY if interviewer asked about resume.
 - Behavioral Skills: Evaluate ONLY from behavioral questions (Situation, Task, Action, Result).
 - Strengths: Must be mentioned multiple times, supported by transcript, score > 80, and confidence HIGH. Else, do not list it.
-- Weaknesses: Must have specific transcript/question evidence.
+- Weaknesses: Must have specific transcript/question evidence. Reference the Turn number.
 
 Transcript:
 {full_transcript}"""
@@ -502,12 +531,12 @@ def enrich_report_with_grading(report: dict) -> dict:
             d_name = d.get("name")
             d_score = d.get("score")
             
-            # check if score is None/null
+            # check if score is None/null — do NOT include these in the overall average
             if d_score is None or str(d_score).strip().lower() in ("null", "none") or d.get("evidence_level") == "NONE" or d.get("grade") == "N/A":
                 sec_grade = "N/A"
                 sec_color = "#7a8ba8"
                 sec_bg = "rgba(122, 139, 168, 0.15)"
-                sec_label = "Not Enough Evidence"
+                sec_label = "Not Assessed"
                 score_val = None
             else:
                 try:
@@ -522,12 +551,12 @@ def enrich_report_with_grading(report: dict) -> dict:
                     sec_grade = "N/A"
                     sec_color = "#7a8ba8"
                     sec_bg = "rgba(122, 139, 168, 0.15)"
-                    sec_label = "Not Enough Evidence"
+                    sec_label = "Not Assessed"
                     score_val = None
             
             sections.append({
                 "name": d_name,
-                "score": int(score_val) if score_val is not None else "N/A",
+                "score": int(score_val) if score_val is not None else None,
                 "grade": sec_grade,
                 "color": sec_color,
                 "bgColor": sec_bg,
@@ -538,7 +567,7 @@ def enrich_report_with_grading(report: dict) -> dict:
         
         report["section_grades"] = sections
         
-        # Calculate overall score dynamically from dimensions if valid_scores is present
+        # Overall score = mean of ONLY assessed (non-null) dimensions
         if valid_scores:
             score = round(sum(valid_scores) / len(valid_scores))
         else:
@@ -575,25 +604,35 @@ def enrich_report_with_grading(report: dict) -> dict:
         else:
             report["badges"] = award_badges(score, report["section_grades"])
 
-    # Backwards compatibility for strengths and weaknesses
+    # Strengths — only keep if AI returned evidence-backed items; NEVER fabricate
     strengths = report.get("strengths") or []
     if strengths and isinstance(strengths[0], dict):
-        report["top_strengths"] = [f"{s.get('title')}: {s.get('evidence')}" for s in strengths if isinstance(s, dict)]
+        # Keep only strengths the AI grounded in transcript evidence
+        report["top_strengths"] = [
+            f"{s.get('title')}: {s.get('evidence')}"
+            for s in strengths
+            if isinstance(s, dict) and s.get("title") and s.get("evidence")
+        ] or ["No evidence-backed strengths identified in this session."]
     else:
-        if not strengths:
-            strengths = ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"]
-        report["top_strengths"] = strengths
+        # Plain string list — use as-is only if non-empty
+        report["top_strengths"] = strengths if strengths else ["No evidence-backed strengths identified in this session."]
 
+    # Weaknesses — same rule
     improvements = report.get("weaknesses") or report.get("improvement_suggestions") or []
     if improvements and isinstance(improvements[0], dict):
-        report["top_improvements"] = [f"{w.get('title')}: {w.get('evidence')}" for w in improvements if isinstance(w, dict)]
+        report["top_improvements"] = [
+            f"{w.get('title')}: {w.get('evidence')}"
+            for w in improvements
+            if isinstance(w, dict) and w.get("title") and w.get("evidence")
+        ] or ["No specific weaknesses identified — review your lowest-scoring dimensions above."]
     else:
-        if not improvements:
-            improvements = ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"]
-        report["top_improvements"] = improvements
+        report["top_improvements"] = improvements if improvements else ["No specific weaknesses identified — review your lowest-scoring dimensions above."]
 
     if not report.get("ai_summary"):
-        report["ai_summary"] = f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, {g_info['score']}/100). Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}."
+        assessed_count = len([s for s in report.get("section_grades", []) if s.get("score") is not None])
+        report["ai_summary"] = (f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, "
+                                f"{g_info['score']}/100) across {assessed_count} assessed dimension(s). "
+                                f"Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}.")
 
     return report
 

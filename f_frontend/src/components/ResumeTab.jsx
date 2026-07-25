@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { calculateATSMatch } from '../utils/atsEngine';
 
 const SAMPLE_JDS = {
   fullstack: `Senior Full Stack Engineer with:\n• 3+ years React/Next.js experience\n• Node.js, REST & GraphQL API design\n• AWS, Kubernetes, Docker, CI/CD\n• PostgreSQL, Redis\n• Strong frontend styling & system design`,
@@ -96,16 +97,15 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       }
     }
 
-    // Demo fallback / local simulation
+    // Offline / demo fallback — uses the same deterministic engine as the backend
+    const engineResult = calculateATSMatch(resumeText, jdText);
     setTimeout(() => {
-      const demoScore = 60 + Math.floor(Math.random() * 30);
-      const generatedResults = buildDemoResumeResult(resumeText, jdText, demoScore);
-      setResults(generatedResults);
-      setStatusMsg(isLoggedIn() ? "" : "⚠️ Demo mode — log in for real scoring.");
-      setStatusColor("var(--text2)");
+      setResults(engineResult);
+      setStatusMsg(isLoggedIn() ? '' : '⚠️ Demo mode — log in for AI narrative suggestions.');
+      setStatusColor('var(--text2)');
       setIsScoring(false);
       scrollToResults();
-    }, 1200);
+    }, 900);
   };
 
   const scrollToResults = () => {
@@ -123,51 +123,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
     }, 100);
   };
 
-  const buildDemoResumeResult = (resume, jd, score) => {
-    const jdWords = jd.match(/\b[A-Za-z][A-Za-z0-9#+./\-]{2,}\b/g) || [];
-    const resumeLower = resume.toLowerCase();
-    const seen = {};
-    const matched = [];
-    const missing = [];
-    const skip = new Set(['and','the','for','with','have','your','from','that','this','will','are','our','you','they','all','any','can','has','not','job','role','team','work']);
-    
-    jdWords.forEach(w => {
-      const l = w.toLowerCase();
-      if (seen[l] || l.length < 3 || skip.has(l)) return;
-      seen[l] = true;
-      if (resumeLower.includes(l)) {
-        matched.push(w);
-      } else {
-        missing.push(w);
-      }
-    });
-
-    return {
-      ats_score: score,
-      overall_grade: score >= 90 ? 'S' : score >= 80 ? 'A' : score >= 65 ? 'B' : score >= 50 ? 'C' : 'D',
-      matched_keywords: matched.slice(0, 12),
-      missing_keywords: missing.slice(0, 8),
-      skill_match: {
-        'Technical Skills': Math.min(99, score + 10),
-        'JD Keywords': Math.round(score * 0.9),
-        'Experience Depth': Math.min(99, score + 5),
-        'Tools & Frameworks': Math.round(score * 0.85),
-        'Domain Fit': Math.round(score * 0.92)
-      },
-      section_scores: {
-        experience: Math.min(10, Math.round(score / 11)),
-        skills: Math.min(10, Math.round(score / 12)),
-        format: 6 + Math.floor(Math.random() * 3),
-        projects: Math.min(10, Math.round(score / 10))
-      },
-      improvement_tips: [
-        missing.length ? `Add ${missing.slice(0, 3).join(', ')} to your skills section — found in JD but missing from resume.` : 'Great keyword coverage!',
-        'Quantify achievements: "reduced load time by 40%" is stronger than "improved performance".',
-        score < 75 ? `ATS score is ${score}/100 — tailor language more closely to the JD.` : 'Good ATS compatibility! Review formatting for further improvements.',
-        'Keep skills section ordered by relevance to this specific role.'
-      ]
-    };
-  };
+  // buildDemoResumeResult removed — replaced by the deterministic atsEngine.js
+  // Both online (API) and offline (local) paths now use real skill matching.
 
   const circumference = 238.8; // 2 * Math.PI * 38
   const scorePercent = results ? results.ats_score : 0;
@@ -256,6 +213,21 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
               <button className="btn btn-ghost btn-xs" onClick={resetResumeScorer}>← Clear Results</button>
             </div>
 
+            {/* AI Summary banner */}
+            {results.ai_summary && (
+              <div className="card mb16" style={{background:"rgba(0,196,167,0.07)",border:"1px solid rgba(0,196,167,0.2)",padding:"14px 18px"}}>
+                <div style={{fontSize:"11px",fontWeight:700,color:"var(--cyan)",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"5px"}}>AI Recruiter Summary</div>
+                <div style={{fontSize:"13px",lineHeight:1.55,color:"var(--text2)"}}>{results.ai_summary}</div>
+                {results.meta && (
+                  <div style={{display:"flex",gap:"16px",flexWrap:"wrap",marginTop:"10px"}}>
+                    <span style={{fontSize:"11px",color:"var(--text3)"}}>⚙️ Engine: {results.meta.engine}</span>
+                    <span style={{fontSize:"11px",color:"var(--text3)"}}>🎯 Skills matched: {results.meta.total_matched_skills}/{results.meta.total_jd_skills}</span>
+                    {results.meta.resume_years && <span style={{fontSize:"11px",color:"var(--text3)"}}>📅 Exp. detected: {results.meta.resume_years} yrs</span>}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="g-main mb20">
               {/* Left Column: ATS Score Circle & Keyword Grid */}
               <div className="flex-col gap16">
@@ -297,12 +269,20 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                 <div className="card">
                   <div className="sec-sub fw7 mb12">JD Keyword Analysis</div>
                   <div className="kw-grid" id="kw-grid-result">
-                    {results.matched_keywords.map((k, i) => (
-                      <span key={`match-${i}`} className="kw kw-match">{k}</span>
+                    {(results.matched_keywords || []).map((k, i) => (
+                      <span key={`match-${i}`} className="kw kw-match">✓ {k}</span>
                     ))}
-                    {results.missing_keywords.map((k, i) => (
-                      <span key={`miss-${i}`} className="kw kw-miss">{k}</span>
+                    {(results.missing_keywords || []).map((k, i) => (
+                      <span key={`miss-${i}`} className="kw kw-miss">✗ {k}</span>
                     ))}
+                    {(results.bonus_skills || []).length > 0 && (
+                      <>
+                        <div style={{width:"100%",fontSize:"10px",fontWeight:700,color:"var(--purple)",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:"8px",marginBottom:"2px"}}>Bonus skills (not required)</div>
+                        {results.bonus_skills.map((k, i) => (
+                          <span key={`bonus-${i}`} className="kw" style={{background:"rgba(139,92,246,0.12)",border:"1px solid rgba(139,92,246,0.3)",color:"var(--purple)"}}>+ {k}</span>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
