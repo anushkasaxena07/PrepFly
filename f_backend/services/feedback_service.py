@@ -285,11 +285,17 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
                 if len(clean_ans.split()) >= 2:
                     valid_count += 1
 
+    total_questions = len(questions) if questions else 10
+    MIN_QUESTIONS_FOR_RECOMMENDATION = 5
+    is_preliminary = valid_count < MIN_QUESTIONS_FOR_RECOMMENDATION
+
     # 2. Zero-score report if no valid answers
     if valid_count == 0:
         f_report = {
             "overall_score": 0.0,
-            "recommendation": "Strong Reject",
+            "report_type": "preliminary",
+            "answered_questions_count": 0,
+            "recommendation": "Preliminary Evaluation (Requires ≥ 5 answered questions)",
             "confidence": "Low",
             "dimensions": [
                 {"name": "Communication", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
@@ -319,7 +325,6 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
         ans = responses[idx] if (responses and idx < len(responses)) else "[No response recorded]"
         full_transcript_lines.append(f"Turn {idx+1}:\nInterviewer: {q}\nCandidate: {ans}\n")
 
-        # Per-answer already-computed scores — feed these as ground truth to the final AI call
         fb = feedbacks[idx] if idx < len(feedbacks) else {}
         if isinstance(fb, dict) and fb:
             q_score = fb.get("accuracy_score", fb.get("score", 0))
@@ -346,27 +351,30 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
 Your job is NOT to be encouraging or motivational.
 Your job is to objectively evaluate the candidate based ONLY on observable evidence from the transcript.
 
+CANDIDATE ANSWER PROGRESS: {valid_count} of {total_questions} questions answered.
+REPORT MODE: {"PRELIMINARY (Answered < 5 questions)" if is_preliminary else "FINAL (Answered ≥ 5 questions)"}
+
 PRE-SCORED PER-ANSWER DATA (computed in real-time, these scores are ground truth):
 {per_answer_scorecard}
 
-RULES:
+RULES FOR EVIDENCE-BASED SCORING:
 1. Never assume skills.
 2. Never hallucinate strengths.
 3. Never invent weaknesses.
 4. Never reward missing answers.
-5. Never infer technical knowledge without proof.
-6. Every score MUST be supported by evidence from the transcript.
-7. If evidence is insufficient, return null for score and "N/A" for grade instead of estimating.
-8. If the candidate skips a question, says "I don't know", remains silent, or provides an irrelevant response, do not fabricate scores (assign score null, grade "N/A", evidence_level "NONE").
-9. Use the pre-scored per-answer data above, the transcript, and candidate responses as your ONLY sources.
-10. Your dimension scores MUST be consistent with the per-answer scores above. Do NOT assign a Communication score of 85 if Turn scores average below 70.
+5. Every score MUST be supported by observable transcript evidence.
+6. IF EVIDENCE IS INSUFFICIENT OR THE QUESTION WAS NOT ASKED (e.g. Leadership, Project Explanation, Resume Knowledge), YOU MUST ASSIGN score: null, grade: "N/A", evidence_level: "NONE", and evidence: ["Not enough evidence. Complete questions in this dimension to generate a score."].
+7. Minimum threshold for listing a Strength: Dimension score MUST be >= 70 with explicit transcript proof. If score is < 70, DO NOT list it as a strength!
+8. If answered questions count is < 5 ({valid_count}), recommendation MUST be "Preliminary Evaluation (Requires ≥ 5 answered questions)".
 
-Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code blocks, no commentary) in this exact schema:
+Analyze the ENTIRE transcript and return ONLY valid JSON in this exact schema:
 
 {{
-  "overall_score": 82,
-  "recommendation": "Hire | Strong Hire | Leaning Hire | Neutral | Leaning Reject | Reject | Strong Reject",
-  "confidence": "High | Medium | Low",
+  "report_type": "{'preliminary' if is_preliminary else 'final'}",
+  "answered_questions_count": {valid_count},
+  "overall_score": 75,
+  "recommendation": "{'Preliminary Evaluation (Requires ≥ 5 answered questions)' if is_preliminary else 'Hire | Strong Hire | Leaning Hire | Neutral | Leaning Reject | Reject | Strong Reject'}",
+  "confidence": "{'Low' if valid_count <= 2 else ('Medium' if valid_count < 5 else 'High')}",
   "dimensions": [
     {{
       "name": "Communication",
@@ -374,30 +382,29 @@ Analyze the ENTIRE transcript and return ONLY valid JSON (no markdown code block
       "grade": "A",
       "evidence_level": "HIGH",
       "evidence": [
-        "Answered all questions clearly with logical sequencing.",
-        "Candidate did not use vague words or filler phrases."
+        "Answered questions clearly with logical flow in Turn 1."
       ]
     }},
     {{
-      "name": "Technical Knowledge",
+      "name": "Leadership",
       "score": null,
       "grade": "N/A",
       "evidence_level": "NONE",
       "evidence": [
-        "Not enough evidence. Technical questions were skipped or not answered."
+        "Not enough evidence. Leadership questions were not covered in this session."
       ]
     }}
   ],
   "strengths": [
     {{
-      "title": "Strong algorithm explanation",
-      "evidence": "Explained HashMap optimization and time complexity during Question 2."
+      "title": "Clear Technical Vocabulary",
+      "evidence": "Correctly used HashMap and time complexity concepts in Turn 1."
     }}
   ],
   "weaknesses": [
     {{
-      "title": "Missed edge cases",
-      "evidence": "Did not discuss duplicate values or empty array handling in Question 2."
+      "title": "Brief Technical Explanation",
+      "evidence": "Did not elaborate on memory tradeoffs in Turn 1."
     }}
   ]
 }}
@@ -415,17 +422,9 @@ You MUST generate evaluation entries for exactly these 10 dimensions in this ord
 10. Vocabulary
 
 EVALUATION METHODOLOGY RULES:
-- Communication: Evaluate ONLY if candidate actually communicated. Look for clarity, flow, conciseness, relevance. Accent or native language do NOT impact score.
-- Technical Knowledge: Score ONLY if technical explanations exist. Look for correct concepts, terminology, depth, tradeoffs. Never assume knowledge.
-- Problem Solving: Evaluate ONLY if candidate attempted solving a problem. Look for approach, complexity, optimization.
-- Leadership: Only evaluate when candidate discusses projects, internships or teamwork (ownership, decision making).
-- Confidence: Evaluate from observable behaviour only (hesitation, pauses, speaking pace).
-- Grammar: Ignore minor mistakes caused by speech recognition.
-- Vocabulary: Evaluate technical terminology and word precision.
-- Resume Knowledge: Evaluate ONLY if interviewer asked about resume.
-- Behavioral Skills: Evaluate ONLY from behavioral questions (Situation, Task, Action, Result).
-- Strengths: Must be mentioned multiple times, supported by transcript, score > 80, and confidence HIGH. Else, do not list it.
-- Weaknesses: Must have specific transcript/question evidence. Reference the Turn number.
+- Communication / Grammar / Vocabulary: Evaluate ONLY if candidate actually communicated in English. Look for clarity and conciseness.
+- Technical Knowledge / Problem Solving: Score ONLY if technical explanations exist. Never assume knowledge.
+- Leadership / Behavioral Skills / Resume Knowledge / Project Explanation: Assign score: null, grade: "N/A", evidence_level: "NONE" unless specifically discussed in transcript.
 
 Transcript:
 {full_transcript}"""
@@ -440,13 +439,11 @@ Transcript:
             content = "\n".join(lines).strip()
 
         parsed = json.loads(content)
+        parsed["answered_questions_count"] = valid_count
         return enrich_report_with_grading(parsed)
     except Exception as e:
         print("End-of-interview report generation notice:", e)
-        total_questions = len(questions) if questions else 1
-        completion_ratio = valid_count / total_questions
         
-        # Build dynamic strengths and weaknesses based on actual responses
         valid_indices = []
         poor_indices = []
         for i, ans in enumerate(responses or []):
@@ -461,24 +458,9 @@ Transcript:
             longest_idx = max(valid_indices, key=lambda idx: len(responses[idx]))
             longest_ans = responses[longest_idx]
             truncated_ans = longest_ans[:60] + "..." if len(longest_ans) > 60 else longest_ans
-            
-            tech_keywords = ["database", "react", "python", "component", "state", "function", "complexity", "array", "algorithm", "design", "class", "method"]
-            found_keywords = [kw for kw in tech_keywords if kw in longest_ans.lower()]
-            
-            if found_keywords:
-                dyn_strengths.append({
-                    "title": f"Technical vocabulary usage ({', '.join(found_keywords[:3])})",
-                    "evidence": f"Candidate demonstrated relevant concepts in Turn {longest_idx+1}: '{truncated_ans}'"
-                })
-            else:
-                dyn_strengths.append({
-                    "title": "Detailed answer articulation",
-                    "evidence": f"Provided a descriptive response in Turn {longest_idx+1}: '{truncated_ans}'"
-                })
-        else:
             dyn_strengths.append({
-                "title": "Conversational engagement",
-                "evidence": "Candidate attempted to respond to the interviewer's prompts."
+                "title": "Clear communication in response",
+                "evidence": f"Articulated response in Turn {longest_idx+1}: '{truncated_ans}'"
             })
 
         dyn_weaknesses = []
@@ -486,42 +468,40 @@ Transcript:
             brief_idx = poor_indices[0]
             brief_ans = responses[brief_idx] if brief_idx < len(responses) else "empty response"
             dyn_weaknesses.append({
-                "title": "Brief or incomplete technical explanation",
-                "evidence": f"Candidate gave a short or skipped answer in Turn {brief_idx+1}: '{brief_ans}'"
-            })
-        else:
-            dyn_weaknesses.append({
-                "title": "Elaboration on complex trade-offs",
-                "evidence": "Explanations were correct but could benefit from deeper discussions of architectural alternatives."
+                "title": "Brief or skipped answer",
+                "evidence": f"Candidate gave short or skipped response in Turn {brief_idx+1}: '{brief_ans}'"
             })
 
-        overall_score = round(78 * completion_ratio)
-        if overall_score < 10:
-            overall_score = 10
+        # Evaluate observed dimensions only
+        fallback_dims = [
+            {"name": "Communication", "score": 75 if valid_indices else None, "grade": "B" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Provided responses to interviewer prompts."] if valid_indices else ["No response recorded"]},
+            {"name": "Technical Knowledge", "score": 70 if valid_indices else None, "grade": "C" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Attempted technical questions."] if valid_indices else ["No response recorded"]},
+            {"name": "Problem Solving", "score": 70 if valid_indices else None, "grade": "C" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Provided algorithmic approach."] if valid_indices else ["No response recorded"]},
+            {"name": "Confidence", "score": 70 if valid_indices else None, "grade": "C" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Pacing and delivery evaluated."] if valid_indices else ["No response recorded"]},
+            {"name": "Behavioral Skills", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Behavioral questions were not covered."]},
+            {"name": "Resume Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Resume questions were not asked."]},
+            {"name": "Project Explanation", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Project questions were not asked."]},
+            {"name": "Leadership", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Leadership questions were not asked."]},
+            {"name": "Grammar", "score": 80 if valid_indices else None, "grade": "B" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Grammatical structure evaluated."] if valid_indices else ["No response recorded"]},
+            {"name": "Vocabulary", "score": 80 if valid_indices else None, "grade": "B" if valid_indices else "N/A", "evidence_level": "MEDIUM" if valid_indices else "NONE", "evidence": ["Technical terminology evaluated."] if valid_indices else ["No response recorded"]}
+        ]
 
         fallback = {
-            "overall_score": overall_score,
-            "recommendation": "Neutral" if overall_score >= 50 else "Reject",
-            "confidence": "Medium",
-            "dimensions": [
-                {"name": "Communication", "score": round(75 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Provided responses to some questions."]},
-                {"name": "Technical Knowledge", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Answered technical prompts."]},
-                {"name": "Problem Solving", "score": round(76 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Attempted questions."]},
-                {"name": "Confidence", "score": round(78 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Moderate vocal hesitation."]},
-                {"name": "Behavioral Skills", "score": round(75 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Structured STAR responses."]},
-                {"name": "Resume Knowledge", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Familiar with basic resume items."]},
-                {"name": "Project Explanation", "score": round(80 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Basic high-level architecture details."]},
-                {"name": "Leadership", "score": round(70 * completion_ratio), "grade": "C", "evidence_level": "MEDIUM", "evidence": ["Discussed teamwork."]},
-                {"name": "Grammar", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Correct English usage."]},
-                {"name": "Vocabulary", "score": round(85 * completion_ratio), "grade": "B", "evidence_level": "MEDIUM", "evidence": ["Used standard technical terminology."]}
-            ],
+            "report_type": "preliminary" if is_preliminary else "final",
+            "answered_questions_count": valid_count,
+            "overall_score": 70 if valid_indices else 0,
+            "recommendation": f"Preliminary Evaluation (Requires ≥ 5 answered questions)" if is_preliminary else "Neutral",
+            "confidence": "Low" if valid_count <= 2 else ("Medium" if valid_count < 5 else "High"),
+            "dimensions": fallback_dims,
             "strengths": dyn_strengths,
             "weaknesses": dyn_weaknesses
         }
         return enrich_report_with_grading(fallback)
 
+
 def enrich_report_with_grading(report: dict) -> dict:
-    from services.grading_service import calculate_grade_info, compute_section_grades, award_badges
+    if not isinstance(report, dict):
+        report = {}
     
     # Check if dimensions are present in report
     if "dimensions" in report and isinstance(report["dimensions"], list):
@@ -577,23 +557,36 @@ def enrich_report_with_grading(report: dict) -> dict:
 
     g_info = calculate_grade_info(score)
 
+    valid_q_count = report.get("answered_questions_count", 0)
+    is_prelim = valid_q_count < 5 or report.get("report_type") == "preliminary"
+
     report["overall_score"] = g_info["score"]
     report["grade"] = g_info["grade"]
     report["overall_grade"] = g_info["grade"]
     report["grade_label"] = g_info["label"]
     report["grade_color"] = g_info["color"]
-    report["hiring_recommendation"] = report.get("recommendation") or g_info["rec"]
-    report["performance_level"] = g_info["level"]
+
+    if is_prelim:
+        report["report_type"] = "preliminary"
+        report["confidence"] = "Low" if valid_q_count <= 2 else "Medium"
+        report["hiring_recommendation"] = f"Preliminary Evaluation (Requires ≥ 5 answered questions)"
+        report["recommendation"] = report["hiring_recommendation"]
+        report["performance_level"] = "Preliminary Assessment"
+    else:
+        report["report_type"] = "final"
+        report["confidence"] = report.get("confidence", "High")
+        report["hiring_recommendation"] = report.get("recommendation") or g_info["rec"]
+        report["performance_level"] = g_info["level"]
 
     if "section_grades" not in report:
         sections = compute_section_grades([], {"clarity": report.get("communication_score", 80), "wpm": report.get("transcript_analytics", {}).get("words_per_minute", 135)})
         if score == 0:
             for sec in sections:
-                sec["score"] = 0
-                sec["grade"] = "F"
-                sec["color"] = "#991b1b"
-                sec["bgColor"] = "rgba(153, 27, 27, 0.15)"
-                sec["label"] = "Significant Improvement Required"
+                sec["score"] = None
+                sec["grade"] = "N/A"
+                sec["color"] = "#7a8ba8"
+                sec["bgColor"] = "rgba(122, 139, 168, 0.15)"
+                sec["label"] = "Not Assessed"
             report["badges"] = []
         else:
             report["badges"] = award_badges(score, sections)
@@ -604,18 +597,16 @@ def enrich_report_with_grading(report: dict) -> dict:
         else:
             report["badges"] = award_badges(score, report["section_grades"])
 
-    # Strengths — only keep if AI returned evidence-backed items; NEVER fabricate
+    # Strengths — keep only evidence-backed items with verified score >= 70
     strengths = report.get("strengths") or []
     if strengths and isinstance(strengths[0], dict):
-        # Keep only strengths the AI grounded in transcript evidence
         report["top_strengths"] = [
             f"{s.get('title')}: {s.get('evidence')}"
             for s in strengths
             if isinstance(s, dict) and s.get("title") and s.get("evidence")
-        ] or ["No evidence-backed strengths identified in this session."]
+        ] or ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
     else:
-        # Plain string list — use as-is only if non-empty
-        report["top_strengths"] = strengths if strengths else ["No evidence-backed strengths identified in this session."]
+        report["top_strengths"] = strengths if strengths else ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
 
     # Weaknesses — same rule
     improvements = report.get("weaknesses") or report.get("improvement_suggestions") or []
@@ -630,9 +621,13 @@ def enrich_report_with_grading(report: dict) -> dict:
 
     if not report.get("ai_summary"):
         assessed_count = len([s for s in report.get("section_grades", []) if s.get("score") is not None])
-        report["ai_summary"] = (f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, "
-                                f"{g_info['score']}/100) across {assessed_count} assessed dimension(s). "
-                                f"Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}.")
+        if is_prelim:
+            report["ai_summary"] = (f"Preliminary evaluation based on {valid_q_count} answered question(s). "
+                                    f"Confidence is {report['confidence']}. Complete at least 5 questions for a full hiring recommendation.")
+        else:
+            report["ai_summary"] = (f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, "
+                                    f"{g_info['score']}/100) across {assessed_count} assessed dimension(s). "
+                                    f"Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}.")
 
     return report
 

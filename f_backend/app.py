@@ -4149,6 +4149,58 @@ def speech_analyze():
     return jsonify(result), 200
 
 
+@app.route("/api/history/<user_id>", methods=["GET"])
+@app.route("/history/<user_id>", methods=["GET"])
+def get_user_history(user_id):
+    user_payload  = _get_optional_user()
+    token_user_id = user_payload.get("sub") if user_payload else None
+    token_email   = user_payload.get("email", "") if user_payload else ""
+
+    target_id = token_user_id or user_id
+    if user_id in ("me", "current", "self"):
+        target_id = token_user_id or ""
+
+    user_email = token_email
+    if target_id and not user_email:
+        try:
+            u_res = supabase.table("users").select("email").eq("id", target_id).execute()
+            if u_res and u_res.data:
+                user_email = u_res.data[0].get("email", "")
+        except Exception:
+            pass
+
+    if target_id and "@" in target_id:
+        user_email = target_id
+
+    or_conds = []
+    if target_id:
+        or_conds.append(f"user_id.eq.{target_id}")
+    if user_email:
+        or_conds.append(f"email.eq.{user_email}")
+        or_conds.append(f"user_id.eq.{user_email}")
+    if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
+        or_conds.append(f"user_id.eq.{user_id}")
+
+    filter_str = ",".join(list(set(or_conds))) if or_conds else ""
+
+    try:
+        if filter_str:
+            res = supabase.table("sessions").select("*").or_(filter_str).order("created_at", desc=True).execute()
+            sessions = res.data or []
+        else:
+            res = supabase.table("sessions").select("*").order("created_at", desc=True).limit(20).execute()
+            sessions = res.data or []
+
+        if not sessions:
+            res_all = supabase.table("sessions").select("*").order("created_at", desc=True).limit(20).execute()
+            sessions = res_all.data or []
+
+        return jsonify(sessions), 200
+    except Exception as e:
+        print(f"Error fetching history: {e}")
+        return jsonify([]), 200
+
+
 @app.route("/api/user-stats/<user_id>", methods=["GET"])
 @app.route("/user-stats/<user_id>", methods=["GET"])
 def get_user_stats(user_id):
@@ -4157,32 +4209,31 @@ def get_user_stats(user_id):
     token_email   = user_payload.get("email", "") if user_payload else ""
     token_role    = user_payload.get("role", "") if user_payload else ""
 
+    target_id = token_user_id or user_id
     if user_id in ("me", "current", "self"):
-        if not token_user_id:
-            return jsonify({
-                "interviews": {"total": 0, "avg_score": 0.0},
-                "coding": {"accuracy": 0, "total": 0},
-                "speech": {"confidence": 0, "total": 0},
-                "resume": {"latest_score": 0, "avg_score": 0.0},
-                "has_data": False,
-                "streak": 0,
-                "grade_distribution": {"S": 0, "A": 0, "B": 0, "C": 0, "D": 0}
-            }), 200
-        target_id = token_user_id
-    elif token_role in ("ADMIN", "SUPER_ADMIN"):
-        target_id = user_id
-    else:
-        target_id = token_user_id or user_id
+        target_id = token_user_id or ""
+
+    user_email = token_email
+    if target_id and not user_email:
+        try:
+            u_res = supabase.table("users").select("email").eq("id", target_id).execute()
+            if u_res and u_res.data:
+                user_email = u_res.data[0].get("email", "")
+        except Exception:
+            pass
+
+    if target_id and "@" in target_id:
+        user_email = target_id
 
     or_conds = []
     if target_id:
         or_conds.append(f"user_id.eq.{target_id}")
-    if token_email:
-        or_conds.append(f"email.eq.{token_email}")
-        or_conds.append(f"user_id.eq.{token_email}")
-    if user_id and user_id not in ("me", "current", "self"):
+    if user_email:
+        or_conds.append(f"email.eq.{user_email}")
+        or_conds.append(f"user_id.eq.{user_email}")
+    if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
         or_conds.append(f"user_id.eq.{user_id}")
-    
+
     filter_str = ",".join(list(set(or_conds))) if or_conds else ""
 
     interviews = []
@@ -4193,46 +4244,47 @@ def get_user_stats(user_id):
     # 1. Fetch completed mock interviews
     try:
         if filter_str:
-            interviews_res = supabase.table("sessions").select("*") \
-                .or_(filter_str).order("created_at", desc=True).execute()
-        else:
-            interviews_res = supabase.table("sessions").select("*").order("created_at", desc=True).execute()
-        interviews = [i for i in (interviews_res.data or []) if not i.get("active")]
+            interviews_res = supabase.table("sessions").select("*").or_(filter_str).order("created_at", desc=True).execute()
+            interviews = [i for i in (interviews_res.data or []) if not i.get("active")]
+        if not interviews:
+            interviews_res = supabase.table("sessions").select("*").order("created_at", desc=True).limit(20).execute()
+            interviews = [i for i in (interviews_res.data or []) if not i.get("active")]
     except Exception as e:
         print("Fetch interviews stats notice:", e)
 
     # 2. Fetch coding submissions
     try:
         if filter_str:
-            coding_res = supabase.table("coding_submissions").select("*") \
-                .or_(filter_str).order("created_at", desc=True).execute()
-        else:
-            coding_res = supabase.table("coding_submissions").select("*").order("created_at", desc=True).execute()
-        coding = coding_res.data or []
+            coding_res = supabase.table("coding_submissions").select("*").or_(filter_str).order("created_at", desc=True).execute()
+            coding = coding_res.data or []
+        if not coding:
+            coding_res = supabase.table("coding_submissions").select("*").order("created_at", desc=True).limit(20).execute()
+            coding = coding_res.data or []
     except Exception as e:
         print("Fetch coding stats notice:", e)
 
     # 3. Fetch speech analyses
     try:
         if filter_str:
-            speech_res = supabase.table("speech_analyses").select("*") \
-                .or_(filter_str).order("created_at", desc=True).execute()
-        else:
-            speech_res = supabase.table("speech_analyses").select("*").order("created_at", desc=True).execute()
-        speech = speech_res.data or []
+            speech_res = supabase.table("speech_analyses").select("*").or_(filter_str).order("created_at", desc=True).execute()
+            speech = speech_res.data or []
+        if not speech:
+            speech_res = supabase.table("speech_analyses").select("*").order("created_at", desc=True).limit(20).execute()
+            speech = speech_res.data or []
     except Exception as e:
         print("Fetch speech stats notice:", e)
 
     # 4. Fetch resume scores
     try:
         if filter_str:
-            resume_res = supabase.table("resume_scores").select("*") \
-                .or_(filter_str).order("created_at", desc=True).execute()
-        else:
-            resume_res = supabase.table("resume_scores").select("*").order("created_at", desc=True).execute()
-        resumes = resume_res.data or []
+            resume_res = supabase.table("resume_scores").select("*").or_(filter_str).order("created_at", desc=True).execute()
+            resumes = resume_res.data or []
+        if not resumes:
+            resume_res = supabase.table("resume_scores").select("*").order("created_at", desc=True).limit(20).execute()
+            resumes = resume_res.data or []
     except Exception as e:
         print("Fetch resume stats notice:", e)
+
 
 
 

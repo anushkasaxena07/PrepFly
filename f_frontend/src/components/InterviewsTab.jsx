@@ -420,7 +420,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      console.log("Remote Stream Track Received: kind =", event.track.kind, "| id =", event.track.id);
+      console.log('🟢 ontrack fired:', event.track.kind, 'enabled:', event.track.enabled, 'readyState:', event.track.readyState);
+      console.log('🟢 streams received:', event.streams.length);
 
       const incomingStream = event.streams[0];
       if (incomingStream) {
@@ -462,8 +463,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log('🔵 ICE connection state:', pc.iceConnectionState);
       const state = pc.iceConnectionState;
-      console.log("ICE Connection State Change:", state);
       if (state === "checking" || state === "disconnected") {
         setConnectionStatus("Reconnecting...");
       } else if (state === "connected" || state === "completed") {
@@ -474,12 +475,13 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     };
     
     pc.onconnectionstatechange = () => {
-      console.log("Peer Connection State Change:", pc.connectionState);
+      console.log('🟣 Connection state:', pc.connectionState);
     };
 
     pc.onsignalingstatechange = () => {
-      console.log("Signaling State Change:", pc.signalingState);
+      console.log('🟡 Signaling state:', pc.signalingState);
     };
+
 
     peerConnectionRef.current = pc;
   };

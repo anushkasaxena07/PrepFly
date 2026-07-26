@@ -1001,17 +1001,34 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           const gInfo = getGradeInfo(score100);
           const sectionGrades = reportData.section_grades || computeSectionGrades(score100, allFeedbacks);
           const earnedBadges = reportData.badges || getBadges(score100, sectionGrades);
-          const topStrengths = reportData.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
-          const topImprovements = reportData.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
+          const isPrelim = reportData.report_type === "preliminary" || (reportData.answered_questions_count !== undefined && reportData.answered_questions_count < 5);
+          const confidence = reportData.confidence || (isPrelim ? "Low" : "High");
+          const recText = reportData.hiring_recommendation || reportData.recommendation || (isPrelim ? "Preliminary Evaluation (Requires ≥ 5 answered questions)" : gInfo.rec);
 
           return (
             <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>
+              
+              {/* PRELIMINARY CONFIDENCE BANNER */}
+              {isPrelim && (
+                <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "16px", padding: "14px 20px", marginBottom: "20px", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#f59e0b", textTransform: "uppercase" }}>⚠️ Preliminary Evaluation</div>
+                    <div style={{ fontSize: "13px", color: "#e2e8f0", marginTop: "2px" }}>
+                      Questions Answered: <strong>{reportData.answered_questions_count || 1} / 10</strong> · Complete at least 5 questions for a full hiring recommendation.
+                    </div>
+                  </div>
+                  <span style={{ background: "#f59e0b22", color: "#f59e0b", fontSize: "11px", fontWeight: 900, padding: "4px 12px", borderRadius: "20px", border: "1px solid #f59e0b44" }}>
+                    Confidence: {confidence}
+                  </span>
+                </div>
+              )}
+
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "20px", marginBottom: "24px" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
-                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{gInfo.label} Candidate</div>
-                  <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "4px" }}>📌 Hiring Recommendation: {gInfo.rec}</div>
-                  <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700, marginTop: "2px" }}>Level: {gInfo.level}</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`}</div>
+                  <div style={{ fontSize: "13px", color: isPrelim ? "#f59e0b" : gInfo.color, fontWeight: 800, marginTop: "4px" }}>📌 Hiring Recommendation: {recText}</div>
+                  <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700, marginTop: "2px" }}>Level: {isPrelim ? "Preliminary Evaluation" : gInfo.level}</div>
                 </div>
 
                 <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `4px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 24px ${gInfo.color}44`, flexShrink: 0 }}>
@@ -1039,24 +1056,26 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
                   {sectionGrades.map((sec, idx) => {
                     const isSelected = selectedEvidenceDimension?.name === sec.name;
+                    const isNotAssessed = sec.score === null || sec.score === undefined || sec.grade === "N/A";
                     return (
                       <div 
                         key={idx} 
                         onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
                         style={{ 
                           background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
-                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${sec.color}33`, 
+                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${isNotAssessed ? "#475569" : sec.color}33`, 
                           borderRadius: "12px", 
                           padding: "10px", 
                           textAlign: "center",
                           cursor: "pointer",
                           transition: "all 0.15s ease",
-                          transform: isSelected ? "scale(1.03)" : "none"
+                          transform: isSelected ? "scale(1.03)" : "none",
+                          opacity: isNotAssessed ? 0.75 : 1
                         }}
                       >
                         <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                        <div style={{ fontSize: "16px", fontWeight: 900, color: sec.color, marginTop: "2px" }}>
-                          {sec.score} <span style={{ fontSize: "11px", opacity: 0.8 }}>({sec.grade})</span>
+                        <div style={{ fontSize: "15px", fontWeight: 900, color: isNotAssessed ? "#94a3b8" : sec.color, marginTop: "2px" }}>
+                          {isNotAssessed ? "Not Evaluated" : `${sec.score} (${sec.grade})`}
                         </div>
                         <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
                           {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}
@@ -1065,6 +1084,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     );
                   })}
                 </div>
+
 
                 {/* Evidence Viewer Panel */}
                 {selectedEvidenceDimension && (
