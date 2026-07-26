@@ -420,22 +420,30 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const [selectedSheetId, setSelectedSheetId] = useState("");
   const [sheetsList, setSheetsList] = useState([]); // tracks parsed sheets
 
-  // Refs for typing state synchronization
+  // Refs for typing state synchronization and stable polling
   const lastTypedRef = useRef(Date.now());
-  const isTypingRef = useRef(false);
+  const isEditingRef = useRef(false);
+  const codeRef = useRef(code);
+  const langRef = useRef(lang);
+  const editDebounceRef = useRef(null);
   const syncIntervalRef = useRef(null);
 
-  // ── Reload persistence: restore roomId from sessionStorage on mount ──
+  // Keep refs in sync with state
+  useEffect(() => { codeRef.current = code; }, [code]);
+  useEffect(() => { langRef.current = lang; }, [lang]);
+
+  // ── Reload & URL persistence: restore room from URL param or sessionStorage ──
   useEffect(() => {
-    const savedRoomId = sessionStorage.getItem("coding_room_id");
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlRoomId = urlParams.get("room");
+    const savedRoomId = urlRoomId || sessionStorage.getItem("coding_room_id");
     if (savedRoomId) {
-      // Re-join the room to restore state
       const savedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user";
-      const savedUserName = user?.name || localStorage.getItem("user_name") || "User";
+      const savedUserName = user?.name || localStorage.getItem("user_name") || localStorage.getItem("user_email")?.split('@')[0] || "User";
       apiFetch('/api/coding/room/join', {
         method: 'POST',
         body: JSON.stringify({
-          room_id: savedRoomId,
+          room_id: savedRoomId.toUpperCase(),
           user_id: savedUserId,
           user_name: savedUserName,
           role: user?.role || "candidate"
@@ -443,19 +451,22 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       }).then(res => res.ok ? res.json() : null).then(data => {
         if (data) {
           setRoomId(data.room_id);
+          sessionStorage.setItem("coding_room_id", data.room_id);
+          if (!urlParams.get("room")) {
+            window.history.replaceState(null, "", `?room=${data.room_id}`);
+          }
           if (data.problem) setCurrentProblem(data.problem);
-          if (data.current_code) setCode(data.current_code);
-          if (data.current_lang) setLang(data.current_lang);
+          if (data.current_code) { setCode(data.current_code); codeRef.current = data.current_code; }
+          if (data.current_lang) { setLang(data.current_lang); langRef.current = data.current_lang; }
           if (data.participants) setRoomParticipants(data.participants);
           if (data.current_output) {
             setConsoleOut(data.current_output);
             setConsoleColor("var(--text2)");
           }
-          setConsoleOut(prev => data.current_output || prev);
         }
       }).catch(() => {
-        // Room expired or not found — clear stale sessionStorage
         sessionStorage.removeItem("coding_room_id");
+        window.history.replaceState(null, "", window.location.pathname);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -475,7 +486,6 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         const problemsList = data.problems || [];
         setProblems(problemsList);
         
-        // Auto-select standard problem or assigned question
         const pendingPid = localStorage.getItem("selected_problem_id");
         if (pendingPid) {
           const found = problemsList.find(p => p.problem_id === pendingPid);
@@ -496,36 +506,39 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-  // 2. Synchronization Polling loop
+  // 2. Stable Synchronization Polling loop (depends ONLY on roomId)
   useEffect(() => {
     if (roomId) {
-      syncIntervalRef.current = setInterval(syncRoomState, 1500);
+      syncRoomState(false); // immediate poll on room entry
+      syncIntervalRef.current = setInterval(() => syncRoomState(false), 800);
     } else {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
+      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     }
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
-  }, [roomId, code, lang]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]);
 
-  const syncRoomState = async () => {
+  const syncRoomState = async (isExplicitEdit = false) => {
     if (!roomId) return;
     try {
       const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "anonymous_user";
-      const myUserName = user?.name || localStorage.getItem("user_name") || "User";
-      const timeSinceType = Date.now() - lastTypedRef.current;
-      const isTyping = isTypingRef.current || timeSinceType < 1500;
+      const myUserName = user?.name || localStorage.getItem("user_name") || localStorage.getItem("user_email")?.split('@')[0] || "User";
+      const shouldSendEdit = isExplicitEdit || isEditingRef.current;
+      
+      if (shouldSendEdit) {
+        isEditingRef.current = false;
+      }
 
       const payload = {
         room_id: roomId,
         user_id: myUserId,
         user_name: myUserName,
         cursor: getCursorPosition(),
-        // ── FIX Bug 2: ALWAYS send code so both users' changes propagate ──
-        code: code,
-        lang: lang,
+        code: codeRef.current,
+        lang: langRef.current,
+        is_editing: shouldSendEdit
       };
 
       const res = await apiFetch('/api/coding/room/sync', {
@@ -537,14 +550,18 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         const data = await res.json();
         setRoomParticipants(data.participants || []);
         
-        // ── FIX Bug 2: Only RECEIVE (update editor) if WE are NOT actively typing ──
-        if (!isTyping && data.current_code !== code) {
-          setCode(data.current_code);
+        const timeSinceType = Date.now() - lastTypedRef.current;
+        // Update local editor ONLY if we aren't actively typing AND server code comes from another participant
+        if (data.current_code !== undefined && data.last_editor !== myUserId && timeSinceType > 600) {
+          if (data.current_code !== codeRef.current) {
+            setCode(data.current_code);
+            codeRef.current = data.current_code;
+          }
         }
-        if (data.current_lang && data.current_lang !== lang) {
+        if (data.current_lang && data.current_lang !== langRef.current) {
           setLang(data.current_lang);
+          langRef.current = data.current_lang;
         }
-        // ── FIX Bug 3: Receive run output from other participant ──
         if (data.current_output && data.current_output !== consoleOut) {
           setConsoleOut(data.current_output);
           setConsoleColor("var(--text2)");
@@ -552,6 +569,21 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       }
     } catch (err) {
       console.error("Room synchronization error:", err);
+    }
+  };
+
+  // Push code edit to room with debounce
+  const handleCodeChange = (newCode) => {
+    setCode(newCode);
+    codeRef.current = newCode;
+    lastTypedRef.current = Date.now();
+    isEditingRef.current = true;
+
+    if (roomId) {
+      if (editDebounceRef.current) clearTimeout(editDebounceRef.current);
+      editDebounceRef.current = setTimeout(() => {
+        syncRoomState(true);
+      }, 250);
     }
   };
 
@@ -564,12 +596,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         body: JSON.stringify({
           room_id: roomId,
           user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user",
+          user_name: user?.name || localStorage.getItem("user_name") || "User",
           output: outputText,
         })
       });
     } catch (_) {}
   };
-
 
   const getCursorPosition = () => {
     const area = document.getElementById("code-textarea");
@@ -585,9 +617,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setHintIdx(0);
     setHintBox("Click below to get a hint from your AI coach.");
     
-    // Load starter code using getDynamicStarterCode
     const template = getDynamicStarterCode(problem, lang);
     setCode(template);
+    codeRef.current = template;
   };
 
   const handleProblemChange = (e) => {
@@ -595,7 +627,6 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     const found = problems.find(p => p.problem_id === pid);
     if (found) {
       if (roomId) {
-        // Assign new problem to room
         assignProblemToRoom(pid);
       } else {
         selectProblem(found);
@@ -613,7 +644,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         const data = await res.json();
         setCurrentProblem(data.problem);
         setCode(data.current_code);
+        codeRef.current = data.current_code;
         setLang(data.current_lang);
+        langRef.current = data.current_lang;
       }
     } catch (err) {
       console.error("Failed to assign problem to room:", err);
@@ -624,8 +657,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const createRoom = async () => {
     try {
       const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "interviewer_user";
-      // ── FIX Bug 1: Read real name from localStorage not just user prop ──
-      const myUserName = user?.name || localStorage.getItem("user_name") || "Interviewer";
+      const myUserName = user?.name || localStorage.getItem("user_name") || localStorage.getItem("user_email")?.split('@')[0] || "Interviewer";
       const res = await apiFetch('/api/coding/room/create', {
         method: 'POST',
         body: JSON.stringify({
@@ -638,11 +670,13 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       if (res.ok) {
         const data = await res.json();
         setRoomId(data.room_id);
-        // ── FIX Bug 4: Persist room to sessionStorage so reload restores it ──
         sessionStorage.setItem("coding_room_id", data.room_id);
+        window.history.replaceState(null, "", `?room=${data.room_id}`);
         setCurrentProblem(data.problem);
         setCode(data.current_code);
+        codeRef.current = data.current_code;
         setLang(data.current_lang);
+        langRef.current = data.current_lang;
         setRoomParticipants(data.participants);
         setConsoleOut(`Joined Room ${data.room_id}. Editor synchronized!`);
       }
@@ -651,13 +685,11 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-
   const joinRoom = async () => {
     const rId = joinRoomInput.trim().toUpperCase();
     if (!rId) return;
     try {
-      // ── FIX Bug 1: Read real name from localStorage not just user prop ──
-      const myUserName = user?.name || localStorage.getItem("user_name") || "Candidate";
+      const myUserName = user?.name || localStorage.getItem("user_name") || localStorage.getItem("user_email")?.split('@')[0] || "Candidate";
       const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "candidate_user";
       const res = await apiFetch('/api/coding/room/join', {
         method: 'POST',
@@ -671,11 +703,13 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       if (res.ok) {
         const data = await res.json();
         setRoomId(data.room_id);
-        // ── FIX Bug 4: Persist room to sessionStorage so reload restores it ──
         sessionStorage.setItem("coding_room_id", data.room_id);
+        window.history.replaceState(null, "", `?room=${data.room_id}`);
         setCurrentProblem(data.problem);
         setCode(data.current_code);
+        codeRef.current = data.current_code;
         setLang(data.current_lang);
+        langRef.current = data.current_lang;
         setRoomParticipants(data.participants);
         if (data.current_output) {
           setConsoleOut(data.current_output);
@@ -691,13 +725,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-
   const leaveRoom = () => {
     setRoomId("");
     setRoomParticipants([]);
     setJoinRoomInput("");
-    // ── FIX Bug 4: Clear persisted room on explicit leave ──
     sessionStorage.removeItem("coding_room_id");
+    window.history.replaceState(null, "", window.location.pathname);
     if (problems.length > 0) {
       selectProblem(problems[0]);
     }
@@ -1092,11 +1125,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               id="code-textarea"
               className="code-area" 
               value={code} 
-              onChange={(e) => {
-                setCode(e.target.value);
-                lastTypedRef.current = Date.now();
-                isTypingRef.current = true;
-              }} 
+              onChange={(e) => handleCodeChange(e.target.value)} 
               spellCheck="false" 
               aria-label="Code editor" 
             />

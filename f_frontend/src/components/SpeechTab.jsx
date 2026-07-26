@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { calculateSpeechMetrics } from '../utils/speechEngine';
 
 const renderMarkdown = (text) => {
   if (!text) return null;
@@ -232,27 +233,16 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           throw new Error(d.detail || 'Analysis failed');
         }
       } catch(e) {
-        setRecStatus("AI analysis failed: " + e.message + " — showing local estimate instead.");
-        setRecStatusColor("var(--red)");
+        setRecStatus("AI analysis notice: " + e.message + " — using deterministic speech engine.");
+        setRecStatusColor("var(--text2)");
       }
     }
 
-    // Demo fallback
+    // Demo / offline fallback using deterministic frontend speech engine
     setTimeout(() => {
-      renderSpeechResults({
-        confidence_pct: 87, 
-        wpm: 142, 
-        filler_count: 3, 
-        overall_score: 8.2,
-        tone: { confidence: 87, clarity: 79, enthusiasm: 65, nervousness: 22 },
-        feedback: [
-          '✅ Strong clarity — your technical explanation was well-structured',
-          '⚠️ Reduce fillers — 3 "um/uh" detected. Pause instead of using filler words.',
-          '📈 Pace is ideal — 142 WPM is perfect for technical interviews',
-          '💡 Tip: Brief eye contact with the camera signals confidence [Demo mode]'
-        ]
-      });
-    }, 1400);
+      const localResult = calculateSpeechMetrics(rawText, durationRef.current);
+      renderSpeechResults(localResult);
+    }, 600);
   };
 
   const renderSpeechResults = (d) => {

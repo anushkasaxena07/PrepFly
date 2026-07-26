@@ -3230,10 +3230,12 @@ def coding_room_sync():
     data = request.get_json() or {}
     room_id = data.get("room_id", "").strip().upper()
     user_id = data.get("user_id")
+    user_name = data.get("user_name") or "User"
     code = data.get("code")
     lang = data.get("lang")
     cursor = data.get("cursor")
     output = data.get("output")  # Run output to broadcast to all participants
+    is_editing = data.get("is_editing", False)
     
     if not room_id or not user_id:
         return jsonify({"error": "room_id and user_id are required"}), 400
@@ -3259,6 +3261,7 @@ def coding_room_sync():
             
             if p["user_id"] == user_id:
                 p["last_seen"] = now.isoformat()
+                p["name"] = user_name
                 if cursor is not None:
                     p["cursor"] = cursor
                 is_active = True
@@ -3270,11 +3273,18 @@ def coding_room_sync():
             "participants": active_participants
         }
         
-        if code is not None and code != room["current_code"]:
-            update_data["current_code"] = code
-            room["current_code"] = code
+        # Only update server code if the client explicitly edited code (is_editing=True)
+        # OR if server code is currently empty
+        if code is not None and (is_editing or not room.get("current_code")):
+            if code != room.get("current_code"):
+                update_data["current_code"] = code
+                update_data["last_editor"] = user_id
+                update_data["last_editor_name"] = user_name
+                room["current_code"] = code
+                room["last_editor"] = user_id
+                room["last_editor_name"] = user_name
             
-        if lang is not None and lang != room["current_lang"]:
+        if lang is not None and lang != room.get("current_lang"):
             update_data["current_lang"] = lang
             room["current_lang"] = lang
 
@@ -3286,9 +3296,11 @@ def coding_room_sync():
         supabase.table("coding_rooms").update(update_data).eq("room_id", room_id).execute()
         
         return jsonify({
-            "current_code": room["current_code"],
-            "current_lang": room["current_lang"],
+            "current_code": room.get("current_code", ""),
+            "current_lang": room.get("current_lang", "python"),
             "current_output": room.get("current_output", ""),
+            "last_editor": room.get("last_editor", ""),
+            "last_editor_name": room.get("last_editor_name", ""),
             "participants": active_participants
         }), 200
         
@@ -3957,59 +3969,37 @@ def speech_analyze():
     user_id = data.get("user_id")
     transcript = data.get("transcript", "")
     duration_seconds = data.get("duration_seconds", 60)
+    words_data = data.get("words") # Optional list of word timestamp dicts: [{text, start, end}]
 
     if not transcript:
         return jsonify({"error": "transcript is required"}), 400
 
-    prompt = f"""You are a communications coach and AI interviewer.
-Analyze this interview transcript:
-{transcript}
+    from services.speech_engine import compute_speech_metrics, generate_speech_feedback
 
-The speech duration was approximately {duration_seconds} seconds.
+    # Step 1: Compute exact, deterministic speech metrics (WPM, Fillers, Pauses, Vocab, Score)
+    metrics = compute_speech_metrics(transcript, duration_seconds=duration_seconds, words_data=words_data)
 
-Determine:
-1. Words Per Minute (WPM): calculate based on word count / (duration_seconds / 60).
-2. Count filler words such as "um", "uh", "like", "so", "actually", "basically", etc.
-3. Clarity, enthusiasm, nervousness, and confidence (percentages).
-4. Overall speech delivery score (1 to 10).
-5. Feedback points (strengths, filler word notes, pace notes, tips).
+    # Step 2: Generate natural feedback fed ONLY computed ground-truth metrics
+    feedback_points = generate_speech_feedback(metrics, chat_model=chat_model)
 
-Return a JSON object with the following fields:
-- "confidence_pct": integer (0 to 100)
-- "wpm": integer (words per minute)
-- "filler_count": integer (number of filler words detected)
-- "overall_score": float (overall score out of 10, e.g. 8.2)
-- "tone": object containing:
-    - "confidence": integer (0 to 100)
-    - "clarity": integer (0 to 100)
-    - "enthusiasm": integer (0 to 100)
-    - "nervousness": integer (0 to 100)
-- "feedback": list of strings (formatted starting with emoji, e.g., "✅ Strong clarity...", "⚠️ Reduce fillers...", "📈 Pace is ideal...", "💡 Tip...")
-
-Return ONLY the raw JSON string, no markdown wrapper, no preamble."""
-
-    try:
-        raw_res = chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
-        result = parse_gemini_json(raw_res)
-    except Exception as e:
-        print(f"Speech analyze error: {e}")
-        result = {
-            "confidence_pct": 82,
-            "wpm": 130,
-            "filler_count": 2,
-            "overall_score": 8.0,
-            "tone": {
-                "confidence": 80,
-                "clarity": 85,
-                "enthusiasm": 70,
-                "nervousness": 15
-            },
-            "feedback": [
-                "✅ Good speech clarity and delivery speed.",
-                "⚠️ Try to reduce pauses and filler word count.",
-                "📈 WPM is within average normal bounds."
-            ]
+    result = {
+        "confidence_pct": metrics["confidence_pct"],
+        "wpm": metrics["wpm"],
+        "filler_count": metrics["filler_count"],
+        "fillers_per_min": metrics["fillers_per_min"],
+        "fillers_found": metrics["fillers_found"],
+        "pause_count": metrics["pause_count"],
+        "longest_pause_ms": metrics["longest_pause_ms"],
+        "pace_consistent": metrics["pace_consistent"],
+        "vocabulary_diversity": metrics["vocabulary_diversity"],
+        "overall_score": metrics["overall_score"],
+        "tone": metrics["tone"],
+        "feedback": feedback_points,
+        "meta": {
+            "engine": "deterministic_speech_v1",
+            "total_words": metrics["total_words"]
         }
+    }
 
     # Save to database if user_id is provided
     if user_id:
@@ -4017,12 +4007,12 @@ Return ONLY the raw JSON string, no markdown wrapper, no preamble."""
             db_data = {
                 "user_id": user_id,
                 "transcript": transcript,
-                "confidence_pct": result.get("confidence_pct", 80.0),
-                "wpm": result.get("wpm", 130),
-                "filler_count": result.get("filler_count", 0),
-                "overall_score": result.get("overall_score", 8.0),
-                "feedback": result.get("feedback", []),
-                "tone": result.get("tone", {})
+                "confidence_pct": result["confidence_pct"],
+                "wpm": result["wpm"],
+                "filler_count": result["filler_count"],
+                "overall_score": result["overall_score"],
+                "feedback": result["feedback"],
+                "tone": result["tone"]
             }
             supabase.table("speech_analyses").insert(db_data).execute()
         except Exception as db_err:
