@@ -75,6 +75,7 @@ allowed_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
+    "http://127.0.0.1:5173",
     "https://prepfly.vercel.app",
     re.compile(r"^https://.*\.vercel\.app$")
 ]
@@ -83,10 +84,22 @@ if frontend_url:
     allowed_origins.append(frontend_url)
 
 CORS(app, resources={r"/*": {
-    "origins": "*",
+    "origins": allowed_origins,
+    "supports_credentials": True,
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["*"]
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }})
+
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get("Origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
+
 
 
 # ─── Supabase Setup ────────────────────────────────────────────────────────────
