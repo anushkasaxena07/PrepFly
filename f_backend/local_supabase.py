@@ -204,11 +204,20 @@ class SQLiteSupabaseMock:
                 created_by TEXT,
                 current_code TEXT,
                 current_lang TEXT,
+                current_output TEXT,
+                last_editor TEXT,
+                last_editor_name TEXT,
                 participants TEXT,
                 assigned_problems TEXT,
                 created_at TEXT
             )
         """)
+        for col in ["current_output", "last_editor", "last_editor_name"]:
+            try:
+                cursor.execute(f"ALTER TABLE coding_rooms ADD COLUMN {col} TEXT")
+            except Exception:
+                pass
+
 
         # 13. webrtc_rooms
         cursor.execute("""

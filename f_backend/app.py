@@ -3331,99 +3331,110 @@ def coding_room_join():
         return jsonify({"error": f"Failed to join coding room: {str(e)}"}), 500
 
 
+coding_rooms_memory = {}
+
 @app.route("/api/coding/room/sync", methods=["POST"])
 @app.route("/coding/room/sync", methods=["POST"])
 def coding_room_sync():
     data = request.get_json() or {}
-    room_id = data.get("room_id", "").strip().upper()
-    user_id = data.get("user_id")
-    user_name = data.get("user_name") or "User"
+    room_id = str(data.get("room_id", "")).strip().upper()
+    user_id = str(data.get("user_id", ""))
+    user_name = str(data.get("user_name", "User"))
     code = data.get("code")
     lang = data.get("lang")
     cursor = data.get("cursor")
-    output = data.get("output")  # Run output to broadcast to all participants
-    is_editing = data.get("is_editing", False)
-    
+    output = data.get("output")
+
     if not room_id or not user_id:
         return jsonify({"error": "room_id and user_id are required"}), 400
-        
+
     try:
-        res = supabase.table("coding_rooms").select("*").eq("room_id", room_id).execute()
-        if not res or not res.data:
-            return jsonify({"error": "Room not found"}), 404
-            
-        room = res.data[0]
+        if room_id not in coding_rooms_memory:
+            try:
+                res = supabase.table("coding_rooms").select("*").eq("room_id", room_id).execute()
+                room_db = res.data[0] if (res and res.data) else {}
+            except Exception:
+                room_db = {}
+
+            coding_rooms_memory[room_id] = {
+                "room_id": room_id,
+                "current_code": room_db.get("current_code", ""),
+                "current_lang": room_db.get("current_lang", "python"),
+                "current_output": room_db.get("current_output", ""),
+                "last_editor": room_db.get("last_editor", ""),
+                "last_editor_name": room_db.get("last_editor_name", ""),
+                "participants": room_db.get("participants") or []
+            }
+
+        room = coding_rooms_memory[room_id]
         
+        # Update participants list & heartbeat
         participants = room.get("participants") or []
         if isinstance(participants, str):
-            participants = json.loads(participants)
-            
-        active_participants = []
-        now = datetime.utcnow()
-        
-        for p in participants:
-            if not isinstance(p, dict):
-                continue
-            last_seen_val = p.get("last_seen")
-            is_active = True
-            if last_seen_val:
-                try:
-                    p_time = datetime.fromisoformat(str(last_seen_val).replace('Z', '+00:00'))
-                    now_aware = now.replace(tzinfo=p_time.tzinfo)
-                    is_active = (now_aware - p_time).total_seconds() < 15
-                except Exception:
-                    is_active = True
+            try:
+                participants = json.loads(participants)
+            except Exception:
+                participants = []
 
-            p_id = p.get("user_id", "")
-            if p_id == user_id:
-                p["last_seen"] = now.isoformat()
+        now_iso = datetime.utcnow().isoformat()
+        found_user = False
+        for p in participants:
+            if isinstance(p, dict) and p.get("user_id") == user_id:
+                p["last_seen"] = now_iso
                 p["name"] = user_name
                 if cursor is not None:
                     p["cursor"] = cursor
-                is_active = True
-                
-            p["active"] = is_active
-            active_participants.append(p)
+                p["active"] = True
+                found_user = True
+                break
 
-            
-        update_data = {
-            "participants": active_participants
-        }
-        
-        # Update server code whenever code is provided and differs from room code
-        if code is not None and code.strip():
-            if code != room.get("current_code"):
-                update_data["current_code"] = code
-                update_data["last_editor"] = user_id
-                update_data["last_editor_name"] = user_name
-                room["current_code"] = code
-                room["last_editor"] = user_id
-                room["last_editor_name"] = user_name
+        if not found_user:
+            participants.append({
+                "user_id": user_id,
+                "name": user_name,
+                "role": "candidate",
+                "last_seen": now_iso,
+                "active": True
+            })
 
-            
-        if lang is not None and lang != room.get("current_lang"):
-            update_data["current_lang"] = lang
+        room["participants"] = participants
+
+        # Update code if changed
+        if isinstance(code, str) and code != room.get("current_code"):
+            room["current_code"] = code
+            room["last_editor"] = user_id
+            room["last_editor_name"] = user_name
+
+        if isinstance(lang, str) and lang:
             room["current_lang"] = lang
 
-        # Broadcast run output if provided
         if output is not None:
-            update_data["current_output"] = output
-            room["current_output"] = output
-            
-        supabase.table("coding_rooms").update(update_data).eq("room_id", room_id).execute()
-        
+            room["current_output"] = str(output)
+
+        # Safe database sync without breaking real-time memory state
+        try:
+            supabase.table("coding_rooms").update({
+                "current_code": room["current_code"],
+                "current_lang": room["current_lang"],
+                "participants": room["participants"]
+            }).eq("room_id", room_id).execute()
+        except Exception as e_db:
+            pass
+
         return jsonify({
+            "room_id": room_id,
             "current_code": room.get("current_code", ""),
             "current_lang": room.get("current_lang", "python"),
             "current_output": room.get("current_output", ""),
             "last_editor": room.get("last_editor", ""),
             "last_editor_name": room.get("last_editor_name", ""),
-            "participants": active_participants
+            "participants": room.get("participants", [])
         }), 200
-        
+
     except Exception as e:
         print(f"Error syncing room: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/api/coding/room/assign-question", methods=["POST"])
