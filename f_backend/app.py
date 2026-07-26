@@ -6801,8 +6801,7 @@ def superadmin_dashboard_stats():
             if a_res and a_res.data: admins = a_res.data
         except Exception:
             pass  # admin table may not exist yet
-        # Use the `users` table — subscription_plan is the correct column name
-        u_res = supabase.table("users").select("id,role,subscription_plan,created_at").execute()
+        u_res = supabase.table("users").select("*").execute()
         if u_res and u_res.data: users_all = u_res.data
         s_res = supabase.table("sessions").select("user_id,created_at").execute()
         if s_res and s_res.data: sessions_all = s_res.data
@@ -6811,23 +6810,27 @@ def superadmin_dashboard_stats():
 
     now = datetime.utcnow()
     seven_days_ago = now - timedelta(days=7)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_iso = now.strftime("%Y-%m-%d")
 
-    candidates = [u for u in users_all if u.get("role") not in ("ADMIN", "SUPER_ADMIN", "admin")]
+    candidates = [u for u in users_all if u.get("role") not in ("ADMIN", "SUPER_ADMIN", "admin", "Super Admin")]
     total_students = len(candidates)
-    premium_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() == "PREMIUM"])
-    free_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() in ("", "FREE", "NONE", "NULL") or not u.get("subscription_plan")])
-    trial_students = len([u for u in candidates if str(u.get("subscription_plan", "")).upper() == "TRIAL"])
+    
+    def get_sub(u):
+        return str(u.get("subscription") or u.get("subscription_plan") or "FREE").upper()
 
-    # Active = had at least one session in the last 7 days
+    premium_students = len([u for u in candidates if get_sub(u) == "PREMIUM"])
+    free_students = len([u for u in candidates if get_sub(u) in ("", "FREE", "NONE", "NULL")])
+    trial_students = len([u for u in candidates if get_sub(u) == "TRIAL"])
+
+    # Active = had at least one session in the last 7 days or registered recently
     active_user_ids = set(
         s["user_id"] for s in sessions_all
-        if s.get("created_at") and s["created_at"] >= seven_days_ago.isoformat()
+        if s.get("created_at") and str(s["created_at"])[:10] >= seven_days_ago.strftime("%Y-%m-%d")
     )
-    active_students = len([u for u in candidates if u.get("id") in active_user_ids])
+    active_students = len([u for u in candidates if u.get("id") in active_user_ids or (u.get("created_at") and str(u["created_at"])[:10] >= seven_days_ago.strftime("%Y-%m-%d"))])
 
     # New registrations today
-    new_today = len([u for u in candidates if u.get("created_at") and u["created_at"] >= today_start.isoformat()])
+    new_today = len([u for u in candidates if u.get("created_at") and str(u["created_at"])[:10] >= today_iso])
 
     total_sessions = len(sessions_all)
 
