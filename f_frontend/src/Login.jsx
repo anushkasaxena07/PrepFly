@@ -424,41 +424,42 @@ export default function Login() {
 
   return (
     <div className="auth-root">
-      <div className="orb orb-1" />
-      <div className="orb orb-2" />
-      <div className="orb orb-3" />
+      {/* Background Stars & Streaks */}
+      <div className="stars" id="stars" />
+      <svg className="streak s1" viewBox="0 0 280 60" fill="none">
+        <path d="M2 50 Q120 10 278 4" stroke="#57c9f5" strokeWidth="1.2" strokeDasharray="1 8" strokeLinecap="round"/>
+      </svg>
+      <svg className="streak s2" viewBox="0 0 220 50" fill="none">
+        <path d="M2 40 Q100 6 218 2" stroke="#9b8bfa" strokeWidth="1.2" strokeDasharray="1 8" strokeLinecap="round"/>
+      </svg>
 
-      <div className="auth-card">
-        {/* Brand Header with Glowing Circle Logo */}
-        <div className="brand-header">
-          <div className="logo-circle-glow">
-            <img 
-              src="/prepfly-logo.jpg" 
-              alt="PrepFly Logo" 
-              className="logo-circle-img"
-              onError={(e) => { e.target.src = "/prepfly-logo.png"; }}
-            />
-          </div>
-          <h1 className="brand-title">
-            Prep<span className="brand-highlight">Fly</span>
-          </h1>
-          <p className="brand-tagline">
-            P R A C T I C E &nbsp;.&nbsp; P R E P A R E &nbsp;.&nbsp; <span style={{ color: '#35c7f0' }}>F L Y</span>
-          </p>
+      <div className="stage">
+        {/* Logo Badge */}
+        <div className="logo-badge">
+          <img 
+            src="/prepfly-logo.jpg" 
+            alt="PrepFly Logo" 
+            onError={(e) => { e.target.src = "/prepfly-logo.png"; }}
+          />
+        </div>
+
+        {/* Wordmark & Tagline */}
+        <p className="wordmark">
+          <span className="prep">Prep</span><span className="fly">Fly</span>
+        </p>
+        <div className="tagline">
+          P R A C T I C E &nbsp;.&nbsp; P R E P A R E &nbsp;.&nbsp; <em>F L Y</em>
         </div>
 
         {/* Header */}
-        <div className="auth-header">
-          <h2 className="auth-title">{title}</h2>
-          <p className="auth-subtitle">
-            {screen === 'login' ? (
-              <>Sign in to continue your <span style={{ color: '#35c7f0', fontWeight: 600 }}>growth</span></>
-            ) : screen === 'signup' ? (
-              <>Start your journey to tech <span style={{ color: '#35c7f0', fontWeight: 600 }}>mastery</span></>
-            ) : sub}
-          </p>
-        </div>
-
+        <h1>{title}</h1>
+        <p className="sub">
+          {screen === 'login' ? (
+            <>Sign in to continue your <span>growth</span></>
+          ) : screen === 'signup' ? (
+            <>Start your journey to tech <span>mastery</span></>
+          ) : sub}
+        </p>
 
         {/* Google btn – only on login / signup screens */}
         {(screen === "login" || screen === "signup") && (
@@ -477,9 +478,7 @@ export default function Login() {
               )}
               {googleLoading ? "Signing in…" : "Continue with Google"}
             </button>
-            <div className="divider">
-              <span className="divider-line"/><span className="divider-text">or</span><span className="divider-line"/>
-            </div>
+            <div className="divider">or</div>
           </>
         )}
 
@@ -501,64 +500,78 @@ export default function Login() {
 
         {/* ══ LOGIN ══════════════════════════════════════════════════════ */}
         {screen === "login" && (
-          <form onSubmit={handleLogin} className="auth-form">
-            <div className="field-group">
-              <label className="field-label">Email Address</label>
-              <div className="field-wrap">
-                <EmailIcon />
-                <input type="email" name="email" placeholder="you@example.com"
-                  value={formData.email} onChange={handleChange}
-                  className="field-input" required autoComplete="email" />
+          <form onSubmit={handleLogin} style={{ width: "100%" }}>
+            <div className="field">
+              <div className="field-label">
+                <span>EMAIL ADDRESS</span>
               </div>
+              <div className="input-wrap mail">
+                <span className="icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                  </svg>
+                </span>
+                <input type="email" name="email" placeholder="you@company.com"
+                  value={formData.email} onChange={handleChange} required autoComplete="email" />
+              </div>
+              <div className="underline" />
             </div>
 
-            <div className="field-group">
-              <div className="field-label-row">
-                <label className="field-label">Password</label>
-                <button type="button" className="forgot-link"
-                  onClick={() => { setOtpEmail(formData.email); goTo("forgot-email"); }}>
+            <div className="field">
+              <div className="field-label">
+                <span>PASSWORD</span>
+                <button type="button" onClick={() => { setOtpEmail(formData.email); goTo("forgot-email"); }}>
                   Forgot password?
                 </button>
               </div>
-              <div className="field-wrap">
-                <LockIcon />
+              <div className="input-wrap lock">
+                <span className="icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                </span>
                 <input type={showPassword ? "text" : "password"} name="password"
                   placeholder="••••••••" value={formData.password} onChange={handleChange}
-                  className="field-input" required autoComplete="current-password" />
-                <button type="button" className="eye-btn" onClick={() => setShowPassword(p => !p)}>
+                  required autoComplete="current-password" />
+                <button type="button" className="eye" onClick={() => setShowPassword(p => !p)}>
                   <EyeIcon open={showPassword} />
                 </button>
               </div>
+              <div className="underline" />
             </div>
 
-            <button type="submit" className="submit-btn" disabled={isLoading}>
+            <button type="submit" className="signin-btn" disabled={isLoading}>
               {isLoading ? <span className="spinner" /> : (
-                <>Sign in <span style={{ fontSize: "16px", marginLeft: "4px" }}>→</span></>
+                <>
+                  Sign in
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </>
               )}
             </button>
 
-            <p style={{textAlign:"center",fontSize:"13px",color:"var(--text-secondary)",marginTop:"4px"}}>
+            <div className="foot">
               Prefer no password?{" "}
-              <button type="button" className="toggle-btn"
-                onClick={() => { setOtpEmail(formData.email); goTo("otp-login"); }}>
+              <button type="button" onClick={() => { setOtpEmail(formData.email); goTo("otp-login"); }}>
                 Login with OTP
               </button>
-            </p>
+            </div>
 
-            <p className="toggle-text">
-              Don't have an account?
-              <button type="button" onClick={() => goTo("signup")} className="toggle-btn"> Sign up</button>
-            </p>
+            <div className="foot">
+              Don't have an account?{" "}
+              <button type="button" onClick={() => goTo("signup")}>Sign up</button>
+            </div>
           </form>
         )}
 
         {/* ══ LOGIN OTP VERIFY ═══════════════════════════════════════════ */}
         {screen === "login-otp" && (
-          <form onSubmit={handleVerifyLoginOtp} className="auth-form">
+          <form onSubmit={handleVerifyLoginOtp} style={{ width: "100%" }}>
             <EmailSentBadge onBack={() => goTo("login")} />
             <OtpInput />
             <OtpCountdownBadge />
-            <button type="submit" className="submit-btn" disabled={isLoading || otp.length !== 6}>
+            <button type="submit" className="signin-btn" disabled={isLoading || otp.length !== 6}>
               {isLoading ? <span className="spinner" /> : "Verify & Sign In"}
             </button>
             <ResendBtn purpose="login" />
@@ -567,58 +580,71 @@ export default function Login() {
 
         {/* ══ SIGNUP ═════════════════════════════════════════════════════ */}
         {screen === "signup" && (
-          <form onSubmit={handleSignup} className="auth-form">
-            <div className="field-group">
-              <label className="field-label">Full Name</label>
-              <div className="field-wrap">
-                <UserIcon />
+          <form onSubmit={handleSignup} style={{ width: "100%" }}>
+            <div className="field">
+              <div className="field-label">
+                <span>FULL NAME</span>
+              </div>
+              <div className="input-wrap user">
+                <span className="icon">
+                  <UserIcon />
+                </span>
                 <input type="text" name="name" placeholder="John Doe"
-                  value={formData.name} onChange={handleChange}
-                  className="field-input" autoComplete="name" required />
+                  value={formData.name} onChange={handleChange} autoComplete="name" required />
               </div>
+              <div className="underline" />
             </div>
 
-            <div className="field-group">
-              <label className="field-label">Email Address</label>
-              <div className="field-wrap">
-                <EmailIcon />
-                <input type="email" name="email" placeholder="you@example.com"
-                  value={formData.email} onChange={handleChange}
-                  className="field-input" required autoComplete="email" />
+            <div className="field">
+              <div className="field-label">
+                <span>EMAIL ADDRESS</span>
               </div>
+              <div className="input-wrap mail">
+                <span className="icon">
+                  <EmailIcon />
+                </span>
+                <input type="email" name="email" placeholder="you@company.com"
+                  value={formData.email} onChange={handleChange} required autoComplete="email" />
+              </div>
+              <div className="underline" />
             </div>
 
-            <div className="field-group">
-              <label className="field-label">Password</label>
-              <div className="field-wrap">
-                <LockIcon />
+            <div className="field">
+              <div className="field-label">
+                <span>PASSWORD</span>
+              </div>
+              <div className="input-wrap lock">
+                <span className="icon">
+                  <LockIcon />
+                </span>
                 <input type={showPassword ? "text" : "password"} name="password"
                   placeholder="Min. 6 characters" value={formData.password} onChange={handleChange}
-                  className="field-input" required autoComplete="new-password" />
-                <button type="button" className="eye-btn" onClick={() => setShowPassword(p => !p)}>
+                  required autoComplete="new-password" />
+                <button type="button" className="eye" onClick={() => setShowPassword(p => !p)}>
                   <EyeIcon open={showPassword} />
                 </button>
               </div>
+              <div className="underline" />
             </div>
 
-            <button type="submit" className="submit-btn" disabled={isLoading}>
+            <button type="submit" className="signin-btn" disabled={isLoading}>
               {isLoading ? <span className="spinner" /> : "Create Account"}
             </button>
 
-            <p className="toggle-text">
-              Already have an account?
-              <button type="button" onClick={() => goTo("login")} className="toggle-btn"> Sign in</button>
-            </p>
+            <div className="foot">
+              Already have an account?{" "}
+              <button type="button" onClick={() => goTo("login")}>Sign in</button>
+            </div>
           </form>
         )}
 
         {/* ══ SIGNUP OTP VERIFY ══════════════════════════════════════════ */}
         {screen === "signup-otp" && (
-          <form onSubmit={handleVerifySignupOtp} className="auth-form">
+          <form onSubmit={handleVerifySignupOtp} style={{ width: "100%" }}>
             <EmailSentBadge onBack={() => goTo("signup")} />
             <OtpInput />
             <OtpCountdownBadge />
-            <button type="submit" className="submit-btn" disabled={isLoading || otp.length !== 6}>
+            <button type="submit" className="signin-btn" disabled={isLoading || otp.length !== 6}>
               {isLoading ? <span className="spinner" /> : "Verify & Create Account"}
             </button>
             <ResendBtn purpose="signup" />
@@ -627,32 +653,37 @@ export default function Login() {
 
         {/* ══ PASSWORDLESS OTP LOGIN ═════════════════════════════════════ */}
         {screen === "otp-login" && (
-          <form onSubmit={handleRequestOtpLogin} className="auth-form">
-            <div className="field-group">
-              <label className="field-label">Email Address</label>
-              <div className="field-wrap">
-                <EmailIcon />
-                <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
-                  placeholder="you@example.com" className="field-input" required autoFocus />
+          <form onSubmit={handleRequestOtpLogin} style={{ width: "100%" }}>
+            <div className="field">
+              <div className="field-label">
+                <span>EMAIL ADDRESS</span>
               </div>
+              <div className="input-wrap mail">
+                <span className="icon">
+                  <EmailIcon />
+                </span>
+                <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
+                  placeholder="you@company.com" required autoFocus />
+              </div>
+              <div className="underline" />
             </div>
-            <button type="submit" className="submit-btn" disabled={isLoading}>
+            <button type="submit" className="signin-btn" disabled={isLoading}>
               {isLoading ? <span className="spinner" /> : "Send OTP"}
             </button>
-            <p className="toggle-text">
-              Have a password?
-              <button type="button" onClick={() => goTo("login")} className="toggle-btn"> Sign in with password</button>
-            </p>
+            <div className="foot">
+              Have a password?{" "}
+              <button type="button" onClick={() => goTo("login")}>Sign in with password</button>
+            </div>
           </form>
         )}
 
         {/* ══ PASSWORDLESS OTP VERIFY ════════════════════════════════════ */}
         {screen === "otp-login-verify" && (
-          <form onSubmit={handleVerifyOtpLogin} className="auth-form">
+          <form onSubmit={handleVerifyOtpLogin} style={{ width: "100%" }}>
             <EmailSentBadge onBack={() => goTo("otp-login")} />
             <OtpInput />
             <OtpCountdownBadge />
-            <button type="submit" className="submit-btn" disabled={isLoading || otp.length !== 6}>
+            <button type="submit" className="signin-btn" disabled={isLoading || otp.length !== 6}>
               {isLoading ? <span className="spinner" /> : "Verify & Login"}
             </button>
             <ResendBtn purpose="otp" />
@@ -661,32 +692,37 @@ export default function Login() {
 
         {/* ══ FORGOT PASSWORD – EMAIL ════════════════════════════════════ */}
         {screen === "forgot-email" && (
-          <form onSubmit={handleForgotRequest} className="auth-form">
-            <div className="field-group">
-              <label className="field-label">Your Email Address</label>
-              <div className="field-wrap">
-                <EmailIcon />
-                <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
-                  placeholder="you@example.com" className="field-input" required autoFocus />
+          <form onSubmit={handleForgotRequest} style={{ width: "100%" }}>
+            <div className="field">
+              <div className="field-label">
+                <span>YOUR EMAIL ADDRESS</span>
               </div>
+              <div className="input-wrap mail">
+                <span className="icon">
+                  <EmailIcon />
+                </span>
+                <input type="email" value={otpEmail} onChange={e => setOtpEmail(e.target.value)}
+                  placeholder="you@company.com" required autoFocus />
+              </div>
+              <div className="underline" />
             </div>
-            <button type="submit" className="submit-btn" disabled={isLoading}>
+            <button type="submit" className="signin-btn" disabled={isLoading}>
               {isLoading ? <span className="spinner" /> : "Send Reset Code"}
             </button>
-            <p className="toggle-text">
-              Remember it?
-              <button type="button" onClick={() => goTo("login")} className="toggle-btn"> Back to login</button>
-            </p>
+            <div className="foot">
+              Remember it?{" "}
+              <button type="button" onClick={() => goTo("login")}>Back to login</button>
+            </div>
           </form>
         )}
 
         {/* ══ FORGOT PASSWORD – OTP ══════════════════════════════════════ */}
         {screen === "forgot-otp" && (
-          <form onSubmit={handleVerifyResetOtp} className="auth-form">
+          <form onSubmit={handleVerifyResetOtp} style={{ width: "100%" }}>
             <EmailSentBadge onBack={() => goTo("forgot-email")} />
             <OtpInput />
             <OtpCountdownBadge />
-            <button type="submit" className="submit-btn" disabled={isLoading || otp.length !== 6}>
+            <button type="submit" className="signin-btn" disabled={isLoading || otp.length !== 6}>
               {isLoading ? <span className="spinner" /> : "Verify Code"}
             </button>
             <ResendBtn purpose="reset" />
@@ -695,11 +731,15 @@ export default function Login() {
 
         {/* ══ RESET PASSWORD ═════════════════════════════════════════════ */}
         {screen === "reset-password" && (
-          <form onSubmit={handleResetPassword} className="auth-form">
-            <div className="field-group">
-              <label className="field-label">New Password</label>
-              <div className="field-wrap">
-                <LockIcon />
+          <form onSubmit={handleResetPassword} style={{ width: "100%" }}>
+            <div className="field">
+              <div className="field-label">
+                <span>NEW PASSWORD</span>
+              </div>
+              <div className="input-wrap lock">
+                <span className="icon">
+                  <LockIcon />
+                </span>
                 <input type={showNewPass ? "text" : "password"} value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   placeholder="Min. 6 characters" className="field-input" required autoFocus />
