@@ -304,7 +304,7 @@ def _otp_html(otp: str, title: str, subtitle: str) -> str:
         .info{{color:#7a8ba8;font-size:13px;margin-top:20px;line-height:1.7}}
         .footer{{text-align:center;color:#4a5a72;font-size:11px;margin-top:36px}}
     </style></head><body><div class="c">
-        <div class="hdr">🎯 HireAI</div>
+        <div class="hdr">🎯 PrepFly</div>
         <div class="sub">{subtitle}</div>
         <p style="color:#e8edf8">{title}</p>
         <div class="box"><div class="otp">{otp}</div></div>
@@ -313,22 +313,22 @@ def _otp_html(otp: str, title: str, subtitle: str) -> str:
             🔒 Do not share this code with anyone
         </div>
         <p style="color:#7a8ba8;font-size:13px">If you didn't request this, please ignore this email.</p>
-        <div class="footer">© 2026 HireAI · AI-Powered Interview Platform</div>
+        <div class="footer">© 2026 PrepFly · AI-Powered Interview Platform</div>
     </div></body></html>"""
 
 
 def send_otp_email(email: str, otp: str, purpose: str = "login"):
     titles = {
-        "login":   ("Your login verification code:", "Sign in to HireAI"),
-        "signup":  ("Verify your new HireAI account:", "Confirm your email address"),
-        "reset":   ("Reset your HireAI password:", "Password Reset Request"),
+        "login":   ("Your login verification code:", "Sign in to PrepFly"),
+        "signup":  ("Verify your new PrepFly account:", "Confirm your email address"),
+        "reset":   ("Reset your PrepFly password:", "Password Reset Request"),
     }
     title, subtitle = titles.get(purpose, titles["login"])
-    return send_email(email, f"HireAI – {subtitle}", _otp_html(otp, title, subtitle))
+    return send_email(email, f"PrepFly – {subtitle}", _otp_html(otp, title, subtitle))
 
 
 def send_login_confirmation_email(email, name, login_time):
-    subject = "Successful Login – HireAI"
+    subject = "Successful Login – PrepFly"
     html = f"""<!DOCTYPE html><html><head><style>
         body{{font-family:Arial,sans-serif;background:#080c14;color:#e8edf8;padding:20px}}
         .c{{max-width:600px;margin:0 auto;background:linear-gradient(135deg,rgba(15,22,40,.95),rgba(13,18,32,.95));
@@ -343,14 +343,14 @@ def send_login_confirmation_email(email, name, login_time):
         <div style="text-align:center;font-size:48px">✅</div>
         <div class="hdr">Login Successful</div>
         <p>Hello {name},</p>
-        <p style="color:#7a8ba8">You signed in to <strong>HireAI</strong> via Google.</p>
+        <p style="color:#7a8ba8">You signed in to <strong>PrepFly</strong> via Google.</p>
         <div class="box">
             <div><span class="lbl">📧 Email:</span> <span style="color:#7a8ba8">{email}</span></div>
             <div style="margin-top:10px"><span class="lbl">🕐 Time:</span> <span style="color:#7a8ba8">{login_time}</span></div>
             <div style="margin-top:10px"><span class="lbl">🔐 Method:</span> <span style="color:#7a8ba8">Google OAuth 2.0</span></div>
         </div>
         <div class="warn">⚠️ If this wasn't you, secure your Google account immediately.</div>
-        <div class="footer">© 2026 HireAI</div>
+        <div class="footer">© 2026 PrepFly</div>
     </div></body></html>"""
     return send_email(email, subject, html)
 
