@@ -1738,8 +1738,11 @@ def generate_final_report_async(session_id, resume_text, questions, responses, f
 
 
 @app.route("/end-interview", methods=["POST"])
-@require_auth
 def end_interview():
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
+
     data = request.get_json() or {}
     session_id = data.get("session_id", "").strip()
     if not session_id:
