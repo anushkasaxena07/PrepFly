@@ -274,8 +274,8 @@ supabase = SupabaseFallbackClient(SUPABASE_URL, SUPABASE_KEY)
 # ─── Email / SMTP ──────────────────────────────────────────────────────────────
 SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_EMAIL    = os.getenv("SMTP_EMAIL")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_EMAIL    = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
 
 # ─── Google OAuth ──────────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -301,18 +301,20 @@ except Exception as e_chat:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def send_email(to_email, subject, html_body):
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
+    sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
+    sender_password = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
+    if not sender_email or not sender_password:
         print("SMTP not configured – skipping email")
         return False
     try:
         msg = MIMEMultipart('alternative')
-        msg['From']    = SMTP_EMAIL
+        msg['From']    = f"PrepFly <{sender_email}>"
         msg['To']      = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.login(sender_email, sender_password)
             server.send_message(msg)
         return True
     except Exception as e:
