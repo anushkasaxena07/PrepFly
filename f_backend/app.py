@@ -4202,7 +4202,7 @@ def speech_analyze():
 
 @app.route("/api/history/<user_id>", methods=["GET"])
 @app.route("/history/<user_id>", methods=["GET"])
-def get_user_history(user_id):
+def get_user_history_by_id_endpoint(user_id):
     user_payload  = _get_optional_user()
     token_user_id = user_payload.get("sub") if user_payload else None
     token_email   = user_payload.get("email", "") if user_payload else ""
