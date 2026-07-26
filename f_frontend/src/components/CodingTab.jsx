@@ -425,12 +425,15 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const isEditingRef = useRef(false);
   const codeRef = useRef(code);
   const langRef = useRef(lang);
+  const consoleOutRef = useRef(consoleOut);
   const editDebounceRef = useRef(null);
   const syncIntervalRef = useRef(null);
 
   // Keep refs in sync with state
   useEffect(() => { codeRef.current = code; }, [code]);
   useEffect(() => { langRef.current = lang; }, [lang]);
+  useEffect(() => { consoleOutRef.current = consoleOut; }, [consoleOut]);
+
 
   // ── Reload & URL persistence: restore room from URL param or sessionStorage ──
   useEffect(() => {
@@ -551,8 +554,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         setRoomParticipants(data.participants || []);
         
         const timeSinceType = Date.now() - lastTypedRef.current;
-        // Update local editor ONLY if we aren't actively typing AND server code comes from another participant
-        if (data.current_code !== undefined && data.last_editor !== myUserId && timeSinceType > 600) {
+        // Update local editor if server code comes from another participant or differs
+        if (data.current_code !== undefined && data.last_editor !== myUserId && timeSinceType > 300) {
           if (data.current_code !== codeRef.current) {
             setCode(data.current_code);
             codeRef.current = data.current_code;
@@ -562,8 +565,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           setLang(data.current_lang);
           langRef.current = data.current_lang;
         }
-        if (data.current_output && data.current_output !== consoleOut) {
+        if (data.current_output && data.current_output !== consoleOutRef.current) {
           setConsoleOut(data.current_output);
+          consoleOutRef.current = data.current_output;
           setConsoleColor("var(--text2)");
         }
       }
@@ -583,25 +587,30 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       if (editDebounceRef.current) clearTimeout(editDebounceRef.current);
       editDebounceRef.current = setTimeout(() => {
         syncRoomState(true);
-      }, 250);
+      }, 200);
     }
   };
 
   // Push run output to room so all participants see it
   const pushOutputToRoom = async (outputText) => {
+    setConsoleOut(outputText);
+    consoleOutRef.current = outputText;
     if (!roomId) return;
     try {
+      const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user";
+      const myUserName = user?.name || localStorage.getItem("user_name") || "User";
       await apiFetch('/api/coding/room/sync', {
         method: 'POST',
         body: JSON.stringify({
           room_id: roomId,
-          user_id: user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "user",
-          user_name: user?.name || localStorage.getItem("user_name") || "User",
+          user_id: myUserId,
+          user_name: myUserName,
           output: outputText,
         })
       });
     } catch (_) {}
   };
+
 
   const getCursorPosition = () => {
     const area = document.getElementById("code-textarea");

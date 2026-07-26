@@ -3390,9 +3390,8 @@ def coding_room_sync():
             "participants": active_participants
         }
         
-        # Only update server code if the client explicitly edited code (is_editing=True)
-        # OR if server code is currently empty
-        if code is not None and (is_editing or not room.get("current_code")):
+        # Update server code whenever code is provided and differs from room code
+        if code is not None and code.strip():
             if code != room.get("current_code"):
                 update_data["current_code"] = code
                 update_data["last_editor"] = user_id
@@ -3400,6 +3399,7 @@ def coding_room_sync():
                 room["current_code"] = code
                 room["last_editor"] = user_id
                 room["last_editor_name"] = user_name
+
             
         if lang is not None and lang != room.get("current_lang"):
             update_data["current_lang"] = lang

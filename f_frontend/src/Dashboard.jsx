@@ -20,7 +20,25 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   // Navigation & panels active states
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get("room");
+      const tabParam = params.get("tab");
+      if (roomParam || tabParam === "coding" || sessionStorage.getItem("coding_room_id")) {
+        return "coding";
+      }
+      return tabParam || sessionStorage.getItem("active_tab") || "dashboard";
+    }
+    return "dashboard";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("active_tab", activeTab);
+    }
+  }, [activeTab]);
+
   const handleTabChange = (targetTab) => {
     if (activeTab === targetTab) return;
     if (activeTab === 'ava' || activeTab === 'interviews') {
@@ -29,6 +47,7 @@ export default function Dashboard() {
     }
     setActiveTab(targetTab);
   };
+
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
