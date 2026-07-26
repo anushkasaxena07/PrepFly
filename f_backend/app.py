@@ -1211,9 +1211,12 @@ SUMMARY: [2-3 sentences]"""
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/upload", methods=["POST"])
-@require_auth
 def upload_resume():
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
     file = None
+
     if "resume" in request.files:
         file = request.files["resume"]
     elif "file" in request.files:
@@ -1282,10 +1285,10 @@ def upload_resume():
 
 
 @app.route("/create-session-no-resume", methods=["POST"])
-@require_auth
 def create_session_no_resume():
+    user_payload = _get_optional_user()
     data       = request.get_json() or {}
-    user_id    = data.get("user_id")
+    user_id    = data.get("user_id") or (user_payload.get("sub") if user_payload else None) or (user_payload.get("email") if user_payload else None)
     role       = data.get("role", "").strip() or "Software Engineer"
     tools      = data.get("tools", "").strip() or "Algorithms, System Design, React, Python, SQL"
     experience = data.get("experience", "").strip() or "1-3 Years"
@@ -1332,8 +1335,11 @@ def get_candidate_name_for_session(session):
 
 
 @app.route("/start-interview", methods=["POST"])
-@require_auth
 def start_interview():
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
+
     data       = request.get_json() or {}
     session_id = data.get("session_id", "").strip()
     category   = data.get("category")
@@ -1530,8 +1536,10 @@ def get_interview_hint():
 
 
 @app.route("/get-session", methods=["GET"])
-@require_auth
 def get_session():
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
     session_id = request.args.get("session_id", "").strip()
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
@@ -1544,6 +1552,7 @@ def get_session():
         return jsonify(session), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/user-sessions", methods=["GET"])
