@@ -95,10 +95,36 @@ def add_cors_headers(response):
     origin = request.headers.get("Origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     return response
+
+@app.route("/<path:dummy>", methods=["OPTIONS"])
+@app.route("/", methods=["OPTIONS"])
+def handle_global_options(dummy=None):
+    origin = request.headers.get("Origin") or "*"
+    res = Response("", status=200)
+    res.headers["Access-Control-Allow-Origin"] = origin
+    res.headers["Access-Control-Allow-Credentials"] = "true"
+    res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
+    res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return res
+
+@app.errorhandler(Exception)
+def handle_global_exception(e):
+    origin = request.headers.get("Origin") or "*"
+    print(f"Global server error: {e}")
+    res = jsonify({"error": str(e)})
+    res.status_code = 500
+    res.headers["Access-Control-Allow-Origin"] = origin
+    res.headers["Access-Control-Allow-Credentials"] = "true"
+    res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
+    res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return res
+
 
 
 
@@ -358,6 +384,8 @@ def send_login_confirmation_email(email, name, login_time):
 # ══════════════════════════════════════════════════════════════════════════════
 #  OTP / AUTH HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
+
+pending_users_memory = {}
 
 def generate_otp() -> str:
     return ''.join(str(secrets.randbelow(10)) for _ in range(6))
@@ -730,12 +758,19 @@ def register():
         if not check_otp_rate_limit(email):
             return jsonify({"error": "Too many requests. Try again in 10 minutes."}), 429
 
-        # Store pending registration in a temp table
-        supabase.table("pending_users").delete().eq("email", email).execute()
-        supabase.table("pending_users").insert({
+        # Store pending registration in memory and temp table
+        pending_users_memory[email] = {
             "email": email, "name": name, "password": password,
             "created_at": datetime.utcnow().isoformat()
-        }).execute()
+        }
+        try:
+            supabase.table("pending_users").delete().eq("email", email).execute()
+            supabase.table("pending_users").insert({
+                "email": email, "name": name, "password": password,
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e_pending:
+            print("Pending user DB notice:", e_pending)
 
         otp = generate_otp()
         if not store_otp(email, otp, purpose="signup"):
@@ -766,11 +801,19 @@ def verify_signup_otp():
 
     try:
         # Fetch pending registration
-        pending = supabase.table("pending_users").select("*").eq("email", email).execute()
-        if not pending or not pending.data:
-            return jsonify({"error": "Signup session expired. Please register again."}), 400
+        p = None
+        try:
+            pending = supabase.table("pending_users").select("*").eq("email", email).execute()
+            if pending and pending.data:
+                p = pending.data[0]
+        except Exception:
+            pass
 
-        p = pending.data[0]
+        if not p and email in pending_users_memory:
+            p = pending_users_memory[email]
+
+        if not p:
+            return jsonify({"error": "Signup session expired. Please register again."}), 400
 
         # Create real user
         ins = supabase.table("users").insert({
@@ -783,7 +826,11 @@ def verify_signup_otp():
 
         user = ins.data[0]
         # Clean up pending row
-        supabase.table("pending_users").delete().eq("email", email).execute()
+        try:
+            supabase.table("pending_users").delete().eq("email", email).execute()
+        except Exception:
+            pass
+        pending_users_memory.pop(email, None)
 
         log_authentication(email, "signup_otp", True, get_client_ip())
         return jsonify({"message": "Account created successfully!", **user_response(user)}), 201

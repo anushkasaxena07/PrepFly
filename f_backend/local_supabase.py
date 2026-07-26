@@ -219,6 +219,17 @@ class SQLiteSupabaseMock:
                 pass
 
 
+        # 14. pending_users
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_users (
+                email TEXT PRIMARY KEY,
+                name TEXT,
+                password TEXT,
+                created_at TEXT
+            )
+        """)
+
+
         # 13. webrtc_rooms
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS webrtc_rooms (
