@@ -774,12 +774,11 @@ export default function Login() {
 
         {/* Terms */}
         {(screen === "login" || screen === "signup") && (
-          <p className="terms-text">
-            By continuing, you agree to our{" "}
-            <a href="#" className="terms-link">Terms</a> &amp;{" "}
-            <a href="#" className="terms-link">Privacy Policy</a>
+          <p className="legal">
+            By continuing, you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a>
           </p>
         )}
+
       </div>
     </div>
   );

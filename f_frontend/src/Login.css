@@ -310,11 +310,18 @@ h1 {
 .foot a:hover, .foot button:hover { text-decoration: underline; }
 
 .legal {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 11px;
   color: #5c6690;
+  white-space: nowrap;
+  text-align: center;
+  width: 100%;
 }
-.legal a { color: #8b93b5; text-decoration: underline; }
+.legal a {
+  color: #57c9f5;
+  text-decoration: underline;
+}
+
 
 /* Notification Message Box */
 .message-box {
