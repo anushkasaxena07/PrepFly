@@ -83,9 +83,11 @@ if frontend_url:
     allowed_origins.append(frontend_url)
 
 CORS(app, resources={r"/*": {
-    "origins": allowed_origins,
-    "supports_credentials": True
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["*"]
 }})
+
 
 # ─── Supabase Setup ────────────────────────────────────────────────────────────
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "https://atfozkznxxuehyjgqvvm.supabase.co/")
