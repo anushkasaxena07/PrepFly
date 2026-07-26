@@ -104,10 +104,12 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     const roomParam = params.get("room");
     if (roomParam) {
       setRoomCodeInput(roomParam.toUpperCase());
+      window.history.replaceState(null, "", window.location.pathname);
       setTimeout(() => {
         handleJoinRoom(roomParam);
-      }, 1000);
+      }, 500);
     }
+
     
     // Cleanup on unmount
     return () => {
@@ -791,9 +793,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
   // End call and auto-generate AI Report
   const handleEndCall = async () => {
+    window.history.replaceState(null, "", window.location.pathname);
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(t => t.stop());
     }
+
     setInCall(false);
     setIsScreenSharing(false);
     setRoomParticipants([]);
