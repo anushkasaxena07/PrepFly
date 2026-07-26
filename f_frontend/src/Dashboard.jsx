@@ -32,8 +32,15 @@ export default function Dashboard() {
   const [showProfile, setShowProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showLinkedIn, setShowLinkedIn] = useState(false);
-  const [user, setUser] = useState({ name: "Anushka", email: "saxenaanushka9645@gmail.com", avatar: "A", _id: "", role: "SUPER_ADMIN" });
-  const [settings, setSettings] = useState({ name: "Anushka", targetRole: "Super Admin Platform Lead", voiceEnabled: true, detailLevel: "High" });
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [settings, setSettings] = useState({ name: "User", targetRole: "Software Engineer", voiceEnabled: true, detailLevel: "High" });
   const [linkedInUrl, setLinkedInUrl] = useState(localStorage.getItem("linkedin_url") || "");
   const [linkedInSuccess, setLinkedInSuccess] = useState(false);
   const [showPracticeModal, setShowPracticeModal] = useState(false);
@@ -53,36 +60,25 @@ export default function Dashboard() {
     { id: 4, title: '🔥 7-day streak maintained!', desc: 'Keep going — you\'re on a roll. 3 more days for a badge.', time: 'Yesterday', type: 'dashboard', read: true },
   ]);
 
-  // Load user from localStorage
+  // Load user from localStorage on mount & redirect if unauthenticated
   useEffect(() => {
     try {
       const stored = localStorage.getItem("user");
-      if (stored) {
-        setUser(JSON.parse(stored));
+      const token = localStorage.getItem("access_token");
+      if (stored && token) {
+        const parsed = JSON.parse(stored);
+        setUser(parsed);
+        setSettings(s => ({ ...s, name: parsed.name || "User" }));
       } else {
-        let guestId = localStorage.getItem("guest_id");
-        let guestName = localStorage.getItem("guest_name");
-        if (!guestId) {
-          guestId = "guest_" + Math.random().toString(36).substring(2, 9);
-          guestName = "Guest_" + Math.floor(1000 + Math.random() * 9000);
-          localStorage.setItem("guest_id", guestId);
-          localStorage.setItem("guest_name", guestName);
-        }
-        const email = localStorage.getItem("email") || (guestId + "@prepfly.guest");
-        const user_id = localStorage.getItem("user_id") || guestId;
-        const name = localStorage.getItem("full_name") || guestName;
-        setUser({
-          name,
-          email,
-          avatar: name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0, 2),
-          _id: user_id,
-          role: "candidate"
-        });
+        // Unauthenticated direct link access — redirect to login landing page
+        navigate("/", { replace: true });
       }
     } catch (e) {
-      /* silent */
+      navigate("/", { replace: true });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   const [history, setHistory] = useState([]);
   const [userStats, setUserStats] = useState(null);

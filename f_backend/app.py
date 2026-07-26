@@ -631,7 +631,7 @@ def user_response(user: dict) -> dict:
 import functools
 
 def _get_jwt_secret():
-    return app.config.get("JWT_SECRET_KEY", os.getenv("JWT_SECRET_KEY", "super-secret-key-123"))
+    return app.config.get("JWT_SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "super-secret-key-123"
 
 def require_auth(f):
     """Route decorator: verifies Bearer JWT and attaches request.current_user payload."""
@@ -4461,11 +4461,11 @@ def get_admin_org_id():
         return org_header
         
     if auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
+        token = auth_header.split(" ", 1)[1]
         try:
-            payload = jwt.decode(token, app.config["JWT_SECRET_KEY"], algorithms=["HS256"])
-            if payload.get("role") == "Organization Admin" or "organization_id" in payload:
-                return payload.get("organization_id", "org_stanford_01")
+            payload = pyjwt.decode(token, _get_jwt_secret(), algorithms=["HS256"])
+            if payload.get("role") in ("ADMIN", "admin", "Organization Admin", "SUPER_ADMIN") or "organization_id" in payload:
+                return payload.get("organization_id") or "org_stanford_01"
         except Exception:
             pass
 
@@ -5016,6 +5016,7 @@ Candidate demonstrated strong proficiency in systems architecture, algorithm opt
 
 @app.route("/api/admin/coding/generate-test-cases", methods=["POST"], endpoint="admin_gen_tc_api")
 @app.route("/admin/coding/generate-test-cases", methods=["POST"], endpoint="admin_gen_tc_admin")
+@require_admin
 def admin_generate_coding_test_cases():
     data = request.get_json() or {}
     title = data.get("title", "Coding Challenge")

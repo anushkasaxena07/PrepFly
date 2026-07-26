@@ -1,204 +1,270 @@
 /* ═══════════════════════════════════════════════════════════════════
-   PrepFly Auth — Premium Redesign
+   PrepFly Auth — Premium Dark Glassmorphism Redesign
+   Matching Reference: Circular Logo Glow, Cosmic Gradient, Pill Buttons
    ═══════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── Root canvas ──────────────────────────────────────────────────── */
+/* ── Root Canvas ──────────────────────────────────────────────────── */
 .auth-root {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(ellipse 1100px 700px at 8%  -10%, rgba(99,102,241,.22) 0%, transparent 55%),
-    radial-gradient(ellipse  900px 600px at 95%  20%, rgba(20,184,166,.18) 0%, transparent 50%),
-    radial-gradient(ellipse  700px 500px at 50% 110%, rgba(139,92,246,.14) 0%, transparent 55%),
+    radial-gradient(ellipse 900px 600px at 50% 0%, rgba(47, 143, 255, 0.24) 0%, transparent 60%),
+    radial-gradient(ellipse 800px 600px at 95% 30%, rgba(123, 92, 250, 0.20) 0%, transparent 55%),
+    radial-gradient(ellipse 700px 500px at 10% 90%, rgba(53, 199, 240, 0.16) 0%, transparent 50%),
     #04050f;
   position: relative;
   overflow: hidden;
-  font-family: 'Inter', 'Cabinet Grotesk', sans-serif;
-  color: #e8ecf8;
-  padding: 32px 20px;
+  font-family: 'Inter', sans-serif;
+  color: #eef1fb;
+  padding: 40px 20px;
 }
 
-/* animated nebula orbs */
+/* Animated nebula orbs */
 .orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
+  filter: blur(85px);
   pointer-events: none;
   animation: orbDrift 18s ease-in-out infinite alternate;
 }
 .orb-1 {
   width: 520px; height: 520px;
   top: -120px; left: -120px;
-  background: radial-gradient(circle, rgba(99,102,241,.25), transparent 70%);
+  background: radial-gradient(circle, rgba(47, 143, 255, 0.25), transparent 70%);
   animation-delay: 0s;
 }
 .orb-2 {
   width: 440px; height: 440px;
   bottom: -80px; right: -80px;
-  background: radial-gradient(circle, rgba(20,184,166,.2), transparent 70%);
+  background: radial-gradient(circle, rgba(53, 199, 240, 0.22), transparent 70%);
   animation-delay: -6s;
 }
 .orb-3 {
   width: 300px; height: 300px;
   top: 40%; left: 60%;
-  background: radial-gradient(circle, rgba(168,85,247,.15), transparent 70%);
+  background: radial-gradient(circle, rgba(123, 92, 250, 0.18), transparent 70%);
   animation-delay: -12s;
 }
 @keyframes orbDrift {
-  0%   { transform: translate(0,0) scale(1); }
-  33%  { transform: translate(30px,-40px) scale(1.08); }
-  66%  { transform: translate(-20px,20px) scale(.95); }
-  100% { transform: translate(40px,10px) scale(1.04); }
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -40px) scale(1.08); }
+  66%  { transform: translate(-20px, 20px) scale(0.95); }
+  100% { transform: translate(40px, 10px) scale(1.04); }
 }
 
-/* subtle star grid */
+/* Subtle star grid */
 .auth-root::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,.35) 0%, transparent 100%),
-    radial-gradient(1px 1px at 30% 40%, rgba(255,255,255,.2)  0%, transparent 100%),
-    radial-gradient(1px 1px at 55% 20%, rgba(255,255,255,.3)  0%, transparent 100%),
-    radial-gradient(1px 1px at 75% 60%, rgba(255,255,255,.25) 0%, transparent 100%),
-    radial-gradient(1px 1px at 90% 35%, rgba(255,255,255,.2)  0%, transparent 100%),
-    radial-gradient(1px 1px at 20% 80%, rgba(255,255,255,.15) 0%, transparent 100%),
-    radial-gradient(1px 1px at 65% 85%, rgba(255,255,255,.2)  0%, transparent 100%);
+    radial-gradient(1px 1px at 10% 15%, rgba(255, 255, 255, 0.35) 0%, transparent 100%),
+    radial-gradient(1px 1px at 30% 40%, rgba(255, 255, 255, 0.2)  0%, transparent 100%),
+    radial-gradient(1px 1px at 55% 20%, rgba(255, 255, 255, 0.3)  0%, transparent 100%),
+    radial-gradient(1px 1px at 75% 60%, rgba(255, 255, 255, 0.25) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 35%, rgba(255, 255, 255, 0.2)  0%, transparent 100%),
+    radial-gradient(1px 1px at 20% 80%, rgba(255, 255, 255, 0.15) 0%, transparent 100%),
+    radial-gradient(1px 1px at 65% 85%, rgba(255, 255, 255, 0.2)  0%, transparent 100%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* ── Card ─────────────────────────────────────────────────────────── */
+/* ── Card Container ───────────────────────────────────────────────── */
 .auth-card {
-  background: rgba(8, 10, 22, 0.82);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
-  border: 1px solid rgba(255,255,255,.08);
-  border-top-color: rgba(255,255,255,.15);
-  border-radius: 24px;
-  padding: 36px 32px 30px;
-  width: 390px;
+  background: rgba(9, 12, 24, 0.85);
+  backdrop-filter: blur(36px) saturate(1.4);
+  -webkit-backdrop-filter: blur(36px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top-color: rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  padding: 40px 36px 32px;
+  width: 410px;
   max-width: 100%;
   position: relative;
   z-index: 10;
   box-shadow:
-    0 0  0 1px rgba(255,255,255,.04) inset,
-    0 32px 64px -12px rgba(0,0,0,.72),
-    0  8px 24px -4px rgba(0,0,0,.5);
-  animation: cardIn .55s cubic-bezier(.22,.68,0,1.2) both;
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 32px 64px -12px rgba(0, 0, 0, 0.8),
+    0 8px 30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: cardIn 0.55s cubic-bezier(0.22, 0.68, 0, 1.2) both;
 }
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(28px) scale(.97); }
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
   to   { opacity: 1; transform: none; }
 }
 
-/* thin prismatic top-border glow */
+/* Thin prismatic top-border glow */
 .auth-card::before {
   content: '';
   position: absolute;
   top: 0; left: 32px; right: 32px; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(139,92,246,.7) 35%, rgba(20,184,166,.7) 65%, transparent);
+  background: linear-gradient(90deg, transparent, rgba(53, 199, 240, 0.7) 35%, rgba(123, 92, 250, 0.7) 65%, transparent);
   border-radius: 0 0 4px 4px;
 }
 
-/* ── Brand ────────────────────────────────────────────────────────── */
-.brand {
+/* ── Brand Header (Centered Circle Logo) ─────────────────────────── */
+.brand-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.logo-circle-glow {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  position: relative;
+  margin: 0 auto 16px;
+  padding: 3px;
+  background: radial-gradient(circle, rgba(53, 199, 240, 0.5), rgba(47, 143, 255, 0.15) 70%);
+  box-shadow: 
+    0 0 35px rgba(47, 143, 255, 0.5),
+    0 0 15px rgba(53, 199, 240, 0.35);
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 26px;
+  justify-content: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.brand-icon {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #6366f1 0%, #14b8a6 100%);
-  display: flex; align-items: center; justify-content: center;
-  position: relative;
-  box-shadow: 0 4px 14px rgba(99,102,241,.45);
+.logo-circle-glow:hover {
+  transform: scale(1.03);
+  box-shadow: 
+    0 0 45px rgba(47, 143, 255, 0.65),
+    0 0 22px rgba(53, 199, 240, 0.45);
 }
-.brand-icon::after {
-  content: '';
-  position: absolute; inset: 0; border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255,255,255,.22), transparent 60%);
-}
-.brand-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.2; }
 
-.brand-name {
+.logo-circle-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.brand-title {
   font-family: 'Manrope', sans-serif;
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 900;
-  letter-spacing: -.5px;
-  background: linear-gradient(90deg, #a5b4fc 0%, #2dd4bf 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #ffffff;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+
+.brand-highlight {
+  color: #35c7f0;
+}
+
+.brand-tagline {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #4f5d88;
+  text-transform: uppercase;
+  margin: 0;
+  text-align: center;
 }
 
 /* ── Header ───────────────────────────────────────────────────────── */
-.auth-header { margin-bottom: 22px; }
+.auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+  width: 100%;
+}
 
 .auth-title {
   font-family: 'Manrope', sans-serif;
   font-size: 26px;
   font-weight: 800;
-  color: #f0f4ff;
+  color: #ffffff;
   margin: 0 0 6px;
-  letter-spacing: -.5px;
+  letter-spacing: -0.5px;
   line-height: 1.2;
 }
 
 .auth-subtitle {
   font-size: 13.5px;
-  color: #7c87b4;
+  color: #7b87b2;
   line-height: 1.45;
   margin: 0;
 }
-.auth-subtitle span { color: #5eead4; }
 
-/* ── Google button ────────────────────────────────────────────────── */
+/* ── Google Pill Button ───────────────────────────────────────────── */
 .google-btn {
   width: 100%;
-  padding: 11px 18px;
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 14px;
-  color: #d4d9f0;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  color: #e2e8f0;
   font-family: 'Inter', sans-serif;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
-  transition: background .18s, border-color .18s, transform .15s, box-shadow .18s;
-  letter-spacing: .01em;
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
 }
 .google-btn:hover:not(:disabled) {
-  background: rgba(255,255,255,.08);
-  border-color: rgba(255,255,255,.2);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(53, 199, 240, 0.35);
+  box-shadow: 0 0 20px rgba(53, 199, 240, 0.15);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0,0,0,.3);
 }
 .google-btn:active:not(:disabled) { transform: translateY(0); }
-.google-btn:disabled { opacity: .6; cursor: not-allowed; }
+.google-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .google-icon { flex-shrink: 0; }
 
 /* ── Divider ──────────────────────────────────────────────────────── */
-.divider { display: flex; align-items: center; margin: 20px 0; }
-.divider-line { flex: 1; height: 1px; background: rgba(255,255,255,.08); }
-.divider-text { padding: 0 14px; font-size: 11.5px; color: #4a5580; letter-spacing: .08em; text-transform: uppercase; }
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 22px 0;
+  width: 100%;
+}
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.divider-text {
+  padding: 0 16px;
+  font-size: 11px;
+  color: #4a5580;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
 
-/* ── Fields ───────────────────────────────────────────────────────── */
-.auth-form { display: flex; flex-direction: column; }
+/* ── Form & Fields ────────────────────────────────────────────────── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 
-.field-group { margin-bottom: 18px; position: relative; }
+.field-group {
+  margin-bottom: 20px;
+  position: relative;
+}
 
 .field-label-row {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
@@ -208,24 +274,25 @@
   font-weight: 700;
   color: #6c78a8;
   text-transform: uppercase;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   margin-bottom: 8px;
 }
 .field-label-row .field-label { margin-bottom: 0; }
 
 .field-wrap {
   position: relative;
-  display: flex; align-items: center;
+  display: flex;
+  align-items: center;
   width: 100%;
   border-radius: 12px;
-  background: rgba(255,255,255,.035);
-  border: 1px solid rgba(255,255,255,.08);
-  transition: border-color .2s, background .2s, box-shadow .2s;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
 }
 .field-wrap:focus-within {
-  border-color: rgba(99,102,241,.5);
-  background: rgba(99,102,241,.06);
-  box-shadow: 0 0 0 3px rgba(99,102,241,.12), 0 4px 14px rgba(0,0,0,.25);
+  border-color: rgba(53, 199, 240, 0.6);
+  background: rgba(53, 199, 240, 0.05);
+  box-shadow: 0 0 0 3px rgba(53, 199, 240, 0.12);
 }
 
 .field-input {
@@ -233,27 +300,29 @@
   background: transparent;
   border: none;
   outline: none;
-  padding: 11px 14px 11px 40px;
-  color: #e8ecf8;
+  padding: 12px 14px 12px 40px;
+  color: #eef1fb;
   font-family: 'Inter', sans-serif;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1;
 }
 .field-input::placeholder { color: #3d4668; }
 .field-input:-webkit-autofill,
 .field-input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px rgba(8,10,22,.9) inset !important;
-  -webkit-text-fill-color: #e8ecf8 !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(9, 12, 24, 0.9) inset !important;
+  -webkit-text-fill-color: #eef1fb !important;
 }
 
 .field-icon {
-  position: absolute; left: 13px;
+  position: absolute;
+  left: 14px;
   color: #4a5580;
   pointer-events: none;
-  display: flex; align-items: center;
-  transition: color .2s;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
 }
-.field-wrap:focus-within .field-icon { color: #818cf8; }
+.field-wrap:focus-within .field-icon { color: #35c7f0; }
 
 .eye-btn {
   position: absolute; right: 12px;
@@ -262,67 +331,67 @@
   display: flex; align-items: center;
   padding: 4px;
   border-radius: 6px;
-  transition: color .15s, background .15s;
+  transition: color 0.15s, background 0.15s;
 }
-.eye-btn:hover { color: #a5b4fc; background: rgba(255,255,255,.06); }
+.eye-btn:hover { color: #35c7f0; background: rgba(255, 255, 255, 0.06); }
 
-/* ── Forgot link ──────────────────────────────────────────────────── */
-.forgot-link {
-  background: none; border: none;
-  color: #5eead4; font-size: 12px; font-weight: 600;
-  cursor: pointer; font-family: inherit;
-  transition: color .15s;
+/* ── Forgot & Toggle Links ────────────────────────────────────────── */
+.forgot-link, .toggle-btn {
+  background: none;
+  border: none;
+  color: #35c7f0;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s;
   padding: 0;
 }
-.forgot-link:hover { color: #99f6e4; text-decoration: underline; }
+.forgot-link:hover, .toggle-btn:hover {
+  color: #70dcff;
+  text-decoration: underline;
+}
 
-/* ── Submit button ────────────────────────────────────────────────── */
+/* ── Submit Pill Button ───────────────────────────────────────────── */
 .submit-btn {
   width: 100%;
-  margin-top: 6px;
-  padding: 13px;
-  background: linear-gradient(90deg, #6366f1 0%, #14b8a6 100%);
+  margin-top: 8px;
+  padding: 13.5px 24px;
+  background: linear-gradient(90deg, #35c7f0 0%, #2f8fff 45%, #7b5cfa 100%);
   border: none;
-  border-radius: 14px;
-  color: #fff;
+  border-radius: 9999px;
+  color: #ffffff;
   font-family: 'Manrope', sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: .02em;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  position: relative;
-  overflow: hidden;
-  transition: opacity .2s, transform .18s, box-shadow .2s;
-  box-shadow: 0 6px 24px -4px rgba(99,102,241,.5), 0 2px 8px rgba(0,0,0,.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 8px 28px rgba(53, 199, 240, 0.35);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.submit-btn::before {
-  content: '';
-  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
-  transform: skewX(-15deg);
-  transition: left .5s ease;
-}
-.submit-btn:hover:not(:disabled)::before { left: 140%; }
 .submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px -4px rgba(99,102,241,.6), 0 4px 12px rgba(0,0,0,.35);
+  box-shadow: 0 12px 35px rgba(53, 199, 240, 0.5);
 }
 .submit-btn:active:not(:disabled) { transform: translateY(0); }
-.submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Spinner ──────────────────────────────────────────────────────── */
 .spinner {
   display: inline-block;
   width: 16px; height: 16px;
-  border: 2.5px solid rgba(255,255,255,.3);
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
-  animation: spin .7s linear infinite;
+  animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Message box ──────────────────────────────────────────────────── */
+/* ── Message Box ──────────────────────────────────────────────────── */
 .message-box {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px;
@@ -330,72 +399,51 @@
   font-size: 12.5px;
   margin-bottom: 16px;
   line-height: 1.4;
-  animation: msgIn .25s ease both;
+  width: 100%;
+  animation: msgIn 0.25s ease both;
 }
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: none; }
 }
 .message-error {
-  background: rgba(239,68,68,.1);
-  border: 1px solid rgba(239,68,68,.2);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
   color: #fca5a5;
 }
 .message-success {
-  background: rgba(20,184,166,.1);
-  border: 1px solid rgba(20,184,166,.2);
-  color: #5eead4;
+  background: rgba(53, 199, 240, 0.1);
+  border: 1px solid rgba(53, 199, 240, 0.2);
+  color: #35c7f0;
 }
 
-/* ── Toggle / footer links ────────────────────────────────────────── */
+/* ── Footer Links ─────────────────────────────────────────────────── */
 .toggle-text {
   text-align: center;
   font-size: 13px;
   color: #6c78a8;
   margin-top: 18px;
+  width: 100%;
 }
-.toggle-btn {
-  background: none; border: none;
-  color: #818cf8;
-  font-weight: 700; cursor: pointer;
-  padding: 0; font-family: inherit; font-size: inherit;
-  margin-left: 4px;
-  transition: color .15s;
-}
-.toggle-btn:hover { color: #a5b4fc; text-decoration: underline; }
 
 .terms-text {
   text-align: center;
   font-size: 11px;
   color: #3d4668;
-  margin-top: 18px;
+  margin-top: 20px;
   line-height: 1.5;
+  width: 100%;
 }
 .terms-link {
   color: #4a5580;
   text-decoration: underline;
-  transition: color .15s;
+  transition: color 0.15s;
 }
-.terms-link:hover { color: #818cf8; }
-
-/* ── OTP + Email sent badge ───────────────────────────────────────── */
-/* OTP large digit input inherits field-input with inline style override */
-
-/* ── Resend button ────────────────────────────────────────────────── */
-/* targets inline style — no extra class needed, already styled inline */
-
-/* ── Auth link (generic) ──────────────────────────────────────────── */
-.auth-link, .auth-link:visited {
-  color: #818cf8; font-weight: 700; cursor: pointer;
-  background: none; border: none; padding: 0;
-  font-family: inherit; font-size: inherit; margin-left: 4px;
-  text-decoration: none;
-  transition: color .15s;
-}
-.auth-link:hover { color: #a5b4fc; text-decoration: underline; }
+.terms-link:hover { color: #35c7f0; }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
-@media (max-width: 420px) {
-  .auth-card { padding: 28px 20px 24px; border-radius: 20px; }
+@media (max-width: 440px) {
+  .auth-card { padding: 32px 24px 24px; border-radius: 22px; }
   .auth-title { font-size: 22px; }
+  .logo-circle-glow { width: 84px; height: 84px; }
 }

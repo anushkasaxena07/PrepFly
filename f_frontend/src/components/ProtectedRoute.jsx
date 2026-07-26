@@ -18,22 +18,26 @@ function getStoredUser() {
 }
 
 function hasValidToken(key = 'access_token') {
-  const token = localStorage.getItem(key);
+  const token = localStorage.getItem(key) || localStorage.getItem('access_token');
   if (!token) return false;
-  // Basic JWT expiry check (middle payload segment)
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const parts = token.split('.');
+    if (parts.length !== 3) return false; // Must be valid 3-part JWT
+    const payload = JSON.parse(atob(parts[1]));
     if (payload.exp && Date.now() / 1000 > payload.exp) {
-      // Token expired — clear it so the user is redirected to login
+      // Token expired — clear stale keys
       localStorage.removeItem(key);
+      localStorage.removeItem('access_token');
       localStorage.removeItem('user');
       return false;
     }
+    return true;
   } catch {
-    // Not a JWT or can't decode — treat as valid (backend will reject if expired)
+    // Malformed token — reject access
+    return false;
   }
-  return true;
 }
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ProtectedRoute — any authenticated user (student / candidate)

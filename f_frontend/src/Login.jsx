@@ -410,7 +410,7 @@ export default function Login() {
 
   /* ── screen meta ── */
   const screenMeta = {
-    login:            { title: "Welcome Back",           sub: "Sign in to continue your journey" },
+    login:            { title: "Welcome back",           sub: "Sign in to continue your growth" },
     signup:           { title: "Create account",         sub: "Start building something great today" },
     "login-otp":      { title: "Check your email",       sub: "Enter the code we just sent you" },
     "signup-otp":     { title: "Verify your email",      sub: "One last step to activate your account" },
@@ -429,26 +429,36 @@ export default function Login() {
       <div className="orb orb-3" />
 
       <div className="auth-card">
-        {/* Brand */}
-        <div className="brand" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 14px rgba(99,102,241,0.5)' }} />
-          <div>
-            <span className="brand-name" style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.5px', display: 'block' }}>
-              Prep<span style={{ background: 'linear-gradient(90deg,#2dd4bf,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Fly</span>
-            </span>
-            {(screen === 'login' || screen === 'signup') && (
-              <span style={{ fontSize: 9, letterSpacing: '2.4px', color: '#3d4668', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginTop: 1 }}>
-                Practice · Prepare · <span style={{ color: '#5eead4' }}>Fly</span>
-              </span>
-            )}
+        {/* Brand Header with Glowing Circle Logo */}
+        <div className="brand-header">
+          <div className="logo-circle-glow">
+            <img 
+              src="/prepfly-logo.jpg" 
+              alt="PrepFly Logo" 
+              className="logo-circle-img"
+              onError={(e) => { e.target.src = "/prepfly-logo.png"; }}
+            />
           </div>
+          <h1 className="brand-title">
+            Prep<span className="brand-highlight">Fly</span>
+          </h1>
+          <p className="brand-tagline">
+            P R A C T I C E &nbsp;.&nbsp; P R E P A R E &nbsp;.&nbsp; <span style={{ color: '#35c7f0' }}>F L Y</span>
+          </p>
         </div>
 
         {/* Header */}
         <div className="auth-header">
-          <h1 className="auth-title">{title}</h1>
-          <p className="auth-subtitle">{sub}</p>
+          <h2 className="auth-title">{title}</h2>
+          <p className="auth-subtitle">
+            {screen === 'login' ? (
+              <>Sign in to continue your <span style={{ color: '#35c7f0', fontWeight: 600 }}>growth</span></>
+            ) : screen === 'signup' ? (
+              <>Start your journey to tech <span style={{ color: '#35c7f0', fontWeight: 600 }}>mastery</span></>
+            ) : sub}
+          </p>
         </div>
+
 
         {/* Google btn – only on login / signup screens */}
         {(screen === "login" || screen === "signup") && (
@@ -522,7 +532,9 @@ export default function Login() {
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
-              {isLoading ? <span className="spinner" /> : "Sign In"}
+              {isLoading ? <span className="spinner" /> : (
+                <>Sign in <span style={{ fontSize: "16px", marginLeft: "4px" }}>→</span></>
+              )}
             </button>
 
             <p style={{textAlign:"center",fontSize:"13px",color:"var(--text-secondary)",marginTop:"4px"}}>

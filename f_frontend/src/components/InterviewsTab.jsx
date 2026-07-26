@@ -49,8 +49,13 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const localVideoRef = useRef(null);
   const mediaStreamRef = useRef(null);
 
-  const userId = user?._id || user?.id || "user_guest";
-  const userName = user?.full_name || user?.name || "Candidate";
+  // Unique per-tab session token to prevent collision when testing on multiple tabs
+  const tabTokenRef = useRef(sessionStorage.getItem("webrtc_tab_token") || Math.random().toString(36).substring(2, 7));
+  useEffect(() => { sessionStorage.setItem("webrtc_tab_token", tabTokenRef.current); }, []);
+
+  const userId = (user?._id || user?.id || localStorage.getItem("user_id") || "usr") + "_" + tabTokenRef.current;
+  const userName = user?.full_name || user?.name || localStorage.getItem("user_name") || localStorage.getItem("email")?.split('@')[0] || "Candidate";
+
 
   // WebRTC Live video room states and refs
   const [roomParticipants, setRoomParticipants] = useState([]);
@@ -413,15 +418,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      console.log("Remote Stream Received: track kind =", event.track.kind, "| enabled:", event.track.enabled, "| readyState:", event.track.readyState);
+      console.log("Remote Stream Track Received: kind =", event.track.kind, "| id =", event.track.id);
 
-      // Add incoming tracks directly to the shared remoteStreamInstance.
-      // Do NOT clone with new MediaStream() — the video element's srcObject
-      // must point to the same object we keep adding tracks into.
       const incomingStream = event.streams[0];
       if (incomingStream) {
         incomingStream.getTracks().forEach(track => {
-          // Avoid duplicate tracks (ontrack can fire multiple times)
           if (!remoteStreamInstance.getTracks().find(t => t.id === track.id)) {
             remoteStreamInstance.addTrack(track);
           }
@@ -432,16 +433,16 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         }
       }
 
-      // Attach srcObject once (or re-attach if the element just mounted)
-      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== remoteStreamInstance) {
-        console.log("Attaching remoteStreamInstance to video element");
-        remoteVideoRef.current.srcObject = remoteStreamInstance;
-        remoteVideoRef.current.play().catch(() => {});
-      }
+      // Create a fresh MediaStream wrapper so React state reference changes and triggers UI re-render
+      const newStreamWrapper = new MediaStream(remoteStreamInstance.getTracks());
+      setRemoteStream(newStreamWrapper);
 
-      // Trigger React state update so the display:none guard re-evaluates
-      setRemoteStream(remoteStreamInstance);
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = newStreamWrapper;
+        remoteVideoRef.current.play().catch(e => console.warn("Video play notice:", e));
+      }
     };
+
 
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRoom) {
