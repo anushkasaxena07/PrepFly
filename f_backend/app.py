@@ -286,10 +286,14 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # ─── Gemini / LangChain ────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-chat_model = ChatGoogleGenerativeAI(
-    api_key=GEMINI_API_KEY, model="gemini-3.5-flash", temperature=0.6
-)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "AIzaSyBYSdXjmLnimrFY7ujWfRDIwyk_8cm9Ywo"
+try:
+    chat_model = ChatGoogleGenerativeAI(
+        api_key=GEMINI_API_KEY, model="gemini-1.5-flash", temperature=0.6
+    )
+except Exception as e_chat:
+    print("Warning: ChatGoogleGenerativeAI startup init notice:", e_chat)
+    chat_model = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
