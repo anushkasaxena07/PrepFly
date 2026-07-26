@@ -652,6 +652,20 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated
 
+def _get_optional_user():
+    """Helper to extract user payload from Bearer JWT if present, without enforcing authentication."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        if token and token != "null" and token != "undefined":
+            try:
+                import jwt as pyjwt
+                return pyjwt.decode(token, _get_jwt_secret(), algorithms=["HS256"])
+            except Exception:
+                pass
+    return None
+
+
 def require_admin(f):
     """Route decorator: verifies Bearer JWT + ADMIN or SUPER_ADMIN role."""
     @functools.wraps(f)
@@ -1884,26 +1898,41 @@ def session_report(session_id):
 
 
 @app.route("/history/<user_id>", methods=["GET"])
-@require_auth
 def get_user_history(user_id):
-    token_user_id = request.current_user.get("sub")
-    token_email   = request.current_user.get("email", "")
-    token_role    = request.current_user.get("role", "")
+    user_payload  = _get_optional_user()
+    token_user_id = user_payload.get("sub") if user_payload else None
+    token_email   = user_payload.get("email", "") if user_payload else ""
+    token_role    = user_payload.get("role", "") if user_payload else ""
     
     # Resolve target user_id for history retrieval
-    if user_id in ("me", "current", "self") or user_id == token_user_id or user_id == token_email:
+    if user_id in ("me", "current", "self"):
+        if not token_user_id:
+            return jsonify([]), 200
         target_id = token_user_id
     elif token_role in ("ADMIN", "SUPER_ADMIN"):
         target_id = user_id
     else:
-        target_id = token_user_id
+        target_id = token_user_id or user_id
 
     try:
-        # Fetch sessions by target_id or token_email for maximum resilience
-        res = supabase.table("sessions").select("*") \
-            .or_(f"user_id.eq.{target_id},email.eq.{token_email}").order("created_at", desc=True).execute()
+        # Build flexible OR conditions
+        or_conds = []
+        if target_id:
+            or_conds.append(f"user_id.eq.{target_id}")
+        if token_email:
+            or_conds.append(f"email.eq.{token_email}")
+        if user_id and user_id not in ("me", "current", "self"):
+            or_conds.append(f"user_id.eq.{user_id}")
+
+        if or_conds:
+            filter_str = ",".join(list(set(or_conds)))
+            res = supabase.table("sessions").select("*") \
+                .or_(filter_str).order("created_at", desc=True).execute()
+        else:
+            res = supabase.table("sessions").select("*").order("created_at", desc=True).execute()
         
         sessions = res.data or []
+
 
         
         for session in sessions:
@@ -3262,11 +3291,20 @@ def coding_room_sync():
         now = datetime.utcnow()
         
         for p in participants:
-            p_time = datetime.fromisoformat(p["last_seen"].replace('Z', '+00:00'))
-            now_aware = now.replace(tzinfo=p_time.tzinfo)
-            is_active = (now_aware - p_time).total_seconds() < 10
-            
-            if p["user_id"] == user_id:
+            if not isinstance(p, dict):
+                continue
+            last_seen_val = p.get("last_seen")
+            is_active = True
+            if last_seen_val:
+                try:
+                    p_time = datetime.fromisoformat(str(last_seen_val).replace('Z', '+00:00'))
+                    now_aware = now.replace(tzinfo=p_time.tzinfo)
+                    is_active = (now_aware - p_time).total_seconds() < 15
+                except Exception:
+                    is_active = True
+
+            p_id = p.get("user_id", "")
+            if p_id == user_id:
                 p["last_seen"] = now.isoformat()
                 p["name"] = user_name
                 if cursor is not None:
@@ -3275,6 +3313,7 @@ def coding_room_sync():
                 
             p["active"] = is_active
             active_participants.append(p)
+
             
         update_data = {
             "participants": active_participants
@@ -4030,18 +4069,39 @@ def speech_analyze():
 
 @app.route("/api/user-stats/<user_id>", methods=["GET"])
 @app.route("/user-stats/<user_id>", methods=["GET"])
-@require_auth
 def get_user_stats(user_id):
-    token_user_id = request.current_user.get("sub")
-    token_email   = request.current_user.get("email", "")
-    token_role    = request.current_user.get("role", "")
+    user_payload  = _get_optional_user()
+    token_user_id = user_payload.get("sub") if user_payload else None
+    token_email   = user_payload.get("email", "") if user_payload else ""
+    token_role    = user_payload.get("role", "") if user_payload else ""
 
-    if user_id in ("me", "current", "self") or user_id == token_user_id or user_id == token_email:
+    if user_id in ("me", "current", "self"):
+        if not token_user_id:
+            return jsonify({
+                "interviews": {"total": 0, "avg_score": 0.0},
+                "coding": {"accuracy": 0, "total": 0},
+                "speech": {"confidence": 0, "total": 0},
+                "resume": {"latest_score": 0, "avg_score": 0.0},
+                "has_data": False,
+                "streak": 0,
+                "grade_distribution": {"S": 0, "A": 0, "B": 0, "C": 0, "D": 0}
+            }), 200
         target_id = token_user_id
     elif token_role in ("ADMIN", "SUPER_ADMIN"):
         target_id = user_id
     else:
         target_id = token_user_id or user_id
+
+    or_conds = []
+    if target_id:
+        or_conds.append(f"user_id.eq.{target_id}")
+    if token_email:
+        or_conds.append(f"email.eq.{token_email}")
+        or_conds.append(f"user_id.eq.{token_email}")
+    if user_id and user_id not in ("me", "current", "self"):
+        or_conds.append(f"user_id.eq.{user_id}")
+    
+    filter_str = ",".join(list(set(or_conds))) if or_conds else ""
 
     interviews = []
     coding = []
@@ -4050,35 +4110,48 @@ def get_user_stats(user_id):
 
     # 1. Fetch completed mock interviews
     try:
-        interviews_res = supabase.table("sessions").select("*") \
-            .or_(f"user_id.eq.{target_id},email.eq.{token_email}").order("created_at", desc=True).execute()
+        if filter_str:
+            interviews_res = supabase.table("sessions").select("*") \
+                .or_(filter_str).order("created_at", desc=True).execute()
+        else:
+            interviews_res = supabase.table("sessions").select("*").order("created_at", desc=True).execute()
         interviews = [i for i in (interviews_res.data or []) if not i.get("active")]
     except Exception as e:
         print("Fetch interviews stats notice:", e)
 
     # 2. Fetch coding submissions
     try:
-        coding_res = supabase.table("coding_submissions").select("*") \
-            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
+        if filter_str:
+            coding_res = supabase.table("coding_submissions").select("*") \
+                .or_(filter_str).order("created_at", desc=True).execute()
+        else:
+            coding_res = supabase.table("coding_submissions").select("*").order("created_at", desc=True).execute()
         coding = coding_res.data or []
     except Exception as e:
         print("Fetch coding stats notice:", e)
 
     # 3. Fetch speech analyses
     try:
-        speech_res = supabase.table("speech_analyses").select("*") \
-            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
+        if filter_str:
+            speech_res = supabase.table("speech_analyses").select("*") \
+                .or_(filter_str).order("created_at", desc=True).execute()
+        else:
+            speech_res = supabase.table("speech_analyses").select("*").order("created_at", desc=True).execute()
         speech = speech_res.data or []
     except Exception as e:
         print("Fetch speech stats notice:", e)
 
     # 4. Fetch resume scores
     try:
-        resume_res = supabase.table("resume_scores").select("*") \
-            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
+        if filter_str:
+            resume_res = supabase.table("resume_scores").select("*") \
+                .or_(filter_str).order("created_at", desc=True).execute()
+        else:
+            resume_res = supabase.table("resume_scores").select("*").order("created_at", desc=True).execute()
         resumes = resume_res.data or []
     except Exception as e:
         print("Fetch resume stats notice:", e)
+
 
 
         # -- Calculations --
