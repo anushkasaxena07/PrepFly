@@ -86,44 +86,55 @@ export default function Dashboard() {
 
   useEffect(() => {
     const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
-    if (targetUserId) {
-      const fetchData = async () => {
-        try {
-          const histRes = await apiFetch(`/history/${targetUserId}`);
-          if (histRes.ok) {
-            const histData = await histRes.json();
-            setHistory(histData || []);
+    const fetchData = async () => {
+      try {
+        const histRes = await apiFetch(`/history/me`);
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          setHistory(histData || []);
+        } else if (targetUserId) {
+          const fbRes = await apiFetch(`/history/${targetUserId}`);
+          if (fbRes.ok) {
+            const fbData = await fbRes.json();
+            setHistory(fbData || []);
           }
-        } catch (e) {
-          console.error("Failed to fetch user history:", e);
         }
+      } catch (e) {
+        console.error("Failed to fetch user history:", e);
+      }
 
-        try {
-          const statsRes = await apiFetch(`/user-stats/${targetUserId}`);
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            setUserStats(statsData);
+      try {
+        const statsRes = await apiFetch(`/user-stats/me`);
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setUserStats(statsData);
+        } else if (targetUserId) {
+          const fbStatsRes = await apiFetch(`/user-stats/${targetUserId}`);
+          if (fbStatsRes.ok) {
+            const fbStatsData = await fbStatsRes.json();
+            setUserStats(fbStatsData);
           }
-        } catch (e) {
-          console.error("Failed to fetch user stats:", e);
         }
+      } catch (e) {
+        console.error("Failed to fetch user stats:", e);
+      }
 
-        try {
-          const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "org_stanford_01";
-          const notifRes = await apiFetch(`/notifications?user_id=${targetUserId}&org_id=${orgId}`);
-          if (notifRes.ok) {
-            const notifData = await notifRes.json();
-            if (notifData && notifData.length > 0) {
-              setNotifications(notifData);
-            }
+      try {
+        const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "org_stanford_01";
+        const notifRes = await apiFetch(`/notifications?user_id=${targetUserId || 'me'}&org_id=${orgId}`);
+        if (notifRes.ok) {
+          const notifData = await notifRes.json();
+          if (notifData && notifData.length > 0) {
+            setNotifications(notifData);
           }
-        } catch (e) {
-          console.error("Failed to fetch live notifications:", e);
         }
-      };
-      fetchData();
-    }
+      } catch (e) {
+        console.error("Failed to fetch live notifications:", e);
+      }
+    };
+    fetchData();
   }, [user?._id, user?.email, activeTab]);
+
 
   // Click outside to close panels
   useEffect(() => {

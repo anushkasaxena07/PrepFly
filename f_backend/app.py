@@ -1886,18 +1886,25 @@ def session_report(session_id):
 @app.route("/history/<user_id>", methods=["GET"])
 @require_auth
 def get_user_history(user_id):
-    # IDOR protection: users can only read their own history
     token_user_id = request.current_user.get("sub")
+    token_email   = request.current_user.get("email", "")
     token_role    = request.current_user.get("role", "")
-    if user_id != token_user_id and token_role not in ("ADMIN", "SUPER_ADMIN"):
-        return jsonify({"error": "Forbidden"}), 403
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    
+    # Resolve target user_id for history retrieval
+    if user_id in ("me", "current", "self") or user_id == token_user_id or user_id == token_email:
+        target_id = token_user_id
+    elif token_role in ("ADMIN", "SUPER_ADMIN"):
+        target_id = user_id
+    else:
+        target_id = token_user_id
+
     try:
+        # Fetch sessions by target_id or token_email for maximum resilience
         res = supabase.table("sessions").select("*") \
-            .eq("user_id", user_id).order("created_at", desc=True).execute()
+            .or_(f"user_id.eq.{target_id},email.eq.{token_email}").order("created_at", desc=True).execute()
         
         sessions = res.data or []
+
         
         for session in sessions:
             feedbacks = session.get("feedbacks") or []
@@ -4023,30 +4030,56 @@ def speech_analyze():
 
 @app.route("/api/user-stats/<user_id>", methods=["GET"])
 @app.route("/user-stats/<user_id>", methods=["GET"])
+@require_auth
 def get_user_stats(user_id):
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    token_user_id = request.current_user.get("sub")
+    token_email   = request.current_user.get("email", "")
+    token_role    = request.current_user.get("role", "")
 
+    if user_id in ("me", "current", "self") or user_id == token_user_id or user_id == token_email:
+        target_id = token_user_id
+    elif token_role in ("ADMIN", "SUPER_ADMIN"):
+        target_id = user_id
+    else:
+        target_id = token_user_id or user_id
+
+    interviews = []
+    coding = []
+    speech = []
+    resumes = []
+
+    # 1. Fetch completed mock interviews
     try:
-        # 1. Fetch completed mock interviews
         interviews_res = supabase.table("sessions").select("*") \
-            .eq("user_id", user_id).eq("active", False).order("created_at", desc=True).execute()
-        interviews = interviews_res.data or []
+            .or_(f"user_id.eq.{target_id},email.eq.{token_email}").order("created_at", desc=True).execute()
+        interviews = [i for i in (interviews_res.data or []) if not i.get("active")]
+    except Exception as e:
+        print("Fetch interviews stats notice:", e)
 
-        # 2. Fetch coding submissions
+    # 2. Fetch coding submissions
+    try:
         coding_res = supabase.table("coding_submissions").select("*") \
-            .eq("user_id", user_id).order("created_at", desc=True).execute()
+            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
         coding = coding_res.data or []
+    except Exception as e:
+        print("Fetch coding stats notice:", e)
 
-        # 3. Fetch speech analyses
+    # 3. Fetch speech analyses
+    try:
         speech_res = supabase.table("speech_analyses").select("*") \
-            .eq("user_id", user_id).order("created_at", desc=True).execute()
+            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
         speech = speech_res.data or []
+    except Exception as e:
+        print("Fetch speech stats notice:", e)
 
-        # 4. Fetch resume scores
+    # 4. Fetch resume scores
+    try:
         resume_res = supabase.table("resume_scores").select("*") \
-            .eq("user_id", user_id).order("created_at", desc=True).execute()
+            .or_(f"user_id.eq.{target_id},user_id.eq.{token_email}").order("created_at", desc=True).execute()
         resumes = resume_res.data or []
+    except Exception as e:
+        print("Fetch resume stats notice:", e)
+
 
         # -- Calculations --
         # Interviews
