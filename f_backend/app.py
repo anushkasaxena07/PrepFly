@@ -1867,7 +1867,51 @@ def end_interview():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/session-report/<session_id>", methods=["GET"])
+@app.route("/session-report/<session_id>", methods=["GET"])
+def get_session_report(session_id):
+    try:
+        res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+        if not res or not res.data:
+            return jsonify({"error": "Session report not found"}), 404
+        
+        session = res.data[0]
+        final_report = session.get("final_report") or ""
+        report_json = session.get("report_json") or {}
+        
+        parsed_report = {}
+        if isinstance(report_json, dict) and report_json:
+            parsed_report = report_json
+        elif isinstance(final_report, str) and final_report.startswith("{"):
+            try:
+                parsed_report = json.loads(final_report)
+            except Exception:
+                parsed_report = {}
+
+        response_data = {
+            "session_id": session.get("session_id"),
+            "final_report": final_report if isinstance(final_report, str) else json.dumps(final_report),
+            "report_json": report_json,
+            "overall_score": session.get("final_score") or 0.0,
+            "overall_score_100": session.get("final_score_100") or 0,
+            "grade": session.get("final_grade") or "N/A",
+            "overall_grade": session.get("final_grade") or "N/A",
+            "grade_label": session.get("grade_label") or "",
+            "grade_color": session.get("grade_color") or "",
+            "hiring_recommendation": session.get("hiring_recommendation") or "",
+            "performance_level": session.get("performance_level") or ""
+        }
+        if isinstance(parsed_report, dict):
+            response_data.update(parsed_report)
+            
+        return jsonify(response_data), 200
+    except Exception as e:
+        print(f"Get session report error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/save-recording", methods=["POST"])
+
 def save_recording():
     try:
         # Check if multipart form data file upload
