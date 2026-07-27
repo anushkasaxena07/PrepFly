@@ -3339,17 +3339,36 @@ def coding_room_create():
             {"user_id": user_id, "name": user_name, "role": "interviewer", "last_seen": datetime.utcnow().isoformat()}
         ]
         
-        supabase.table("coding_rooms").insert({
+        room_data = {
             "room_id": room_id,
             "problem_id": selected_problem["problem_id"],
+            "problem": selected_problem,
             "created_by": user_id,
             "current_code": starter_code,
             "current_lang": "python",
+            "current_output": "",
+            "last_editor": user_id,
+            "last_editor_name": user_name,
             "participants": participants,
             "assigned_problems": [selected_problem["problem_id"]],
             "created_at": datetime.utcnow().isoformat()
-        }).execute()
-        
+        }
+        coding_rooms_memory[room_id] = room_data
+
+        try:
+            supabase.table("coding_rooms").insert({
+                "room_id": room_id,
+                "problem_id": selected_problem["problem_id"],
+                "created_by": user_id,
+                "current_code": starter_code,
+                "current_lang": "python",
+                "participants": participants,
+                "assigned_problems": [selected_problem["problem_id"]],
+                "created_at": datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e_ins:
+            print("Coding room DB insert notice (using RAM store):", e_ins)
+
         return jsonify({
             "room_id": room_id,
             "problem": selected_problem,
@@ -3357,7 +3376,7 @@ def coding_room_create():
             "current_lang": "python",
             "participants": participants
         }), 200
-        
+
     except Exception as e:
         print(f"Error creating room: {e}")
         return jsonify({"error": f"Failed to create coding room: {str(e)}"}), 500
@@ -3367,37 +3386,52 @@ def coding_room_create():
 @app.route("/coding/room/join", methods=["POST"])
 def coding_room_join():
     data = request.get_json() or {}
-    room_id = data.get("room_id", "").strip().upper()
-    user_id = data.get("user_id")
-    user_name = data.get("user_name") or "Anonymous"
+    room_id = str(data.get("room_id", "")).strip().upper()
+    user_id = str(data.get("user_id", ""))
+    user_name = str(data.get("user_name") or "Anonymous")
     role = data.get("role", "candidate")
-    
+
     if not room_id or not user_id:
         return jsonify({"error": "room_id and user_id are required"}), 400
-        
+
     try:
-        res = supabase.table("coding_rooms").select("*").eq("room_id", room_id).execute()
-        if not res or not res.data:
+        room = coding_rooms_memory.get(room_id)
+        if not room:
+            try:
+                res = supabase.table("coding_rooms").select("*").eq("room_id", room_id).execute()
+                if res and res.data:
+                    room = res.data[0]
+                    coding_rooms_memory[room_id] = room
+            except Exception:
+                pass
+
+        if not room:
             return jsonify({"error": f"Coding Room '{room_id}' not found."}), 404
-            
-        room = res.data[0]
-        
-        prob_res = supabase.table("coding_problems").select("*").eq("problem_id", room["problem_id"]).execute()
-        problem = prob_res.data[0] if prob_res.data else None
-        
+
+        problem = room.get("problem")
+        if not problem and room.get("problem_id"):
+            try:
+                prob_res = supabase.table("coding_problems").select("*").eq("problem_id", room["problem_id"]).execute()
+                problem = prob_res.data[0] if prob_res.data else None
+            except Exception:
+                pass
+
         participants = room.get("participants") or []
         if isinstance(participants, str):
-            participants = json.loads(participants)
-            
+            try:
+                participants = json.loads(participants)
+            except Exception:
+                participants = []
+
         exists = False
         for p in participants:
-            if p["user_id"] == user_id:
+            if str(p.get("user_id")) == user_id:
                 p["name"] = user_name
                 p["last_seen"] = datetime.utcnow().isoformat()
                 p["role"] = role
                 exists = True
                 break
-                
+
         if not exists:
             participants.append({
                 "user_id": user_id,
@@ -3405,19 +3439,25 @@ def coding_room_join():
                 "role": role,
                 "last_seen": datetime.utcnow().isoformat()
             })
-            
-        supabase.table("coding_rooms").update({
-            "participants": participants
-        }).eq("room_id", room_id).execute()
-        
+
+        room["participants"] = participants
+        coding_rooms_memory[room_id] = room
+
+        try:
+            supabase.table("coding_rooms").update({
+                "participants": participants
+            }).eq("room_id", room_id).execute()
+        except Exception:
+            pass
+
         return jsonify({
             "room_id": room_id,
             "problem": problem,
-            "current_code": room["current_code"],
-            "current_lang": room["current_lang"],
+            "current_code": room.get("current_code", ""),
+            "current_lang": room.get("current_lang", "python"),
             "participants": participants
         }), 200
-        
+
     except Exception as e:
         print(f"Error joining room: {e}")
         return jsonify({"error": f"Failed to join coding room: {str(e)}"}), 500
@@ -4268,7 +4308,6 @@ def get_user_history_by_id_endpoint(user_id):
     if target_id:
         or_conds.append(f"user_id.eq.{target_id}")
     if user_email:
-        or_conds.append(f"email.eq.{user_email}")
         or_conds.append(f"user_id.eq.{user_email}")
     if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
         or_conds.append(f"user_id.eq.{user_id}")
@@ -4321,7 +4360,6 @@ def get_user_stats(user_id):
     if target_id:
         or_conds.append(f"user_id.eq.{target_id}")
     if user_email:
-        or_conds.append(f"email.eq.{user_email}")
         or_conds.append(f"user_id.eq.{user_email}")
     if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
         or_conds.append(f"user_id.eq.{user_id}")
