@@ -287,13 +287,18 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # ─── Gemini / LangChain ────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "AIzaSyBYSdXjmLnimrFY7ujWfRDIwyk_8cm9Ywo"
+chat_model = None
 try:
     chat_model = ChatGoogleGenerativeAI(
-        api_key=GEMINI_API_KEY, model="gemini-1.5-flash", temperature=0.6
+        api_key=GEMINI_API_KEY, model="gemini-2.0-flash", temperature=0.6
     )
 except Exception as e_chat:
-    print("Warning: ChatGoogleGenerativeAI startup init notice:", e_chat)
-    chat_model = None
+    try:
+        chat_model = ChatGoogleGenerativeAI(
+            api_key=GEMINI_API_KEY, model="gemini-1.5-flash-latest", temperature=0.6
+        )
+    except Exception:
+        chat_model = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -303,6 +308,12 @@ except Exception as e_chat:
 def send_email(to_email, subject, html_body):
     sender_email = os.getenv("SMTP_EMAIL") or "vaibhavchandelcs@gmail.com"
     sender_password = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
+    smtp_server = os.getenv("SMTP_SERVER") or "smtp.gmail.com"
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT") or 587)
+    except Exception:
+        smtp_port = 587
+
     if not sender_email or not sender_password:
         print("SMTP not configured – skipping email")
         return False
@@ -312,7 +323,7 @@ def send_email(to_email, subject, html_body):
         msg['To']      = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(html_body, 'html'))
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
             server.login(sender_email, sender_password)
             server.send_message(msg)
@@ -698,7 +709,7 @@ def user_response(user: dict) -> dict:
     role = user.get("role", "candidate")
     if email == "saxenaanushka9645@gmail.com":
         role = "SUPER_ADMIN"
-    _secret = app.config.get("JWT_SECRET_KEY", os.getenv("JWT_SECRET_KEY", "super-secret-key-123"))
+    _secret = app.config.get("JWT_SECRET_KEY", os.getenv("JWT_SECRET_KEY", "prepfly-super-secret-jwt-signature-key-2026-secure-32byte-min"))
     access_token = pyjwt.encode({
         "sub": user["id"],
         "email": email,
