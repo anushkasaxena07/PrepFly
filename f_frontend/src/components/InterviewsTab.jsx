@@ -403,13 +403,29 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   };
 
   const initRTCPeerConnection = (stream) => {
-    if (peerConnectionRef.current) return;
+    if (peerConnectionRef.current) return peerConnectionRef.current;
 
-    console.log("Initializing RTCPeerConnection");
+    console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
     const remoteStreamInstance = new MediaStream();
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
+        { urls: "stun:stun.services.mozilla.com" },
+        {
+          urls: [
+            "turn:openrelay.metered.ca:80",
+            "turn:openrelay.metered.ca:443",
+            "turns:openrelay.metered.ca:443"
+          ],
+          username: "openrelayproject",
+          credential: "openrelayproject"
+        }
+      ]
     });
 
     if (stream) {
@@ -420,10 +436,9 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      console.log('🟢 ontrack fired:', event.track.kind, 'enabled:', event.track.enabled, 'readyState:', event.track.readyState);
-      console.log('🟢 streams received:', event.streams.length);
+      console.log('🟢 WebRTC ontrack received:', event.track.kind, 'enabled:', event.track.enabled, 'readyState:', event.track.readyState);
 
-      const incomingStream = event.streams[0];
+      const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
       if (incomingStream) {
         incomingStream.getTracks().forEach(track => {
           if (!remoteStreamInstance.getTracks().find(t => t.id === track.id)) {
@@ -436,20 +451,20 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         }
       }
 
-      // Create a fresh MediaStream wrapper so React state reference changes and triggers UI re-render
       const newStreamWrapper = new MediaStream(remoteStreamInstance.getTracks());
       setRemoteStream(newStreamWrapper);
 
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = newStreamWrapper;
-        remoteVideoRef.current.play().catch(e => console.warn("Video play notice:", e));
+        remoteVideoRef.current.playsInline = true;
+        remoteVideoRef.current.autoplay = true;
+        remoteVideoRef.current.muted = false;
+        remoteVideoRef.current.play().catch(e => console.warn("Remote video play notice:", e));
       }
     };
 
-
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRoom) {
-        console.log("ICE Candidate Generated");
         const targetId = remoteParticipantIdRef.current;
         if (targetId) {
           sendSignal(targetId, { type: "candidate", candidate: event.candidate });
@@ -473,23 +488,14 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         setConnectionStatus("Disconnected");
       }
     };
-    
-    pc.onconnectionstatechange = () => {
-      console.log('🟣 Connection state:', pc.connectionState);
-    };
-
-    pc.onsignalingstatechange = () => {
-      console.log('🟡 Signaling state:', pc.signalingState);
-    };
-
 
     peerConnectionRef.current = pc;
+    return pc;
   };
 
   const syncInterviewRoomState = async () => {
     if (!currentRoom) return;
     try {
-      // 1. Poll room synchronization (chat, notes, participants)
       const res = await apiFetch('/api/webrtc/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -511,7 +517,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           const remoteId = remote ? remote.user_id : null;
           remoteParticipantIdRef.current = remoteId;
           
-          // Flush pending candidates if we just found the peer
           if (remoteId && pendingIceCandidatesRef.current[currentRoom.room_code]?.length > 0) {
             const pending = pendingIceCandidatesRef.current[currentRoom.room_code];
             pending.forEach(cand => {
@@ -531,10 +536,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         }
       }
 
-      // If local media stream is not ready, defer WebRTC signaling to avoid race condition
       if (!streamLoaded) return;
 
-      // 2. WebRTC P2P signaling exchange
       const signalRes = await apiFetch(`/api/webrtc/signals?user_id=${userId}`);
       if (signalRes.ok) {
         const signalData = await signalRes.json();
@@ -545,40 +548,32 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           }
           const pc = peerConnectionRef.current;
           if (signal.type === "offer") {
-            console.log("Offer Received");
+            console.log("WebRTC Offer Received from", sender_id);
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log("Answer Created");
+            console.log("WebRTC Answer Created and Sent");
             sendSignal(sender_id, answer);
 
-            // Process queued remote candidates
             if (pc.pendingRemoteCandidates) {
               for (const cand of pc.pendingRemoteCandidates) {
                 try {
                   await pc.addIceCandidate(new RTCIceCandidate(cand));
-                  console.log("ICE Candidate Added from queue");
-                } catch (err) {
-                  console.warn("Failed to add queued remote candidate:", err);
-                }
+                } catch (err) {}
               }
               pc.pendingRemoteCandidates = [];
             }
           } else if (signal.type === "answer") {
-            console.log("Answer Received");
+            console.log("WebRTC Answer Received from", sender_id);
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
 
-            // Process queued remote candidates
             if (pc.pendingRemoteCandidates) {
               for (const cand of pc.pendingRemoteCandidates) {
                 try {
                   await pc.addIceCandidate(new RTCIceCandidate(cand));
-                  console.log("ICE Candidate Added from queue");
-                } catch (err) {
-                  console.warn("Failed to add queued remote candidate:", err);
-                }
+                } catch (err) {}
               }
               pc.pendingRemoteCandidates = [];
             }
@@ -586,31 +581,38 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             try {
               if (pc.remoteDescription && pc.remoteDescription.type) {
                 await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-                console.log("ICE Candidate Added");
               } else {
-                if (!pc.pendingRemoteCandidates) {
-                  pc.pendingRemoteCandidates = [];
-                }
+                if (!pc.pendingRemoteCandidates) pc.pendingRemoteCandidates = [];
                 pc.pendingRemoteCandidates.push(signal.candidate);
               }
             } catch (e) {
-              console.warn("Error adding ICE candidate:", e);
+              console.warn("ICE Candidate Error:", e);
             }
           }
         }
       }
 
-      // 3. If host (interviewer) and remote candidate is detected, send WebRTC connection offer
-      const isHost = currentRoom.created_by === userId;
-      const remoteId = latestParticipants.find(p => p.user_id !== userId)?.user_id;
-      if (remoteId && isHost && !sentOfferRef.current) {
-        sentOfferRef.current = true;
-        initRTCPeerConnection(mediaStreamRef.current);
+      const remote = latestParticipants.find(p => p.user_id !== userId);
+      const remoteId = remote ? remote.user_id : null;
+      if (remoteId) {
+        remoteParticipantIdRef.current = remoteId;
         const pc = peerConnectionRef.current;
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        console.log("Offer Created");
-        sendSignal(remoteId, offer);
+        const isConnected = pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected');
+        const isHost = currentRoom.created_by === userId;
+
+        if (!isConnected && (!sentOfferRef.current || (isHost && pc && pc.signalingState === 'stable' && !remoteStream))) {
+          sentOfferRef.current = true;
+          if (!pc) {
+            initRTCPeerConnection(mediaStreamRef.current);
+          }
+          const activePc = peerConnectionRef.current;
+          if (activePc && activePc.signalingState === 'stable') {
+            console.log("Sending WebRTC offer to remote participant:", remoteId);
+            const offer = await activePc.createOffer();
+            await activePc.setLocalDescription(offer);
+            sendSignal(remoteId, offer);
+          }
+        }
       }
 
     } catch (err) {

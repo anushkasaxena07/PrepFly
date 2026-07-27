@@ -214,6 +214,44 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     alert(`Selected Capture Devices:\n\n📷 Camera: ${videoLabel}\n🎙️ Microphone: ${audioLabel}\n\nUsing system-default selection.`);
   };
 
+  // Restore active interview step or report from sessionStorage on reload
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("prepfly_avatab_session");
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p && p.step && p.step !== "loading") {
+          if (p.step) setStep(p.step);
+          if (p.sessionId) setSessionId(p.sessionId);
+          if (p.reportData) setReportData(p.reportData);
+          if (p.allFeedbacks) setAllFeedbacks(p.allFeedbacks);
+          if (p.atsScore) setAtsScore(p.atsScore);
+          if (p.question) setQuestion(p.question);
+          if (p.questionNumber) setQuestionNumber(p.questionNumber);
+        }
+      }
+    } catch (e) {
+      console.warn("Session restore notice:", e);
+    }
+  }, []);
+
+  // Persist session state on change
+  useEffect(() => {
+    if (step && step !== "resume_upload" && step !== "loading") {
+      try {
+        sessionStorage.setItem("prepfly_avatab_session", JSON.stringify({
+          step,
+          sessionId,
+          reportData,
+          allFeedbacks,
+          atsScore,
+          question,
+          questionNumber
+        }));
+      } catch (e) {}
+    }
+  }, [step, sessionId, reportData, allFeedbacks, atsScore, question, questionNumber]);
+
   useEffect(() => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.getVoices();
@@ -997,15 +1035,48 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* ── REPORT PANEL ── */}
         {step === "report" && reportData && (() => {
-          const score100 = reportData.overall_score_100 || Math.round((reportData.overall_score || 7.5) * 10);
-          const gInfo = getGradeInfo(score100);
+          const answeredCount = reportData.answered_questions_count !== undefined 
+            ? reportData.answered_questions_count 
+            : (allFeedbacks ? allFeedbacks.length : 0);
+
+          let score100 = 0;
+          if (answeredCount > 0) {
+            score100 = reportData.overall_score_100 !== undefined && reportData.overall_score_100 !== null
+              ? Number(reportData.overall_score_100)
+              : (reportData.overall_score !== undefined && reportData.overall_score !== null
+                  ? Math.round(Number(reportData.overall_score) * 10)
+                  : 75);
+          }
+
+          const allZero = reportData.section_grades && reportData.section_grades.length > 0 && reportData.section_grades.every(s => s.score === 0);
+          if (answeredCount === 0 || allZero) {
+            score100 = 0;
+          }
+
+          const gInfo = score100 === 0 ? {
+            grade: "F",
+            label: "Unevaluated / No Responses",
+            desc: "No responses attempted during interview",
+            color: "#ef4444",
+            bgColor: "rgba(239, 68, 68, 0.15)",
+            rec: "Strong Reject (No Responses Provided)",
+            level: "Beginner / Not Attempted",
+            score: 0
+          } : getGradeInfo(score100);
+
           const sectionGrades = reportData.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = reportData.badges || getBadges(score100, sectionGrades);
-          const isPrelim = reportData.report_type === "preliminary" || (reportData.answered_questions_count !== undefined && reportData.answered_questions_count < 5);
-          const confidence = reportData.confidence || (isPrelim ? "Low" : "High");
-          const recText = reportData.hiring_recommendation || reportData.recommendation || (isPrelim ? "Preliminary Evaluation (Requires ≥ 5 answered questions)" : gInfo.rec);
-          const topStrengths = reportData.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
-          const topImprovements = reportData.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
+          const earnedBadges = score100 === 0 ? [] : (reportData.badges || getBadges(score100, sectionGrades));
+          const isPrelim = answeredCount < 5 && answeredCount > 0;
+          const confidence = score100 === 0 ? "None" : (reportData.confidence || (isPrelim ? "Low" : "High"));
+          const recText = score100 === 0 ? "Strong Reject (No Responses Provided)" : (reportData.hiring_recommendation || reportData.recommendation || (isPrelim ? "Preliminary Evaluation (Requires ≥ 5 answered questions)" : gInfo.rec));
+
+          const topStrengths = score100 === 0 
+            ? ["None identified (no responses provided)"] 
+            : (reportData.top_strengths || ["Clear Communication", "Technical Understanding", "Structured Approach"]);
+
+          const topImprovements = score100 === 0 
+            ? ["Did not attempt questions during mock interview", "Ensure microphone and audio setup are active", "Provide detailed STAR-format spoken or written answers"] 
+            : (reportData.top_improvements || ["Provide deeper technical details", "Use STAR technique for behavioral questions", "Structure answers with clear outcomes"]);
 
           return (
             <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>
@@ -1177,7 +1248,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
 
               <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
-                <button onClick={() => setStep("type_selection")} style={{ padding: "12px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Practice Another</button>
+                <button onClick={() => { try { sessionStorage.removeItem("prepfly_avatab_session"); } catch (_) {} setStep("type_selection"); setReportData(null); setAllFeedbacks([]); }} style={{ padding: "12px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Practice Another</button>
                 <button onClick={downloadPDFReport} style={{ padding: "12px 28px", borderRadius: "12px", background: "linear-gradient(135deg,#00c4a7,#7c3aed)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>📄 Download PDF Report</button>
               </div>
             </div>

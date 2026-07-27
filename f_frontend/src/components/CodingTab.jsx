@@ -1,5 +1,251 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const SmartCodeEditor = ({ value, onChange, lang }) => {
+  const textareaRef = useRef(null);
+  const gutterRef = useRef(null);
+  const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+
+  const lines = (value || "").split("\n");
+  const lineCount = lines.length;
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+  const handleScroll = () => {
+    if (textareaRef.current && gutterRef.current) {
+      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const updateCursorInfo = () => {
+    if (!textareaRef.current) return;
+    const { selectionStart, value: val } = textareaRef.current;
+    const textBeforeCursor = val.substring(0, selectionStart);
+    const lineList = textBeforeCursor.split("\n");
+    const currentLine = lineList.length;
+    const currentCol = lineList[lineList.length - 1].length + 1;
+    setCursorPos({ line: currentLine, col: currentCol });
+  };
+
+  const handleKeyDown = (e) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const { selectionStart, selectionEnd, value: val } = textarea;
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      if (selectionStart !== selectionEnd) {
+        const startLineIdx = val.substring(0, selectionStart).split("\n").length - 1;
+        const endLineIdx = val.substring(0, selectionEnd).split("\n").length - 1;
+        const allLines = val.split("\n");
+        if (e.shiftKey) {
+          for (let i = startLineIdx; i <= endLineIdx; i++) {
+            if (allLines[i].startsWith("  ")) allLines[i] = allLines[i].substring(2);
+            else if (allLines[i].startsWith(" ")) allLines[i] = allLines[i].substring(1);
+          }
+        } else {
+          for (let i = startLineIdx; i <= endLineIdx; i++) allLines[i] = "  " + allLines[i];
+        }
+        const newVal = allLines.join("\n");
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = Math.max(0, selectionStart + (e.shiftKey ? -2 : 2));
+          textarea.selectionEnd = Math.max(0, selectionEnd + (allLines.length * (e.shiftKey ? -2 : 2)));
+          updateCursorInfo();
+        }, 0);
+      } else {
+        const newVal = val.substring(0, selectionStart) + "  " + val.substring(selectionEnd);
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = selectionStart + 2;
+          updateCursorInfo();
+        }, 0);
+      }
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const currentLineText = val.substring(0, selectionStart).split("\n").pop() || "";
+      const matchIndent = currentLineText.match(/^(\s*)/);
+      let indent = matchIndent ? matchIndent[1] : "";
+      
+      const charBefore = val.charAt(selectionStart - 1);
+      const charAfter = val.charAt(selectionStart);
+
+      if (charBefore === "{" && charAfter === "}") {
+        const extraIndent = indent + "  ";
+        const newVal = val.substring(0, selectionStart) + "\n" + extraIndent + "\n" + indent + val.substring(selectionEnd);
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = selectionStart + 1 + extraIndent.length;
+          updateCursorInfo();
+        }, 0);
+        return;
+      }
+
+      if (charBefore === "{" || charBefore === ":" || charBefore === "(" || charBefore === "[") {
+        indent += "  ";
+      }
+
+      const newVal = val.substring(0, selectionStart) + "\n" + indent + val.substring(selectionEnd);
+      onChange(newVal);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = selectionStart + 1 + indent.length;
+        updateCursorInfo();
+      }, 0);
+      return;
+    }
+
+    const pairs = { "{": "}", "(": ")", "[": "]", '"': '"', "'": "'" };
+
+    if (pairs[e.key]) {
+      const closeChar = pairs[e.key];
+      if ((e.key === '"' || e.key === "'") && val.charAt(selectionStart) === e.key) {
+        e.preventDefault();
+        textarea.selectionStart = textarea.selectionEnd = selectionStart + 1;
+        updateCursorInfo();
+        return;
+      }
+
+      e.preventDefault();
+      if (selectionStart !== selectionEnd) {
+        const selectedText = val.substring(selectionStart, selectionEnd);
+        const newVal = val.substring(0, selectionStart) + e.key + selectedText + closeChar + val.substring(selectionEnd);
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = selectionStart + 1;
+          textarea.selectionEnd = selectionEnd + 1;
+          updateCursorInfo();
+        }, 0);
+      } else {
+        const newVal = val.substring(0, selectionStart) + e.key + closeChar + val.substring(selectionEnd);
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = selectionStart + 1;
+          updateCursorInfo();
+        }, 0);
+      }
+      return;
+    }
+
+    if (e.key === "Backspace" && selectionStart === selectionEnd && selectionStart > 0) {
+      const prevChar = val.charAt(selectionStart - 1);
+      const nextChar = val.charAt(selectionStart);
+      if (
+        (prevChar === "{" && nextChar === "}") ||
+        (prevChar === "(" && nextChar === ")") ||
+        (prevChar === "[" && nextChar === "]") ||
+        (prevChar === '"' && nextChar === '"') ||
+        (prevChar === "'" && nextChar === "'")
+      ) {
+        e.preventDefault();
+        const newVal = val.substring(0, selectionStart - 1) + val.substring(selectionStart + 1);
+        onChange(newVal);
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = selectionStart - 1;
+          updateCursorInfo();
+        }, 0);
+        return;
+      }
+    }
+  };
+
+  return (
+    <div style={{
+      position: "relative",
+      display: "flex",
+      flexDirection: "column",
+      background: "#080c16",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: "14px",
+      overflow: "hidden",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)"
+    }}>
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "6px 14px",
+        background: "rgba(255,255,255,0.03)",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+        fontSize: "11px",
+        color: "#94a3b8",
+        fontWeight: 700
+      }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3" }}></span>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>{lang || "code"} editor</span>
+        </div>
+        <div style={{ display: "flex", gap: "14px" }}>
+          <span>Lines: {lineCount}</span>
+          <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", position: "relative", height: "340px" }}>
+        <div
+          ref={gutterRef}
+          style={{
+            width: "44px",
+            background: "rgba(0,0,0,0.4)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            padding: "12px 0",
+            fontFamily: "'DM Mono', 'Fira Code', monospace",
+            fontSize: "13px",
+            lineHeight: "1.6",
+            color: "rgba(255,255,255,0.3)",
+            textAlign: "right",
+            paddingRight: "8px",
+            userSelect: "none",
+            overflowY: "hidden",
+            flexShrink: 0
+          }}
+        >
+          {lineNumbers.map(n => (
+            <div 
+              key={n} 
+              style={{
+                color: n === cursorPos.line ? "#00e5c3" : "rgba(255,255,255,0.3)",
+                fontWeight: n === cursorPos.line ? 800 : 400
+              }}
+            >
+              {n}
+            </div>
+          ))}
+        </div>
+
+        <textarea
+          ref={textareaRef}
+          id="code-textarea"
+          value={value}
+          onChange={(e) => { onChange(e.target.value); updateCursorInfo(); }}
+          onKeyDown={handleKeyDown}
+          onKeyUp={updateCursorInfo}
+          onClick={updateCursorInfo}
+          onScroll={handleScroll}
+          spellCheck="false"
+          style={{
+            flex: 1,
+            height: "100%",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            color: "#f0f4fd",
+            fontFamily: "'DM Mono', 'Fira Code', monospace",
+            fontSize: "13px",
+            lineHeight: "1.6",
+            padding: "12px",
+            resize: "none",
+            tabSize: 2,
+            whiteSpace: "pre",
+            wordBreak: "normal"
+          }}
+          aria-label="Code editor"
+        />
+      </div>
+    </div>
+  );
+};
+
 const defaultCodeTemplates = {
   python: `def twoSum(nums, target):
     # Write your code here
@@ -819,13 +1065,30 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         })
       });
       const data = await res.json();
-      if (res.ok) {
-        setHintBox('💡 ' + (data.hint || 'Analyze the constraints and loop conditions.'));
+      if (res.ok && data.hint) {
+        setHintBox('💡 ' + data.hint);
         setHintIdx(prev => prev + 1);
+        return;
       }
     } catch (e) {
-      setHintBox("Failed to get hint. Try thinking about optimal time limits.");
+      console.warn("Hint fetch notice:", e);
     }
+    
+    const pid = (currentProblem?.problem_id || '').toLowerCase();
+    let localHint = "💡 Analyze the problem constraints to determine if a linear O(N) or logarithmic O(log N) algorithm is expected.";
+    if (pid.includes("two-sum")) {
+      localHint = hintIdx === 0 
+        ? "💡 Try using a hash map to store each number's value and its index as you iterate." 
+        : "💡 For each number x, check if (target - x) is already in your hash map.";
+    } else if (pid.includes("parentheses")) {
+      localHint = hintIdx === 0 
+        ? "💡 A stack data structure is ideal for tracking open brackets in correct order." 
+        : "💡 Push open brackets onto stack. For closing brackets, check if they match top of stack.";
+    } else if (currentProblem?.title) {
+      localHint = `💡 For '${currentProblem.title}', trace a small example input by hand to identify pattern boundaries.`;
+    }
+    setHintBox(localHint);
+    setHintIdx(prev => prev + 1);
   };
 
   const runCode = async () => {
@@ -1130,14 +1393,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
             </div>
             
-            <textarea 
-              id="code-textarea"
-              className="code-area" 
-              value={code} 
-              onChange={(e) => handleCodeChange(e.target.value)} 
-              spellCheck="false" 
-              aria-label="Code editor" 
-            />
+            <SmartCodeEditor value={code} onChange={handleCodeChange} lang={lang} />
             
             {/* Console execution outputs */}
             <div>

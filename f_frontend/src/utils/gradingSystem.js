@@ -26,17 +26,33 @@ export function getGradeInfo(score100) {
 export function computeSectionGrades(overallScore100 = 75, rawFeedbacks = []) {
   const base100 = Math.min(100, Math.max(0, Math.round(overallScore100)));
   
+  if (base100 === 0) {
+    const categories = [
+      "Communication", "Technical Knowledge", "Problem Solving", "Confidence",
+      "Behavioral Skills", "Resume Knowledge", "Project Explanation", "Leadership",
+      "Grammar", "Vocabulary"
+    ];
+    return categories.map(name => ({
+      name,
+      score: 0,
+      grade: "F",
+      color: "#ef4444",
+      bgColor: "rgba(239, 68, 68, 0.15)",
+      label: "Unevaluated / No Responses"
+    }));
+  }
+
   const rawScores = {
-    "Communication": Math.min(100, Math.max(45, base100 + 4)),
-    "Technical Knowledge": Math.min(100, Math.max(45, base100 + 2)),
-    "Problem Solving": Math.min(100, Math.max(45, base100 - 3)),
-    "Confidence": Math.min(100, Math.max(45, base100 + 5)),
-    "Behavioral Skills": Math.min(100, Math.max(45, base100 - 2)),
-    "Resume Knowledge": Math.min(100, Math.max(45, base100 + 3)),
-    "Project Explanation": Math.min(100, Math.max(45, base100 + 6)),
-    "Leadership": Math.min(100, Math.max(45, base100 - 4)),
-    "Grammar": Math.min(100, Math.max(45, 88)),
-    "Vocabulary": Math.min(100, Math.max(45, 85))
+    "Communication": Math.min(100, Math.max(0, base100 + 4)),
+    "Technical Knowledge": Math.min(100, Math.max(0, base100 + 2)),
+    "Problem Solving": Math.min(100, Math.max(0, base100 - 3)),
+    "Confidence": Math.min(100, Math.max(0, base100 + 5)),
+    "Behavioral Skills": Math.min(100, Math.max(0, base100 - 2)),
+    "Resume Knowledge": Math.min(100, Math.max(0, base100 + 3)),
+    "Project Explanation": Math.min(100, Math.max(0, base100 + 6)),
+    "Leadership": Math.min(100, Math.max(0, base100 - 4)),
+    "Grammar": Math.min(100, Math.max(0, Math.round(base100 * 0.95))),
+    "Vocabulary": Math.min(100, Math.max(0, Math.round(base100 * 0.92)))
   };
 
   return Object.keys(rawScores).map(name => {
