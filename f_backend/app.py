@@ -307,7 +307,7 @@ except Exception as e_chat:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def send_email(to_email, subject, html_body):
-    sender_email = os.getenv("SMTP_EMAIL") or "vaibhavchandelcs@gmail.com"
+    sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
     sender_password = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
     smtp_server = os.getenv("SMTP_SERVER") or "smtp.gmail.com"
     try:
