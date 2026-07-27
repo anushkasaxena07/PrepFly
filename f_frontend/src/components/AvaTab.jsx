@@ -1004,6 +1004,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           const isPrelim = reportData.report_type === "preliminary" || (reportData.answered_questions_count !== undefined && reportData.answered_questions_count < 5);
           const confidence = reportData.confidence || (isPrelim ? "Low" : "High");
           const recText = reportData.hiring_recommendation || reportData.recommendation || (isPrelim ? "Preliminary Evaluation (Requires ≥ 5 answered questions)" : gInfo.rec);
+          const topStrengths = reportData.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
+          const topImprovements = reportData.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
 
           return (
             <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>

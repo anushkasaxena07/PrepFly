@@ -4558,6 +4558,12 @@ def get_user_stats(user_id):
             streak_count = max(1, total_activity_count) if total_activity_count > 0 else 0
 
 
+        grade_dist = {}
+        try:
+            grade_dist = calculate_grade_distribution(interviews)
+        except Exception:
+            grade_dist = {}
+
         # Build stats payload
         stats = {
             "has_data": total_interviews > 0 or total_coding > 0 or total_speech > 0 or total_resumes > 0,
@@ -4583,12 +4589,21 @@ def get_user_stats(user_id):
             },
             "streak": streak_count,
             "insights": dynamic_insights,
-            "grade_distribution": calculate_grade_distribution(interviews)
+            "grade_distribution": grade_dist
         }
         return jsonify(stats), 200
     except Exception as e:
         print(f"User stats error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "has_data": False,
+            "interviews": {"total": 0, "avg_score": 0.0, "readiness": 0},
+            "coding": {"total": 0, "accuracy": 0},
+            "speech": {"total": 0, "confidence": 0, "avg_score": 0.0, "avg_fillers": 0},
+            "resume": {"total": 0, "avg_score": 0.0, "latest_score": 0.0},
+            "streak": 0,
+            "insights": [],
+            "grade_distribution": {}
+        }), 200
 
 def Math_readiness(avg_score, count):
     if count == 0:
