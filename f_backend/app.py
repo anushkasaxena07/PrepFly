@@ -100,6 +100,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     return response
 
 @app.route("/<path:dummy>", methods=["OPTIONS"])
@@ -730,7 +731,7 @@ def user_response(user: dict) -> dict:
 import functools
 
 def _get_jwt_secret():
-    return app.config.get("JWT_SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "super-secret-key-123"
+    return app.config.get("JWT_SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "prepfly-super-secret-jwt-signature-key-2026-secure-32byte-min"
 
 def require_auth(f):
     """Route decorator: verifies Bearer JWT and attaches request.current_user payload."""
@@ -4312,15 +4313,20 @@ def get_user_history_by_id_endpoint(user_id):
         except Exception:
             pass
 
-    if target_id and "@" in target_id:
+    if target_id and "@" in str(target_id):
         user_email = target_id
+        target_id = ""
+        try:
+            u_res = supabase.table("users").select("id").eq("email", user_email).execute()
+            if u_res and u_res.data:
+                target_id = u_res.data[0].get("id", "")
+        except Exception:
+            pass
 
     or_conds = []
-    if target_id:
+    if target_id and "@" not in str(target_id):
         or_conds.append(f"user_id.eq.{target_id}")
-    if user_email:
-        or_conds.append(f"user_id.eq.{user_email}")
-    if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
+    if user_id and user_id not in ("me", "current", "self") and user_id != target_id and "@" not in str(user_id):
         or_conds.append(f"user_id.eq.{user_id}")
 
     filter_str = ",".join(list(set(or_conds))) if or_conds else ""
@@ -4347,16 +4353,16 @@ def get_user_history_by_id_endpoint(user_id):
 @app.route("/user-stats/<user_id>", methods=["GET"])
 def get_user_stats(user_id):
     user_payload  = _get_optional_user()
-    token_user_id = user_payload.get("sub") if user_payload else None
-    token_email   = user_payload.get("email", "") if user_payload else ""
-    token_role    = user_payload.get("role", "") if user_payload else ""
+    token_user_id = user_payload.get("sub") if isinstance(user_payload, dict) else None
+    token_email   = user_payload.get("email", "") if isinstance(user_payload, dict) else ""
+    token_role    = user_payload.get("role", "") if isinstance(user_payload, dict) else ""
 
     target_id = token_user_id or user_id
     if user_id in ("me", "current", "self"):
         target_id = token_user_id or ""
 
     user_email = token_email
-    if target_id and not user_email:
+    if target_id and not user_email and "@" not in str(target_id):
         try:
             u_res = supabase.table("users").select("email").eq("id", target_id).execute()
             if u_res and u_res.data:
@@ -4364,15 +4370,20 @@ def get_user_stats(user_id):
         except Exception:
             pass
 
-    if target_id and "@" in target_id:
+    if target_id and "@" in str(target_id):
         user_email = target_id
+        target_id = ""
+        try:
+            u_res = supabase.table("users").select("id").eq("email", user_email).execute()
+            if u_res and u_res.data:
+                target_id = u_res.data[0].get("id", "")
+        except Exception:
+            pass
 
     or_conds = []
-    if target_id:
+    if target_id and "@" not in str(target_id):
         or_conds.append(f"user_id.eq.{target_id}")
-    if user_email:
-        or_conds.append(f"user_id.eq.{user_email}")
-    if user_id and user_id not in ("me", "current", "self") and user_id != target_id:
+    if user_id and user_id not in ("me", "current", "self") and user_id != target_id and "@" not in str(user_id):
         or_conds.append(f"user_id.eq.{user_id}")
 
     filter_str = ",".join(list(set(or_conds))) if or_conds else ""

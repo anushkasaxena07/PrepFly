@@ -153,16 +153,27 @@ export default function Login() {
   const handleGoogleLogin = () => {
     if (!window.google) { msg("Google SDK not loaded yet."); return; }
     if (!GOOGLE_CLIENT_ID) { msg("Google Client ID not configured."); return; }
-    // Only initialize once — re-initializing on every click causes the GSI_LOGGER warning
-    if (!googleInitRef.current) {
-      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCallback, ux_mode: "popup" });
+    try {
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCallback,
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
       googleInitRef.current = true;
-    }
-    const c = document.getElementById("google-btn-hidden");
-    if (c) {
-      c.innerHTML = "";
-      window.google.accounts.id.renderButton(c, { type: "standard", size: "large" });
-      c.querySelector("div[role=button]")?.click();
+      const c = document.getElementById("google-btn-hidden");
+      if (c) {
+        c.innerHTML = "";
+        window.google.accounts.id.renderButton(c, { type: "standard", size: "large" });
+        const btn = c.querySelector("div[role=button]");
+        if (btn) btn.click();
+        else window.google.accounts.id.prompt();
+      } else {
+        window.google.accounts.id.prompt();
+      }
+    } catch (e) {
+      console.warn("Google Sign-In prompt notice:", e);
+      try { window.google.accounts.id.prompt(); } catch (_) {}
     }
   };
 
