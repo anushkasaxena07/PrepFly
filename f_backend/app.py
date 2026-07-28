@@ -3864,6 +3864,63 @@ def webrtc_room_sync():
     }), 200
 
 
+webrtc_signals_memory = {}
+
+@app.route("/api/webrtc/signal", methods=["POST"])
+@app.route("/webrtc/signal", methods=["POST"])
+def webrtc_send_signal():
+    data = request.get_json() or {}
+    sender_id = str(data.get("sender_id", "")).strip()
+    recipient_id = str(data.get("recipient_id", "")).strip()
+    signal = data.get("signal")
+
+    if not sender_id or not recipient_id or not signal:
+        return jsonify({"error": "sender_id, recipient_id, and signal are required"}), 400
+
+    if recipient_id not in webrtc_signals_memory:
+        webrtc_signals_memory[recipient_id] = []
+
+    webrtc_signals_memory[recipient_id].append({
+        "sender_id": sender_id,
+        "recipient_id": recipient_id,
+        "signal": signal,
+        "created_at": datetime.utcnow().isoformat()
+    })
+
+    # Also store under base UUID if tab token suffix is present (e.g. uuid_tabToken)
+    base_recipient = recipient_id.split("_")[0]
+    if base_recipient != recipient_id:
+        if base_recipient not in webrtc_signals_memory:
+            webrtc_signals_memory[base_recipient] = []
+        webrtc_signals_memory[base_recipient].append({
+            "sender_id": sender_id,
+            "recipient_id": recipient_id,
+            "signal": signal,
+            "created_at": datetime.utcnow().isoformat()
+        })
+
+    print(f"[WEBRTC SIGNAL] Signal stored for recipient '{recipient_id}' from sender '{sender_id}' (type: {signal.get('type')})")
+    return jsonify({"status": "queued"}), 200
+
+
+@app.route("/api/webrtc/signals", methods=["GET"])
+@app.route("/webrtc/signals", methods=["GET"])
+def webrtc_get_signals():
+    user_id = str(request.args.get("user_id", "")).strip()
+    if not user_id:
+        return jsonify({"signals": []}), 200
+
+    base_user_id = user_id.split("_")[0]
+    signals = []
+
+    if user_id in webrtc_signals_memory:
+        signals.extend(webrtc_signals_memory.pop(user_id, []))
+    if base_user_id != user_id and base_user_id in webrtc_signals_memory:
+        signals.extend(webrtc_signals_memory.pop(base_user_id, []))
+
+    return jsonify({"signals": signals}), 200
+
+
 # ─── SUPERADMIN MANAGEMENT & DYNAMIC CANDIDATE DIRECTORY ──────────────────────
 
 @app.route("/api/superadmin/candidates-stats", methods=["GET"])

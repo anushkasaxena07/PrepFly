@@ -548,8 +548,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         }
       }
 
-      if (!streamLoaded) return;
-
       const signalRes = await apiFetch(`/api/webrtc/signals?user_id=${userId}`);
       if (signalRes.ok) {
         const signalData = await signalRes.json();
