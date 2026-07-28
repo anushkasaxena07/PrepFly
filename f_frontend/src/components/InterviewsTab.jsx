@@ -594,6 +594,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             } catch (e) {
               console.warn("ICE Candidate Error:", e);
             }
+          } else if (signal.type === "screen-share-status") {
+            console.log("Remote peer screen-share status update:", signal.sharing);
+            if (remoteVideoRef.current && remoteStream) {
+              safeAttachStream(remoteVideoRef.current, remoteStream, false);
+            }
           }
         }
       }
@@ -748,11 +753,16 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         setIsScreenSharing(true);
 
         const pc = peerConnectionRef.current;
+        const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+
         if (pc) {
           const videoSender = pc.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
           if (videoSender) {
             console.log("Swapping video sender track with screen share track");
             await videoSender.replaceTrack(screenTrack);
+            if (targetId) {
+              sendSignal(targetId, { type: "screen-share-status", sharing: true });
+            }
           } else {
             console.log("Adding screen share track to connection");
             pc.addTrack(screenTrack, screenStream);
@@ -763,7 +773,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             try {
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
-              const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
               if (targetId) {
                 console.log("Sending renegotiation offer for screen share track to", targetId);
                 sendSignal(targetId, offer);
@@ -779,18 +788,22 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           setIsScreenSharing(false);
           const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
           const pcCurrent = peerConnectionRef.current;
+          const targetIdEnd = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+
           if (pcCurrent) {
             const videoSenderBack = pcCurrent.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
             if (videoSenderBack && cameraTrack) {
               await videoSenderBack.replaceTrack(cameraTrack);
+              if (targetIdEnd) {
+                sendSignal(targetIdEnd, { type: "screen-share-status", sharing: false });
+              }
             }
             if (pcCurrent.signalingState === 'stable') {
               try {
                 const offer = await pcCurrent.createOffer();
                 await pcCurrent.setLocalDescription(offer);
-                const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-                if (targetId) {
-                  sendSignal(targetId, offer);
+                if (targetIdEnd) {
+                  sendSignal(targetIdEnd, offer);
                 }
               } catch (renegErr) {}
             }
@@ -807,18 +820,22 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       setIsScreenSharing(false);
       const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
       const pc = peerConnectionRef.current;
+      const targetIdStop = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+
       if (pc) {
         const videoSender = pc.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
         if (videoSender && cameraTrack) {
           await videoSender.replaceTrack(cameraTrack);
+          if (targetIdStop) {
+            sendSignal(targetIdStop, { type: "screen-share-status", sharing: false });
+          }
         }
         if (pc.signalingState === 'stable') {
           try {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-            if (targetId) {
-              sendSignal(targetId, offer);
+            if (targetIdStop) {
+              sendSignal(targetIdStop, offer);
             }
           } catch (renegErr) {}
         }
@@ -1430,11 +1447,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                     width: "100%", 
                     height: "100%", 
                     objectFit: "contain", 
-                    display: (remoteStream && remoteStream.getVideoTracks().length > 0) ? "block" : "none"
+                    display: remoteStream ? "block" : "none"
                   }}
                 />
 
-                {(!remoteParticipantIdRef.current || !remoteStream || remoteStream.getVideoTracks().length === 0) && (
+                {(!remoteParticipantIdRef.current || !remoteStream) && (
                   <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5}}>
                     <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
                       👤
