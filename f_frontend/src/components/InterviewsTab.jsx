@@ -488,8 +488,23 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     pc.oniceconnectionstatechange = () => {
       console.log('🔵 ICE connection state:', pc.iceConnectionState);
       const state = pc.iceConnectionState;
-      if (state === "checking" || state === "disconnected") {
+      if (state === "checking") {
+        setConnectionStatus("Connecting...");
+      } else if (state === "disconnected") {
         setConnectionStatus("Reconnecting...");
+        if (pc.signalingState === "stable") {
+          try {
+            if (pc.restartIce) pc.restartIce();
+            pc.createOffer({ iceRestart: true }).then(async (offer) => {
+              await pc.setLocalDescription(offer);
+              const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+              if (targetId) {
+                console.log("Emitting ICE restart offer to reconnect candidate stream");
+                sendSignal(targetId, offer);
+              }
+            }).catch(() => {});
+          } catch (e) {}
+        }
       } else if (state === "connected" || state === "completed") {
         setConnectionStatus("Connected");
       } else if (state === "failed" || state === "closed") {
