@@ -332,30 +332,30 @@ def send_email(to_email, subject, html_body):
     except Exception:
         pass
 
-    # Strategy 1: Try Port 465 (SSL) over IPv4
+    # Strategy 1
     for host in target_hosts:
         try:
             with smtplib.SMTP_SSL(host, 465, timeout=8) as server:
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
-            print(f"[SUCCESS] OTP Email sent successfully to {to_email} via SSL ({host}:465)")
+            print(f"Email sent!")
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"SSL Error ({host}:465): {e}")
 
-    # Strategy 2: Try Port 587 (TLS) over IPv4
+    # Strategy 2
     for host in target_hosts:
         try:
             with smtplib.SMTP(host, 587, timeout=8) as server:
                 server.starttls()
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
-            print(f"[SUCCESS] OTP Email sent successfully to {to_email} via TLS ({host}:587)")
+            print(f"Email sent!")
             return True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"TLS Error ({host}:587): {e}")
 
-    print(f"[NOTICE] Email delivery notice for {to_email}: master bypass code 981103 active")
+    print("All SMTP attempts failed.")
     return False
 
 
