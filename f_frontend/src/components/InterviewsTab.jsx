@@ -555,6 +555,10 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           const pc = peerConnectionRef.current;
           if (signal.type === "offer") {
             console.log("WebRTC Offer Received from", sender_id);
+            if (pc.signalingState !== "stable") {
+              console.warn("Colliding offer ignored while in signalingState:", pc.signalingState);
+              continue;
+            }
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
@@ -572,6 +576,10 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             }
           } else if (signal.type === "answer") {
             console.log("WebRTC Answer Received from", sender_id);
+            if (pc.signalingState !== "have-local-offer") {
+              console.warn("Stale answer ignored while in signalingState:", pc.signalingState);
+              continue;
+            }
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
 
