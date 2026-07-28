@@ -763,6 +763,21 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             console.log("Adding screen share track to connection");
             pc.addTrack(screenTrack, screenStream);
           }
+
+          // Trigger SDP offer renegotiation so remote decoder updates for screen share resolution
+          if (pc.signalingState === 'stable') {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+              if (targetId) {
+                console.log("Sending renegotiation offer for screen share track to", targetId);
+                sendSignal(targetId, offer);
+              }
+            } catch (renegErr) {
+              console.warn("Renegotiation notice:", renegErr);
+            }
+          }
         }
 
         screenTrack.onended = async () => {
@@ -774,6 +789,16 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             const videoSenderBack = pcCurrent.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
             if (videoSenderBack && cameraTrack) {
               await videoSenderBack.replaceTrack(cameraTrack);
+            }
+            if (pcCurrent.signalingState === 'stable') {
+              try {
+                const offer = await pcCurrent.createOffer();
+                await pcCurrent.setLocalDescription(offer);
+                const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+                if (targetId) {
+                  sendSignal(targetId, offer);
+                }
+              } catch (renegErr) {}
             }
           }
           if (localVideoRef.current && mediaStreamRef.current) {
@@ -792,6 +817,16 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         const videoSender = pc.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
         if (videoSender && cameraTrack) {
           await videoSender.replaceTrack(cameraTrack);
+        }
+        if (pc.signalingState === 'stable') {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+            if (targetId) {
+              sendSignal(targetId, offer);
+            }
+          } catch (renegErr) {}
         }
       }
       if (localVideoRef.current && mediaStreamRef.current) {
@@ -1400,7 +1435,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                   style={{
                     width: "100%", 
                     height: "100%", 
-                    objectFit: "cover", 
+                    objectFit: "contain", 
                     display: (remoteStream && remoteStream.getVideoTracks().length > 0) ? "block" : "none"
                   }}
                 />
