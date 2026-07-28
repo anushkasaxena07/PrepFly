@@ -1038,9 +1038,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   // 6. Running Code & AI Hints
   const handleLangChange = (newLang) => {
     setLang(newLang);
-    if (currentProblem) {
-      const template = getDynamicStarterCode(currentProblem, newLang);
-      setCode(template);
+    langRef.current = newLang;
+    const template = currentProblem ? getDynamicStarterCode(currentProblem, newLang) : (defaultCodeTemplates[newLang] || "");
+    setCode(template);
+    codeRef.current = template;
+    if (roomId) {
+      syncRoomState(true);
     }
   };
 

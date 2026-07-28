@@ -72,14 +72,22 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.muted = false; // UNMUTED SO REMOTE AUDIO IS HEARD CLEARLY!
+      remoteVideoRef.current.playsInline = true;
+      remoteVideoRef.current.autoplay = true;
+      remoteVideoRef.current.play().catch(e => console.warn("Remote video play notice:", e));
     }
-  }, [remoteStream, remoteVideoRef.current]);
+  }, [remoteStream]);
 
   const bindLocalVideo = (element) => {
     if (element) {
       localVideoRef.current = element;
       if (mediaStreamRef.current) {
         element.srcObject = mediaStreamRef.current;
+        element.muted = true; // Prevent local audio echo
+        element.playsInline = true;
+        element.autoplay = true;
+        element.play().catch(e => console.warn("Local video play notice:", e));
       }
     }
   };
@@ -89,6 +97,10 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       remoteVideoRef.current = element;
       if (remoteStream) {
         element.srcObject = remoteStream;
+        element.muted = false; // UNMUTED SO REMOTE AUDIO IS HEARD CLEARLY!
+        element.playsInline = true;
+        element.autoplay = true;
+        element.play().catch(e => console.warn("Remote audio/video play notice:", e));
       }
     }
   };
@@ -414,18 +426,18 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
         { urls: "stun:stun.services.mozilla.com" },
         {
           urls: [
             "turn:openrelay.metered.ca:80",
             "turn:openrelay.metered.ca:443",
-            "turns:openrelay.metered.ca:443"
+            "turns:openrelay.metered.ca:443?transport=tcp"
           ],
           username: "openrelayproject",
           credential: "openrelayproject"
         }
-      ]
+      ],
+      iceCandidatePoolSize: 10
     });
 
     if (stream) {
@@ -436,30 +448,30 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
 
     pc.ontrack = (event) => {
-      console.log('🟢 WebRTC ontrack received:', event.track.kind, 'enabled:', event.track.enabled, 'readyState:', event.track.readyState);
-
+      console.log('🟢 WebRTC ontrack received:', event.track.kind);
       const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
       if (incomingStream) {
-        incomingStream.getTracks().forEach(track => {
-          if (!remoteStreamInstance.getTracks().find(t => t.id === track.id)) {
-            remoteStreamInstance.addTrack(track);
-          }
-        });
+        setRemoteStream(incomingStream);
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== incomingStream) {
+          remoteVideoRef.current.srcObject = incomingStream;
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.autoplay = true;
+          remoteVideoRef.current.play().catch(() => {});
+        }
       } else if (event.track) {
         if (!remoteStreamInstance.getTracks().find(t => t.id === event.track.id)) {
           remoteStreamInstance.addTrack(event.track);
         }
-      }
-
-      const newStreamWrapper = new MediaStream(remoteStreamInstance.getTracks());
-      setRemoteStream(newStreamWrapper);
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = newStreamWrapper;
-        remoteVideoRef.current.playsInline = true;
-        remoteVideoRef.current.autoplay = true;
-        remoteVideoRef.current.muted = false;
-        remoteVideoRef.current.play().catch(e => console.warn("Remote video play notice:", e));
+        const newStreamWrapper = new MediaStream(remoteStreamInstance.getTracks());
+        setRemoteStream(newStreamWrapper);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = newStreamWrapper;
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.autoplay = true;
+          remoteVideoRef.current.play().catch(() => {});
+        }
       }
     };
 
@@ -733,42 +745,35 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     if (!isScreenSharing) {
       try {
         console.log("Screen Share Started");
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const screenTrack = screenStream.getVideoTracks()[0];
+
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = screenStream;
         }
         setIsScreenSharing(true);
 
-        // Swap track in peer connection
-        const videoTrack = screenStream.getVideoTracks()[0];
         const pc = peerConnectionRef.current;
         if (pc) {
-          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-          if (sender) {
-            await sender.replaceTrack(videoTrack);
+          const videoSender = pc.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
+          if (videoSender) {
+            console.log("Swapping video sender track with screen share track");
+            await videoSender.replaceTrack(screenTrack);
           } else {
-            console.log("No pre-existing video sender. Adding screen share track to connection.");
-            pc.addTrack(videoTrack, screenStream);
-            // Renegotiate
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-            if (targetId) {
-              console.log("Sending renegotiation offer for screen share");
-              sendSignal(targetId, offer);
-            }
+            console.log("Adding screen share track to connection");
+            pc.addTrack(screenTrack, screenStream);
           }
         }
 
-        videoTrack.onended = async () => {
+        screenTrack.onended = async () => {
           console.log("Screen Share Stopped");
           setIsScreenSharing(false);
           const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
           const pcCurrent = peerConnectionRef.current;
           if (pcCurrent) {
-            const senderBack = pcCurrent.getSenders().find(s => s.track?.kind === 'video');
-            if (senderBack && cameraTrack) {
-              await senderBack.replaceTrack(cameraTrack);
+            const videoSenderBack = pcCurrent.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
+            if (videoSenderBack && cameraTrack) {
+              await videoSenderBack.replaceTrack(cameraTrack);
             }
           }
           if (localVideoRef.current && mediaStreamRef.current) {
@@ -784,9 +789,9 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       const cameraTrack = mediaStreamRef.current?.getVideoTracks()[0];
       const pc = peerConnectionRef.current;
       if (pc) {
-        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-        if (sender && cameraTrack) {
-          await sender.replaceTrack(cameraTrack);
+        const videoSender = pc.getSenders().find(s => (s.track && s.track.kind === 'video') || (s.kind === 'video'));
+        if (videoSender && cameraTrack) {
+          await videoSender.replaceTrack(cameraTrack);
         }
       }
       if (localVideoRef.current && mediaStreamRef.current) {
@@ -1375,6 +1380,19 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 width: "100%",
                 height: "100%"
               }}>
+                {/* DEDICATED AUDIO PLAYER TO GUARANTEE HEARING REMOTE PEER */}
+                <audio 
+                  ref={(el) => {
+                    if (el && remoteStream) {
+                      el.srcObject = remoteStream;
+                      el.muted = false;
+                      el.play().catch(e => console.warn("Remote audio element play notice:", e));
+                    }
+                  }} 
+                  autoPlay 
+                  playsInline 
+                />
+
                 <video 
                   ref={bindRemoteVideo} 
                   autoPlay 
