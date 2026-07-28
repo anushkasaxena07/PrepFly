@@ -473,7 +473,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRoom) {
-        const targetId = remoteParticipantIdRef.current;
+        const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
         if (targetId) {
           sendSignal(targetId, { type: "candidate", candidate: event.candidate });
         } else {
@@ -774,19 +774,14 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           } else {
             console.log("Adding screen share track to connection");
             pc.addTrack(screenTrack, screenStream);
-          }
-
-          // Trigger SDP offer renegotiation so remote decoder updates for screen share resolution
-          if (pc.signalingState === 'stable') {
-            try {
-              const offer = await pc.createOffer();
-              await pc.setLocalDescription(offer);
-              if (targetId) {
-                console.log("Sending renegotiation offer for screen share track to", targetId);
-                sendSignal(targetId, offer);
-              }
-            } catch (renegErr) {
-              console.warn("Renegotiation notice:", renegErr);
+            if (pc.signalingState === 'stable') {
+              try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                if (targetId) {
+                  sendSignal(targetId, offer);
+                }
+              } catch (renegErr) {}
             }
           }
         }
@@ -805,15 +800,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
               if (targetIdEnd) {
                 sendSignal(targetIdEnd, { type: "screen-share-status", sharing: false });
               }
-            }
-            if (pcCurrent.signalingState === 'stable') {
-              try {
-                const offer = await pcCurrent.createOffer();
-                await pcCurrent.setLocalDescription(offer);
-                if (targetIdEnd) {
-                  sendSignal(targetIdEnd, offer);
-                }
-              } catch (renegErr) {}
             }
           }
           if (localVideoRef.current && mediaStreamRef.current) {
@@ -837,15 +823,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           if (targetIdStop) {
             sendSignal(targetIdStop, { type: "screen-share-status", sharing: false });
           }
-        }
-        if (pc.signalingState === 'stable') {
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            if (targetIdStop) {
-              sendSignal(targetIdStop, offer);
-            }
-          } catch (renegErr) {}
         }
       }
       if (localVideoRef.current && mediaStreamRef.current) {
