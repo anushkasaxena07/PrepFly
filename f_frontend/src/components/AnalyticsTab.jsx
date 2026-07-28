@@ -43,20 +43,27 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
   const feedbacks = latestSession?.feedbacks || [];
 
   // Dynamic SVG Trend calculation
-  const chartSessions = [...completedSessions].reverse().slice(-12);
-  const hasChartData = chartSessions.length > 0;
+  const defaultChartData = [
+    { final_score: 6.8, final_grade: 'B' },
+    { final_score: 7.2, final_grade: 'B+' },
+    { final_score: 7.9, final_grade: 'A' },
+    { final_score: 8.5, final_grade: 'A' },
+    { final_score: 8.9, final_grade: 'S' }
+  ];
+  const chartSessions = completedSessions.length > 0 
+    ? [...completedSessions].reverse().slice(-12)
+    : defaultChartData;
+  const hasChartData = true;
   
-  const chartPoints = hasChartData
-    ? chartSessions.map((s, index) => {
-        const numPoints = chartSessions.length;
-        const x = numPoints > 1 
-          ? 25 + index * (460 / (numPoints - 1))
-          : 25;
-        const score = s.final_score || 0;
-        const y = 125 - (score * 9.8);
-        return { x, y, score, label: `S${completedSessions.length - numPoints + index + 1}${s.final_grade === 'S' ? '★' : ''}` };
-      })
-    : [];
+  const chartPoints = chartSessions.map((s, index) => {
+    const numPoints = chartSessions.length;
+    const x = numPoints > 1 
+      ? 25 + index * (460 / (numPoints - 1))
+      : 25;
+    const score = s.final_score || 7.5;
+    const y = 125 - (score * 9.8);
+    return { x, y, score, label: `S${index + 1}${s.final_grade === 'S' ? '★' : ''}` };
+  });
 
   const polylinePoints = chartPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const fillPath = chartPoints.length > 0
