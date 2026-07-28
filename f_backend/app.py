@@ -4528,9 +4528,14 @@ Please structure the evaluation report in markdown with these exact headings:
 
     report_text = ""
     try:
-        model = genai.GenerativeModel("gemini-3.5-flash")
-        res = model.generate_content(prompt)
-        report_text = res.text.strip()
+        if chat_model:
+            report_text = chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
+        else:
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            res = model.generate_content(prompt)
+            report_text = res.text.strip()
     except Exception as e:
         print("Gemini report generation notice:", e)
         report_text = f"### 🏆 Executive Evaluation Summary\n- **Candidate Name**: {user_name}\n- **Overall Performance Score**: {score} / 10\n- **Technical Competency Rating**: {tech_rating}\n- **Communication & Verbal Delivery**: {comm_rating}\n- **Hiring Recommendation**: {recommendation}\n\n### 💪 Key Strengths & Technical Highlights\n- {cat_strengths[0]}\n- {cat_strengths[1]}\n- {cat_strengths[2]}\n\n### 🎯 Actionable Areas for Improvement\n- {cat_improvements[0]}\n- {cat_improvements[1]}"

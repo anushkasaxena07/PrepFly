@@ -454,29 +454,20 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
     pc.ontrack = (event) => {
       console.log('🟢 WebRTC ontrack received:', event.track.kind);
-      const incomingStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
-      if (incomingStream) {
-        setRemoteStream(incomingStream);
-        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== incomingStream) {
-          remoteVideoRef.current.srcObject = incomingStream;
-          remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.playsInline = true;
-          remoteVideoRef.current.autoplay = true;
-          remoteVideoRef.current.play().catch(() => {});
+      const incoming = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+      
+      // Combine with any accumulated tracks
+      incoming.getTracks().forEach(t => {
+        if (!remoteStreamInstance.getTracks().find(existing => existing.id === t.id)) {
+          remoteStreamInstance.addTrack(t);
         }
-      } else if (event.track) {
-        if (!remoteStreamInstance.getTracks().find(t => t.id === event.track.id)) {
-          remoteStreamInstance.addTrack(event.track);
-        }
-        const newStreamWrapper = new MediaStream(remoteStreamInstance.getTracks());
-        setRemoteStream(newStreamWrapper);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = newStreamWrapper;
-          remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.playsInline = true;
-          remoteVideoRef.current.autoplay = true;
-          remoteVideoRef.current.play().catch(() => {});
-        }
+      });
+
+      const freshStream = new MediaStream(remoteStreamInstance.getTracks());
+      setRemoteStream(freshStream);
+
+      if (remoteVideoRef.current) {
+        safeAttachStream(remoteVideoRef.current, freshStream, false);
       }
     };
 
