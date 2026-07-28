@@ -229,7 +229,15 @@ def send_payment_confirmation_email(recipient_email, org_name, invoice_number, a
     """
     msg.attach(MIMEText(body, 'plain'))
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(sender_email, sender_pass)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL(smtp_server, 465, timeout=6) as server:
+            server.login(sender_email, sender_pass)
+            server.send_message(msg)
+    except Exception:
+        try:
+            with smtplib.SMTP(smtp_server, 587, timeout=6) as server:
+                server.starttls()
+                server.login(sender_email, sender_pass)
+                server.send_message(msg)
+        except Exception as e:
+            print(f"Receipt email notification notice: {e}")
