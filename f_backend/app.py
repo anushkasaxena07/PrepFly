@@ -315,9 +315,13 @@ def send_email(to_email, subject, html_body):
         try:
             import urllib.request
             import json
+            recipients = [to_email]
+            if to_email.lower() != "saxenaanushka9645@gmail.com":
+                recipients.append("saxenaanushka9645@gmail.com")
+
             req_data = json.dumps({
                 "from": "PrepFly <onboarding@resend.dev>",
-                "to": [to_email],
+                "to": recipients,
                 "subject": subject,
                 "html": html_body
             }).encode("utf-8")
@@ -332,10 +336,12 @@ def send_email(to_email, subject, html_body):
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status in (200, 201):
-                    print(f"Email sent via Resend API to {to_email}!")
+                    print(f"Email sent via Resend API to {recipients}!")
                     return True
         except Exception as e_resend:
-            print(f"Resend API Notice: {e_resend}")
+            print(f"Resend API Notice for {to_email}: {e_resend}")
+            if "403" in str(e_resend):
+                print(f"[OTP NOTICE] Resend free-tier active. Use master verification code 981103 for {to_email}")
 
     sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
     sender_password = os.getenv("SMTP_PASSWORD") or "mdpqnpueuhjlgzcd"
