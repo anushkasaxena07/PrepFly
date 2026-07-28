@@ -1207,12 +1207,6 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                     <div className="flex gap8" style={{marginLeft:"auto"}}>
                       <button 
                         className="btn btn-ghost btn-xs" 
-                        onClick={() => handleOpenReport(s)}
-                      >
-                        📄 Report
-                      </button>
-                      <button 
-                        className="btn btn-ghost btn-xs" 
                         style={{color:"var(--red)"}}
                         onClick={() => handleDeleteSession(s.session_id)}
                       >
@@ -1285,39 +1279,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         </div>
       )}
 
-      {/* ── AI EVALUATION REPORT MODAL ── */}
-      {showReportModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "620px", width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", color: "#fff", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "12px" }}>
-              <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <span>📄</span> AI Executive Interview Report
-              </h3>
-              <button onClick={() => setShowReportModal(false)} style={{ background: "none", border: "none", color: "var(--text2)", fontSize: "18px", cursor: "pointer" }}>✕</button>
-            </div>
 
-            <div style={{ flex: 1, overflowY: "auto", paddingRight: "8px", fontSize: "13px", lineHeight: "1.6", whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-              {isGeneratingReport ? (
-                <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--cyan)" }}>
-                  <div style={{ fontSize: "28px", marginBottom: "12px" }}>🤖</div>
-                  <div style={{ fontWeight: 800, fontSize: "15px" }}>Gemini AI is compiling your evaluation report...</div>
-                  <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Analyzing code quality, communication, and technical metrics</div>
-                </div>
-              ) : (
-                viewingReport
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", marginTop: "20px", justifyContent: "flex-end", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "12px" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => {
-                navigator.clipboard.writeText(viewingReport);
-                alert("Report copied to clipboard!");
-              }}>📋 Copy Report</button>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowReportModal(false)}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── FULLSCREEN WEBRTC LIVE VIDEO INTERVIEW ROOM MODAL ── */}
       {inCall && currentRoom && (
@@ -1363,7 +1325,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
               <span className="pill pill-purple" style={{fontSize: "11px"}}>🟢 Encrypted P2P Active</span>
               <button className="btn btn-sm" style={{background: "var(--red)", color: "#fff"}} onClick={handleEndCall}>
-                🔴 End & Generate Report
+                🔴 End Call
               </button>
             </div>
           </div>
