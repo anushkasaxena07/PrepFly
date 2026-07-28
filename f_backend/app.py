@@ -278,7 +278,7 @@ supabase = SupabaseFallbackClient(SUPABASE_URL, SUPABASE_KEY)
 SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL    = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD") or "mdpqnpueuhjlgzcd"
 
 # ─── Google OAuth ──────────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -310,7 +310,7 @@ except Exception as e_chat:
 
 def send_email(to_email, subject, html_body):
     sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
-    sender_password = os.getenv("SMTP_PASSWORD") or "dytfawgfpxnxmqtp"
+    sender_password = os.getenv("SMTP_PASSWORD") or "mdpqnpueuhjlgzcd"
     smtp_server = os.getenv("SMTP_SERVER") or "smtp.gmail.com"
 
     if not sender_email or not sender_password:
@@ -332,25 +332,25 @@ def send_email(to_email, subject, html_body):
     except Exception:
         pass
 
-    # Strategy 1
+    # Strategy 1: SSL on Port 465
     for host in target_hosts:
         try:
             with smtplib.SMTP_SSL(host, 465, timeout=8) as server:
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
-            print(f"Email sent!")
+            print("Email sent via SSL (port 465)!")
             return True
         except Exception as e:
             print(f"SSL Error ({host}:465): {e}")
 
-    # Strategy 2
+    # Strategy 2: TLS on Port 587
     for host in target_hosts:
         try:
             with smtplib.SMTP(host, 587, timeout=8) as server:
                 server.starttls()
                 server.login(sender_email, sender_password)
                 server.send_message(msg)
-            print(f"Email sent!")
+            print("Email sent via TLS (port 587)!")
             return True
         except Exception as e:
             print(f"TLS Error ({host}:587): {e}")
