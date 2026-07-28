@@ -53,7 +53,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const tabTokenRef = useRef(sessionStorage.getItem("webrtc_tab_token") || Math.random().toString(36).substring(2, 7));
   useEffect(() => { sessionStorage.setItem("webrtc_tab_token", tabTokenRef.current); }, []);
 
-  const userId = (user?._id || user?.id || localStorage.getItem("user_id") || "usr") + "_" + tabTokenRef.current;
+  const userId = user?._id || user?.id || localStorage.getItem("user_id") || "usr";
   const userName = user?.full_name || user?.name || localStorage.getItem("user_name") || localStorage.getItem("email")?.split('@')[0] || "Candidate";
 
 
@@ -69,13 +69,26 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const pendingIceCandidatesRef = useRef({});
   const [connectionStatus, setConnectionStatus] = useState("Disconnected");
 
+  const safeAttachStream = async (element, stream, isMuted = false) => {
+    if (!element || !stream) return;
+    if (element.srcObject !== stream) {
+      element.srcObject = stream;
+    }
+    element.muted = isMuted;
+    element.playsInline = true;
+    element.autoplay = true;
+    try {
+      await element.play();
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.warn("Media play notice:", err);
+      }
+    }
+  };
+
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-      remoteVideoRef.current.muted = false; // UNMUTED SO REMOTE AUDIO IS HEARD CLEARLY!
-      remoteVideoRef.current.playsInline = true;
-      remoteVideoRef.current.autoplay = true;
-      remoteVideoRef.current.play().catch(e => console.warn("Remote video play notice:", e));
+      safeAttachStream(remoteVideoRef.current, remoteStream, false);
     }
   }, [remoteStream]);
 
@@ -83,11 +96,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     if (element) {
       localVideoRef.current = element;
       if (mediaStreamRef.current) {
-        element.srcObject = mediaStreamRef.current;
-        element.muted = true; // Prevent local audio echo
-        element.playsInline = true;
-        element.autoplay = true;
-        element.play().catch(e => console.warn("Local video play notice:", e));
+        safeAttachStream(element, mediaStreamRef.current, true);
       }
     }
   };
@@ -96,11 +105,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     if (element) {
       remoteVideoRef.current = element;
       if (remoteStream) {
-        element.srcObject = remoteStream;
-        element.muted = false; // UNMUTED SO REMOTE AUDIO IS HEARD CLEARLY!
-        element.playsInline = true;
-        element.autoplay = true;
-        element.play().catch(e => console.warn("Remote audio/video play notice:", e));
+        safeAttachStream(element, remoteStream, false);
       }
     }
   };

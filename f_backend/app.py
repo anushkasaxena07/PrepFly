@@ -195,6 +195,42 @@ class SupabaseFallbackClient:
                 
                 if callable(orig_attr):
                     def wrapped(*args, **kwargs):
+                        # Automatically sanitize any user_id / id / session_id values containing tab suffixes (e.g. uuid_tabId)
+                        if len(args) > 0:
+                            def sanitize_val(val):
+                                if isinstance(val, str) and "_" in val and "-" in val:
+                                    parts = val.split("_")
+                                    if len(parts[0]) in (36, 32):
+                                        return parts[0]
+                                return val
+
+                            new_args = []
+                            for arg in args:
+                                if isinstance(arg, str):
+                                    new_args.append(sanitize_val(arg))
+                                elif isinstance(arg, dict):
+                                    new_dict = dict(arg)
+                                    for k in ("id", "user_id", "session_id"):
+                                        if k in new_dict and isinstance(new_dict[k], str):
+                                            new_dict[k] = sanitize_val(new_dict[k])
+                                    new_args.append(new_dict)
+                                elif isinstance(arg, list):
+                                    new_list = []
+                                    for item in arg:
+                                        if isinstance(item, dict):
+                                            new_item = dict(item)
+                                            for k in ("id", "user_id", "session_id"):
+                                                if k in new_item and isinstance(new_item[k], str):
+                                                    new_item[k] = sanitize_val(new_item[k])
+                                            new_list.append(new_item)
+                                        else:
+                                            new_list.append(item)
+                                    new_list_res = new_list
+                                    new_args.append(new_list_res)
+                                else:
+                                    new_args.append(arg)
+                            args = tuple(new_args)
+
                         # Intercept sessions table write queries to bypass missing Supabase columns
                         if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
                             import json
