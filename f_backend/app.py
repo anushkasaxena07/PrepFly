@@ -3821,14 +3821,45 @@ def webrtc_room_join():
     else:
         webrtc_sessions[room_code]["participants"] = participants
 
+    default_ice_servers = [
+        {"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302", "stun:stun.services.mozilla.com"]},
+        {
+            "urls": [
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turns:openrelay.metered.ca:443?transport=tcp"
+            ],
+            "username": "openrelayproject",
+            "credential": "openrelayproject"
+        }
+    ]
+
     return jsonify({
         "room_code": room_code,
         "session_name": room.get("session_name", f"{room_code} Interview"),
         "category": room.get("category", "Technical Interview"),
-        "iceServers": [{"urls": "stun:stun.l.google.com:19302"}],
+        "iceServers": default_ice_servers,
         "participants": participants,
         "status": "Live"
     }), 200
+
+
+@app.route("/api/webrtc/turn-credentials", methods=["GET"])
+@app.route("/webrtc/turn-credentials", methods=["GET"])
+def webrtc_get_turn_credentials():
+    default_ice_servers = [
+        {"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302", "stun:stun.services.mozilla.com"]},
+        {
+            "urls": [
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turns:openrelay.metered.ca:443?transport=tcp"
+            ],
+            "username": "openrelayproject",
+            "credential": "openrelayproject"
+        }
+    ]
+    return jsonify({"iceServers": default_ice_servers}), 200
 
 
 @app.route("/api/webrtc/sync", methods=["POST"])
