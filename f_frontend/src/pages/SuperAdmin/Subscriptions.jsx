@@ -90,28 +90,12 @@ export default function Subscriptions() {
     }
   };
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [autoSync, setAutoSync] = useState(true);
-
   useEffect(() => {
     loadData();
   }, []);
 
-  useEffect(() => {
-    let interval = null;
-    if (autoSync) {
-      interval = setInterval(() => {
-        loadData(true);
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoSync]);
-
-  const loadData = async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const loadData = async () => {
+    setLoading(true);
     try {
       const [plansData, couponsData, statsData] = await Promise.all([
         getSuperAdminSubscriptions().catch(() => []),
@@ -124,8 +108,7 @@ export default function Subscriptions() {
     } catch (e) {
       console.error("Error loading subscription data:", e);
     } finally {
-      if (!silent) setLoading(false);
-      setRefreshing(false);
+      setLoading(false);
     }
   };
 
@@ -272,10 +255,7 @@ export default function Subscriptions() {
     URL.revokeObjectURL(url);
   };
 
-  const safePlans = Array.isArray(plans) ? plans : [];
-  const safeCoupons = Array.isArray(coupons) ? coupons : [];
-
-  const filteredPlans = safePlans.filter(p => {
+  const filteredPlans = plans.filter(p => {
     const matchesSearch = !searchPlan || p.plan_name?.toLowerCase().includes(searchPlan.toLowerCase());
     const matchesStatus = statusFilter === 'All' || p.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -297,46 +277,13 @@ export default function Subscriptions() {
         <div>
           <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             👑 SaaS Plan Tiers & Limits
-            {refreshing && <span style={{ fontSize: "12px", color: "var(--cyan)", fontWeight: 700 }}>⚡ Syncing...</span>}
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
             Manage subscription plans, pricing, billing cycles and platform usage limits.
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            onClick={() => setAutoSync(!autoSync)}
-            style={{
-              background: autoSync ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
-              border: `1px solid ${autoSync ? "#10b981" : "rgba(255,255,255,0.12)"}`,
-              borderRadius: "8px",
-              padding: "8px 12px",
-              fontSize: "11px",
-              color: autoSync ? "#10b981" : "#94a3b8",
-              fontWeight: 800,
-              cursor: "pointer"
-            }}
-          >
-            {autoSync ? '🟢 Live Sync (5s)' : '⏸ Sync Off'}
-          </button>
-
-          <button
-            onClick={() => loadData(false)}
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              color: "#fff",
-              fontSize: "11px",
-              fontWeight: 800,
-              cursor: "pointer"
-            }}
-          >
-            🔄 Refresh
-          </button>
-
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={handleOpenNewPlan}
             style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,196,167,0.3)" }}
@@ -577,7 +524,7 @@ export default function Subscriptions() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
-            {safeCoupons.map(c => (
+            {coupons.map(c => (
               <div key={c.id} style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>

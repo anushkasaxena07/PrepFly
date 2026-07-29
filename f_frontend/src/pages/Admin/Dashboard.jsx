@@ -6,25 +6,12 @@ import { getAdminDashboardStats } from '../../services/adminAPI';
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [autoSync, setAutoSync] = useState(true);
 
   useEffect(() => {
     fetchStats();
-    let interval;
-    if (autoSync) {
-      interval = setInterval(() => {
-        fetchStats(true);
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoSync]);
+  }, []);
 
-  const fetchStats = async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
-    else setIsRefreshing(true);
+  const fetchStats = async () => {
     try {
       const data = await getAdminDashboardStats();
       setStats(data);
@@ -32,7 +19,6 @@ export default function Dashboard() {
       console.error("Fetch admin stats error:", e);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -43,54 +29,6 @@ export default function Dashboard() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       
-      {/* HEADER & CONTROLS */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-        <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0 }}>
-            🏛️ Organization Executive Command Center
-          </h2>
-          <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>
-            Real-time candidate telemetry, placement assessment stats, and institutional usage analytics.
-          </p>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button
-            onClick={() => setAutoSync(!autoSync)}
-            style={{
-              background: autoSync ? "rgba(0,196,167,0.15)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${autoSync ? "#00c4a7" : "rgba(255,255,255,0.1)"}`,
-              color: autoSync ? "#00c4a7" : "#94a3b8",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              fontSize: "11px",
-              fontWeight: 800,
-              cursor: "pointer"
-            }}
-          >
-            {autoSync ? "🟢 Live Sync (5s)" : "⏸️ Sync Paused"}
-          </button>
-
-          <button
-            onClick={() => fetchStats(false)}
-            disabled={isRefreshing}
-            style={{
-              background: "linear-gradient(135deg, #7c4fe0, #00c4a7)",
-              border: "none",
-              color: "#fff",
-              padding: "6px 14px",
-              borderRadius: "8px",
-              fontSize: "11px",
-              fontWeight: 900,
-              cursor: "pointer",
-              opacity: isRefreshing ? 0.6 : 1
-            }}
-          >
-            {isRefreshing ? "⚡ Syncing..." : "🔄 Refresh"}
-          </button>
-        </div>
-      </div>
-
       {/* SECTION 1: STATS CARDS GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
         <DashboardCard title="Total Students" value={stats?.total_students ?? 0} subtext="Enrolled Candidates" icon="🎓" trend="+14% this month" color="#00c4a7" />

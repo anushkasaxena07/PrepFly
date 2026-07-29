@@ -70,8 +70,7 @@ export default function ActivityLogs() {
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      const logsArray = Array.isArray(data?.logs) ? data.logs : [];
-      setSelectedIds(logsArray.map(l => l.id));
+      setSelectedIds(data.logs.map(l => l.id));
     } else {
       setSelectedIds([]);
     }
@@ -137,8 +136,7 @@ export default function ActivityLogs() {
 
   // Export functions
   const exportCSV = () => {
-    const logsArray = Array.isArray(data?.logs) ? data.logs : [];
-    const exportData = selectedIds.length > 0 ? logsArray.filter(l => selectedIds.includes(l.id)) : logsArray;
+    const exportData = selectedIds.length > 0 ? data.logs.filter(l => selectedIds.includes(l.id)) : data.logs;
     if (!exportData || exportData.length === 0) return alert("No logs available to export");
 
     const headers = ["Event ID", "Timestamp", "Severity", "Risk Score", "Category", "Action", "Target", "Performed By Name", "Role", "Email", "Organization", "Status", "IP Address", "Location", "Device", "Browser", "Session ID", "Amount", "Transaction ID"];
@@ -177,8 +175,7 @@ export default function ActivityLogs() {
   };
 
   const exportJSON = () => {
-    const logsArray = Array.isArray(data?.logs) ? data.logs : [];
-    const exportData = selectedIds.length > 0 ? logsArray.filter(l => selectedIds.includes(l.id)) : logsArray;
+    const exportData = selectedIds.length > 0 ? data.logs.filter(l => selectedIds.includes(l.id)) : data.logs;
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -201,8 +198,8 @@ export default function ActivityLogs() {
     }
   };
 
-  const summary = data?.summary || {};
-  const logsList = Array.isArray(data?.logs) ? data.logs : [];
+  const summary = data.summary || {};
+  const logsList = data.logs || [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', fontFamily: 'Inter, system-ui, sans-serif' }}>

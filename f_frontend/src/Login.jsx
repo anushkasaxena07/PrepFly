@@ -154,13 +154,15 @@ export default function Login() {
     if (!window.google) { msg("Google SDK not loaded yet."); return; }
     if (!GOOGLE_CLIENT_ID) { msg("Google Client ID not configured."); return; }
     try {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCallback,
-        auto_select: false,
-        cancel_on_tap_outside: true
-      });
-      googleInitRef.current = true;
+      if (!googleInitRef.current) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCallback,
+          auto_select: false,
+          cancel_on_tap_outside: true
+        });
+        googleInitRef.current = true;
+      }
       const c = document.getElementById("google-btn-hidden");
       if (c) {
         c.innerHTML = "";

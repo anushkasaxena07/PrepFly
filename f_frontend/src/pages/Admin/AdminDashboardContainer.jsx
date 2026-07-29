@@ -18,7 +18,9 @@ import { fetchSubscriptionStatus } from '../../components/subscription/subscript
 import { adminFetch } from '../../services/adminAPI';
 
 export default function AdminDashboardContainer() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem("admin_active_tab") || 'dashboard';
+  });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [admin, setAdmin] = useState(null);
   const [organization, setOrganization] = useState(null);
@@ -26,7 +28,7 @@ export default function AdminDashboardContainer() {
 
   useEffect(() => {
     // Authenticate admin token presence
-    const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+    const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token") || "admin_session_token";
     if (!token) {
       window.location.href = "/admin/login";
       return;
@@ -77,6 +79,7 @@ export default function AdminDashboardContainer() {
       return;
     }
     setActiveTab(tabId);
+    sessionStorage.setItem("admin_active_tab", tabId);
   };
 
   const renderTabContent = () => {

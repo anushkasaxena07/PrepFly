@@ -293,8 +293,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
   const fetchActiveRooms = async () => {
     try {
-      const userOrg = localStorage.getItem("organization_id") || localStorage.getItem("user_org_id") || "";
-      const res = await apiFetch(`/api/webrtc/active-rooms?organization_id=${userOrg}`);
+      const res = await apiFetch('/api/webrtc/active-rooms');
       if (res.ok) {
         const data = await res.json();
         setActiveRooms(data.rooms || []);
@@ -423,7 +422,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const initRTCPeerConnection = (stream) => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
-    console.log("🟢 Initializing WebRTC PeerConnection with Multi-Region STUN & TURN Relays");
+    console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
     const remoteStreamInstance = new MediaStream();
 
     const pc = new RTCPeerConnection({
@@ -432,14 +431,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun4.l.google.com:19302" },
         { urls: "stun:stun.services.mozilla.com" },
-        { urls: "stun:global.stun.twilio.com:3478" },
         {
           urls: [
             "turn:openrelay.metered.ca:80",
             "turn:openrelay.metered.ca:443",
-            "turn:openrelay.metered.ca:443?transport=tcp",
             "turns:openrelay.metered.ca:443?transport=tcp"
           ],
           username: "openrelayproject",
@@ -492,40 +488,37 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     let iceDisconnectTimer = null;
 
     pc.oniceconnectionstatechange = () => {
-      console.log('🔵 WebRTC ICE connection state:', pc.iceConnectionState);
+      console.log('🔵 ICE connection state:', pc.iceConnectionState);
       const state = pc.iceConnectionState;
       if (state === "checking") {
         setConnectionStatus("Connecting...");
       } else if (state === "disconnected") {
         setConnectionStatus("Reconnecting...");
-        sentOfferRef.current = false; // Allow fresh offer on next sync loop
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         iceDisconnectTimer = setTimeout(async () => {
           if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-            console.log("⚡ Executing automatic WebRTC ICE restart & SDP renegotiation...");
+            console.log("⚡ Executing automatic ICE restart recovery...");
             try {
+              sentOfferRef.current = false;
               if (pc.restartIce) pc.restartIce();
-              if (pc.signalingState === "stable") {
-                const offer = await pc.createOffer({ iceRestart: true });
-                await pc.setLocalDescription(offer);
-                const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-                if (targetId) {
-                  console.log("Emitting ICE restart offer to reconnect candidate stream to:", targetId);
-                  sendSignal(targetId, offer);
-                }
+              const offer = await pc.createOffer({ iceRestart: true });
+              await pc.setLocalDescription(offer);
+              const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+              if (targetId) {
+                console.log("Emitting ICE restart offer to reconnect candidate stream");
+                sendSignal(targetId, offer);
               }
             } catch (err) {
               console.warn("ICE restart recovery notice:", err);
             }
           }
-        }, 1500);
+        }, 2000);
       } else if (state === "connected" || state === "completed") {
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         setConnectionStatus("Connected");
       } else if (state === "failed" || state === "closed") {
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         setConnectionStatus("Disconnected");
-        sentOfferRef.current = false;
       }
     };
 
@@ -595,7 +588,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log("WebRTC Answer Created and Sent to", sender_id);
+            console.log("WebRTC Answer Created and Sent");
             sendSignal(sender_id, answer);
 
             if (pc.pendingRemoteCandidates) {

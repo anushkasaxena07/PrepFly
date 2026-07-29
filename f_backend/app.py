@@ -100,7 +100,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-User-Role, X-Role, X-Organization-Id"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    response.headers["Cross-Origin-Opener-Policy"] = "unsafe-none"
     return response
 
 @app.route("/<path:dummy>", methods=["OPTIONS"])
@@ -3318,38 +3318,6 @@ Return ONLY the raw JSON string, no markdown code block (like ```json), no pream
 @app.route("/coding/problems", methods=["GET"])
 def get_coding_problems():
     sheet_id = request.args.get("sheet_id")
-    org_id = request.args.get("org_id") or request.args.get("organization_id")
-    
-    problems = []
-    admin_problems = []
-
-    # 1. Fetch organization-specific coding tests created by Admin
-    if org_id:
-        try:
-            ac_res = supabase.table("admin_coding").select("*").eq("organization_id", org_id).execute()
-            if ac_res and hasattr(ac_res, "data") and ac_res.data:
-                for test in ac_res.data:
-                    admin_problems.append({
-                        "problem_id": test.get("id"),
-                        "title": f"🏫 [{test.get('difficulty', 'Medium')}] {test.get('title')}",
-                        "difficulty": test.get("difficulty", "Medium"),
-                        "category": "Org Admin Coding Challenge",
-                        "description": test.get("description"),
-                        "sample_input": test.get("sample_input"),
-                        "sample_output": test.get("sample_output"),
-                        "constraints": test.get("constraints"),
-                        "starter_code": {
-                            "python": f"# {test.get('title')}\n# Duration: {test.get('duration')} mins\n\ndef solution(nums, target):\n    # Write your solution here\n    pass\n",
-                            "javascript": f"// {test.get('title')}\nfunction solution(nums, target) {{\n  // Write your solution here\n}}\n",
-                            "cpp": f"// {test.get('title')}\n#include <iostream>\n#include <vector>\nusing namespace std;\n\nint main() {{\n    return 0;\n}}\n"
-                        },
-                        "organization_id": org_id,
-                        "created_by_admin": True
-                    })
-        except Exception as e:
-            print("Fetch admin coding tests for org notice:", e)
-
-    # 2. Fetch standard coding problem set
     try:
         if sheet_id:
             res = supabase.table("coding_problems").select("*").eq("sheet_id", sheet_id).execute()
@@ -3357,11 +3325,9 @@ def get_coding_problems():
             res = supabase.table("coding_problems").select("*").execute()
             
         problems = res.data or []
+        return jsonify({"problems": problems}), 200
     except Exception as e:
-        print("Fetch coding problems notice:", e)
-
-    combined_problems = admin_problems + problems
-    return jsonify({"problems": combined_problems}), 200
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/coding/room/create", methods=["POST"])
@@ -3743,7 +3709,6 @@ def webrtc_room_create():
     category = data.get("category") or "Full Stack Interview"
     user_id = data.get("user_id") or "interviewer"
     user_name = data.get("user_name") or "Interviewer"
-    org_id = data.get("organization_id") or data.get("org_id") or get_admin_org_id()
     devices = data.get("devices") or {"camera": True, "mic": True, "screen": False}
 
     import string
@@ -3761,7 +3726,6 @@ def webrtc_room_create():
             "room_code": room_code,
             "session_name": session_name,
             "category": category,
-            "organization_id": org_id,
             "created_by": user_id,
             "devices": devices,
             "participants": participants,
@@ -3776,7 +3740,6 @@ def webrtc_room_create():
         "room_code": room_code,
         "session_name": session_name,
         "category": category,
-        "organization_id": org_id,
         "participants": participants,
         "chat_messages": [
             { "sender": "System", "text": "Encrypted WebRTC P2P channel established. STUN/TURN active.", "time": "Just now" }
@@ -4420,12 +4383,8 @@ Suggest a single follow-up question or a quick technical prompt for the intervie
 @app.route("/api/webrtc/active-rooms", methods=["GET"])
 @app.route("/webrtc/active-rooms", methods=["GET"])
 def webrtc_active_rooms():
-    org_id = request.args.get("organization_id") or request.args.get("org_id")
     try:
-        if org_id:
-            res = supabase.table("webrtc_rooms").select("*").eq("organization_id", org_id).order("created_at", desc=True).limit(10).execute()
-        else:
-            res = supabase.table("webrtc_rooms").select("*").order("created_at", desc=True).limit(10).execute()
+        res = supabase.table("webrtc_rooms").select("*").order("created_at", desc=True).limit(10).execute()
         db_rooms = res.data if (res and res.data) else []
     except Exception:
         db_rooms = []
@@ -5635,81 +5594,21 @@ def admin_dashboard_stats():
 @app.route("/api/admin/students", methods=["GET"])
 @app.route("/admin/students", methods=["GET"])
 def admin_get_students():
-    org_id = request.args.get("org_id") or request.args.get("organization_id") or get_admin_org_id()
+    org_id = get_admin_org_id()
     dept = request.args.get("department")
     sem = request.args.get("semester")
     status = request.args.get("status")
     query = request.args.get("query", "").lower()
 
-    students_map = {}
-
-    # 1. Fetch from students table for this organization
+    students = []
     try:
         res = supabase.table("students").select("*").eq("organization_id", org_id).execute()
-        if res and hasattr(res, "data") and res.data:
-            for s in res.data:
-                e = s.get("email") or s.get("id")
-                students_map[e] = s
+        if res and res.data:
+            students = res.data
     except Exception as e:
-        print("Admin get students DB notice:", e)
+        print("Admin get students notice:", e)
 
-    # 2. Fetch signed up candidates/users belonging to this organization
-    try:
-        u_res = supabase.table("users").select("*").eq("organization_id", org_id).execute()
-        if u_res and hasattr(u_res, "data") and u_res.data:
-            for u in u_res.data:
-                e = u.get("email")
-                if e and e not in students_map:
-                    students_map[e] = {
-                        "id": u.get("id") or f"std_{uuid.uuid4().hex[:8]}",
-                        "organization_id": org_id,
-                        "name": u.get("name") or u.get("full_name") or "Student Candidate",
-                        "email": e,
-                        "roll_number": f"CS2026{random.randint(100,999)}",
-                        "department": u.get("department") or "Computer Science",
-                        "semester": u.get("semester") or "Sem 6",
-                        "year": "3rd Year",
-                        "status": "Active",
-                        "interview_score": 8.5,
-                        "coding_score": 88.0,
-                        "overall_score": 8.5,
-                        "created_at": u.get("created_at") or datetime.utcnow().isoformat()
-                    }
-    except Exception as e:
-        print("Admin get users notice:", e)
-
-    students = list(students_map.values())
-
-    # 3. Dynamic seed fallback linked strictly to org_id if empty
-    if not students:
-        sample_candidates = [
-            {"name": "Ananya Patel", "email": f"ananya.{org_id[:6]}@student.edu", "dept": "Computer Science", "sem": "Sem 6", "roll": "CS2026101", "iv": 9.4, "cd": 94.0},
-            {"name": "Aarav Sharma", "email": f"aarav.{org_id[:6]}@student.edu", "dept": "Computer Science", "sem": "Sem 6", "roll": "CS2026102", "iv": 9.0, "cd": 88.0},
-            {"name": "Sneha Reddy", "email": f"sneha.{org_id[:6]}@student.edu", "dept": "Information Tech", "sem": "Sem 6", "roll": "IT2026103", "iv": 8.8, "cd": 86.0},
-            {"name": "Rohan Verma", "email": f"rohan.{org_id[:6]}@student.edu", "dept": "Electronics", "sem": "Sem 4", "roll": "ECE2026104", "iv": 8.2, "cd": 80.0},
-            {"name": "Kavya Gupta", "email": f"kavya.{org_id[:6]}@student.edu", "dept": "Computer Science", "sem": "Sem 8", "roll": "CS2026105", "iv": 8.6, "cd": 84.0}
-        ]
-        for c in sample_candidates:
-            std_obj = {
-                "id": f"std_{uuid.uuid4().hex[:8]}",
-                "organization_id": org_id,
-                "name": c["name"],
-                "email": c["email"],
-                "roll_number": c["roll"],
-                "department": c["dept"],
-                "semester": c["sem"],
-                "year": "3rd Year",
-                "phone": "+91 98765 43210",
-                "interview_score": c["iv"],
-                "coding_score": c["cd"],
-                "overall_score": c["iv"],
-                "subscription": "ACTIVE",
-                "status": "Active",
-                "created_at": datetime.utcnow().isoformat()
-            }
-            students.append(std_obj)
-
-    # 4. Filter by Dept, Semester, Status, and Query
+    # Filter strictly by Org & Query
     filtered = []
     for s in students:
         if dept and dept != "All" and s.get("department") != dept:
@@ -5719,14 +5618,14 @@ def admin_get_students():
         if status and status != "All" and s.get("status") != status:
             continue
         if query:
-            match = (query in str(s.get("name", "")).lower() or 
-                     query in str(s.get("roll_number", "")).lower() or 
-                     query in str(s.get("email", "")).lower())
+            match = (query in s.get("name", "").lower() or 
+                     query in s.get("roll_number", "").lower() or 
+                     query in s.get("email", "").lower())
             if not match:
                 continue
         filtered.append(s)
 
-    return jsonify({"count": len(filtered), "organization_id": org_id, "students": filtered}), 200
+    return jsonify({"count": len(filtered), "students": filtered}), 200
 
 
 @app.route("/api/admin/student", methods=["POST"])
@@ -7669,9 +7568,9 @@ def superadmin_dashboard_stats():
         "new_registrations_today": new_today,
         "active_subscriptions": 12,
         "expired_subscriptions": 2,
-        "today_revenue": "₹1,495.00",
-        "monthly_revenue": "₹42,850.00",
-        "yearly_revenue": "₹3,80,000.00",
+        "today_revenue": "$1,495.00",
+        "monthly_revenue": "$42,850.00",
+        "yearly_revenue": "$380,000.00",
         "total_interviews": total_sessions,
         "total_coding_tests": 0,
         "total_ai_api_calls": total_sessions * 14,
@@ -7695,112 +7594,18 @@ def superadmin_dashboard_stats():
     return jsonify(stats), 200
 
 
-IN_MEMORY_ORGS = [
-    {
-        "id": "org_stanford_01",
-        "name": "Stanford Tech Institute",
-        "type": "College",
-        "industry": "Computer Science & Higher Ed",
-        "admin_name": "Prof. Marcus Vance",
-        "email": "admin@stanford.edu",
-        "phone": "+1 650-723-2300",
-        "website": "https://stanford.edu",
-        "domain": "stanford.edu",
-        "city": "San Francisco",
-        "state": "California",
-        "country": "USA",
-        "student_count": 420,
-        "student_limit": "500",
-        "recruiters_count": 14,
-        "admins_count": 4,
-        "active_drives": 6,
-        "subscription_plan": "ENTERPRISE SCALE",
-        "subscription_expiry": "2027-12-31",
-        "monthly_revenue": 50000,
-        "health_score": 96,
-        "health_badge": "🟢 Healthy",
-        "status": "Active",
-        "ai_credits_remaining": "45,000 Credits",
-        "storage_used": "142 GB",
-        "mfa_enabled": True,
-        "last_activity": "Just Now 🟢",
-        "last_login": "2026-07-29"
-    },
-    {
-        "id": "org_mit_02",
-        "name": "MIT School of Computing",
-        "type": "College",
-        "industry": "Artificial Intelligence & Robotics",
-        "admin_name": "Dr. Sarah Jenkins",
-        "email": "admin@mit.edu",
-        "phone": "+1 617-253-1000",
-        "website": "https://mit.edu",
-        "domain": "mit.edu",
-        "city": "Boston",
-        "state": "Massachusetts",
-        "country": "USA",
-        "student_count": 680,
-        "student_limit": "1000",
-        "recruiters_count": 22,
-        "admins_count": 6,
-        "active_drives": 10,
-        "subscription_plan": "ENTERPRISE SCALE",
-        "subscription_expiry": "2027-10-15",
-        "monthly_revenue": 75000,
-        "health_score": 98,
-        "health_badge": "🟢 Healthy",
-        "status": "Active",
-        "ai_credits_remaining": "85,000 Credits",
-        "storage_used": "320 GB",
-        "mfa_enabled": True,
-        "last_activity": "Just Now 🟢",
-        "last_login": "2026-07-29"
-    },
-    {
-        "id": "org_cambridge_03",
-        "name": "Cambridge Institute of Technology",
-        "type": "College",
-        "industry": "Software Engineering & Data Science",
-        "admin_name": "Dr. Aris Thorne",
-        "email": "admin@cambridge.edu",
-        "phone": "+44 1223 337733",
-        "website": "https://cambridge.edu",
-        "domain": "cambridge.edu",
-        "city": "Cambridge",
-        "state": "Cambridgeshire",
-        "country": "UK",
-        "student_count": 290,
-        "student_limit": "500",
-        "recruiters_count": 9,
-        "admins_count": 3,
-        "active_drives": 5,
-        "subscription_plan": "BUSINESS GROWTH",
-        "subscription_expiry": "2027-08-20",
-        "monthly_revenue": 35000,
-        "health_score": 91,
-        "health_badge": "🟢 Healthy",
-        "status": "Active",
-        "ai_credits_remaining": "30,000 Credits",
-        "storage_used": "110 GB",
-        "mfa_enabled": True,
-        "last_activity": "1 hour ago",
-        "last_login": "2026-07-29"
-    }
-]
-
 @app.route("/api/superadmin/organizations", methods=["GET"])
 @app.route("/superadmin/organizations", methods=["GET"])
 def superadmin_get_organizations():
-    global IN_MEMORY_ORGS
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    db_orgs = []
+    orgs = []
     try:
         res = supabase.table("organization").select("*").execute()
-        if res and hasattr(res, "data") and res.data:
+        if res and res.data:
             for idx, o in enumerate(res.data):
-                db_orgs.append({
+                orgs.append({
                     "id": o.get("id"),
                     "name": o.get("name") or "Organization",
                     "type": o.get("type") or ("College" if idx % 2 == 0 else "Company"),
@@ -7810,6 +7615,7 @@ def superadmin_get_organizations():
                     "phone": o.get("phone") or "+1 650-723-2300",
                     "website": o.get("website") or f"https://{str(o.get('name', 'org')).lower().replace(' ', '')}.edu",
                     "domain": f"{str(o.get('name', 'org')).lower().replace(' ', '')}.edu",
+                    "gst_number": f"27AAAAA00{idx+10}A1Z5",
                     "city": "San Francisco" if idx % 2 == 0 else "Boston",
                     "state": "California" if idx % 2 == 0 else "Massachusetts",
                     "country": "USA",
@@ -7818,7 +7624,7 @@ def superadmin_get_organizations():
                     "recruiters_count": 14 if idx == 0 else 4 + idx,
                     "admins_count": 4 if idx == 0 else 2,
                     "active_drives": 6 if idx == 0 else 2,
-                    "subscription_plan": o.get("subscription_plan") or "ENTERPRISE SCALE",
+                    "subscription_plan": o.get("subscription_plan") or "ENTERPRISE",
                     "subscription_expiry": str(o.get("subscription_expiry") or "2027-12-31")[:10],
                     "monthly_revenue": 50000 if idx == 0 else 35000,
                     "health_score": 96 if idx % 3 != 0 else 78,
@@ -7826,23 +7632,31 @@ def superadmin_get_organizations():
                     "status": o.get("status") or "Active",
                     "ai_credits_remaining": "45,000 Credits",
                     "storage_used": "142 GB",
-                    "last_login": "2026-07-29",
+                    "resume_analyses": 1240,
+                    "mock_interviews": 4820,
+                    "coding_tests": 8940,
+                    "mfa_enabled": True,
+                    "trusted_domains": ["stanford.edu", "mit.edu", "google.com"],
+                    "last_login": "2026-07-21",
+                    "last_activity": "Just Now 🟢" if idx % 2 == 0 else "2 hours ago",
                     "created_at": str(o.get("created_at") or "2026-07-01")[:10]
                 })
-    except Exception as e:
-        print("Query orgs DB notice:", e)
+    except Exception:
+        pass
 
-    merged_map = {o["id"]: o for o in IN_MEMORY_ORGS}
-    for dbo in db_orgs:
-        merged_map[dbo["id"]] = dbo
+    if not orgs:
+        orgs = [
+            {"id": "org_stanford_01", "name": "Stanford Tech Institute", "type": "College", "industry": "Computer Science & Higher Ed", "admin_name": "Prof. Marcus Vance", "email": "admin@stanford.edu", "phone": "+1 650-723-2300", "website": "https://stanford.edu", "domain": "stanford.edu", "city": "San Francisco", "state": "California", "country": "USA", "student_count": 420, "student_limit": "500", "recruiters_count": 14, "admins_count": 4, "active_drives": 6, "subscription_plan": "ENTERPRISE SCALE", "subscription_expiry": "2027-12-31", "monthly_revenue": 50000, "health_score": 96, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "45,000 Credits", "storage_used": "142 GB", "mfa_enabled": True, "last_activity": "Just Now 🟢", "last_login": "2026-07-21"},
+            {"id": "org_mit_02", "name": "MIT School of Computing", "type": "College", "industry": "Artificial Intelligence & Robotics", "admin_name": "Dr. Sarah Jenkins", "email": "admin@mit.edu", "phone": "+1 617-253-1000", "website": "https://mit.edu", "domain": "mit.edu", "city": "Boston", "state": "Massachusetts", "country": "USA", "student_count": 680, "student_limit": "1000", "recruiters_count": 22, "admins_count": 6, "active_drives": 10, "subscription_plan": "ENTERPRISE SCALE", "subscription_expiry": "2027-10-15", "monthly_revenue": 75000, "health_score": 98, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "85,000 Credits", "storage_used": "320 GB", "mfa_enabled": True, "last_activity": "Just Now 🟢", "last_login": "2026-07-21"},
+            {"id": "org_google_03", "name": "Google Talent Acquisition Drive", "type": "Company", "industry": "Cloud Computing & Enterprise Software", "admin_name": "David Miller", "email": "recruiter@google.com", "phone": "+1 650-253-0000", "website": "https://google.com", "domain": "google.com", "city": "Mountain View", "state": "California", "country": "USA", "student_count": 320, "student_limit": "500", "recruiters_count": 8, "admins_count": 2, "active_drives": 4, "subscription_plan": "BUSINESS GROWTH", "subscription_expiry": "2026-11-20", "monthly_revenue": 35000, "health_score": 92, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "25,000 Credits", "storage_used": "95 GB", "mfa_enabled": True, "last_activity": "3 hours ago", "last_login": "2026-07-20"}
+        ]
 
-    return jsonify(list(merged_map.values())), 200
+    return jsonify(orgs), 200
 
 
 @app.route("/api/superadmin/organization", methods=["POST"])
 @app.route("/superadmin/organization", methods=["POST"])
 def superadmin_create_organization():
-    global IN_MEMORY_ORGS
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
@@ -7866,31 +7680,15 @@ def superadmin_create_organization():
         "id": org_id,
         "name": org_name,
         "type": org_type,
-        "industry": data.get("industry", "Technology & Education"),
-        "admin_name": admin_name,
+        "logo": data.get("logo", "https://lh3.googleusercontent.com/a/default_logo"),
         "email": email,
         "phone": data.get("phone", "+1 800-555-0199"),
         "website": data.get("website", f"https://{org_name.lower().replace(' ','')}.com"),
-        "domain": f"{org_name.lower().replace(' ','')}.edu",
-        "city": data.get("city", "San Francisco"),
-        "state": data.get("state", "California"),
-        "country": data.get("country", "USA"),
-        "student_count": 0,
-        "student_limit": data.get("student_limit", "500"),
-        "recruiters_count": 2,
-        "admins_count": 1,
-        "active_drives": 1,
-        "subscription_plan": data.get("subscription_plan", "ENTERPRISE SCALE"),
+        "address": data.get("address", "Silicon Valley Main Ave"),
+        "subscription_plan": data.get("subscription_plan", "ENTERPRISE"),
         "subscription_expiry": "2027-12-31",
-        "monthly_revenue": 50000,
-        "health_score": 100,
-        "health_badge": "🟢 Healthy",
         "status": "Active",
-        "ai_credits_remaining": "50,000 Credits",
-        "storage_used": "0 GB",
-        "last_activity": "Just Now 🟢",
-        "last_login": "2026-07-29",
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d")
+        "created_at": datetime.utcnow().isoformat()
     }
 
     new_admin = {
@@ -7902,9 +7700,6 @@ def superadmin_create_organization():
         "role": "Organization Admin",
         "created_at": datetime.utcnow().isoformat()
     }
-
-    # Store in-memory immediately
-    IN_MEMORY_ORGS.append(new_org)
 
     try:
         supabase.table("organization").insert(new_org).execute()
@@ -7922,12 +7717,10 @@ def superadmin_create_organization():
 @app.route("/api/superadmin/organization/<org_id>", methods=["PUT", "DELETE"])
 @app.route("/superadmin/organization/<org_id>", methods=["PUT", "DELETE"])
 def superadmin_manage_organization(org_id):
-    global IN_MEMORY_ORGS
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
     if request.method == "DELETE":
-        IN_MEMORY_ORGS = [o for o in IN_MEMORY_ORGS if o["id"] != org_id]
         try:
             supabase.table("organization").delete().eq("id", org_id).execute()
             supabase.table("admin").delete().eq("organization_id", org_id).execute()
@@ -8208,80 +8001,6 @@ def superadmin_manage_student(std_id):
 
 
 
-IN_MEMORY_PLANS = [
-    {
-        "id": "plan_starter",
-        "plan_name": "Academic Starter",
-        "subtitle": "Essential AI Mock Tools for Departments",
-        "badge": "Starter",
-        "price_monthly": 199,
-        "price_yearly": 1999,
-        "duration": "Annual",
-        "storage_limit": "50 GB",
-        "student_limit": "250 Students",
-        "admin_limit": "2 Admins",
-        "ai_credits": "1,000 Credits",
-        "ai_interviews": "500 / mo",
-        "coding_tests": "500 / mo",
-        "resume_analyses": "1,000 / mo",
-        "trial_days": 7,
-        "status": "Active",
-        "orgs_count": 4,
-        "updated_at": "2026-07-29"
-    },
-    {
-        "id": "plan_pro",
-        "plan_name": "Institutional Professional",
-        "subtitle": "Complete Placement & Coding Suite",
-        "badge": "Popular",
-        "price_monthly": 499,
-        "price_yearly": 4999,
-        "duration": "Annual",
-        "storage_limit": "500 GB",
-        "student_limit": "1,500 Students",
-        "admin_limit": "10 Admins",
-        "ai_credits": "5,000 Credits",
-        "ai_interviews": "Unlimited",
-        "coding_tests": "Unlimited",
-        "resume_analyses": "Unlimited",
-        "trial_days": 14,
-        "status": "Active",
-        "orgs_count": 8,
-        "updated_at": "2026-07-29"
-    },
-    {
-        "id": "plan_enterprise",
-        "plan_name": "Global Enterprise Scale",
-        "subtitle": "Custom White Label & Dedicated Support SLA",
-        "badge": "Enterprise",
-        "price_monthly": 999,
-        "price_yearly": 9999,
-        "duration": "Annual",
-        "storage_limit": "2 TB",
-        "student_limit": "10,000+ Students",
-        "admin_limit": "Unlimited Admins",
-        "ai_credits": "50,000 Credits",
-        "ai_interviews": "Unlimited",
-        "coding_tests": "Unlimited",
-        "resume_analyses": "Unlimited",
-        "trial_days": 30,
-        "status": "Active",
-        "orgs_count": 2,
-        "updated_at": "2026-07-29"
-    }
-]
-
-IN_MEMORY_COUPONS = [
-    {"id": "coup_1", "code": "SUMMER25", "name": "Summer Institutional Launch", "discount_type": "Percentage", "value": 25, "max_uses": 100, "used_count": 18, "valid_until": "2026-08-31", "status": "Active"},
-    {"id": "coup_2", "code": "WELCOME500", "name": "First Institution Flat Discount", "discount_type": "Flat", "value": 500, "max_uses": 50, "used_count": 14, "valid_until": "2026-12-31", "status": "Active"},
-    {"id": "coup_3", "code": "EDUPARTNER", "name": "Academic Partner Grant", "discount_type": "Percentage", "value": 40, "max_uses": 200, "used_count": 35, "valid_until": "2026-11-30", "status": "Active"}
-]
-
-@app.route("/api/public/plans", methods=["GET"])
-@app.route("/public/plans", methods=["GET"])
-def public_plans():
-    return jsonify(IN_MEMORY_PLANS), 200
-
 @app.route("/api/superadmin/subscriptions", methods=["GET", "POST"])
 @app.route("/superadmin/subscriptions", methods=["GET", "POST"])
 @app.route("/api/superadmin/subscription", methods=["POST", "PUT"])
@@ -8303,7 +8022,6 @@ def superadmin_subscriptions():
             "storage_limit": data.get("storage_limit", "500 GB"),
             "student_limit": data.get("student_limit", "1,000+ Students"),
             "admin_limit": data.get("admin_limit", "10 Admins"),
-            "ai_credits": data.get("ai_credits", "5,000 Credits"),
             "ai_interviews": data.get("ai_interviews", "Unlimited"),
             "coding_tests": data.get("coding_tests", "Unlimited"),
             "resume_analyses": data.get("resume_analyses", "Unlimited"),
@@ -8312,34 +8030,81 @@ def superadmin_subscriptions():
             "orgs_count": data.get("orgs_count", 8),
             "updated_at": datetime.utcnow().strftime("%Y-%m-%d")
         }
-
-        # Update in-memory plans store immediately
-        idx = next((i for i, p in enumerate(IN_MEMORY_PLANS) if p["id"] == plan_id), None)
-        if idx is not None:
-            IN_MEMORY_PLANS[idx] = new_plan
-        else:
-            IN_MEMORY_PLANS.append(new_plan)
-
         try:
             supabase.table("platform_plans").upsert(new_plan).execute()
         except Exception as e:
             print("Upsert plan notice:", e)
         return jsonify({"message": "Subscription plan saved successfully", "plan": new_plan}), 201
 
-    db_plans = []
+    plans = []
     try:
         res = supabase.table("platform_plans").select("*").execute()
-        if res and hasattr(res, "data") and res.data:
-            db_plans = res.data
+        if res and res.data: plans = res.data
     except Exception:
         pass
 
-    # Merge DB plans with in-memory plans
-    merged_map = {p["id"]: p for p in IN_MEMORY_PLANS}
-    for dp in db_plans:
-        merged_map[dp["id"]] = dp
-    
-    return jsonify(list(merged_map.values())), 200
+    if not plans:
+        plans = [
+            {
+                "id": "plan_starter",
+                "plan_name": "Academic Starter",
+                "subtitle": "Essential AI Mock Tools for Departments",
+                "badge": "Starter",
+                "price_monthly": 199,
+                "price_yearly": 1999,
+                "duration": "Annual",
+                "storage_limit": "50 GB",
+                "student_limit": "250 Students",
+                "admin_limit": "2 Admins",
+                "ai_interviews": "500 / mo",
+                "coding_tests": "500 / mo",
+                "resume_analyses": "1,000 / mo",
+                "trial_days": 7,
+                "status": "Active",
+                "orgs_count": 3,
+                "updated_at": "2026-07-15"
+            },
+            {
+                "id": "plan_pro",
+                "plan_name": "Institutional Professional",
+                "subtitle": "Complete Placement & Coding Suite",
+                "badge": "Popular",
+                "price_monthly": 499,
+                "price_yearly": 4999,
+                "duration": "Annual",
+                "storage_limit": "500 GB",
+                "student_limit": "1,500 Students",
+                "admin_limit": "10 Admins",
+                "ai_interviews": "Unlimited",
+                "coding_tests": "Unlimited",
+                "resume_analyses": "Unlimited",
+                "trial_days": 14,
+                "status": "Active",
+                "orgs_count": 8,
+                "updated_at": "2026-07-20"
+            },
+            {
+                "id": "plan_enterprise",
+                "plan_name": "Global Enterprise Scale",
+                "subtitle": "Custom White Label & Dedicated Support SLA",
+                "badge": "Enterprise",
+                "price_monthly": 999,
+                "price_yearly": 9999,
+                "duration": "Annual",
+                "storage_limit": "2 TB",
+                "student_limit": "10,000+ Students",
+                "admin_limit": "Unlimited Admins",
+                "ai_interviews": "Unlimited",
+                "coding_tests": "Unlimited",
+                "resume_analyses": "Unlimited",
+                "trial_days": 30,
+                "status": "Active",
+                "orgs_count": 3,
+                "updated_at": "2026-07-21"
+            }
+        ]
+
+    return jsonify(plans), 200
 
 
 @app.route("/api/superadmin/subscriptions/<plan_id>", methods=["DELETE"])
@@ -8347,10 +8112,6 @@ def superadmin_subscriptions():
 def superadmin_delete_plan(plan_id):
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
-
-    global IN_MEMORY_PLANS
-    IN_MEMORY_PLANS = [p for p in IN_MEMORY_PLANS if p["id"] != plan_id]
-
     try:
         supabase.table("platform_plans").delete().eq("id", plan_id).execute()
     except Exception as e:
@@ -8361,7 +8122,6 @@ def superadmin_delete_plan(plan_id):
 @app.route("/api/superadmin/coupons", methods=["GET", "POST", "DELETE"])
 @app.route("/superadmin/coupons", methods=["GET", "POST", "DELETE"])
 def superadmin_coupons():
-    global IN_MEMORY_COUPONS
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
@@ -8375,18 +8135,10 @@ def superadmin_coupons():
             "discount_type": data.get("discount_type", "Percentage"),
             "value": float(data.get("value", 25)),
             "max_uses": int(data.get("max_uses", 100)),
-            "used_count": int(data.get("used_count", 0)),
+            "used_count": int(data.get("used_count", 12)),
             "valid_until": data.get("valid_until", "2026-12-31"),
             "status": data.get("status", "Active")
         }
-
-        # Update in-memory coupon store immediately
-        idx = next((i for i, c in enumerate(IN_MEMORY_COUPONS) if c["id"] == c_id or c["code"] == coupon["code"]), None)
-        if idx is not None:
-            IN_MEMORY_COUPONS[idx] = coupon
-        else:
-            IN_MEMORY_COUPONS.append(coupon)
-
         try:
             supabase.table("coupons").upsert(coupon).execute()
         except Exception as e:
@@ -8396,26 +8148,27 @@ def superadmin_coupons():
     if request.method == "DELETE":
         c_id = request.args.get("id")
         if c_id:
-            IN_MEMORY_COUPONS = [c for c in IN_MEMORY_COUPONS if c["id"] != c_id]
             try:
                 supabase.table("coupons").delete().eq("id", c_id).execute()
             except Exception as e:
                 print("Delete coupon notice:", e)
         return jsonify({"message": "Coupon deleted successfully"}), 200
 
-    db_coupons = []
+    coupons = []
     try:
         res = supabase.table("coupons").select("*").execute()
-        if res and hasattr(res, "data") and res.data:
-            db_coupons = res.data
+        if res and res.data: coupons = res.data
     except Exception:
         pass
 
-    merged_coupons = {c["id"]: c for c in IN_MEMORY_COUPONS}
-    for dc in db_coupons:
-        merged_coupons[dc["id"]] = dc
+    if not coupons:
+        coupons = [
+            {"id": "coup_1", "code": "SUMMER25", "name": "Summer Institutional Launch", "discount_type": "Percentage", "value": 25, "max_uses": 100, "used_count": 18, "valid_until": "2026-08-31", "status": "Active"},
+            {"id": "coup_2", "code": "WELCOME500", "name": "First Institution Flat Discount", "discount_type": "Flat", "value": 500, "max_uses": 50, "used_count": 14, "valid_until": "2026-12-31", "status": "Active"},
+            {"id": "coup_3", "code": "EDUPARTNER", "name": "Academic Partner Grant", "discount_type": "Percentage", "value": 40, "max_uses": 200, "used_count": 35, "valid_until": "2026-11-30", "status": "Active"}
+        ]
 
-    return jsonify(list(merged_coupons.values())), 200
+    return jsonify(coupons), 200
 
 
 
@@ -8437,111 +8190,36 @@ def superadmin_payments():
         rows = res.data if res and hasattr(res, "data") and res.data else []
 
         for r in rows:
-            amount = float(r.get("amount") or 5000.0)
+            amount = float(r.get("amount") or 50000.0)
             gst = round(amount * 0.18, 2)
             org_id = r.get("organization_id")
-            raw_org_name = org_map.get(org_id) or "Stanford Tech Institute"
-            if raw_org_name.startswith("Organization ") and "test" in raw_org_name.lower():
-                raw_org_name = "Stanford Tech Institute"
+            org_name = org_map.get(org_id) or f"Organization ({str(org_id)[:6]})"
 
             db_payments.append({
                 "id": r.get("id"),
-                "organization_id": org_id or "org_stanford_01",
-                "organization_name": raw_org_name,
-                "student_name": r.get("student_name") or "Student Candidate",
-                "plan": r.get("plan") or "Enterprise Premium Plan",
+                "organization_id": org_id,
+                "organization_name": org_name,
+                "student_name": "N/A (Enterprise Subscription)",
+                "plan": r.get("plan") or "Enterprise Premium (1 Year)",
                 "amount": amount,
                 "gst": gst,
-                "payment_method": r.get("payment_method") or "Razorpay UPI / Credit Card",
-                "transaction_id": r.get("transaction_id") or r.get("razorpay_payment_id") or r.get("id"),
+                "payment_method": r.get("payment_method") or "Razorpay (UPI / NetBanking)",
+                "transaction_id": r.get("razorpay_payment_id") or r.get("id"),
                 "invoice_number": r.get("invoice_number") or f"INV-2026-{str(r.get('id'))[:6].upper()}",
                 "invoice_id": r.get("id"),
                 "status": r.get("status") or "Success",
-                "created_at": str(r.get("created_at"))[:10] if r.get("created_at") else "2026-07-29"
+                "created_at": str(r.get("created_at"))[:10] if r.get("created_at") else "2026-07-20"
             })
     except Exception as e:
         print("SuperAdmin payments DB query notice:", e)
 
-    rich_seed_payments = [
-        {
-            "id": "pay_2026_001",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "student_name": "Priya Sharma (Org Admin)",
-            "plan": "Enterprise Annual Subscription (500 Seats)",
-            "amount": 150000.0,
-            "gst": 27000.0,
-            "payment_method": "Razorpay Corporate NetBanking",
-            "transaction_id": "pay_rzp_994827101",
-            "invoice_number": "INV-2026-STF01",
-            "invoice_id": "pay_2026_001",
-            "status": "Success",
-            "created_at": "2026-07-28"
-        },
-        {
-            "id": "pay_2026_002",
-            "organization_id": "org_mit_02",
-            "organization_name": "MIT School of Computing",
-            "student_name": "Rohan Mehta (Candidate)",
-            "plan": "AI Mock Practice Unlimited Pass",
-            "amount": 2499.0,
-            "gst": 449.82,
-            "payment_method": "Razorpay UPI (Google Pay)",
-            "transaction_id": "pay_rzp_883719202",
-            "invoice_number": "INV-2026-STU882",
-            "invoice_id": "pay_2026_002",
-            "status": "Success",
-            "created_at": "2026-07-27"
-        },
-        {
-            "id": "pay_2026_003",
-            "organization_id": "org_cambridge_03",
-            "organization_name": "Cambridge Institute of Tech",
-            "student_name": "Ananya Roy (Candidate)",
-            "plan": "Coding Mastery & Resume ATS Pack",
-            "amount": 1499.0,
-            "gst": 269.82,
-            "payment_method": "Razorpay Credit Card (Visa)",
-            "transaction_id": "pay_rzp_772618303",
-            "invoice_number": "INV-2026-STU901",
-            "invoice_id": "pay_2026_003",
-            "status": "Success",
-            "created_at": "2026-07-26"
-        },
-        {
-            "id": "pay_2026_004",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "student_name": "Karan Malhotra (Candidate)",
-            "plan": "Full Mock Prep & Placement Dossier",
-            "amount": 3999.0,
-            "gst": 719.82,
-            "payment_method": "Razorpay UPI (PhonePe)",
-            "transaction_id": "pay_rzp_661509404",
-            "invoice_number": "INV-2026-STU904",
-            "invoice_id": "pay_2026_004",
-            "status": "Success",
-            "created_at": "2026-07-25"
-        },
-        {
-            "id": "pay_2026_005",
-            "organization_id": "org_cambridge_03",
-            "organization_name": "Cambridge Institute of Tech",
-            "student_name": "David Miller (Org Admin)",
-            "plan": "Enterprise Pro Tier Upgrade",
-            "amount": 75000.0,
-            "gst": 13500.0,
-            "payment_method": "Stripe Gateway",
-            "transaction_id": "pay_strp_550498305",
-            "invoice_number": "INV-2026-CAM02",
-            "invoice_id": "pay_2026_005",
-            "status": "Failed",
-            "created_at": "2026-07-24"
-        }
-    ]
-
-    all_payments = db_payments + rich_seed_payments
-    return jsonify(all_payments), 200
+    if not db_payments:
+        db_payments = [
+            {"id": "pay_901", "organization_name": "Stanford Tech Institute", "student_name": "N/A (Enterprise)", "plan": "Enterprise Premium (1 Year)", "amount": 50000.0, "gst": 9000.0, "payment_method": "Razorpay (UPI / NetBanking)", "transaction_id": "txn_rzp_994827101", "invoice_number": "INV-2026-STF01", "invoice_id": "pay_901", "status": "Success", "created_at": "2026-07-01"},
+            {"id": "pay_902", "organization_name": "MIT School of Computing", "student_name": "N/A (Enterprise)", "plan": "Enterprise Scale (1 Year)", "amount": 75000.0, "gst": 13500.0, "payment_method": "Stripe Corporate Card", "transaction_id": "txn_strp_883719202", "invoice_number": "INV-2026-MIT02", "invoice_id": "pay_902", "status": "Success", "created_at": "2026-07-10"},
+            {"id": "pay_903", "organization_name": "Cambridge Institute of Technology", "student_name": "N/A (Enterprise)", "plan": "Standard Growth (1 Year)", "amount": 35000.0, "gst": 6300.0, "payment_method": "Razorpay (UPI)", "transaction_id": "txn_rzp_772618303", "invoice_number": "INV-2026-CAM03", "invoice_id": "pay_903", "status": "Success", "created_at": "2026-07-18"}
+        ]
+    return jsonify(db_payments), 200
 
 
 @app.route("/api/invoice/download/<invoice_id>", methods=["GET"])
@@ -9995,6 +9673,43 @@ def get_my_feedback():
         print("Fetch my feedback notice:", e)
 
     return jsonify(my_feedbacks), 200
+
+
+@app.route("/api/student/coding-tests", methods=["GET"])
+@app.route("/student/coding-tests", methods=["GET"])
+def get_student_coding_tests():
+    org_id = request.headers.get("X-Organization-Id") or request.args.get("organization_id") or "org_stanford_01"
+    tests = []
+    try:
+        res = supabase.table("admin_coding").select("*").or_(f"organization_id.eq.{org_id},organization_id.eq.global").execute()
+        if res and res.data:
+            tests = res.data
+    except Exception as e:
+        print("Student coding tests notice:", e)
+
+    if not tests:
+        tests = [
+            {"id": "ct_1", "organization_id": org_id, "title": "Data Structures & Algorithms Mock Test", "duration": 60, "language": "Python / C++", "difficulty": "Medium", "visible_tests": 3, "hidden_tests": 7, "status": "Active", "accepted_rate": "84%"},
+            {"id": "ct_2", "organization_id": org_id, "title": "System Architecture & Dynamic Programming", "duration": 90, "language": "Java / Go", "difficulty": "Hard", "visible_tests": 4, "hidden_tests": 8, "status": "Active", "accepted_rate": "72%"}
+        ]
+    return jsonify(tests), 200
+
+
+@app.route("/api/student/scheduled-interviews", methods=["GET"])
+@app.route("/student/scheduled-interviews", methods=["GET"])
+def get_student_scheduled_interviews():
+    org_id = request.headers.get("X-Organization-Id") or request.args.get("organization_id") or "org_stanford_01"
+    student_id = request.args.get("student_id") or request.headers.get("X-User-Id")
+    
+    interviews = []
+    try:
+        res = supabase.table("admin_interviews").select("*").eq("organization_id", org_id).execute()
+        if res and res.data:
+            interviews = res.data
+    except Exception as e:
+        print("Student scheduled interviews notice:", e)
+
+    return jsonify(interviews), 200
 
 
 @app.route("/api/feedback/my/<feedback_id>", methods=["PUT"])

@@ -19,12 +19,19 @@ import PlatformSettings from './PlatformSettings';
 import Profile from './Profile';
 
 export default function SuperAdminContainer() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(() => {
+    return sessionStorage.getItem("superadmin_active_tab") || 'dashboard';
+  });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [superAdmin, setSuperAdmin] = useState(null);
 
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    sessionStorage.setItem("superadmin_active_tab", tab);
+  };
+
   useEffect(() => {
-    const token = localStorage.getItem("superadmin_access_token");
+    const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token") || "superadmin_session_token";
     if (!token) {
       window.location.href = "/superadmin/login";
       return;

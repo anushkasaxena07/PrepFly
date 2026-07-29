@@ -904,9 +904,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
   const fetchProblems = async (sheetId = "") => {
     try {
-      const userOrg = localStorage.getItem("organization_id") || localStorage.getItem("user_org_id") || "";
-      const base = sheetId ? `/api/coding/problems?sheet_id=${sheetId}` : '/api/coding/problems';
-      const url = base + (base.includes('?') ? `&org_id=${userOrg}` : `?org_id=${userOrg}`);
+      const url = sheetId ? `/api/coding/problems?sheet_id=${sheetId}` : '/api/coding/problems';
       const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
