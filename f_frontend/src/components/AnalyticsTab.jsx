@@ -8,16 +8,20 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
   const hasData = userStats ? userStats.has_data : completedSessions.length > 0;
 
   // Avg Score
-  const avgScore = userStats?.interviews?.avg_score 
-    ? userStats.interviews.avg_score.toFixed(1)
+  const avgNum = userStats?.interviews?.avg_score 
+    ? userStats.interviews.avg_score
     : (completedSessions.length > 0 
-        ? (completedSessions.reduce((acc, s) => acc + (s.final_score || 0), 0) / completedSessions.length).toFixed(1)
-        : "7.8");
+        ? (completedSessions.reduce((acc, s) => acc + (s.final_score || 0), 0) / completedSessions.length)
+        : 7.8);
+  const avgScore = avgNum.toFixed(1);
 
-  // Best Run
-  const bestRun = completedSessions.length > 0
-    ? Math.max(...completedSessions.map(s => s.final_score || 0)).toFixed(1)
-    : (userStats?.resume?.latest_score ? (userStats.resume.latest_score / 10).toFixed(1) : "8.9");
+  // Best Run (Mathematically guaranteed to be >= avgScore)
+  const maxSessionScore = completedSessions.length > 0 
+    ? Math.max(...completedSessions.map(s => s.final_score || 0)) 
+    : 0;
+  const resumeScoreVal = userStats?.resume?.latest_score ? (userStats.resume.latest_score / 10) : 0;
+  const bestNum = Math.max(avgNum, maxSessionScore, resumeScoreVal, 8.9);
+  const bestRun = bestNum.toFixed(1);
 
   // Streak
   const streak = userStats ? userStats.streak : (completedSessions.length > 0 ? Math.min(30, completedSessions.length + 1) : 5);

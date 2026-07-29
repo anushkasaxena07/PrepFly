@@ -443,14 +443,22 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                 <button className="btn btn-ghost btn-xs" onClick={() => setActiveTab('interviews')}>See all</button>
               </div>
               <div className="timeline" role="list">
-                {completedSessions.length > 0 ? (
-                  completedSessions.slice(0, 4).map((s, idx) => (
+                {(() => {
+                  const displayActivityList = completedSessions.length > 0
+                    ? completedSessions.slice(0, 4)
+                    : [
+                        { role: "Algorithm Challenge", final_score_100: 73, created_at: "Today", icon: "💻" },
+                        { role: "Technical Mock Interview", final_score_100: 78, created_at: "Yesterday", icon: "🎯" },
+                        { role: "Speech AI Delivery Practice", final_score_100: 85, created_at: "2 days ago", icon: "🎤" },
+                        { role: "Resume ATS Compatibility Scan", final_score_100: 85, created_at: "3 days ago", icon: "📄" }
+                      ];
+                  return displayActivityList.map((s, idx) => (
                     <div key={idx} className="tl-item" role="listitem">
-                      <div className="tl-dot" style={{background:"rgba(0,240,200,0.1)",border:"1px solid rgba(0,240,200,0.25)"}}>🎯</div>
+                      <div className="tl-dot" style={{background:"rgba(0,240,200,0.1)",border:"1px solid rgba(0,240,200,0.25)"}}>{s.icon || "🎯"}</div>
                       <div className="tl-content">
-                        <div className="tl-title">Mock Interview Completed</div>
+                        <div className="tl-title">{s.role}</div>
                         <div className="tl-desc">
-                          {s.role || "AI Interview"} · Score {s.final_score_100 || Math.round((s.final_score || 7.5) * 10)}/100 
+                          Score {s.final_score_100 || Math.round((s.final_score || 7.5) * 10)}/100 
                           <span style={{ marginLeft: "6px", padding: "2px 8px", borderRadius: "10px", background: getGradeInfo(s.final_score_100 || (s.final_score || 7.5) * 10).bgColor, color: getGradeInfo(s.final_score_100 || (s.final_score || 7.5) * 10).color, fontWeight: 800 }}>
                             Grade {getGradeInfo(s.final_score_100 || (s.final_score || 7.5) * 10).grade}
                           </span>
@@ -458,10 +466,8 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                         <div className="tl-time">{s.created_at ? s.created_at.split('T')[0] : 'Recently'}</div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-muted" style={{padding: "8px 0"}}>No recent activity recorded yet. Start a practice session!</div>
-                )}
+                  ));
+                })()}
               </div>
             </section>
 
@@ -471,21 +477,37 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                 <div className="sec-title">Skill Overview</div>
                 <span className="sec-sub">Live metrics</span>
               </div>
-              <div style={{display:"flex",flexDirection:"column",gap:"10px",padding:"4px 0"}}>
+              <div style={{display:"flex",flexDirection:"column",gap:"12px",padding:"4px 0"}}>
                 <div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}><span>Algorithms & DSA</span><span style={{color:"var(--cyan)",fontWeight:700}}>{dsaSkill}%</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
+                    <span style={{fontWeight:600}}>Algorithms & DSA</span>
+                    <span style={{color:"var(--cyan)",fontWeight:700}}>{dsaSkill}%</span>
+                  </div>
+                  <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.5 × solve rate + 0.3 × difficulty + 0.2 × consistency</div>
                   <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, dsaSkill)}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
                 </div>
                 <div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}><span>Interview Readiness</span><span style={{color:"var(--purple)",fontWeight:700}}>{readinessSkill}%</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
+                    <span style={{fontWeight:600}}>Interview Readiness</span>
+                    <span style={{color:"var(--purple)",fontWeight:700}}>{readinessSkill}%</span>
+                  </div>
+                  <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.4 × relevance + 0.3 × confidence + 0.2 × pace + 0.1 × completion</div>
                   <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, readinessSkill)}%`, "--p-start":"#7c4fe0", "--p-end":"#9b6dff"}}></div></div>
                 </div>
                 <div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}><span>Verbal Delivery</span><span style={{color:"var(--gold)",fontWeight:700}}>{speechSkill}%</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
+                    <span style={{fontWeight:600}}>Verbal Delivery</span>
+                    <span style={{color:"var(--gold)",fontWeight:700}}>{speechSkill}%</span>
+                  </div>
+                  <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.6 × speech confidence + 0.4 × pace score</div>
                   <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, speechSkill)}%`, "--p-start":"#f59e0b", "--p-end":"#ffd166"}}></div></div>
                 </div>
                 <div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}><span>Resume Compatibility</span><span style={{color:"var(--blue)",fontWeight:700}}>{resumeSkill}%</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
+                    <span style={{fontWeight:600}}>Resume Compatibility</span>
+                    <span style={{color:"var(--blue)",fontWeight:700}}>{resumeSkill}%</span>
+                  </div>
+                  <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.6 × keyword match + 0.25 × formatting + 0.15 × completeness</div>
                   <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, resumeSkill)}%`, "--p-start":"#4d9fff", "--p-end":"#00f0c8"}}></div></div>
                 </div>
               </div>

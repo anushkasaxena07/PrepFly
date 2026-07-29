@@ -1,5 +1,5 @@
 import { getGradeInfo } from './utils/gradingSystem';
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchSubscriptionStatus } from './components/subscription/subscriptionAPI';
 
@@ -100,8 +100,24 @@ export default function Dashboard() {
   }, []);
 
 
-  const [history, setHistory] = useState([]);
-  const [userStats, setUserStats] = useState(null);
+  const [history, setHistory] = useState(() => {
+    try {
+      const cached = localStorage.getItem("prepfly_cached_history");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [userStats, setUserStats] = useState(() => {
+    try {
+      const cached = localStorage.getItem("prepfly_cached_stats");
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
   const [profileInitialSubTab, setProfileInitialSubTab] = useState("info");
 
   useEffect(() => {
@@ -112,11 +128,17 @@ export default function Dashboard() {
         if (histRes.ok) {
           const histData = await histRes.json();
           setHistory(histData || []);
+          if (histData && histData.length > 0) {
+            localStorage.setItem("prepfly_cached_history", JSON.stringify(histData));
+          }
         } else if (targetUserId) {
           const fbRes = await apiFetch(`/history/${targetUserId}`);
           if (fbRes.ok) {
             const fbData = await fbRes.json();
             setHistory(fbData || []);
+            if (fbData && fbData.length > 0) {
+              localStorage.setItem("prepfly_cached_history", JSON.stringify(fbData));
+            }
           }
         }
       } catch (e) {
@@ -128,32 +150,47 @@ export default function Dashboard() {
         if (statsRes.ok) {
           const statsData = await statsRes.json();
           setUserStats(statsData);
+          if (statsData) {
+            localStorage.setItem("prepfly_cached_stats", JSON.stringify(statsData));
+          }
         } else if (targetUserId) {
           const fbStatsRes = await apiFetch(`/user-stats/${targetUserId}`);
           if (fbStatsRes.ok) {
             const fbStatsData = await fbStatsRes.json();
             setUserStats(fbStatsData);
+            if (fbStatsData) {
+              localStorage.setItem("prepfly_cached_stats", JSON.stringify(fbStatsData));
+            }
           }
         }
       } catch (e) {
         console.error("Failed to fetch user stats:", e);
       }
-
-      try {
-        const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "org_stanford_01";
-        const notifRes = await apiFetch(`/notifications?user_id=${targetUserId || 'me'}&org_id=${orgId}`);
-        if (notifRes.ok) {
-          const notifData = await notifRes.json();
-          if (notifData && notifData.length > 0) {
-            setNotifications(notifData);
-          }
-        }
-      } catch (e) {
-        console.error("Failed to fetch live notifications:", e);
-      }
     };
     fetchData();
   }, [user?._id, user?.email, activeTab]);
+
+  const fetchLiveNotifications = useCallback(async () => {
+    try {
+      const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
+      const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "org_stanford_01";
+      const notifRes = await apiFetch(`/notifications?user_id=${targetUserId || 'me'}&org_id=${orgId}`);
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        if (notifData && notifData.length > 0) {
+          setNotifications(notifData);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch live notifications:", e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchLiveNotifications();
+    const timer = setInterval(fetchLiveNotifications, 12000);
+    return () => clearInterval(timer);
+  }, [fetchLiveNotifications]);
 
 
   // Click outside to close panels
@@ -330,7 +367,13 @@ export default function Dashboard() {
               id="notif-btn" 
               aria-label="Notifications" 
               title="Notifications" 
-              onClick={() => setShowNotif(prev => !prev)}
+              onClick={() => {
+                setShowNotif(prev => {
+                  const next = !prev;
+                  if (next) fetchLiveNotifications();
+                  return next;
+                });
+              }}
             >
               <span aria-hidden="true" style={{ fontSize: "15px" }}>🔔</span>
               {unreadCount > 0 && <div className="notif-badge" id="notif-badge" aria-hidden="true">{unreadCount}</div>}

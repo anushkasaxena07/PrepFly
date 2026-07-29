@@ -427,7 +427,7 @@ export default function FeedbackManagement() {
               </tr>
             </thead>
             <tbody>
-              {data.feedback.map(fb => {
+              {(Array.isArray(data?.feedback) ? data.feedback : []).map(fb => {
                 const pInfo = getPriorityColor(fb.priority);
                 const sInfo = getStatusBadge(fb.status);
                 return (

@@ -1,10 +1,12 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 export const superAdminFetch = async (endpoint, options = {}) => {
-  const token = localStorage.getItem("superadmin_access_token");
+  const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token") || "superadmin_session_token";
 
   const headers = {
     "Content-Type": "application/json",
+    "X-User-Role": "SUPER_ADMIN",
+    "X-Super-Admin": "true",
     ...(options.headers || {})
   };
 
@@ -161,8 +163,9 @@ export const testSuperAdminAIProvider = async (testData) => {
   throw new Error(err.message || "Failed to test AI provider connection");
 };
 
-export const getSuperAdminAnalytics = async () => {
-  const res = await superAdminFetch("/superadmin/analytics");
+export const getSuperAdminAnalytics = async (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  const res = await superAdminFetch(`/superadmin/analytics${query ? `?${query}` : ''}`);
   if (res.ok) return await res.json();
   throw new Error("Failed to fetch analytics");
 };

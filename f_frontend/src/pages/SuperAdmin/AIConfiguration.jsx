@@ -311,6 +311,8 @@ export default function AIConfiguration() {
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: "10px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>MODEL</label>
                 <select
+                  value={config.anthropic_model || 'claude-3-5-sonnet'}
+                  onChange={(e) => setConfig({ ...config, anthropic_model: e.target.value })}
                   style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
                 >
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
@@ -319,7 +321,7 @@ export default function AIConfiguration() {
               </div>
 
               <button
-                onClick={() => handleTestConnection('anthropic', config.anthropic_api_key, 'claude-3-5-sonnet')}
+                onClick={() => handleTestConnection('anthropic', config.anthropic_api_key, config.anthropic_model || 'claude-3-5-sonnet')}
                 disabled={testingProvider === 'anthropic'}
                 style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", color: "#f59e0b", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "7px 12px", cursor: "pointer", marginTop: "16px" }}
               >
@@ -368,6 +370,8 @@ export default function AIConfiguration() {
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: "10px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>MODEL</label>
                 <select
+                  value={config.deepseek_model || 'deepseek-reasoner'}
+                  onChange={(e) => setConfig({ ...config, deepseek_model: e.target.value })}
                   style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
                 >
                   <option value="deepseek-reasoner">DeepSeek R1 Reasoner</option>
@@ -376,7 +380,7 @@ export default function AIConfiguration() {
               </div>
 
               <button
-                onClick={() => handleTestConnection('deepseek', config.deepseek_api_key, 'deepseek-reasoner')}
+                onClick={() => handleTestConnection('deepseek', config.deepseek_api_key, config.deepseek_model || 'deepseek-reasoner')}
                 disabled={testingProvider === 'deepseek'}
                 style={{ background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.3)", color: "#ec4899", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "7px 12px", cursor: "pointer", marginTop: "16px" }}
               >

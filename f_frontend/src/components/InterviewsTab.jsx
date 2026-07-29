@@ -293,7 +293,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
   const fetchActiveRooms = async () => {
     try {
-      const res = await apiFetch('/api/webrtc/active-rooms');
+      const userOrg = localStorage.getItem("organization_id") || localStorage.getItem("user_org_id") || "";
+      const res = await apiFetch(`/api/webrtc/active-rooms?organization_id=${userOrg}`);
       if (res.ok) {
         const data = await res.json();
         setActiveRooms(data.rooms || []);
@@ -422,7 +423,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const initRTCPeerConnection = (stream) => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
-    console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
+    console.log("🟢 Initializing WebRTC PeerConnection with Multi-Region STUN & TURN Relays");
     const remoteStreamInstance = new MediaStream();
 
     const pc = new RTCPeerConnection({
@@ -431,11 +432,14 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         { urls: "stun:stun1.l.google.com:19302" },
         { urls: "stun:stun2.l.google.com:19302" },
         { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" },
         { urls: "stun:stun.services.mozilla.com" },
+        { urls: "stun:global.stun.twilio.com:3478" },
         {
           urls: [
             "turn:openrelay.metered.ca:80",
             "turn:openrelay.metered.ca:443",
+            "turn:openrelay.metered.ca:443?transport=tcp",
             "turns:openrelay.metered.ca:443?transport=tcp"
           ],
           username: "openrelayproject",
@@ -488,16 +492,17 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     let iceDisconnectTimer = null;
 
     pc.oniceconnectionstatechange = () => {
-      console.log('🔵 ICE connection state:', pc.iceConnectionState);
+      console.log('🔵 WebRTC ICE connection state:', pc.iceConnectionState);
       const state = pc.iceConnectionState;
       if (state === "checking") {
         setConnectionStatus("Connecting...");
       } else if (state === "disconnected") {
         setConnectionStatus("Reconnecting...");
+        sentOfferRef.current = false; // Allow fresh offer on next sync loop
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         iceDisconnectTimer = setTimeout(async () => {
           if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-            console.log("⚡ Executing automatic ICE restart recovery...");
+            console.log("⚡ Executing automatic WebRTC ICE restart & SDP renegotiation...");
             try {
               if (pc.restartIce) pc.restartIce();
               if (pc.signalingState === "stable") {
@@ -505,7 +510,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 await pc.setLocalDescription(offer);
                 const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
                 if (targetId) {
-                  console.log("Emitting ICE restart offer to reconnect candidate stream");
+                  console.log("Emitting ICE restart offer to reconnect candidate stream to:", targetId);
                   sendSignal(targetId, offer);
                 }
               }
@@ -513,13 +518,14 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
               console.warn("ICE restart recovery notice:", err);
             }
           }
-        }, 2500);
+        }, 1500);
       } else if (state === "connected" || state === "completed") {
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         setConnectionStatus("Connected");
       } else if (state === "failed" || state === "closed") {
         if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
         setConnectionStatus("Disconnected");
+        sentOfferRef.current = false;
       }
     };
 
@@ -589,7 +595,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log("WebRTC Answer Created and Sent");
+            console.log("WebRTC Answer Created and Sent to", sender_id);
             sendSignal(sender_id, answer);
 
             if (pc.pendingRemoteCandidates) {
@@ -1204,17 +1210,13 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                 
                 return (
                   <div key={s.session_id || idx} className="session-card" style={{cursor:"default"}}>
-                    <div className="sess-icon" style={{background: gInfo.bgColor, border:`1px solid ${gInfo.color}44`, color: gInfo.color, fontWeight: 900}}>
-                      {gInfo.grade}
+                    <div className="sess-icon" style={{background:"rgba(0,240,200,0.08)", border:"1px solid rgba(0,240,200,0.15)"}}>
+                      🎥
                     </div>
                     <div className="sess-info" style={{flex:1}}>
                       <div className="sess-title" style={{fontWeight:"bold"}}>{s.role || "Interview Session"} · {date}</div>
-                      <div className="sess-meta" style={{display:"flex", alignItems:"center", gap:"8px", marginTop:"2px"}}>
-                        <span>Score: <strong style={{color: gInfo.color}}>{score100}/100</strong></span>
-                        <span style={{padding:"2px 8px", borderRadius:"10px", background: gInfo.bgColor, color: gInfo.color, fontWeight:800, fontSize:"11px"}}>
-                          Grade {gInfo.grade} · {gInfo.label}
-                        </span>
-                        <span>· {qCount} Questions</span>
+                      <div className="sess-meta" style={{color:"var(--text2)", fontSize:"12px", marginTop:"2px"}}>
+                        {qCount} Questions Completed
                       </div>
                     </div>
                     <div className="flex gap8" style={{marginLeft:"auto"}}>

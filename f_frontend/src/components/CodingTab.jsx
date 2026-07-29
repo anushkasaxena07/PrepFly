@@ -3,7 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 const SmartCodeEditor = ({ value, onChange, lang }) => {
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
+  const videoRef = useRef(null);
+  const screenStreamRef = useRef(null);
+
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
+  const [aiCursorPos, setAiCursorPos] = useState({ line: 2, col: 5 });
+  const [dualCursorEnabled, setDualCursorEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const lines = (value || "").split("\n");
   const lineCount = lines.length;
@@ -23,6 +29,37 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
     const currentLine = lineList.length;
     const currentCol = lineList[lineList.length - 1].length + 1;
     setCursorPos({ line: currentLine, col: currentCol });
+
+    // Update AI secondary cursor to follow nearby lines simulating dual-cursor pair programming
+    const nextAiLine = currentLine > 1 ? currentLine - 1 : Math.min(lineCount, currentLine + 1);
+    setAiCursorPos({ line: nextAiLine, col: Math.max(1, currentCol - 2) });
+  };
+
+  const toggleScreenShare = async () => {
+    if (!isScreenSharing) {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        screenStreamRef.current = stream;
+        setIsScreenSharing(true);
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        }, 100);
+        stream.getVideoTracks()[0].onended = () => {
+          setIsScreenSharing(false);
+          screenStreamRef.current = null;
+        };
+      } catch (e) {
+        console.warn("Screen share cancelled or failed:", e);
+      }
+    } else {
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -160,32 +197,143 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
       overflow: "hidden",
       boxShadow: "0 8px 32px rgba(0,0,0,0.5)"
     }}>
+      {/* HEADER WITH DUAL CURSOR STATUS & SCREEN SHARE CONTROLS */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "6px 14px",
+        padding: "8px 14px",
         background: "rgba(255,255,255,0.03)",
         borderBottom: "1px solid rgba(255,255,255,0.08)",
         fontSize: "11px",
         color: "#94a3b8",
-        fontWeight: 700
+        fontWeight: 700,
+        flexWrap: "wrap",
+        gap: "10px"
       }}>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3" }}></span>
-          <span style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>{lang || "code"} editor</span>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3", boxShadow: "0 0 8px #00e5c3" }}></span>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "#fff" }}>{lang || "code"} editor</span>
+          
+          {/* Dual Cursor Indicator Badges */}
+          {dualCursorEnabled && (
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
+              <span style={{
+                background: "rgba(0,229,195,0.15)",
+                border: "1px solid rgba(0,229,195,0.4)",
+                color: "#00e5c3",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#00e5c3" }}></span>
+                👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
+              </span>
+
+              <span style={{
+                background: "rgba(168,85,247,0.15)",
+                border: "1px solid rgba(168,85,247,0.4)",
+                color: "#c084fc",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
+                🤖 Ava AI: Ln {aiCursorPos.line}, Col {aiCursorPos.col}
+              </span>
+            </div>
+          )}
         </div>
-        <div style={{ display: "flex", gap: "14px" }}>
-          <span>Lines: {lineCount}</span>
-          <span>Ln {cursorPos.line}, Col {cursorPos.col}</span>
+
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            onClick={() => setDualCursorEnabled(!dualCursorEnabled)}
+            style={{
+              background: dualCursorEnabled ? "rgba(168,85,247,0.2)" : "rgba(255,255,255,0.05)",
+              border: `1px solid ${dualCursorEnabled ? "#a855f7" : "rgba(255,255,255,0.1)"}`,
+              color: dualCursorEnabled ? "#c084fc" : "#94a3b8",
+              padding: "4px 10px",
+              borderRadius: "8px",
+              fontSize: "11px",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+            title="Toggle 2-Cursor Pair Programming Mode"
+          >
+            👥 2 Cursors: {dualCursorEnabled ? "ON" : "OFF"}
+          </button>
+
+          <button
+            onClick={toggleScreenShare}
+            style={{
+              background: isScreenSharing ? "rgba(245,158,11,0.25)" : "rgba(0,229,195,0.15)",
+              border: `1px solid ${isScreenSharing ? "#f59e0b" : "#00e5c3"}`,
+              color: isScreenSharing ? "#fbbf24" : "#00e5c3",
+              padding: "4px 10px",
+              borderRadius: "8px",
+              fontSize: "11px",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px"
+            }}
+            title="Share screen while using coding tab"
+          >
+            🖥️ {isScreenSharing ? "Stop Sharing" : "Share Screen"}
+          </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", position: "relative", height: "340px" }}>
+      {/* FLOATING SCREEN SHARE PREVIEW IF ACTIVE */}
+      {isScreenSharing && (
+        <div style={{
+          position: "absolute",
+          top: "46px",
+          right: "14px",
+          zIndex: 100,
+          background: "#0c1220",
+          border: "1px solid #f59e0b",
+          borderRadius: "10px",
+          padding: "6px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.8)",
+          width: "210px"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", fontSize: "10px", fontWeight: 800, color: "#fbbf24" }}>
+            <span>🔴 Screen Share Active</span>
+            <button onClick={toggleScreenShare} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "10px" }}>✕ Stop</button>
+          </div>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: "100%", height: "110px", borderRadius: "6px", objectFit: "cover", background: "#000" }}
+          />
+          <div style={{ fontSize: "9px", color: "var(--text2)", textAlign: "center", marginTop: "4px" }}>
+            Coding tab is fully usable & editable while sharing
+          </div>
+        </div>
+      )}
+
+      {/* CODE EDITOR CONTAINER WITH GUTTER & DUAL CURSOR HIGHLIGHTS */}
+      <div style={{ display: "flex", position: "relative", height: "360px" }}>
+        {/* GUTTER LINE NUMBERS */}
         <div
           ref={gutterRef}
           style={{
-            width: "44px",
+            width: "48px",
             background: "rgba(0,0,0,0.4)",
             borderRight: "1px solid rgba(255,255,255,0.08)",
             padding: "12px 0",
@@ -200,19 +348,47 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
             flexShrink: 0
           }}
         >
-          {lineNumbers.map(n => (
-            <div 
-              key={n} 
-              style={{
-                color: n === cursorPos.line ? "#00e5c3" : "rgba(255,255,255,0.3)",
-                fontWeight: n === cursorPos.line ? 800 : 400
-              }}
-            >
-              {n}
-            </div>
-          ))}
+          {lineNumbers.map(n => {
+            const isUserLine = n === cursorPos.line;
+            const isAiLine = dualCursorEnabled && n === aiCursorPos.line;
+            let numColor = "rgba(255,255,255,0.3)";
+            let fontWeight = 400;
+            let prefix = "";
+
+            if (isUserLine && isAiLine) {
+              numColor = "#00e5c3";
+              fontWeight = 900;
+              prefix = "👤🤖";
+            } else if (isUserLine) {
+              numColor = "#00e5c3";
+              fontWeight = 800;
+              prefix = "👤";
+            } else if (isAiLine) {
+              numColor = "#c084fc";
+              fontWeight = 800;
+              prefix = "🤖";
+            }
+
+            return (
+              <div 
+                key={n} 
+                style={{
+                  color: numColor,
+                  fontWeight: fontWeight,
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: "2px"
+                }}
+              >
+                {prefix && <span style={{ fontSize: "8px" }}>{prefix}</span>}
+                <span>{n}</span>
+              </div>
+            );
+          })}
         </div>
 
+        {/* TEXTAREA WITH DUAL CURSOR INTERACTION */}
         <textarea
           ref={textareaRef}
           id="code-textarea"
@@ -728,7 +904,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
   const fetchProblems = async (sheetId = "") => {
     try {
-      const url = sheetId ? `/api/coding/problems?sheet_id=${sheetId}` : '/api/coding/problems';
+      const userOrg = localStorage.getItem("organization_id") || localStorage.getItem("user_org_id") || "";
+      const base = sheetId ? `/api/coding/problems?sheet_id=${sheetId}` : '/api/coding/problems';
+      const url = base + (base.includes('?') ? `&org_id=${userOrg}` : `?org_id=${userOrg}`);
       const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -1390,7 +1568,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <option value="kotlin" style={{ background: "#0c1220", color: "#f0f4fd" }}>Kotlin</option>
                 <option value="sql" style={{ background: "#0c1220", color: "#f0f4fd" }}>SQL</option>
               </select>
-              <div className="flex gap8">
+              <div className="flex gap8" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 2 Cursors Active</span>
+                <span className="pill pill-purple" style={{ fontSize: "11px", fontWeight: 800 }}>🖥️ Screen Share Ready</span>
                 <button className="btn btn-ghost btn-sm" onClick={resetStarterCode}>Reset Starter</button>
                 <button className="btn btn-primary btn-sm" onClick={runCode}>▶ Run Code</button>
               </div>
