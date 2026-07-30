@@ -627,15 +627,28 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           const pc = peerConnectionRef.current;
           if (signal.type === "offer") {
             console.log("WebRTC Offer Received from", sender_id);
-            if (pc.signalingState !== "stable") {
-              console.warn("Colliding offer ignored while in signalingState:", pc.signalingState);
-              continue;
+            const isHost = currentRoom?.created_by === userId;
+            const isPolite = !isHost && (userId > sender_id);
+            const offerCollision = pc.signalingState !== "stable";
+
+            if (offerCollision) {
+              if (!isPolite) {
+                console.warn("Impolite peer ignoring colliding offer from", sender_id, "in state:", pc.signalingState);
+                continue;
+              }
+              console.log("Polite peer rolling back local offer to accept incoming offer from", sender_id);
+              try {
+                await pc.setLocalDescription({ type: "rollback" });
+              } catch (rollbackErr) {
+                console.warn("Rollback notice:", rollbackErr);
+              }
             }
+
             remoteParticipantIdRef.current = sender_id;
             await pc.setRemoteDescription(new RTCSessionDescription(signal));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
-            console.log("WebRTC Answer Created and Sent");
+            console.log("WebRTC Answer Created and Sent to", sender_id);
             sendSignal(sender_id, answer);
 
             if (pc.pendingRemoteCandidates) {
@@ -667,6 +680,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             try {
               if (pc.remoteDescription && pc.remoteDescription.type) {
                 await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                console.log("Added remote ICE candidate from", sender_id);
               } else {
                 if (!pc.pendingRemoteCandidates) pc.pendingRemoteCandidates = [];
                 pc.pendingRemoteCandidates.push(signal.candidate);
@@ -700,9 +714,11 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         remoteParticipantIdRef.current = remoteId;
         const pc = peerConnectionRef.current;
         const isConnected = pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected');
-        const isHost = currentRoom.created_by === userId;
+        const isHost = currentRoom?.created_by === userId;
+        // Designate Offerer: The room host or the peer with lexicographically smaller ID
+        const isOfferer = isHost || (userId < remoteId);
 
-        if (!isConnected && (!sentOfferRef.current || (isHost && pc && pc.signalingState === 'stable' && !remoteStream))) {
+        if (!isConnected && isOfferer && (!sentOfferRef.current || (pc && pc.signalingState === 'stable' && !remoteStream))) {
           sentOfferRef.current = true;
           if (!pc) {
             initRTCPeerConnection(mediaStreamRef.current);
