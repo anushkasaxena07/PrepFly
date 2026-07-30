@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const SmartCodeEditor = ({ value, onChange, lang }) => {
+const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
   const videoRef = useRef(null);
@@ -8,7 +8,7 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
 
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
   const [peerCursorPos, setPeerCursorPos] = useState({ line: 2, col: 5 });
-  const [dualCursorEnabled, setDualCursorEnabled] = useState(true);
+  const dualCursorEnabled = Boolean(isRoomActive);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const lines = (value || "").split("\n");
@@ -220,40 +220,42 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
           <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3", boxShadow: "0 0 8px #00e5c3" }}></span>
           <span style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "#fff" }}>{lang || "code"} editor</span>
           
-          {/* Dual Cursor Indicator Badges - Active in Coding Room */}
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
-            <span style={{
-              background: "rgba(0,229,195,0.15)",
-              border: "1px solid rgba(0,229,195,0.4)",
-              color: "#00e5c3",
-              padding: "2px 8px",
-              borderRadius: "12px",
-              fontSize: "10px",
-              fontWeight: 800,
-              display: "flex",
-              alignItems: "center",
-              gap: "4px"
-            }}>
-              <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#00e5c3" }}></span>
-              👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
-            </span>
+          {/* Dual Cursor Indicator Badges - Active only when Coding Room is Active */}
+          {dualCursorEnabled && (
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
+              <span style={{
+                background: "rgba(0,229,195,0.15)",
+                border: "1px solid rgba(0,229,195,0.4)",
+                color: "#00e5c3",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#00e5c3" }}></span>
+                👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
+              </span>
 
-            <span style={{
-              background: "rgba(168,85,247,0.15)",
-              border: "1px solid rgba(168,85,247,0.4)",
-              color: "#c084fc",
-              padding: "2px 8px",
-              borderRadius: "12px",
-              fontSize: "10px",
-              fontWeight: 800,
-              display: "flex",
-              alignItems: "center",
-              gap: "4px"
-            }}>
-              <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
-              👤 Peer: Ln {peerCursorPos.line}, Col {peerCursorPos.col}
-            </span>
-          </div>
+              <span style={{
+                background: "rgba(168,85,247,0.15)",
+                border: "1px solid rgba(168,85,247,0.4)",
+                color: "#c084fc",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
+                👤 Peer: Ln {peerCursorPos.line}, Col {peerCursorPos.col}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1603,14 +1605,14 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <option value="sql" style={{ background: "#0c1220", color: "#f0f4fd" }}>SQL</option>
               </select>
               <div className="flex gap8" style={{ alignItems: "center", flexWrap: "wrap" }}>
-                <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 2 Cursors Active</span>
-                <span className="pill pill-purple" style={{ fontSize: "11px", fontWeight: 800 }}>🖥️ Screen Share Ready</span>
+                {roomId && <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 2 Cursors Active</span>}
+                {roomId && <span className="pill pill-purple" style={{ fontSize: "11px", fontWeight: 800 }}>🖥️ Room Sync Active</span>}
                 <button className="btn btn-ghost btn-sm" onClick={resetStarterCode}>Reset Starter</button>
                 <button className="btn btn-primary btn-sm" onClick={runCode}>▶ Run Code</button>
               </div>
             </div>
             
-            <SmartCodeEditor value={code} onChange={handleCodeChange} lang={lang} />
+            <SmartCodeEditor value={code} onChange={handleCodeChange} lang={lang} isRoomActive={Boolean(roomId)} />
             
             {/* Console execution outputs */}
             <div>
