@@ -7,7 +7,7 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
   const screenStreamRef = useRef(null);
 
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
-  const [aiCursorPos, setAiCursorPos] = useState({ line: 2, col: 5 });
+  const [peerCursorPos, setPeerCursorPos] = useState({ line: 2, col: 5 });
   const [dualCursorEnabled, setDualCursorEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
@@ -30,9 +30,9 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
     const currentCol = lineList[lineList.length - 1].length + 1;
     setCursorPos({ line: currentLine, col: currentCol });
 
-    // Update AI secondary cursor to follow nearby lines simulating dual-cursor pair programming
-    const nextAiLine = currentLine > 1 ? currentLine - 1 : Math.min(lineCount, currentLine + 1);
-    setAiCursorPos({ line: nextAiLine, col: Math.max(1, currentCol - 2) });
+    // Update Peer secondary cursor to follow nearby lines simulating dual-cursor peer programming
+    const nextPeerLine = currentLine > 1 ? currentLine - 1 : Math.min(lineCount, currentLine + 1);
+    setPeerCursorPos({ line: nextPeerLine, col: Math.max(1, currentCol - 2) });
   };
 
   const toggleScreenShare = async () => {
@@ -251,7 +251,7 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
               gap: "4px"
             }}>
               <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
-              🤖 Ava AI: Ln {aiCursorPos.line}, Col {aiCursorPos.col}
+              👤 Peer: Ln {peerCursorPos.line}, Col {peerCursorPos.col}
             </span>
           </div>
         </div>
@@ -311,23 +311,23 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
         >
           {lineNumbers.map(n => {
             const isUserLine = n === cursorPos.line;
-            const isAiLine = dualCursorEnabled && n === aiCursorPos.line;
+            const isPeerLine = dualCursorEnabled && n === peerCursorPos.line;
             let numColor = "rgba(255,255,255,0.3)";
             let fontWeight = 400;
             let prefix = "";
 
-            if (isUserLine && isAiLine) {
+            if (isUserLine && isPeerLine) {
               numColor = "#00e5c3";
               fontWeight = 900;
-              prefix = "👤🤖";
+              prefix = "👤👤";
             } else if (isUserLine) {
               numColor = "#00e5c3";
               fontWeight = 800;
               prefix = "👤";
-            } else if (isAiLine) {
+            } else if (isPeerLine) {
               numColor = "#c084fc";
               fontWeight = 800;
-              prefix = "🤖";
+              prefix = "👤";
             }
 
             return (
@@ -382,15 +382,15 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
         {/* LIVE MULTI-USER CURSOR OVERLAYS WITH NAME BADGES */}
         {dualCursorEnabled && (
           <>
-            {/* Secondary Peer / AI Floating Cursor Caret */}
+            {/* Secondary Peer Floating Cursor Caret */}
             <div style={{
               position: "absolute",
-              top: `${(aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
-              left: `${Math.min(500, (aiCursorPos.col - 1) * 7.8 + 60)}px`,
+              top: `${(peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
+              left: `${Math.min(500, (peerCursorPos.col - 1) * 7.8 + 60)}px`,
               pointerEvents: "none",
               zIndex: 10,
               transition: "top 0.1s ease, left 0.1s ease",
-              display: (aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
+              display: (peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
             }}>
               <div style={{
                 width: "2px",
@@ -412,7 +412,7 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
                   whiteSpace: "nowrap",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.4)"
                 }}>
-                  🤖 Ava AI (Peer)
+                  👤 Peer
                 </span>
               </div>
             </div>
