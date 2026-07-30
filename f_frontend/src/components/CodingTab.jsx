@@ -220,84 +220,40 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
           <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3", boxShadow: "0 0 8px #00e5c3" }}></span>
           <span style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "#fff" }}>{lang || "code"} editor</span>
           
-          {/* Dual Cursor Indicator Badges */}
-          {dualCursorEnabled && (
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
-              <span style={{
-                background: "rgba(0,229,195,0.15)",
-                border: "1px solid rgba(0,229,195,0.4)",
-                color: "#00e5c3",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                fontSize: "10px",
-                fontWeight: 800,
-                display: "flex",
-                alignItems: "center",
-                gap: "4px"
-              }}>
-                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#00e5c3" }}></span>
-                👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
-              </span>
-
-              <span style={{
-                background: "rgba(168,85,247,0.15)",
-                border: "1px solid rgba(168,85,247,0.4)",
-                color: "#c084fc",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                fontSize: "10px",
-                fontWeight: 800,
-                display: "flex",
-                alignItems: "center",
-                gap: "4px"
-              }}>
-                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
-                🤖 Ava AI: Ln {aiCursorPos.line}, Col {aiCursorPos.col}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <button
-            onClick={() => setDualCursorEnabled(!dualCursorEnabled)}
-            style={{
-              background: dualCursorEnabled ? "rgba(168,85,247,0.2)" : "rgba(255,255,255,0.05)",
-              border: `1px solid ${dualCursorEnabled ? "#a855f7" : "rgba(255,255,255,0.1)"}`,
-              color: dualCursorEnabled ? "#c084fc" : "#94a3b8",
-              padding: "4px 10px",
-              borderRadius: "8px",
-              fontSize: "11px",
+          {/* Dual Cursor Indicator Badges - Active in Coding Room */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
+            <span style={{
+              background: "rgba(0,229,195,0.15)",
+              border: "1px solid rgba(0,229,195,0.4)",
+              color: "#00e5c3",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              fontSize: "10px",
               fontWeight: 800,
-              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: "4px"
-            }}
-            title="Toggle 2-Cursor Pair Programming Mode"
-          >
-            👥 2 Cursors: {dualCursorEnabled ? "ON" : "OFF"}
-          </button>
+            }}>
+              <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#00e5c3" }}></span>
+              👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
+            </span>
 
-          <button
-            onClick={toggleScreenShare}
-            style={{
-              background: isScreenSharing ? "rgba(245,158,11,0.25)" : "rgba(0,229,195,0.15)",
-              border: `1px solid ${isScreenSharing ? "#f59e0b" : "#00e5c3"}`,
-              color: isScreenSharing ? "#fbbf24" : "#00e5c3",
-              padding: "4px 10px",
-              borderRadius: "8px",
-              fontSize: "11px",
+            <span style={{
+              background: "rgba(168,85,247,0.15)",
+              border: "1px solid rgba(168,85,247,0.4)",
+              color: "#c084fc",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              fontSize: "10px",
               fontWeight: 800,
-              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               gap: "4px"
-            }}
-            title="Share screen while using coding tab"
-          >
-            🖥️ {isScreenSharing ? "Stop Sharing" : "Share Screen"}
-          </button>
+            }}>
+              <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
+              🤖 Ava AI: Ln {aiCursorPos.line}, Col {aiCursorPos.col}
+            </span>
+          </div>
         </div>
       </div>
 
