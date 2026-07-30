@@ -41,9 +41,11 @@ export default function Admins() {
   const fetchAdmins = async () => {
     try {
       const data = await getSuperAdminAdmins();
-      setAdmins(data || []);
+      const list = Array.isArray(data) ? data : (data?.admins || data?.data || data?.items || []);
+      setAdmins(list);
     } catch (e) {
-      console.error("Error fetching admins:", e);
+      console.error(e);
+      setAdmins([]);
     } finally {
       setLoading(false);
     }

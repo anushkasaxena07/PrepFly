@@ -15,9 +15,11 @@ export default function Announcements() {
   const fetchAnnouncements = async () => {
     try {
       const data = await getAdminAnnouncements();
-      setAnnouncements(data || []);
+      const list = Array.isArray(data) ? data : (data?.announcements || data?.data || data?.items || []);
+      setAnnouncements(list);
     } catch (e) {
       console.error(e);
+      setAnnouncements([]);
     } finally {
       setLoading(false);
     }
@@ -33,6 +35,8 @@ export default function Announcements() {
       alert("Failed to send announcement");
     }
   };
+
+  const safeAnnouncements = Array.isArray(announcements) ? announcements : [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -57,7 +61,7 @@ export default function Announcements() {
         <div style={{ color: "var(--cyan)", padding: "40px", textAlign: "center" }}>⚡ Loading announcements...</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          {announcements.map((ann) => (
+          {safeAnnouncements.map((ann) => (
             <div key={ann.id} className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                 <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", margin: 0 }}>{ann.title}</h3>

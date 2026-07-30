@@ -358,7 +358,7 @@ const InterviewPage = () => {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 } });
       const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       audioChunksRef.current = [];
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data);

@@ -38,7 +38,12 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
   const toggleScreenShare = async () => {
     if (!isScreenSharing) {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const stream = await navigator.mediaDevices.getDisplayMedia({ 
+          video: { displaySurface: 'browser' }, 
+          audio: false,
+          preferCurrentTab: false,
+          surfaceSwitching: 'include'
+        });
         screenStreamRef.current = stream;
         setIsScreenSharing(true);
         setTimeout(() => {
@@ -417,6 +422,81 @@ const SmartCodeEditor = ({ value, onChange, lang }) => {
           }}
           aria-label="Code editor"
         />
+
+        {/* LIVE MULTI-USER CURSOR OVERLAYS WITH NAME BADGES */}
+        {dualCursorEnabled && (
+          <>
+            {/* Secondary Peer / AI Floating Cursor Caret */}
+            <div style={{
+              position: "absolute",
+              top: `${(aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
+              left: `${Math.min(500, (aiCursorPos.col - 1) * 7.8 + 60)}px`,
+              pointerEvents: "none",
+              zIndex: 10,
+              transition: "top 0.1s ease, left 0.1s ease",
+              display: (aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (aiCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
+            }}>
+              <div style={{
+                width: "2px",
+                height: "20px",
+                background: "#c084fc",
+                boxShadow: "0 0 8px #c084fc",
+                position: "relative"
+              }}>
+                <span style={{
+                  position: "absolute",
+                  top: "-18px",
+                  left: "0px",
+                  background: "#7c3aed",
+                  color: "#fff",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  padding: "1px 5px",
+                  borderRadius: "4px 4px 4px 0",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)"
+                }}>
+                  🤖 Ava AI (Peer)
+                </span>
+              </div>
+            </div>
+
+            {/* Primary User Floating Cursor Caret */}
+            <div style={{
+              position: "absolute",
+              top: `${(cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
+              left: `${Math.min(500, (cursorPos.col - 1) * 7.8 + 60)}px`,
+              pointerEvents: "none",
+              zIndex: 10,
+              transition: "top 0.05s ease, left 0.05s ease",
+              display: (cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
+            }}>
+              <div style={{
+                width: "2px",
+                height: "20px",
+                background: "#00e5c3",
+                boxShadow: "0 0 8px #00e5c3",
+                position: "relative"
+              }}>
+                <span style={{
+                  position: "absolute",
+                  top: "-18px",
+                  left: "0px",
+                  background: "#00b89c",
+                  color: "#000",
+                  fontSize: "9px",
+                  fontWeight: 900,
+                  padding: "1px 5px",
+                  borderRadius: "4px 4px 4px 0",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)"
+                }}>
+                  👤 You
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

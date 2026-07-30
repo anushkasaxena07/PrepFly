@@ -190,7 +190,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const setupCamera = async () => {
     try {
       if (!mediaStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 } });
         mediaStreamRef.current = stream;
       }
       const stream = mediaStreamRef.current;

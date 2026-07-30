@@ -125,7 +125,7 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
 
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 } });
     } catch(e) {
       setRecStatus("Microphone permission denied. Please allow microphone access.");
       setRecStatusColor("var(--red)");

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getAdminAnnouncements } from '../../services/adminAPI';
 
-export default function Navbar({ activeTab, admin = {}, organization = {} }) {
+export default function Navbar({ activeTab, setActiveTab, admin = {}, organization = {} }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: "AI Interview Completed", desc: "Ananya Patel completed SDE Mock Interview (Score: 9.2/10)", time: "10 min ago", unread: true },
@@ -15,8 +15,9 @@ export default function Navbar({ activeTab, admin = {}, organization = {} }) {
     const fetchLiveNotifs = async () => {
       try {
         const liveData = await getAdminAnnouncements();
-        if (liveData && liveData.length > 0) {
-          const mapped = liveData.map((item, idx) => ({
+        const list = Array.isArray(liveData) ? liveData : (liveData?.announcements || liveData?.data || []);
+        if (list && list.length > 0) {
+          const mapped = list.map((item, idx) => ({
             id: item.id || idx + 10,
             title: item.title,
             desc: item.message,
@@ -184,12 +185,21 @@ export default function Navbar({ activeTab, admin = {}, organization = {} }) {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "280px", overflowY: "auto" }}>
                 {notifications.map(n => (
-                  <div key={n.id} style={{
-                    padding: "10px 12px",
-                    borderRadius: "10px",
-                    background: n.unread ? "rgba(124, 79, 224, 0.12)" : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${n.unread ? "rgba(124, 79, 224, 0.3)" : "rgba(255,255,255,0.05)"}`
-                  }}>
+                  <div 
+                    key={n.id} 
+                    onClick={() => {
+                      setShowNotifications(false);
+                      if (setActiveTab) setActiveTab('announcements');
+                    }}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      background: n.unread ? "rgba(124, 79, 224, 0.12)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${n.unread ? "rgba(124, 79, 224, 0.3)" : "rgba(255,255,255,0.05)"}`,
+                      cursor: "pointer",
+                      transition: "transform 0.15s ease"
+                    }}
+                  >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ color: "#fff", fontWeight: 800, fontSize: "12px" }}>{n.title}</div>
                       <div style={{ color: "var(--text2)", fontSize: "10px" }}>{n.time}</div>
@@ -199,6 +209,32 @@ export default function Navbar({ activeTab, admin = {}, organization = {} }) {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
+                <button
+                  onClick={() => {
+                    setShowNotifications(false);
+                    if (setActiveTab) setActiveTab('announcements');
+                  }}
+                  style={{
+                    background: "rgba(0,240,200,0.1)",
+                    border: "1px solid rgba(0,240,200,0.3)",
+                    color: "#00f0c8",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  📢 Open Announcements & Notifications Page →
+                </button>
               </div>
             </div>
           )}

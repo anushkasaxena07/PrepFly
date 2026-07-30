@@ -33,7 +33,9 @@ export default function StudentTable({
     );
   };
 
-  const filtered = students.filter(s => {
+  const safeStudents = Array.isArray(students) ? students : (students?.students || students?.data || []);
+
+  const filtered = safeStudents.filter(s => {
     if (deptFilter !== "All" && s.department !== deptFilter) return false;
     if (semFilter !== "All" && s.semester !== semFilter) return false;
     if (statusFilter !== "All" && s.status !== statusFilter) return false;

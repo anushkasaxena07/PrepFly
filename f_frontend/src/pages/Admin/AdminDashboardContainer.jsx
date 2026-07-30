@@ -136,7 +136,7 @@ export default function AdminDashboardContainer() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         
         {/* NAVBAR */}
-        <Navbar activeTab={activeTab} admin={admin} organization={organization} />
+        <Navbar activeTab={activeTab} setActiveTab={handleTabChange} admin={admin} organization={organization} />
 
         {/* PAGE CONTENT */}
         <main style={{ flex: 1, padding: "24px", overflowY: "auto" }}>

@@ -41,9 +41,11 @@ export default function Students() {
   const fetchStudents = async () => {
     try {
       const data = await getSuperAdminStudents();
-      setStudents(data || []);
+      const list = Array.isArray(data) ? data : (data?.students || data?.data || data?.items || []);
+      setStudents(list);
     } catch (e) {
       console.error("Error fetching students:", e);
+      setStudents([]);
     } finally {
       setLoading(false);
     }

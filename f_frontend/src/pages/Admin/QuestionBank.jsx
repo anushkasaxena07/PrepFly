@@ -27,9 +27,11 @@ export default function QuestionBank() {
   const fetchQuestions = async () => {
     try {
       const data = await getAdminQuestionBank();
-      setQuestions(data || []);
+      const list = Array.isArray(data) ? data : (data?.questions || data?.data || data?.items || []);
+      setQuestions(list);
     } catch (e) {
       console.error(e);
+      setQuestions([]);
     } finally {
       setLoading(false);
     }

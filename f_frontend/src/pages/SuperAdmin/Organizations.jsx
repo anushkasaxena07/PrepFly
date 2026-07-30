@@ -34,9 +34,11 @@ export default function Organizations({ onNavigateCreate }) {
   const fetchOrgs = async () => {
     try {
       const data = await getSuperAdminOrganizations();
-      setOrgs(data || []);
+      const list = Array.isArray(data) ? data : (data?.organizations || data?.data || data?.items || []);
+      setOrgs(list);
     } catch (e) {
       console.error(e);
+      setOrgs([]);
     } finally {
       setLoading(false);
     }

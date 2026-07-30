@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getGradeInfo } from '../utils/gradingSystem';
 
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: 1,
+  sampleRate: 48000
+};
+
 export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user = {} }) {
   const [sessionName, setSessionName] = useState("");
   const [interviewCategory, setInterviewCategory] = useState("Full Stack Interview");
@@ -30,6 +38,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   const [micMuted, setMicMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isRemoteSharing, setIsRemoteSharing] = useState(false);
   const [activeSubPanel, setActiveSubPanel] = useState('chat'); // 'chat' | 'notes' | 'ai'
   const [chatMessages, setChatMessages] = useState([
     { sender: "System", text: "Encrypted WebRTC P2P channel established. STUN/TURN active.", time: "Just now" }
@@ -420,109 +429,134 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
   };
 
   const initRTCPeerConnection = (stream) => {
-    if (peerConnectionRef.current) return peerConnectionRef.current;
+    let pc = peerConnectionRef.current;
+    
+    if (!pc) {
+      console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
+      const remoteStreamInstance = new MediaStream();
 
-    console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
-    const remoteStreamInstance = new MediaStream();
+      pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun.services.mozilla.com" },
+          {
+            urls: [
+              "turn:openrelay.metered.ca:80",
+              "turn:openrelay.metered.ca:443",
+              "turns:openrelay.metered.ca:443?transport=tcp"
+            ],
+            username: "openrelayproject",
+            credential: "openrelayproject"
+          }
+        ],
+        iceCandidatePoolSize: 10
+      });
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-        { urls: "stun:stun3.l.google.com:19302" },
-        { urls: "stun:stun.services.mozilla.com" },
-        {
-          urls: [
-            "turn:openrelay.metered.ca:80",
-            "turn:openrelay.metered.ca:443",
-            "turns:openrelay.metered.ca:443?transport=tcp"
-          ],
-          username: "openrelayproject",
-          credential: "openrelayproject"
+      pc.ontrack = (event) => {
+        console.log('🟢 WebRTC ontrack received:', event.track.kind);
+        setConnectionStatus("Connected");
+        const incoming = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+        
+        // Combine with any accumulated tracks
+        incoming.getTracks().forEach(t => {
+          if (!remoteStreamInstance.getTracks().find(existing => existing.id === t.id)) {
+            remoteStreamInstance.addTrack(t);
+          }
+        });
+
+        const freshStream = new MediaStream(remoteStreamInstance.getTracks());
+        setRemoteStream(freshStream);
+
+        if (remoteVideoRef.current) {
+          safeAttachStream(remoteVideoRef.current, freshStream, false);
         }
-      ],
-      iceCandidatePoolSize: 10
-    });
+      };
 
+      pc.onicecandidate = (event) => {
+        if (event.candidate && currentRoom) {
+          const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+          if (targetId) {
+            sendSignal(targetId, { type: "candidate", candidate: event.candidate });
+          } else {
+            if (!pendingIceCandidatesRef.current[currentRoom.room_code]) {
+              pendingIceCandidatesRef.current[currentRoom.room_code] = [];
+            }
+            pendingIceCandidatesRef.current[currentRoom.room_code].push(event.candidate);
+          }
+        }
+      };
+
+      let iceDisconnectTimer = null;
+
+      const handleStateChange = () => {
+        const iceState = pc.iceConnectionState;
+        const connState = pc.connectionState;
+        console.log('🔵 WebRTC connection states -> ICE:', iceState, '| Conn:', connState);
+
+        if (connState === "connected" || iceState === "connected" || iceState === "completed") {
+          if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
+          setConnectionStatus("Connected");
+
+          // Receiver track check safety fallback
+          const receivers = pc.getReceivers();
+          const activeTracks = receivers.map(r => r.track).filter(Boolean);
+          if (activeTracks.length > 0) {
+            const receiverStream = new MediaStream(activeTracks);
+            setRemoteStream(receiverStream);
+            if (remoteVideoRef.current) {
+              safeAttachStream(remoteVideoRef.current, receiverStream, false);
+            }
+          }
+        } else if (connState === "connecting" || iceState === "checking") {
+          setConnectionStatus("Connecting...");
+        } else if (connState === "disconnected" || iceState === "disconnected") {
+          setConnectionStatus("Reconnecting...");
+          if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
+          iceDisconnectTimer = setTimeout(async () => {
+            if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed" || pc.connectionState === "disconnected") {
+              console.log("⚡ Executing automatic ICE restart recovery...");
+              try {
+                sentOfferRef.current = false;
+                if (pc.restartIce) pc.restartIce();
+                const offer = await pc.createOffer({ iceRestart: true });
+                await pc.setLocalDescription(offer);
+                const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
+                if (targetId) {
+                  console.log("Emitting ICE restart offer to reconnect candidate stream");
+                  sendSignal(targetId, offer);
+                }
+              } catch (err) {
+                console.warn("ICE restart recovery notice:", err);
+              }
+            }
+          }, 2000);
+        } else if (connState === "failed" || iceState === "failed" || connState === "closed" || iceState === "closed") {
+          if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
+          setConnectionStatus("Disconnected");
+        }
+      };
+
+      pc.oniceconnectionstatechange = handleStateChange;
+      pc.onconnectionstatechange = handleStateChange;
+
+      peerConnectionRef.current = pc;
+    }
+
+    // ALWAYS ensure local stream tracks are attached to the PeerConnection even if pc was created earlier
     if (stream) {
+      const existingSenders = pc.getSenders();
       stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
-        console.log("Added local track to peer connection:", track.kind);
+        const alreadyHasTrack = existingSenders.some(s => s.track && s.track.id === track.id);
+        if (!alreadyHasTrack) {
+          pc.addTrack(track, stream);
+          console.log("Added local track to peer connection:", track.kind);
+        }
       });
     }
 
-    pc.ontrack = (event) => {
-      console.log('🟢 WebRTC ontrack received:', event.track.kind);
-      const incoming = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
-      
-      // Combine with any accumulated tracks
-      incoming.getTracks().forEach(t => {
-        if (!remoteStreamInstance.getTracks().find(existing => existing.id === t.id)) {
-          remoteStreamInstance.addTrack(t);
-        }
-      });
-
-      const freshStream = new MediaStream(remoteStreamInstance.getTracks());
-      setRemoteStream(freshStream);
-
-      if (remoteVideoRef.current) {
-        safeAttachStream(remoteVideoRef.current, freshStream, false);
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && currentRoom) {
-        const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-        if (targetId) {
-          sendSignal(targetId, { type: "candidate", candidate: event.candidate });
-        } else {
-          if (!pendingIceCandidatesRef.current[currentRoom.room_code]) {
-            pendingIceCandidatesRef.current[currentRoom.room_code] = [];
-          }
-          pendingIceCandidatesRef.current[currentRoom.room_code].push(event.candidate);
-        }
-      }
-    };
-
-    let iceDisconnectTimer = null;
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('🔵 ICE connection state:', pc.iceConnectionState);
-      const state = pc.iceConnectionState;
-      if (state === "checking") {
-        setConnectionStatus("Connecting...");
-      } else if (state === "disconnected") {
-        setConnectionStatus("Reconnecting...");
-        if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
-        iceDisconnectTimer = setTimeout(async () => {
-          if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-            console.log("⚡ Executing automatic ICE restart recovery...");
-            try {
-              sentOfferRef.current = false;
-              if (pc.restartIce) pc.restartIce();
-              const offer = await pc.createOffer({ iceRestart: true });
-              await pc.setLocalDescription(offer);
-              const targetId = remoteParticipantIdRef.current || roomParticipants.find(p => p.user_id !== userId)?.user_id;
-              if (targetId) {
-                console.log("Emitting ICE restart offer to reconnect candidate stream");
-                sendSignal(targetId, offer);
-              }
-            } catch (err) {
-              console.warn("ICE restart recovery notice:", err);
-            }
-          }
-        }, 2000);
-      } else if (state === "connected" || state === "completed") {
-        if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
-        setConnectionStatus("Connected");
-      } else if (state === "failed" || state === "closed") {
-        if (iceDisconnectTimer) clearTimeout(iceDisconnectTimer);
-        setConnectionStatus("Disconnected");
-      }
-    };
-
-    peerConnectionRef.current = pc;
     return pc;
   };
 
@@ -629,6 +663,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             }
           } else if (signal.type === "screen-share-status") {
             console.log("Remote peer screen-share status update:", signal.sharing);
+            setIsRemoteSharing(!!signal.sharing);
             if (peerConnectionRef.current) {
               const receivers = peerConnectionRef.current.getReceivers();
               const activeTracks = receivers.map(r => r.track).filter(Boolean);
@@ -700,6 +735,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     setInCall(true);
     setMicMuted(!deviceMic);
     setCameraOff(!deviceCamera);
+    setIsScreenSharing(false);
+    setIsRemoteSharing(false);
     setStreamLoaded(false);
     remoteParticipantIdRef.current = null;
     setRemoteStream(null);
@@ -707,7 +744,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     // Prompt real webcam/mic stream if enabled
     if (deviceCamera || deviceMic) {
       // Always request both video and audio for robust P2P capabilities
-      navigator.mediaDevices?.getUserMedia({ video: true, audio: true })
+      navigator.mediaDevices?.getUserMedia({ video: true, audio: AUDIO_CONSTRAINTS })
         .then(stream => {
           mediaStreamRef.current = stream;
           // Apply initial toggle states
@@ -726,7 +763,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
         .catch(err => {
           console.warn("Media devices full capture failed, trying fallback:", err);
           // Fallback: try only audio or only video if one is missing/blocked
-          navigator.mediaDevices?.getUserMedia({ video: false, audio: true })
+          navigator.mediaDevices?.getUserMedia({ video: false, audio: AUDIO_CONSTRAINTS })
             .then(stream => {
               mediaStreamRef.current = stream;
               stream.getAudioTracks().forEach(track => {
@@ -787,7 +824,12 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     if (!isScreenSharing) {
       try {
         console.log("Screen Share Started");
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+          video: { displaySurface: 'browser' }, 
+          audio: false,
+          preferCurrentTab: false,
+          surfaceSwitching: 'include'
+        });
         const screenTrack = screenStream.getVideoTracks()[0];
 
         if (localVideoRef.current) {
@@ -875,6 +917,7 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
     setInCall(false);
     setIsScreenSharing(false);
+    setIsRemoteSharing(false);
     setRoomParticipants([]);
     sentOfferRef.current = false;
     if (peerConnectionRef.current) {
@@ -1341,154 +1384,168 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           {/* MAIN VIDEO + SIDEBAR BODY */}
           <div style={{flex: 1, display: "flex", overflow: "hidden"}}>
             
-            {/* VIDEO STREAMS GRID */}
-            <div style={{flex: 1, padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", background: "#080d19", position: "relative"}}>
-              
-              {/* LOCAL USER VIDEO CARD */}
-              <div style={{
-                position: "relative",
-                background: "#0c1220",
-                borderRadius: "12px",
-                border: "1px solid rgba(255,255,255,0.1)",
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}>
-                <video 
-                  ref={bindLocalVideo} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  style={{width: "100%", height: "100%", objectFit: "cover", display: cameraOff ? "none" : "block"}}
-                />
+            {/* VIDEO STREAMS GRID / SPOTLIGHT STAGE */}
+            {(() => {
+              const sharingActive = isScreenSharing || isRemoteSharing;
+              const containerStyle = sharingActive
+                ? { flex: 1, padding: "16px", display: "block", position: "relative", width: "100%", height: "100%", background: "#080d19", overflow: "hidden" }
+                : { flex: 1, padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", background: "#080d19", position: "relative" };
 
-                {cameraOff && (
-                  <div style={{textAlign: "center"}}>
-                    <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, margin: "0 auto 12px"}}>
-                      {userName.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || "ME"}
+              const localCardStyle = !sharingActive
+                ? { position: "relative", background: "#0c1220", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }
+                : isScreenSharing
+                  ? { position: "relative", background: "#0c1220", borderRadius: "12px", border: "2px solid var(--cyan)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }
+                  : { position: "absolute", bottom: "24px", right: "24px", width: "220px", height: "155px", background: "#0c1220", borderRadius: "12px", border: "2px solid rgba(0,240,200,0.5)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20, boxShadow: "0 8px 32px rgba(0,0,0,0.7)" };
+
+              const remoteCardStyle = !sharingActive
+                ? { position: "relative", background: "#0c1220", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }
+                : isRemoteSharing
+                  ? { position: "relative", background: "#0c1220", borderRadius: "12px", border: "2px solid var(--cyan)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }
+                  : { position: "absolute", bottom: "24px", right: "24px", width: "220px", height: "155px", background: "#0c1220", borderRadius: "12px", border: "2px solid rgba(124,58,237,0.5)", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20, boxShadow: "0 8px 32px rgba(0,0,0,0.7)" };
+
+              return (
+                <div style={containerStyle}>
+                  
+                  {/* LOCAL USER VIDEO CARD */}
+                  <div style={localCardStyle}>
+                    <video 
+                      ref={bindLocalVideo} 
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      style={{width: "100%", height: "100%", objectFit: isScreenSharing ? "contain" : (cameraOff ? "none" : "cover"), display: cameraOff ? "none" : "block"}}
+                    />
+
+                    {cameraOff && (
+                      <div style={{textAlign: "center"}}>
+                        <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, margin: "0 auto 12px"}}>
+                          {userName.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || "ME"}
+                        </div>
+                        <div style={{fontSize: "14px", fontWeight: 700}}>{userName} (You)</div>
+                        <div style={{fontSize: "11px", color: "var(--text2)"}}>Camera Off</div>
+                      </div>
+                    )}
+
+                    {isScreenSharing && (
+                      <div style={{position: "absolute", top: "12px", left: "12px", background: "rgba(245,158,11,0.9)", color: "#000", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, zIndex: 15}}>
+                        🖥️ Sharing Your Screen
+                      </div>
+                    )}
+
+                    <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, zIndex: 10}}>
+                      {userName} (You) {micMuted ? "🎤 Muted" : "🎙 Active"}
                     </div>
-                    <div style={{fontSize: "14px", fontWeight: 700}}>{userName} (You)</div>
-                    <div style={{fontSize: "11px", color: "var(--text2)"}}>Camera Off</div>
-                  </div>
-                )}
 
-                <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, zIndex: 10}}>
-                  {userName} (You) {micMuted ? "🎤 Muted" : "🎙 Active"}
+                    {/* Floating Media Controls Overlay */}
+                    <div style={{ position: "absolute", bottom: "12px", right: "12px", display: "flex", gap: "8px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
+                      <button onClick={toggleCamera} style={{ background: cameraOff ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={cameraOff ? "Turn Camera On" : "Turn Camera Off"}>
+                        {cameraOff ? "🚫" : "📷"}
+                      </button>
+                      <button onClick={toggleMic} style={{ background: micMuted ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={micMuted ? "Unmute Mic" : "Mute Mic"}>
+                        {micMuted ? "🔇" : "🎙️"}
+                      </button>
+                      <button onClick={toggleScreenShare} style={{ background: isScreenSharing ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
+                        🖥️
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* PEER CANDIDATE / INTERVIEWER VIDEO CARD */}
+                  <div style={remoteCardStyle}>
+                    {/* DEDICATED AUDIO PLAYER TO GUARANTEE HEARING REMOTE PEER */}
+                    <audio 
+                      ref={(el) => {
+                        if (el && remoteStream) {
+                          el.srcObject = remoteStream;
+                          el.muted = false;
+                          el.play().catch(e => console.warn("Remote audio element play notice:", e));
+                        }
+                      }} 
+                      autoPlay 
+                      playsInline 
+                    />
+
+                    <video 
+                      ref={bindRemoteVideo} 
+                      autoPlay 
+                      playsInline 
+                      style={{
+                        width: "100%", 
+                        height: "100%", 
+                        objectFit: "contain", 
+                        display: remoteStream ? "block" : "none"
+                      }}
+                    />
+
+                    {isRemoteSharing && (
+                      <div style={{position: "absolute", top: "12px", left: "12px", background: "rgba(0,240,200,0.9)", color: "#000", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, zIndex: 15}}>
+                        🖥️ Remote Screen Share
+                      </div>
+                    )}
+
+                    {(!remoteParticipantIdRef.current || !remoteStream) && (
+                      <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5}}>
+                        <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
+                          👤
+                        </div>
+                        <div style={{fontSize: "14px", fontWeight: 800, color: "#fff"}}>
+                          {remoteStream && remoteStream.getVideoTracks().length > 0 ? "Video loading..." : "Waiting for video..."}
+                        </div>
+                        <div style={{fontSize: "11px", color: "var(--text2)", marginTop: "4px"}}>
+                          {!remoteParticipantIdRef.current ? "Waiting for peer to join room" : "Connecting media stream..."}
+                        </div>
+                      </div>
+                    )}
+
+                    {connectionStatus === "Reconnecting..." && (
+                      <div style={{
+                        position: "absolute",
+                        top: "12px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "rgba(245,158,11,0.85)",
+                        color: "#fff",
+                        padding: "6px 12px",
+                        borderRadius: "20px",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        zIndex: 10,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                      }}>
+                        ⚠ Reconnecting...
+                      </div>
+                    )}
+
+                    {connectionStatus === "Connected" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "12px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "rgba(16,185,129,0.85)",
+                        color: "#fff",
+                        padding: "6px 12px",
+                        borderRadius: "20px",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        zIndex: 10,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                      }}>
+                        ✓ Connected
+                      </div>
+                    )}
+
+                    <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700}}>
+                      {/* Show the remote peer's name — check both .name and .user_name since backend may use either */}
+                      {(roomParticipants.find(p => p.user_id !== userId)?.name ||
+                        roomParticipants.find(p => p.user_id !== userId)?.user_name ||
+                        "Remote Peer")} 🎙 Active
+                    </div>
+                  </div>
+
                 </div>
-
-                {/* Floating Media Controls Overlay */}
-                <div style={{ position: "absolute", bottom: "12px", right: "12px", display: "flex", gap: "8px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
-                  <button onClick={toggleCamera} style={{ background: cameraOff ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={cameraOff ? "Turn Camera On" : "Turn Camera Off"}>
-                    {cameraOff ? "🚫" : "📷"}
-                  </button>
-                  <button onClick={toggleMic} style={{ background: micMuted ? "rgba(239,68,68,0.25)" : "rgba(0,240,200,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={micMuted ? "Unmute Mic" : "Mute Mic"}>
-                    {micMuted ? "🔇" : "🎙️"}
-                  </button>
-                  <button onClick={toggleScreenShare} style={{ background: isScreenSharing ? "rgba(245,158,11,0.25)" : "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }} title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
-                    🖥️
-                  </button>
-                </div>
-              </div>
-
-              {/* PEER CANDIDATE / INTERVIEWER VIDEO CARD */}
-              <div style={{
-                position: "relative",
-                background: "#0c1220",
-                borderRadius: "12px",
-                border: "1px solid rgba(255,255,255,0.1)",
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%"
-              }}>
-                {/* DEDICATED AUDIO PLAYER TO GUARANTEE HEARING REMOTE PEER */}
-                <audio 
-                  ref={(el) => {
-                    if (el && remoteStream) {
-                      el.srcObject = remoteStream;
-                      el.muted = false;
-                      el.play().catch(e => console.warn("Remote audio element play notice:", e));
-                    }
-                  }} 
-                  autoPlay 
-                  playsInline 
-                />
-
-                <video 
-                  ref={bindRemoteVideo} 
-                  autoPlay 
-                  playsInline 
-                  style={{
-                    width: "100%", 
-                    height: "100%", 
-                    objectFit: "contain", 
-                    display: remoteStream ? "block" : "none"
-                  }}
-                />
-
-                {(!remoteParticipantIdRef.current || !remoteStream) && (
-                  <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5}}>
-                    <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
-                      👤
-                    </div>
-                    <div style={{fontSize: "14px", fontWeight: 800, color: "#fff"}}>
-                      {remoteStream && remoteStream.getVideoTracks().length > 0 ? "Video loading..." : "Waiting for video..."}
-                    </div>
-                    <div style={{fontSize: "11px", color: "var(--text2)", marginTop: "4px"}}>
-                      {!remoteParticipantIdRef.current ? "Waiting for peer to join room" : "Connecting media stream..."}
-                    </div>
-                  </div>
-                )}
-
-                {connectionStatus === "Reconnecting..." && (
-                  <div style={{
-                    position: "absolute",
-                    top: "12px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "rgba(245,158,11,0.85)",
-                    color: "#fff",
-                    padding: "6px 12px",
-                    borderRadius: "20px",
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    zIndex: 10,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-                  }}>
-                    ⚠ Reconnecting...
-                  </div>
-                )}
-
-                {connectionStatus === "Connected" && (
-                  <div style={{
-                    position: "absolute",
-                    top: "12px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "rgba(16,185,129,0.85)",
-                    color: "#fff",
-                    padding: "6px 12px",
-                    borderRadius: "20px",
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    zIndex: 10,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-                  }}>
-                    ✓ Connected
-                  </div>
-                )}
-
-                <div style={{position: "absolute", bottom: "12px", left: "12px", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700}}>
-                  {/* Show the remote peer's name — check both .name and .user_name since backend may use either */}
-                  {(roomParticipants.find(p => p.user_id !== userId)?.name ||
-                    roomParticipants.find(p => p.user_id !== userId)?.user_name ||
-                    "Remote Peer")} 🎙 Active
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* SIDEBAR FOR CHAT / SHARED NOTES / AI ASSISTANT */}
             <div style={{width: "340px", borderLeft: "1px solid rgba(255,255,255,0.1)", background: "#0c1220", display: "flex", flexDirection: "column"}}>

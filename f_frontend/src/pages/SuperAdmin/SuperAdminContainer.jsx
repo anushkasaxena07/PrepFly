@@ -89,7 +89,7 @@ export default function SuperAdminContainer() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <Navbar activeTab={activeTab} superAdmin={superAdmin} />
+        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} superAdmin={superAdmin} />
         
         <main style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
           {renderContent()}
