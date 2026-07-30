@@ -428,9 +428,22 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     }
   };
 
-  const initRTCPeerConnection = (stream) => {
+  const initRTCPeerConnection = (stream, forceNew = false) => {
     let pc = peerConnectionRef.current;
     
+    if (pc && (pc.connectionState === "closed" || pc.signalingState === "closed" || forceNew)) {
+      console.log("🧹 Tearing down previous closed/stale RTCPeerConnection instance");
+      try {
+        pc.onicecandidate = null;
+        pc.ontrack = null;
+        pc.oniceconnectionstatechange = null;
+        pc.onconnectionstatechange = null;
+        pc.close();
+      } catch (e) {}
+      pc = null;
+      peerConnectionRef.current = null;
+    }
+
     if (!pc) {
       console.log("Initializing WebRTC PeerConnection with STUN & TURN Relays");
       const remoteStreamInstance = new MediaStream();
@@ -741,6 +754,19 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     remoteParticipantIdRef.current = null;
     setRemoteStream(null);
 
+    // Clean up any existing peer connection before starting a new call session
+    if (peerConnectionRef.current) {
+      console.log("🧹 Tearing down previous RTCPeerConnection before launching new room session");
+      try {
+        peerConnectionRef.current.onicecandidate = null;
+        peerConnectionRef.current.ontrack = null;
+        peerConnectionRef.current.oniceconnectionstatechange = null;
+        peerConnectionRef.current.onconnectionstatechange = null;
+        peerConnectionRef.current.close();
+      } catch (e) {}
+      peerConnectionRef.current = null;
+    }
+
     // Prompt real webcam/mic stream if enabled
     if (deviceCamera || deviceMic) {
       // Always request both video and audio for robust P2P capabilities
@@ -884,7 +910,15 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
           }
         };
       } catch (err) {
-        console.warn("Screen share cancelled:", err);
+        setIsScreenSharing(false);
+        if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+          console.log('User cancelled screen share picker or permission denied');
+        } else {
+          console.error('Screen share failed:', err);
+        }
+        if (localVideoRef.current && mediaStreamRef.current) {
+          localVideoRef.current.srcObject = mediaStreamRef.current;
+        }
       }
     } else {
       console.log("Screen Share Stopped");
