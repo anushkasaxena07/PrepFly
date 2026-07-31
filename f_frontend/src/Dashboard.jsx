@@ -72,13 +72,15 @@ export default function Dashboard() {
   const notifRef = useRef(null);
   const profileRef = useRef(null);
 
-  // Default notifications list
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Speech session analyzed', desc: 'Your last mock interview scored 8.2 — 3 filler words detected', time: '2 min ago', type: 'speech', read: false },
-    { id: 2, title: 'Resume ATS report ready', desc: 'Score: 75/100 · 4 missing keywords found', time: '18 min ago', type: 'resume', read: false },
-    { id: 3, title: 'New coding challenge unlocked', desc: 'LRU Cache · Hard · System Design track', time: '1 hour ago', type: 'coding', read: false },
-    { id: 4, title: '🔥 7-day streak maintained!', desc: 'Keep going — you\'re on a roll. 3 more days for a badge.', time: 'Yesterday', type: 'dashboard', read: true },
-  ]);
+  // Notifications list initialized from cache or empty
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const cached = localStorage.getItem("prepfly_cached_notifications");
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   // Load user from localStorage on mount & redirect if unauthenticated
   useEffect(() => {
@@ -173,13 +175,13 @@ export default function Dashboard() {
   const fetchLiveNotifications = useCallback(async () => {
     try {
       const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
-      const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "org_stanford_01";
+      const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "global";
       const notifRes = await apiFetch(`/notifications?user_id=${targetUserId || 'me'}&org_id=${orgId}`);
       if (notifRes.ok) {
         const notifData = await notifRes.json();
-        if (notifData && notifData.length > 0) {
-          setNotifications(notifData);
-        }
+        const list = Array.isArray(notifData) ? notifData : (notifData?.notifications || []);
+        setNotifications(list);
+        localStorage.setItem("prepfly_cached_notifications", JSON.stringify(list));
       }
     } catch (e) {
       console.error("Failed to fetch live notifications:", e);

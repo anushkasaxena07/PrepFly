@@ -7034,6 +7034,36 @@ def admin_announcements():
     return jsonify(announcements), 200
 
 
+IN_MEMORY_NOTIFICATIONS = []
+
+def _push_notification(notif):
+    """Pushes notification to live memory and syncs to Supabase notifications table."""
+    if not isinstance(notif, dict): return
+    if "id" not in notif:
+        notif["id"] = f"notif_{uuid.uuid4().hex[:8]}"
+    if "created_at" not in notif:
+        notif["created_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    IN_MEMORY_NOTIFICATIONS.insert(0, notif)
+    
+    try:
+        supabase.table("notifications").insert({
+            "id": notif.get("id"),
+            "sender_type": notif.get("sender_type") or ("SUPER_ADMIN" if notif.get("organization_id") is None else "ORG_ADMIN"),
+            "sender_name": notif.get("sender_name") or notif.get("sender") or "Platform Admin",
+            "organization_id": notif.get("organization_id"),
+            "target_group": notif.get("target_group") or notif.get("target_dept") or "All",
+            "title": notif.get("title") or "Platform Notification",
+            "message": notif.get("message") or notif.get("desc") or "",
+            "target_dept": notif.get("target_dept", "All"),
+            "target_sem": notif.get("target_sem", "All"),
+            "created_at": notif.get("created_at"),
+            "read": 0
+        }).execute()
+    except Exception as e:
+        print("Push notification DB notice:", e)
+
+
 @app.route("/api/notifications", methods=["GET", "POST", "OPTIONS"])
 @app.route("/notifications", methods=["GET", "POST", "OPTIONS"])
 def get_user_notifications():
@@ -7167,13 +7197,6 @@ def get_user_notifications():
                 "read": bool(n.get("read", 0)),
                 "raw_message": message_content
             })
-
-    if not notifications_list:
-        notifications_list = [
-            { "id": "demo_1", "title": "Speech session analyzed", "desc": "Your last mock interview scored 8.2 — 3 filler words detected", "time": "2 min ago", "type": "speech", "sender": "Ava AI", "read": False },
-            { "id": "demo_2", "title": "Resume ATS report ready", "desc": "Score: 75/100 · 4 missing keywords found", "time": "18 min ago", "type": "resume", "sender": "Ava AI", "read": False },
-            { "id": "demo_3", "title": "📢 Campus Announcement: Placement Readiness Drive", "desc": "Mandatory placement assessment session starts this Friday.", "time": "1 hour ago", "type": "announcement", "sender": "Stanford Tech Admin", "read": False }
-        ]
 
     return jsonify(notifications_list), 200
 
