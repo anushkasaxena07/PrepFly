@@ -90,6 +90,17 @@ CORS(app, resources={r"/*": {
     "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Super-Admin", "X-User-Role", "X-Role", "X-Organization-Id"]
 }})
 
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        origin = request.headers.get("Origin") or "*"
+        res = Response("", status=200)
+        res.headers["Access-Control-Allow-Origin"] = origin
+        res.headers["Access-Control-Allow-Credentials"] = "true"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-User-Role, X-Role, X-Organization-Id"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        return res
+
 @app.after_request
 def add_cors_headers(response):
     origin = request.headers.get("Origin")
@@ -351,14 +362,13 @@ def send_email(to_email, subject, html_body):
         try:
             import urllib.request
             import json
-            recipients = [to_email]
-            if to_email.lower() != "saxenaanushka9645@gmail.com":
-                recipients.append("saxenaanushka9645@gmail.com")
+            # Resend free-tier domain onboarding@resend.dev allows sending only to verified account owner email
+            recipients = ["saxenaanushka9645@gmail.com"]
 
             req_data = json.dumps({
                 "from": "PrepFly <onboarding@resend.dev>",
                 "to": recipients,
-                "subject": subject,
+                "subject": f"[PrepFly] {subject} (For: {to_email})",
                 "html": html_body
             }).encode("utf-8")
             req = urllib.request.Request(
@@ -372,12 +382,11 @@ def send_email(to_email, subject, html_body):
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status in (200, 201):
-                    print(f"Email sent via Resend API to {recipients}!")
+                    print(f"Email sent via Resend API to {recipients} for {to_email}!")
                     return True
         except Exception as e_resend:
             print(f"Resend API Notice for {to_email}: {e_resend}")
-            if "403" in str(e_resend):
-                print(f"[OTP NOTICE] Resend free-tier active. Use master verification code 981103 for {to_email}")
+            print(f"[OTP NOTICE] Resend free-tier active. Use master verification code 981103 for {to_email}")
 
     sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
     sender_password = os.getenv("SMTP_PASSWORD") or "mdpqnpueuhjlgzcd"
@@ -3510,9 +3519,11 @@ def coding_room_join():
 
 coding_rooms_memory = {}
 
-@app.route("/api/coding/room/sync", methods=["POST"])
-@app.route("/coding/room/sync", methods=["POST"])
+@app.route("/api/coding/room/sync", methods=["GET", "POST", "OPTIONS"])
+@app.route("/coding/room/sync", methods=["GET", "POST", "OPTIONS"])
 def coding_room_sync():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
     data = request.get_json() or {}
     room_id = str(data.get("room_id", "")).strip().upper()
     user_id = str(data.get("user_id", ""))
@@ -4560,15 +4571,37 @@ Please structure the evaluation report in markdown with these exact headings:
     report_text = ""
     try:
         if chat_model:
-            report_text = chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
-        else:
+            try:
+                report_text = chat_model.invoke([HumanMessage(content=prompt)]).content.strip()
+            except Exception as e_chat_inv:
+                print("Primary chat model invoke error, trying fallback models:", e_chat_inv)
+                import google.generativeai as genai
+                genai.configure(api_key=GEMINI_API_KEY)
+                for fallback_m in ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"]:
+                    try:
+                        m_obj = genai.GenerativeModel(fallback_m)
+                        res = m_obj.generate_content(prompt)
+                        if res and res.text:
+                            report_text = res.text.strip()
+                            break
+                    except Exception:
+                        continue
+        if not report_text:
             import google.generativeai as genai
             genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            res = model.generate_content(prompt)
-            report_text = res.text.strip()
+            for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"]:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    res = model.generate_content(prompt)
+                    if res and res.text:
+                        report_text = res.text.strip()
+                        break
+                except Exception:
+                    continue
     except Exception as e:
         print("Gemini report generation notice:", e)
+
+    if not report_text:
         report_text = f"### 🏆 Executive Evaluation Summary\n- **Candidate Name**: {user_name}\n- **Overall Performance Score**: {score} / 10\n- **Technical Competency Rating**: {tech_rating}\n- **Communication & Verbal Delivery**: {comm_rating}\n- **Hiring Recommendation**: {recommendation}\n\n### 💪 Key Strengths & Technical Highlights\n- {cat_strengths[0]}\n- {cat_strengths[1]}\n- {cat_strengths[2]}\n\n### 🎯 Actionable Areas for Improvement\n- {cat_improvements[0]}\n- {cat_improvements[1]}"
 
     try:
@@ -7001,9 +7034,11 @@ def admin_announcements():
     return jsonify(announcements), 200
 
 
-@app.route("/api/notifications", methods=["GET"])
-@app.route("/notifications", methods=["GET"])
+@app.route("/api/notifications", methods=["GET", "POST", "OPTIONS"])
+@app.route("/notifications", methods=["GET", "POST", "OPTIONS"])
 def get_user_notifications():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
     org_id = request.args.get("org_id") or request.args.get("organization_id") or get_admin_org_id()
     
     notifications_list = []

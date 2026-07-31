@@ -1,23 +1,70 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
+const USER_COLORS = [
+  "#3b82f6", // Blue (Anushka)
+  "#10b981", // Emerald Green (Rahul)
+  "#a855f7", // Purple (Aditi)
+  "#f59e0b", // Amber (Rohan)
+  "#ec4899", // Pink
+  "#06b6d4", // Cyan
+  "#f97316", // Orange
+  "#84cc16"  // Lime
+];
+
+const getParticipantColor = (userId, name, idx = 0) => {
+  const str = (userId || name || "user").toString();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return USER_COLORS[Math.abs(hash + idx) % USER_COLORS.length];
+};
+
+const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, participants = [], currentUserId = "" }) => {
   const textareaRef = useRef(null);
   const gutterRef = useRef(null);
   const videoRef = useRef(null);
   const screenStreamRef = useRef(null);
 
   const [cursorPos, setCursorPos] = useState({ line: 1, col: 1 });
-  const [peerCursorPos, setPeerCursorPos] = useState({ line: 2, col: 5 });
-  const dualCursorEnabled = Boolean(isRoomActive);
+  const [scrollTop, setScrollTop] = useState(0);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+
+  // Extract active remote participants & assign unique color, name, line & col when isRoomActive is ON
+  const remoteUsers = React.useMemo(() => {
+    if (!isRoomActive || !Array.isArray(participants)) return [];
+    const myId = String(currentUserId || localStorage.getItem("user_id") || "");
+    return participants
+      .filter(p => p && String(p.user_id) !== myId)
+      .map((p, idx) => {
+        const color = p.color || getParticipantColor(p.user_id, p.name || p.user_name, idx);
+        let cursor = { line: 1, col: 1 };
+        if (p.cursor && typeof p.cursor === 'object') {
+          cursor = {
+            line: Number(p.cursor.line || p.cursor.lineNumber || 1),
+            col: Number(p.cursor.col || p.cursor.ch || p.cursor.column || 1)
+          };
+        }
+        return {
+          id: p.user_id || `remote_${idx}`,
+          name: p.name || p.user_name || `Participant ${idx + 1}`,
+          color: color,
+          cursor: cursor,
+          isEditing: Boolean(p.is_editing)
+        };
+      });
+  }, [isRoomActive, participants, currentUserId]);
 
   const lines = (value || "").split("\n");
   const lineCount = lines.length;
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   const handleScroll = () => {
-    if (textareaRef.current && gutterRef.current) {
-      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (textareaRef.current) {
+      setScrollTop(textareaRef.current.scrollTop);
+      if (gutterRef.current) {
+        gutterRef.current.scrollTop = textareaRef.current.scrollTop;
+      }
     }
   };
 
@@ -29,10 +76,6 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
     const currentLine = lineList.length;
     const currentCol = lineList[lineList.length - 1].length + 1;
     setCursorPos({ line: currentLine, col: currentCol });
-
-    // Update Peer secondary cursor to follow nearby lines simulating dual-cursor peer programming
-    const nextPeerLine = currentLine > 1 ? currentLine - 1 : Math.min(lineCount, currentLine + 1);
-    setPeerCursorPos({ line: nextPeerLine, col: Math.max(1, currentCol - 2) });
   };
 
   const toggleScreenShare = async () => {
@@ -202,7 +245,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
       overflow: "hidden",
       boxShadow: "0 8px 32px rgba(0,0,0,0.5)"
     }}>
-      {/* HEADER WITH DUAL CURSOR STATUS & SCREEN SHARE CONTROLS */}
+      {/* HEADER WITH CONDITIONAL SINGLE-USER VS MULTI-PARTICIPANT CURSOR STATUS */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -216,13 +259,29 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
         flexWrap: "wrap",
         gap: "10px"
       }}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3", boxShadow: "0 0 8px #00e5c3" }}></span>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: isRoomActive ? "#00e5c3" : "#64748b", boxShadow: isRoomActive ? "0 0 8px #00e5c3" : "none" }}></span>
           <span style={{ textTransform: "uppercase", letterSpacing: "0.5px", color: "#fff" }}>{lang || "code"} editor</span>
+
+          {/* Case 1: Coding Room = OFF */}
+          {!isRoomActive && (
+            <span style={{
+              background: "rgba(100,116,139,0.15)",
+              border: "1px solid rgba(100,116,139,0.4)",
+              color: "#94a3b8",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              fontSize: "10px",
+              fontWeight: 700
+            }}>
+              👤 Single-User Mode (Local Edit)
+            </span>
+          )}
           
-          {/* Dual Cursor Indicator Badges - Active only when Coding Room is Active */}
-          {dualCursorEnabled && (
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "6px" }}>
+          {/* Case 2: Coding Room = ON -> Live Multi-Participant Cursor Indicators */}
+          {isRoomActive && (
+            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+              {/* Local User Badge */}
               <span style={{
                 background: "rgba(0,229,195,0.15)",
                 border: "1px solid rgba(0,229,195,0.4)",
@@ -239,21 +298,24 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
                 👤 You: Ln {cursorPos.line}, Col {cursorPos.col}
               </span>
 
-              <span style={{
-                background: "rgba(168,85,247,0.15)",
-                border: "1px solid rgba(168,85,247,0.4)",
-                color: "#c084fc",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                fontSize: "10px",
-                fontWeight: 800,
-                display: "flex",
-                alignItems: "center",
-                gap: "4px"
-              }}>
-                <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: "#c084fc" }}></span>
-                👤 Peer: Ln {peerCursorPos.line}, Col {peerCursorPos.col}
-              </span>
+              {/* Remote Participant Badges with Unique Colors */}
+              {remoteUsers.map(u => (
+                <span key={u.id} style={{
+                  background: `${u.color}22`,
+                  border: `1px solid ${u.color}66`,
+                  color: u.color,
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px"
+                }}>
+                  <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: u.color }}></span>
+                  👤 {u.name}: Ln {u.cursor.line}, Col {u.cursor.col}
+                </span>
+              ))}
             </div>
           )}
         </div>
@@ -284,19 +346,16 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
             muted
             style={{ width: "100%", height: "110px", borderRadius: "6px", objectFit: "cover", background: "#000" }}
           />
-          <div style={{ fontSize: "9px", color: "var(--text2)", textAlign: "center", marginTop: "4px" }}>
-            Coding tab is fully usable & editable while sharing
-          </div>
         </div>
       )}
 
-      {/* CODE EDITOR CONTAINER WITH GUTTER & DUAL CURSOR HIGHLIGHTS */}
+      {/* CODE EDITOR CONTAINER WITH GUTTER & MULTI-USER CURSOR HIGHLIGHTS */}
       <div style={{ display: "flex", position: "relative", height: "360px" }}>
         {/* GUTTER LINE NUMBERS */}
         <div
           ref={gutterRef}
           style={{
-            width: "48px",
+            width: "52px",
             background: "rgba(0,0,0,0.4)",
             borderRight: "1px solid rgba(255,255,255,0.08)",
             padding: "12px 0",
@@ -313,23 +372,16 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
         >
           {lineNumbers.map(n => {
             const isUserLine = n === cursorPos.line;
-            const isPeerLine = dualCursorEnabled && n === peerCursorPos.line;
+            const remoteOnLine = isRoomActive ? remoteUsers.filter(u => u.cursor.line === n) : [];
             let numColor = "rgba(255,255,255,0.3)";
             let fontWeight = 400;
-            let prefix = "";
 
-            if (isUserLine && isPeerLine) {
-              numColor = "#00e5c3";
-              fontWeight = 900;
-              prefix = "👤👤";
-            } else if (isUserLine) {
+            if (isUserLine) {
               numColor = "#00e5c3";
               fontWeight = 800;
-              prefix = "👤";
-            } else if (isPeerLine) {
-              numColor = "#c084fc";
+            } else if (remoteOnLine.length > 0) {
+              numColor = remoteOnLine[0].color;
               fontWeight = 800;
-              prefix = "👤";
             }
 
             return (
@@ -344,14 +396,23 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
                   gap: "2px"
                 }}
               >
-                {prefix && <span style={{ fontSize: "8px" }}>{prefix}</span>}
+                {/* Render colored indicator dots for remote user cursors on line */}
+                {remoteOnLine.map(ru => (
+                  <span key={ru.id} style={{
+                    display: "inline-block",
+                    width: "5px",
+                    height: "5px",
+                    borderRadius: "50%",
+                    background: ru.color
+                  }} title={`${ru.name}'s cursor`} />
+                ))}
                 <span>{n}</span>
               </div>
             );
           })}
         </div>
 
-        {/* TEXTAREA WITH DUAL CURSOR INTERACTION */}
+        {/* TEXTAREA FOR EDITING */}
         <textarea
           ref={textareaRef}
           id="code-textarea"
@@ -381,80 +442,52 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false }) => {
           aria-label="Code editor"
         />
 
-        {/* LIVE MULTI-USER CURSOR OVERLAYS WITH NAME BADGES */}
-        {dualCursorEnabled && (
-          <>
-            {/* Secondary Peer Floating Cursor Caret */}
-            <div style={{
-              position: "absolute",
-              top: `${(peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
-              left: `${Math.min(500, (peerCursorPos.col - 1) * 7.8 + 60)}px`,
-              pointerEvents: "none",
-              zIndex: 10,
-              transition: "top 0.1s ease, left 0.1s ease",
-              display: (peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (peerCursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
-            }}>
-              <div style={{
-                width: "2px",
-                height: "20px",
-                background: "#c084fc",
-                boxShadow: "0 0 8px #c084fc",
-                position: "relative"
-              }}>
-                <span style={{
-                  position: "absolute",
-                  top: "-18px",
-                  left: "0px",
-                  background: "#7c3aed",
-                  color: "#fff",
-                  fontSize: "9px",
-                  fontWeight: 800,
-                  padding: "1px 5px",
-                  borderRadius: "4px 4px 4px 0",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)"
-                }}>
-                  👤 Peer
-                </span>
-              </div>
-            </div>
+        {/* LIVE MULTI-PARTICIPANT FLOATING CURSORS & NAME TAGS (CASE 2: ROOM ON ONLY) */}
+        {isRoomActive && remoteUsers.map(u => {
+          const lineY = (u.cursor.line - 1) * 20.8 + 12 - scrollTop;
+          const colX = Math.min(650, Math.max(0, (u.cursor.col - 1) * 7.8 + 64));
+          const isVisible = lineY >= -10 && lineY <= 340;
 
-            {/* Primary User Floating Cursor Caret */}
-            <div style={{
+          if (!isVisible) return null;
+
+          return (
+            <div key={u.id} style={{
               position: "absolute",
-              top: `${(cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0)}px`,
-              left: `${Math.min(500, (cursorPos.col - 1) * 7.8 + 60)}px`,
+              top: `${lineY}px`,
+              left: `${colX}px`,
               pointerEvents: "none",
               zIndex: 10,
-              transition: "top 0.05s ease, left 0.05s ease",
-              display: (cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) < 0 || (cursorPos.line - 1) * 20.8 + 12 - (textareaRef.current?.scrollTop || 0) > 340 ? "none" : "block"
+              transition: "top 0.1s ease, left 0.1s ease"
             }}>
+              {/* Vertical Caret Bar */}
               <div style={{
                 width: "2px",
                 height: "20px",
-                background: "#00e5c3",
-                boxShadow: "0 0 8px #00e5c3",
+                background: u.color,
+                boxShadow: `0 0 8px ${u.color}`,
                 position: "relative"
               }}>
+                {/* Floating Name Badge Above Cursor */}
                 <span style={{
                   position: "absolute",
                   top: "-18px",
                   left: "0px",
-                  background: "#00b89c",
-                  color: "#000",
+                  background: u.color,
+                  color: "#fff",
                   fontSize: "9px",
                   fontWeight: 900,
                   padding: "1px 5px",
                   borderRadius: "4px 4px 4px 0",
                   whiteSpace: "nowrap",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)"
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                  letterSpacing: "0.2px"
                 }}>
-                  👤 You
+                  👤 {u.name}
                 </span>
               </div>
             </div>
-          </>
-        )}
+          );
+        })}
       </div>
     </div>
   );
@@ -1605,14 +1638,21 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <option value="sql" style={{ background: "#0c1220", color: "#f0f4fd" }}>SQL</option>
               </select>
               <div className="flex gap8" style={{ alignItems: "center", flexWrap: "wrap" }}>
-                {roomId && <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 2 Cursors Active</span>}
+                {roomId && <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 {Math.max(1, roomParticipants.length)} Participant{roomParticipants.length === 1 ? '' : 's'} Active</span>}
                 {roomId && <span className="pill pill-purple" style={{ fontSize: "11px", fontWeight: 800 }}>🖥️ Room Sync Active</span>}
                 <button className="btn btn-ghost btn-sm" onClick={resetStarterCode}>Reset Starter</button>
                 <button className="btn btn-primary btn-sm" onClick={runCode}>▶ Run Code</button>
               </div>
             </div>
             
-            <SmartCodeEditor value={code} onChange={handleCodeChange} lang={lang} isRoomActive={Boolean(roomId)} />
+            <SmartCodeEditor 
+              value={code} 
+              onChange={handleCodeChange} 
+              lang={lang} 
+              isRoomActive={Boolean(roomId)} 
+              participants={roomParticipants} 
+              currentUserId={user?._id || user?.user_id || user?.id || localStorage.getItem("user_id")} 
+            />
             
             {/* Console execution outputs */}
             <div>
