@@ -32,9 +32,17 @@ export default function StudentFeedbackForm({ role = "Student" }) {
     setLoadingHistory(true);
     try {
       const records = await getMyFeedback();
-      setMyFeedbacks(records || []);
+      let list = [];
+      if (Array.isArray(records)) {
+        list = records;
+      } else if (records && typeof records === 'object') {
+        list = records.feedback || records.feedbacks || records.data || records.records || [];
+        if (!Array.isArray(list)) list = [];
+      }
+      setMyFeedbacks(list);
     } catch (e) {
-      console.error(e);
+      console.error("Fetch history notice:", e);
+      setMyFeedbacks([]);
     } finally {
       setLoadingHistory(false);
     }
@@ -241,14 +249,21 @@ export default function StudentFeedbackForm({ role = "Student" }) {
           📜 My Submitted Feedback & Status
         </h3>
 
-        {loadingHistory ? (
-          <div style={{ color: "#00c4a7", fontSize: "13px", fontWeight: 700 }}>Loading feedback history...</div>
-        ) : myFeedbacks.length === 0 ? (
-          <div style={{ color: "#94a3b8", fontSize: "13px" }}>You haven't submitted any feedback yet.</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            {myFeedbacks.map(fb => (
-              <div key={fb.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px" }}>
+        {(() => {
+          const safeFeedbacks = Array.isArray(myFeedbacks) ? myFeedbacks : [];
+
+          if (loadingHistory) {
+            return <div style={{ color: "#00c4a7", fontSize: "13px", fontWeight: 700 }}>Loading feedback history...</div>;
+          }
+
+          if (safeFeedbacks.length === 0) {
+            return <div style={{ color: "#94a3b8", fontSize: "13px" }}>You haven't submitted any feedback yet.</div>;
+          }
+
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {safeFeedbacks.map(fb => (
+                <div key={fb.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px" }}>
                 
                 {editingId === fb.id ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -297,7 +312,8 @@ export default function StudentFeedbackForm({ role = "Student" }) {
               </div>
             ))}
           </div>
-        )}
+        );
+      })()}
       </div>
 
     </div>

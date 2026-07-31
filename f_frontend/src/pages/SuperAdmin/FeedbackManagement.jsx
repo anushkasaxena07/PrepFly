@@ -131,9 +131,10 @@ export default function FeedbackManagement() {
 
   // Export functions
   const exportToCSV = () => {
-    if (!data.feedback || data.feedback.length === 0) return alert("No feedback records available to export");
+    const feedbackList = Array.isArray(data?.feedback) ? data.feedback : (Array.isArray(data) ? data : []);
+    if (feedbackList.length === 0) return alert("No feedback records available to export");
     const headers = ["Feedback ID", "Date", "Role", "Submitter", "Organization", "Category", "Rating", "Status", "Priority", "Subject", "Message"];
-    const rows = data.feedback.map(f => [
+    const rows = feedbackList.map(f => [
       f.id,
       f.created_at,
       f.submitted_by_role,
@@ -427,7 +428,7 @@ export default function FeedbackManagement() {
               </tr>
             </thead>
             <tbody>
-              {data.feedback.map(fb => {
+              {(Array.isArray(data?.feedback) ? data.feedback : (Array.isArray(data) ? data : [])).map(fb => {
                 const pInfo = getPriorityColor(fb.priority);
                 const sInfo = getStatusBadge(fb.status);
                 return (
