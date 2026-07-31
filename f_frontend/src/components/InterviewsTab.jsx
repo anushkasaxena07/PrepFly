@@ -89,7 +89,21 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
     try {
       await element.play();
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name === 'NotAllowedError') {
+        console.warn("Autoplay blocked on laptop browser. Muting video temporarily to start playback and waiting for user gesture...");
+        element.muted = true;
+        try {
+          await element.play();
+        } catch (e2) {}
+        const unmuteOnUserAction = () => {
+          if (!isMuted) element.muted = false;
+          element.play().catch(() => {});
+          window.removeEventListener('click', unmuteOnUserAction);
+          window.removeEventListener('keydown', unmuteOnUserAction);
+        };
+        window.addEventListener('click', unmuteOnUserAction);
+        window.addEventListener('keydown', unmuteOnUserAction);
+      } else if (err.name !== 'AbortError') {
         console.warn("Media play notice:", err);
       }
     }
@@ -469,10 +483,20 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       });
 
       pc.ontrack = (event) => {
-        console.log('🟢 WebRTC ontrack received:', event.track.kind);
+        console.log('🟢 WebRTC ontrack received:', event.track.kind, event.track.id);
         setConnectionStatus("Connected");
         const incoming = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
         
+        // Listen for unmute / live track state changes on mobile/desktop
+        event.track.onunmute = () => {
+          console.log("Remote track unmuted:", event.track.kind);
+          const fresh = new MediaStream(remoteStreamInstance.getTracks());
+          setRemoteStream(fresh);
+          if (remoteVideoRef.current) {
+            safeAttachStream(remoteVideoRef.current, fresh, false);
+          }
+        };
+
         // Combine with any accumulated tracks
         incoming.getTracks().forEach(t => {
           if (!remoteStreamInstance.getTracks().find(existing => existing.id === t.id)) {
@@ -1515,37 +1539,51 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                       playsInline 
                     />
 
-                    <video 
-                      ref={bindRemoteVideo} 
-                      autoPlay 
-                      playsInline 
-                      style={{
-                        width: "100%", 
-                        height: "100%", 
-                        objectFit: "contain", 
-                        display: remoteStream ? "block" : "none"
-                      }}
-                    />
+                    {(() => {
+                      const hasRemoteVideo = Boolean(
+                        remoteStream && 
+                        remoteStream.getVideoTracks && 
+                        remoteStream.getVideoTracks().length > 0 && 
+                        remoteStream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)
+                      );
 
-                    {isRemoteSharing && (
-                      <div style={{position: "absolute", top: "12px", left: "12px", background: "rgba(0,240,200,0.9)", color: "#000", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, zIndex: 15}}>
-                        🖥️ Remote Screen Share
-                      </div>
-                    )}
+                      return (
+                        <>
+                          <video 
+                            ref={bindRemoteVideo} 
+                            autoPlay 
+                            playsInline 
+                            style={{
+                              width: "100%", 
+                              height: "100%", 
+                              objectFit: "cover", 
+                              borderRadius: "10px",
+                              display: hasRemoteVideo ? "block" : "none"
+                            }}
+                          />
 
-                    {(!remoteParticipantIdRef.current || !remoteStream) && (
-                      <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5}}>
-                        <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
-                          👤
-                        </div>
-                        <div style={{fontSize: "14px", fontWeight: 800, color: "#fff"}}>
-                          {remoteStream && remoteStream.getVideoTracks().length > 0 ? "Video loading..." : "Waiting for video..."}
-                        </div>
-                        <div style={{fontSize: "11px", color: "var(--text2)", marginTop: "4px"}}>
-                          {!remoteParticipantIdRef.current ? "Waiting for peer to join room" : "Connecting media stream..."}
-                        </div>
-                      </div>
-                    )}
+                          {isRemoteSharing && (
+                            <div style={{position: "absolute", top: "12px", left: "12px", background: "rgba(0,240,200,0.9)", color: "#000", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, zIndex: 15}}>
+                              🖥️ Remote Screen Share
+                            </div>
+                          )}
+
+                          {(!remoteParticipantIdRef.current || !hasRemoteVideo) && (
+                            <div style={{textAlign: "center", color: "var(--text2)", zIndex: 5, padding: "16px"}}>
+                              <div style={{width: "64px", height: "64px", borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px"}}>
+                                👤
+                              </div>
+                              <div style={{fontSize: "14px", fontWeight: 800, color: "#fff"}}>
+                                {!remoteParticipantIdRef.current ? "Waiting for peer to join room..." : "Peer camera is off or connecting..."}
+                              </div>
+                              <div style={{fontSize: "11px", color: "var(--text2)", marginTop: "4px"}}>
+                                {!remoteParticipantIdRef.current ? "Share room code with candidate" : "Establishing WebRTC video stream..."}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {connectionStatus === "Reconnecting..." && (
                       <div style={{
