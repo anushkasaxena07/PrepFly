@@ -445,8 +445,8 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
         {/* LIVE MULTI-PARTICIPANT FLOATING CURSORS & NAME TAGS (CASE 2: ROOM ON ONLY) */}
         {isRoomActive && remoteUsers.map(u => {
           const lineY = (u.cursor.line - 1) * 20.8 + 12 - scrollTop;
-          const colX = Math.min(650, Math.max(0, (u.cursor.col - 1) * 7.8 + 64));
-          const isVisible = lineY >= -10 && lineY <= 340;
+          const colX = Math.min(680, Math.max(0, (u.cursor.col - 1) * 7.8 + 64));
+          const isVisible = lineY >= -15 && lineY <= 345;
 
           if (!isVisible) return null;
 
@@ -456,33 +456,38 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
               top: `${lineY}px`,
               left: `${colX}px`,
               pointerEvents: "none",
-              zIndex: 10,
-              transition: "top 0.1s ease, left 0.1s ease"
+              zIndex: 20,
+              transition: "top 0.08s ease-out, left 0.08s ease-out"
             }}>
               {/* Vertical Caret Bar */}
               <div style={{
                 width: "2px",
                 height: "20px",
                 background: u.color,
-                boxShadow: `0 0 8px ${u.color}`,
-                position: "relative"
+                boxShadow: `0 0 10px ${u.color}, 0 0 3px #fff`,
+                position: "relative",
+                borderRadius: "1px"
               }}>
                 {/* Floating Name Badge Above Cursor */}
                 <span style={{
                   position: "absolute",
-                  top: "-18px",
+                  top: "-20px",
                   left: "0px",
                   background: u.color,
                   color: "#fff",
-                  fontSize: "9px",
+                  fontSize: "9.5px",
                   fontWeight: 900,
-                  padding: "1px 5px",
+                  padding: "2px 6px",
                   borderRadius: "4px 4px 4px 0",
                   whiteSpace: "nowrap",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.5)",
-                  letterSpacing: "0.2px"
+                  boxShadow: `0 2px 8px ${u.color}66, 0 2px 4px rgba(0,0,0,0.5)`,
+                  letterSpacing: "0.2px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px"
                 }}>
-                  👤 {u.name}
+                  <span>👤 {u.name}</span>
+                  {u.isEditing && <span style={{ fontSize: "8px", opacity: 0.9 }}>✍️</span>}
                 </span>
               </div>
             </div>
@@ -1107,10 +1112,19 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
   const getCursorPosition = () => {
     const area = document.getElementById("code-textarea");
-    if (!area) return null;
+    if (!area) return { line: 1, col: 1, ch: 0 };
     const start = area.selectionStart;
-    const lines = area.value.substring(0, start).split("\n");
-    return { line: lines.length, ch: lines[lines.length - 1].length };
+    const textBefore = area.value.substring(0, start);
+    const lineList = textBefore.split("\n");
+    const currentLine = lineList.length;
+    const lastLineText = lineList[lineList.length - 1];
+    return { 
+      line: currentLine, 
+      col: lastLineText.length + 1, 
+      ch: lastLineText.length,
+      selectionStart: area.selectionStart,
+      selectionEnd: area.selectionEnd
+    };
   };
 
   // 3. Selection of problem helper
