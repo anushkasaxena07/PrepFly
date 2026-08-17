@@ -1,5 +1,9 @@
 Flask
 flask-cors
+flask-limiter
+PyJWT
+redis
+celery
 python-docx
 PyMuPDF
 langchain-google-genai
@@ -13,3 +17,4 @@ gunicorn
 openpyxl
 razorpay
 sentry-sdk[flask]
+httpx
