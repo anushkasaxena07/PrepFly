@@ -4,12 +4,8 @@ from services.payment_service import create_razorpay_order, verify_razorpay_paym
 payment_bp = Blueprint("payment_bp", __name__)
 
 def get_supabase():
-    try:
-        import app
-        return app.supabase
-    except Exception:
-        from local_supabase import SQLiteSupabaseMock
-        return SQLiteSupabaseMock()
+    import app
+    return app.supabase
 
 @payment_bp.route("/api/payment/create-order", methods=["POST"])
 @payment_bp.route("/payment/create-order", methods=["POST"])

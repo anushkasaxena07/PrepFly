@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchSubscriptionStatus } from './components/subscription/subscriptionAPI';
 
+import { handleSessionInvalidation } from './utils/sessionUtils';
+
 // Modular tab components
 import DashboardTab from "./components/DashboardTab";
 import CodingTab from "./components/CodingTab";
@@ -12,6 +14,8 @@ import AvaTab from "./components/AvaTab";
 import InterviewsTab from "./components/InterviewsTab";
 import AnalyticsTab from "./components/AnalyticsTab";
 import Profile from "./profile";
+import RenewButton from './components/subscription/RenewButton';
+import { subscribeToRealtimeNotifications } from "./services/realtimeService";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:5000" : "https://prepfly.up.railway.app");
 
@@ -101,6 +105,29 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Periodic heartbeat session check to enforce single device login
+  useEffect(() => {
+    const checkSessionStatus = async () => {
+      const token = localStorage.getItem("access_token");
+      if (!token) return;
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/me`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (res.status === 401) {
+          const data = await res.json().catch(() => ({}));
+          handleSessionInvalidation(data.error);
+        }
+      } catch (e) {
+        // Network errors are ignored
+      }
+    };
+
+    checkSessionStatus();
+    const interval = setInterval(checkSessionStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
 
   const [history, setHistory] = useState(() => {
     try {
@@ -172,11 +199,18 @@ export default function Dashboard() {
     fetchData();
   }, [user?._id, user?.email, activeTab]);
 
+  const isFetchingNotifRef = useRef(false);
+
+  const userId = user?._id || user?.id || user?.email || localStorage.getItem("user_id");
+  const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "global";
+
   const fetchLiveNotifications = useCallback(async () => {
+    if (isFetchingNotifRef.current) return;
+    isFetchingNotifRef.current = true;
     try {
-      const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
-      const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "global";
-      const notifRes = await apiFetch(`/notifications?user_id=${targetUserId || 'me'}&org_id=${orgId}`);
+      const targetUserId = userId || 'me';
+      const targetOrgId = orgId || 'global';
+      const notifRes = await apiFetch(`/notifications?user_id=${targetUserId}&org_id=${targetOrgId}`);
       if (notifRes.ok) {
         const notifData = await notifRes.json();
         const list = Array.isArray(notifData) ? notifData : (notifData?.notifications || []);
@@ -185,13 +219,26 @@ export default function Dashboard() {
       }
     } catch (e) {
       console.error("Failed to fetch live notifications:", e);
+    } finally {
+      isFetchingNotifRef.current = false;
     }
-  }, [user]);
+  }, [userId, orgId]);
 
   useEffect(() => {
     fetchLiveNotifications();
-    const timer = setInterval(fetchLiveNotifications, 12000);
-    return () => clearInterval(timer);
+    // 🔌 Realtime WebSocket Subscription - Zero HTTP polling network calls!
+    const unsubscribe = subscribeToRealtimeNotifications((newNotif) => {
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n.id === newNotif.id);
+        if (exists) return prev;
+        const updated = [newNotif, ...prev];
+        localStorage.setItem("prepfly_cached_notifications", JSON.stringify(updated));
+        return updated;
+      });
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [fetchLiveNotifications]);
 
 
@@ -292,7 +339,7 @@ export default function Dashboard() {
       setIsOrgExpired(false);
       return;
     }
-    const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("user_id") || "org_default";
+    const orgId = user?.organization_id || user?.id || user?._id || localStorage.getItem("organization_id") || localStorage.getItem("user_id") || "org_default";
     fetchSubscriptionStatus(apiFetch, orgId).then((sub) => {
       if (sub && (sub.is_blocked || sub.subscription_status === 'EXPIRED')) {
         setIsOrgExpired(true);
@@ -472,15 +519,34 @@ export default function Dashboard() {
       </nav>
 
       <main style={{ padding: "24px 0" }}>
-        {isOrgExpired ? (
-          <div style={{ maxWidth: "600px", margin: "60px auto", padding: "40px 24px", background: "linear-gradient(145deg, #0c1220, #1a1020)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "24px", textAlign: "center", color: "#fff" }}>
+        {isOrgExpired && activeTab !== "profile" ? (
+          <div style={{ maxWidth: "680px", margin: "40px auto", padding: "40px 28px", background: "linear-gradient(145deg, #0c1220, #1a1020)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "24px", textAlign: "center", color: "#fff", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔒</div>
-            <span className="pill pill-red" style={{ fontSize: "11px", marginBottom: "12px" }}>Access Restricted</span>
-            <h2 style={{ fontSize: "22px", fontWeight: 900, marginBottom: "8px", color: "#fff" }}>Organization Subscription Expired</h2>
-            <p style={{ fontSize: "14px", color: "var(--text2)", marginBottom: "24px", lineHeight: "1.6" }}>
-              Your organization's 10-day trial or annual subscription has expired. AI Interviews, Coding Tests, Reports, and Resume Analysis are currently disabled. Please contact your College / Organization Administrator to renew the subscription.
+            <span className="pill pill-red" style={{ fontSize: "11px", marginBottom: "12px" }}>Subscription Required</span>
+            <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "10px", color: "#fff" }}>Organization Trial / Plan Expired</h2>
+            <p style={{ fontSize: "14px", color: "var(--text2)", marginBottom: "28px", lineHeight: "1.6", maxWidth: "560px", margin: "0 auto 28px auto" }}>
+              Your 10-day free trial or organization subscription period has completed. Standard features are currently locked. Click below to view available plan options and instantly renew/upgrade your subscription.
             </p>
-            <button onClick={handleLogout} className="btn btn-ghost" style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}>
+            <div style={{ display: "flex", gap: "14px", justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginBottom: "20px" }}>
+              <RenewButton
+                apiFetch={apiFetch}
+                orgId={orgId}
+                onSuccess={() => {
+                  setIsOrgExpired(false);
+                  window.location.reload();
+                }}
+                label="Renew Subscription (₹500 / Year)"
+                style={{ padding: "14px 24px", fontSize: "14px" }}
+              />
+              <button 
+                onClick={() => { setProfileInitialSubTab('subscription'); setActiveTab('profile'); }} 
+                className="btn btn-primary" 
+                style={{ background: "linear-gradient(135deg, #00c4a7, #1e293b)", border: "none", padding: "14px 24px", fontSize: "14px", fontWeight: 800 }}
+              >
+                👑 View Subscription Plans
+              </button>
+            </div>
+            <button onClick={handleLogout} className="btn btn-ghost" style={{ background: "rgba(255,255,255,0.06)", color: "#94a3b8", fontSize: "13px", marginTop: "12px" }}>
               🚪 Sign Out
             </button>
           </div>

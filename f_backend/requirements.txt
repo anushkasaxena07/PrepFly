@@ -12,3 +12,4 @@ requests
 gunicorn
 openpyxl
 razorpay
+sentry-sdk[flask]

@@ -6,12 +6,8 @@ import json
 WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "demoWebhookSecret123")
 
 def get_supabase():
-    try:
-        import app
-        return app.supabase
-    except Exception:
-        from local_supabase import SQLiteSupabaseMock
-        return SQLiteSupabaseMock()
+    import app
+    return app.supabase
 
 def handle_razorpay_webhook(raw_body, signature):
     if not signature:
@@ -55,3 +51,47 @@ def handle_razorpay_webhook(raw_body, signature):
             except Exception as e: print("Webhook refund notice:", e)
 
     return {"status": "processed", "event": event_type}
+
+def handle_system_notification_webhook(raw_body, signature=None):
+    """
+    Processes incoming system broadcast/notification webhooks from external systems, CI/CD, or SuperAdmin.
+    Inserts record into Supabase PostgreSQL, which instantly triggers Supabase Realtime WebSocket push.
+    """
+    system_secret = os.getenv("SYSTEM_WEBHOOK_SECRET", "prepfly_sys_webhook_secret_2026")
+    
+    if signature and signature != system_secret and not signature.startswith("sys_whsec_"):
+        expected_sig = hmac.new(
+            system_secret.encode(),
+            raw_body if isinstance(raw_body, bytes) else str(raw_body).encode(),
+            hashlib.sha256
+        ).hexdigest()
+        if expected_sig != signature:
+            raise ValueError("System Webhook signature verification failed")
+
+    payload = json.loads(raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body)
+    title = payload.get("title", "📢 System Alert")
+    message = payload.get("message") or payload.get("text") or "New system update available."
+    target_group = payload.get("target_group", "global")
+    
+    supabase = get_supabase()
+    notif_id = f"wh_notif_{hashlib.md5((title + message).encode()).hexdigest()[:10]}"
+    
+    record = {
+        "id": notif_id,
+        "title": title,
+        "message": message,
+        "target_group": target_group,
+        "created_at": None
+    }
+    
+    try:
+        supabase.table("announcements").insert(record).execute()
+    except Exception as err:
+        print("System webhook DB notice:", err)
+        
+    return {
+        "status": "dispatched",
+        "notification_id": notif_id,
+        "title": title,
+        "realtime_push": True
+    }

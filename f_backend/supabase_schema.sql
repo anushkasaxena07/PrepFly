@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
                 avatar TEXT,
                 google_id TEXT,
                 phone TEXT,
+                current_session_id TEXT,
                 created_at TEXT
             );
 
@@ -27,8 +28,6 @@ CREATE TABLE IF NOT EXISTS otps (
                 is_used INTEGER DEFAULT 0,
                 purpose TEXT
             );
-
-CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);
 
 CREATE TABLE IF NOT EXISTS otp_requests (
                 id BIGSERIAL PRIMARY KEY ,

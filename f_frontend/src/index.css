@@ -355,3 +355,135 @@ svg.main-chart text{font-family:'Cabinet Grotesk',sans-serif}
 .wave-bar:nth-child(3n){animation-delay:.3s}
 .pulse-active{animation:avatarPulse 2s ease-in-out infinite;border-color:var(--cyan) !important}
 @keyframes avatarPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,240,200,0.3)}50%{box-shadow:0 0 0 8px rgba(0,240,200,0)}}
+
+/* ── MOBILE & RESPONSIVE UI ENHANCEMENTS ── */
+
+/* Table Responsiveness Wrapper */
+.table-responsive,
+.table-container,
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.table-responsive table,
+.table-container table,
+.table-wrapper table,
+table.admin-table {
+  min-width: 580px;
+}
+
+/* Touch targets and smooth scrolling */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+/* Mobile Media Queries (<= 768px) */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px 12px 60px !important;
+  }
+
+  /* Navigation Bar for Candidate */
+  .nav {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+    height: auto !important;
+  }
+
+  .nav-center {
+    order: 3;
+    width: 100% !important;
+    overflow-x: auto !important;
+    display: flex !important;
+    white-space: nowrap !important;
+    padding-bottom: 4px !important;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .nav-center::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-right {
+    margin-left: auto;
+  }
+
+  /* Responsive Headers & Heroes */
+  .hero-top {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+  }
+
+  .hero-name {
+    font-size: 24px !important;
+  }
+
+  .hero-sub {
+    font-size: 13px !important;
+    max-width: 100% !important;
+  }
+
+  .hero-actions {
+    width: 100% !important;
+  }
+
+  .hero-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Readiness & Stat Cards */
+  .readiness-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px !important;
+  }
+
+  .readiness-pct {
+    font-size: 36px !important;
+    text-align: center;
+  }
+
+  /* Grid Layouts Stacked for Mobile */
+  .g2, .g3, .g4, .g-main {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Section Header Flexing */
+  .sec-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Modals on Mobile */
+  [style*="position: fixed"][style*="zIndex"],
+  .modal-dialog,
+  .modal-overlay > div {
+    max-width: 94vw !important;
+    width: 94vw !important;
+    padding: 18px !important;
+    margin: 8px auto !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* Tablet Media Queries (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .g3, .g4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .g-main {
+    grid-template-columns: 1fr !important;
+  }
+}
+
