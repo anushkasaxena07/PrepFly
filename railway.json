@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd f_backend && gunicorn app:app --workers 2 --threads 4 --bind 0.0.0.0:$PORT -c gunicorn.conf.py",
+    "startCommand": "cd f_backend && gunicorn app:app --workers 2 --threads 4 -c gunicorn.conf.py",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE"
