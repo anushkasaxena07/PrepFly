@@ -6,6 +6,7 @@
   "deploy": {
     "startCommand": "cd f_backend && gunicorn -c gunicorn.conf.py app:app",
     "healthcheckPath": "/health",
+    "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE"
   }
 }
