@@ -21,8 +21,13 @@ export const supabaseRealtimeClient = createClient(SUPABASE_URL, SUPABASE_ANON_K
  */
 export function subscribeToRealtimeNotifications(onNewNotification) {
   try {
-    const channel = supabaseRealtimeClient
-      .channel('public:system_events')
+    const channelName = 'public:system_events';
+    let channel = supabaseRealtimeClient.channels.find(c => c.name === channelName);
+    if (!channel) {
+      channel = supabaseRealtimeClient.channel(channelName);
+    }
+
+    channel
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'announcements' },
@@ -52,15 +57,22 @@ export function subscribeToRealtimeNotifications(onNewNotification) {
             });
           }
         }
-      )
-      .subscribe((status) => {
+      );
+
+    if (channel.state !== 'joined' && channel.state !== 'joining') {
+      channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           console.info('🔌 Supabase Realtime WebSocket connected. Listening for zero-polling push events.');
         }
       });
+    }
 
     return () => {
-      supabaseRealtimeClient.removeChannel(channel);
+      setTimeout(() => {
+        try {
+          if (channel) supabaseRealtimeClient.removeChannel(channel);
+        } catch (_) {}
+      }, 100);
     };
   } catch (err) {
     console.warn('Realtime subscription fallback notice:', err);
