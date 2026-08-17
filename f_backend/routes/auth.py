@@ -396,8 +396,7 @@ def reset_password():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-import urllib.request
-import json
+import requests
 
 @auth_bp.route("/auth/google/verify", methods=["POST", "OPTIONS"])
 @auth_bp.route("/api/auth/google/verify", methods=["POST", "OPTIONS"])
@@ -413,16 +412,17 @@ def verify_google_token():
 
     try:
         google_api_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={credential}"
-        req = urllib.request.Request(google_api_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            token_info = json.loads(resp.read().decode("utf-8"))
+        resp = requests.get(google_api_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if resp.status_code != 200:
+            return jsonify({"error": "Invalid or expired Google credential token"}), 400
 
+        token_info = resp.json()
         email = token_info.get("email", "").strip().lower()
         name = token_info.get("name", "").strip() or email.split("@")[0].capitalize()
         picture = token_info.get("picture", "")
 
         if not email:
-            return jsonify({"error": "Invalid Google credential token"}), 400
+            return jsonify({"error": "Invalid Google credential token payload"}), 400
 
         supabase = get_supabase()
         res = supabase.table("users").select("*").eq("email", email).execute()
