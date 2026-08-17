@@ -32,10 +32,9 @@ bind_env = os.getenv("BIND_ADDRESS")
 if bind_env and "$" not in bind_env:
     bind = bind_env
 
-# Dynamic CPU-based worker autoscaling calculation (2 * cores + 1)
-cpu_cores = multiprocessing.cpu_count()
-default_workers = (cpu_cores * 2) + 1
-workers = int(os.getenv("WEB_CONCURRENCY", default_workers))
+# Worker Configuration for Container Environments (Default 2 workers, max 4 unless WEB_CONCURRENCY is explicitly set)
+# Prevents Railway host machine core count (e.g. 32 physical cores = 65 workers) from causing OOM crashes
+workers = int(os.getenv("WEB_CONCURRENCY", 2))
 
 # Async Threaded Worker Configuration for High Concurrency
 worker_class = os.getenv("WORKER_CLASS", "gthread")

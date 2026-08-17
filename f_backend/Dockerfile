@@ -24,4 +24,4 @@ COPY . .
 EXPOSE 5000
 
 # Default entrypoint using autoscaling Gunicorn server
-CMD ["sh", "-c", "gunicorn -c gunicorn.conf.py app:app"]
+CMD ["gunicorn", "app:app", "--workers", "2", "--threads", "4", "-c", "gunicorn.conf.py"]
