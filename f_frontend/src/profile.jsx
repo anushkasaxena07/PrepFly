@@ -82,9 +82,9 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
           const res = await axios.get(`${BACKEND_URL}/user-stats/${userId}`);
           if (res.status === 200) {
             const data = res.data;
-            const totalSessions = (data.interviews?.total || 0) + (data.coding?.total || 0) + (data.speech?.total || 0) + (data.resume?.total || 0);
+            const totalSessions = (data.interviews?.total || data.interviews?.count || 0) + (data.coding?.total || data.coding?.count || 0) + (data.speech?.total || data.speech?.count || 0) + (data.resume?.total || data.resume?.latest_score || 0);
             setStats({
-              interviews: data.interviews?.total || 0,
+              interviews: data.interviews?.total || data.interviews?.count || 0,
               avgScore: data.interviews?.avg_score ? data.interviews.avg_score.toFixed(1) : "—",
               sessions: totalSessions
             });

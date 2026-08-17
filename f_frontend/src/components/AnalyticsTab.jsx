@@ -4,7 +4,7 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
   const completedSessions = (history || []).filter(s => !s.active);
   const isLoggedIn = user?._id || user?.user_id;
 
-  const totalSessions = userStats ? userStats.interviews.total : completedSessions.length;
+  const totalSessions = userStats?.interviews?.total ?? userStats?.interviews?.count ?? completedSessions.length;
   const hasData = userStats ? userStats.has_data : completedSessions.length > 0;
 
   // Avg Score
@@ -24,7 +24,7 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
   const bestRun = bestNum.toFixed(1);
 
   // Streak
-  const streak = userStats ? userStats.streak : (completedSessions.length > 0 ? Math.min(30, completedSessions.length + 1) : 5);
+  const streak = userStats?.streak_days ?? userStats?.streak ?? (completedSessions.length > 0 ? Math.min(30, completedSessions.length + 1) : 5);
 
   // Grade distribution
   const grades = { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 };

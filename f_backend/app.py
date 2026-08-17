@@ -108,6 +108,11 @@ class SupabasePostgreSQLClient:
                         return res
                     except Exception as err:
                         last_err = err
+                        err_msg = str(err)
+                        if "PGRST204" in err_msg or "PGRST205" in err_msg or "schema cache" in err_msg or "Could not find" in err_msg:
+                            import logging
+                            logging.warning(f"[DB SCHEMA NOTICE] Table {self.table_name} query notice: {err_msg}")
+                            raise err
                         import logging, time
                         logging.warning(f"[DB RETRY {attempt+1}/{retries}] Table {self.table_name} query notice: {err}")
                         if attempt < retries - 1:

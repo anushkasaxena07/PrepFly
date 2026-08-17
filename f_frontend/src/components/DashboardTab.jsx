@@ -10,7 +10,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
 
   // 1. Total sessions
   const displayTotal = userStats?.interviews
-    ? (userStats.interviews.total ?? 0)
+    ? (userStats.interviews.total ?? userStats.interviews.count ?? 0)
     : (hasData ? completedSessions.length : (isLoggedIn ? 0 : 24));
 
   // 2. Average score
@@ -36,7 +36,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
 
   // Streak & Milestone Info
   const displayStreak = userStats
-    ? (userStats.streak ?? 0)
+    ? (userStats.streak_days ?? userStats.streak ?? 0)
     : (hasData ? Math.min(30, completedSessions.length + 2) : (isLoggedIn ? 0 : 7));
 
   const gradeACount = userStats
@@ -163,8 +163,8 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
     : "";
 
   // Dynamic metrics
-  const displayCoding = userStats ? userStats.coding.total : (hasData ? completedSessions.length : 0);
-  const displaySpeech = userStats ? userStats.speech.total : (hasData ? completedSessions.length : 0);
+  const displayCoding = userStats?.coding?.total ?? userStats?.coding?.count ?? (hasData ? completedSessions.length : 0);
+  const displaySpeech = userStats?.speech?.total ?? userStats?.speech?.count ?? (hasData ? completedSessions.length : 0);
 
   // Daily Goals calculation
   const goal1Pct = Math.min(100, Math.round((displayCoding / 2) * 100));
