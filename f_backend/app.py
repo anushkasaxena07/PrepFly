@@ -229,19 +229,17 @@ def handle_preflight():
         res.headers["Access-Control-Allow-Credentials"] = "true"
         res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-User-Role, X-Role, X-Organization-Id"
         res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        res.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         return res
 
 @app.after_request
 def add_cors_headers(response):
-    origin = request.headers.get("Origin")
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = "*"
+    origin = request.headers.get("Origin") or "*"
+    response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-User-Role, X-Role, X-Organization-Id"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Cross-Origin-Opener-Policy"] = "unsafe-none"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     return response
 
 @app.route("/<path:dummy>", methods=["OPTIONS"])
@@ -253,6 +251,7 @@ def handle_global_options(dummy=None):
     res.headers["Access-Control-Allow-Credentials"] = "true"
     res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-User-Role, X-Role, X-Organization-Id"
     res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    res.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     return res
 
 @app.route("/health", methods=["GET", "HEAD"])

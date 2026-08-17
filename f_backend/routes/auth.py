@@ -395,3 +395,91 @@ def reset_password():
         return jsonify({"message": "Password reset successfully! You can now log in."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+import urllib.request
+import json
+
+@auth_bp.route("/auth/google/verify", methods=["POST", "OPTIONS"])
+@auth_bp.route("/api/auth/google/verify", methods=["POST", "OPTIONS"])
+def verify_google_token():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
+    data = request.get_json() or {}
+    credential = data.get("credential") or data.get("token") or data.get("id_token")
+
+    if not credential:
+        return jsonify({"error": "Google credential token is required"}), 400
+
+    try:
+        google_api_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={credential}"
+        req = urllib.request.Request(google_api_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            token_info = json.loads(resp.read().decode("utf-8"))
+
+        email = token_info.get("email", "").strip().lower()
+        name = token_info.get("name", "").strip() or email.split("@")[0].capitalize()
+        picture = token_info.get("picture", "")
+
+        if not email:
+            return jsonify({"error": "Invalid Google credential token"}), 400
+
+        supabase = get_supabase()
+        res = supabase.table("users").select("*").eq("email", email).execute()
+
+        if res and hasattr(res, "data") and res.data:
+            user = res.data[0]
+            updates = {}
+            if not user.get("avatar") and picture:
+                updates["avatar"] = picture
+            if not user.get("name") and name:
+                updates["name"] = name
+            if updates:
+                try:
+                    supabase.table("users").update(updates).eq("id", user["id"]).execute()
+                    user.update(updates)
+                except Exception:
+                    pass
+        else:
+            user_id = str(uuid.uuid4())
+            org_id = f"org_{user_id}"
+            now = datetime.utcnow()
+            t_end = now + timedelta(days=10)
+
+            try:
+                supabase.table("organization").insert({
+                    "id": org_id,
+                    "name": f"{name}'s Organization",
+                    "type": "Candidate",
+                    "subscription_status": "TRIAL",
+                    "trial_start": now.isoformat(),
+                    "trial_end": t_end.isoformat(),
+                    "current_plan": "Trial",
+                    "status": "Active",
+                    "created_at": now.isoformat(),
+                    "updated_at": now.isoformat()
+                }).execute()
+            except Exception as e_org:
+                print("Google user org notice:", e_org)
+
+            ins = supabase.table("users").insert({
+                "id": user_id,
+                "name": name,
+                "email": email,
+                "avatar": picture,
+                "role": "candidate",
+                "organization_id": org_id,
+                "created_at": now.isoformat()
+            }).execute()
+
+            user = ins.data[0] if (ins and hasattr(ins, "data") and ins.data) else {
+                "id": user_id, "name": name, "email": email, "avatar": picture, "role": "candidate", "organization_id": org_id
+            }
+
+        log_authentication(email, "google_oauth", True, get_client_ip())
+        return jsonify({"message": "Signed in with Google successfully!", **user_response(user)}), 200
+
+    except Exception as e:
+        print("Google token verification notice:", e)
+        return jsonify({"error": f"Google verification failed: {str(e)}"}), 400
+
