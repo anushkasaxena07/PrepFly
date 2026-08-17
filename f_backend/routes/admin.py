@@ -339,3 +339,17 @@ def get_admin_feedback():
         }), 200
     except Exception as e:
         return jsonify({"summary": {"total_feedback": 0}, "analytics": {}, "feedback": []}), 200
+
+@admin_bp.route("/api/feedback/my", methods=["GET", "OPTIONS"])
+@admin_bp.route("/feedback/my", methods=["GET", "OPTIONS"])
+def get_my_feedback():
+    if request.method == "OPTIONS":
+        return jsonify([]), 200
+    try:
+        supabase = get_supabase()
+        res = supabase.table("feedback").select("*").execute()
+        items = res.data if (res and hasattr(res, "data") and res.data) else []
+        return jsonify(items), 200
+    except Exception as e:
+        print("My feedback notice:", e)
+        return jsonify([]), 200
