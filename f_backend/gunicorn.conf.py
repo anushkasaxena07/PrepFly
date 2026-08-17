@@ -1,17 +1,36 @@
 import os
+import sys
 import multiprocessing
 
-# Gunicorn Production Autoscaling Configuration
-
+# Sanitize sys.argv to replace any literal '$PORT' passed by Railway CLI / Nixpacks
 raw_port = os.getenv("PORT", "5000").strip()
 if not raw_port.isdigit():
     raw_port = "5000"
 
+new_argv = []
+skip_next = False
+for i, arg in enumerate(sys.argv):
+    if skip_next:
+        skip_next = False
+        continue
+    if "$PORT" in arg:
+        arg = arg.replace("$PORT", raw_port)
+    elif arg in ("-b", "--bind"):
+        if i + 1 < len(sys.argv):
+            next_arg = sys.argv[i + 1]
+            if "$PORT" in next_arg:
+                next_arg = next_arg.replace("$PORT", raw_port)
+                new_argv.extend([arg, next_arg])
+                skip_next = True
+                continue
+    new_argv.append(arg)
+
+sys.argv = new_argv
+
+bind = f"0.0.0.0:{raw_port}"
 bind_env = os.getenv("BIND_ADDRESS")
-if bind_env and not bind_env.startswith("$"):
+if bind_env and "$" not in bind_env:
     bind = bind_env
-else:
-    bind = f"0.0.0.0:{raw_port}"
 
 # Dynamic CPU-based worker autoscaling calculation (2 * cores + 1)
 cpu_cores = multiprocessing.cpu_count()

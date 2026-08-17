@@ -1,2 +1,2 @@
-web: sh -c "gunicorn -c gunicorn.conf.py app:app"
+web: gunicorn -c gunicorn.conf.py app:app
 worker: celery -A tasks.celery_app.celery_app worker --loglevel=info --autoscale=10,2
