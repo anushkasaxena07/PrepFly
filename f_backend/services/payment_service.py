@@ -4,8 +4,8 @@ import hashlib
 import uuid
 from datetime import datetime, timedelta
 
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID") or "rzp_test_demoKey123"
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET") or "demo_secret_key_123"
 
 def get_supabase_client():
     from app import supabase
