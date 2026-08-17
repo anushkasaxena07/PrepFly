@@ -329,4 +329,6 @@ def handle_global_exception(e):
     return res
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port_str = os.getenv("PORT", "5000").strip()
+    port_num = int(port_str) if port_str.isdigit() else 5000
+    app.run(host="0.0.0.0", port=port_num, debug=False)

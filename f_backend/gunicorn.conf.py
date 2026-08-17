@@ -3,7 +3,15 @@ import multiprocessing
 
 # Gunicorn Production Autoscaling Configuration
 
-bind = os.getenv("BIND_ADDRESS", "0.0.0.0:5000")
+raw_port = os.getenv("PORT", "5000").strip()
+if not raw_port.isdigit():
+    raw_port = "5000"
+
+bind_env = os.getenv("BIND_ADDRESS")
+if bind_env and not bind_env.startswith("$"):
+    bind = bind_env
+else:
+    bind = f"0.0.0.0:{raw_port}"
 
 # Dynamic CPU-based worker autoscaling calculation (2 * cores + 1)
 cpu_cores = multiprocessing.cpu_count()
