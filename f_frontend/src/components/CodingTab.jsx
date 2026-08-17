@@ -984,12 +984,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
-        const problemsList = data.problems || [];
+        const problemsList = Array.isArray(data) ? data : (data.problems || []);
         setProblems(problemsList);
         
         const pendingPid = localStorage.getItem("selected_problem_id");
         if (pendingPid) {
-          const found = problemsList.find(p => p.problem_id === pendingPid);
+          const found = problemsList.find(p => (p.problem_id === pendingPid || p.id === pendingPid));
           if (found) {
             selectProblem(found);
             localStorage.removeItem("selected_problem_id");
@@ -997,9 +997,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           }
         }
 
-        if (!currentProblem && problemsList.length > 0) {
-          const twoSum = problemsList.find(p => p.problem_id === "two-sum") || problemsList[0];
-          selectProblem(twoSum);
+        if (problemsList.length > 0) {
+          const defaultProb = problemsList.find(p => (p.problem_id === "prob_01" || p.problem_id === "two-sum" || p.id === "prob_01")) || problemsList[0];
+          selectProblem(defaultProb);
         }
       }
     } catch (e) {

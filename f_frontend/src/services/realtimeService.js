@@ -22,7 +22,8 @@ export const supabaseRealtimeClient = createClient(SUPABASE_URL, SUPABASE_ANON_K
 export function subscribeToRealtimeNotifications(onNewNotification) {
   try {
     const channelName = 'public:system_events';
-    let channel = supabaseRealtimeClient.channels.find(c => c.name === channelName);
+    const channels = typeof supabaseRealtimeClient.getChannels === 'function' ? supabaseRealtimeClient.getChannels() : [];
+    let channel = Array.isArray(channels) ? channels.find(c => c.name === channelName) : null;
     if (!channel) {
       channel = supabaseRealtimeClient.channel(channelName);
     }

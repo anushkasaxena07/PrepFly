@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 from flask import Blueprint, request, jsonify
+from werkzeug.utils import secure_filename
 from services.ats import extract_text_from_pdf, extract_text_from_docx, parse_resume_content, calculate_ats_match
 
 resume_bp = Blueprint("resume_bp", __name__)

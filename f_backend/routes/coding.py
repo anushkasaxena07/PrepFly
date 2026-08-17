@@ -109,6 +109,48 @@ def upload_coding_sheet():
         "message": "Question sheet uploaded and processed successfully"
     }), 200
 
+DEFAULT_CODING_PROBLEMS = [
+    {
+        "id": "prob_01",
+        "problem_id": "prob_01",
+        "title": "Two Sum",
+        "category": "Algorithm",
+        "difficulty": "Easy",
+        "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+        "starter_code": "def twoSum(nums, target):\n    # Write your code here\n    pass",
+        "test_cases": [
+            {"input": "[2,7,11,15], 9", "expected": "[0,1]"},
+            {"input": "[3,2,4], 6", "expected": "[1,2]"},
+            {"input": "[3,3], 6", "expected": "[0,1]"}
+        ]
+    },
+    {
+        "id": "prob_02",
+        "problem_id": "prob_02",
+        "title": "Reverse Linked List",
+        "category": "Data Structures",
+        "difficulty": "Easy",
+        "description": "Given the head of a singly linked list, reverse the list, and return the reversed list.",
+        "starter_code": "def reverseList(head):\n    # Write your code here\n    pass",
+        "test_cases": [
+            {"input": "[1,2,3,4,5]", "expected": "[5,4,3,2,1]"}
+        ]
+    },
+    {
+        "id": "prob_03",
+        "problem_id": "prob_03",
+        "title": "Valid Parentheses",
+        "category": "Data Structures",
+        "difficulty": "Medium",
+        "description": "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
+        "starter_code": "def isValid(s):\n    # Write your code here\n    pass",
+        "test_cases": [
+            {"input": "'()'", "expected": "True"},
+            {"input": "'()[]{}'", "expected": "True"}
+        ]
+    }
+]
+
 @coding_bp.route("/api/coding/problems", methods=["GET"])
 @coding_bp.route("/coding/problems", methods=["GET"])
 def get_coding_problems():
@@ -116,9 +158,11 @@ def get_coding_problems():
         supabase = get_supabase()
         res = supabase.table("coding_problems").select("*").execute()
         problems = res.data if (res and hasattr(res, "data") and res.data) else []
+        if not problems:
+            problems = DEFAULT_CODING_PROBLEMS
         return jsonify(problems), 200
     except Exception as e:
-        return jsonify([]), 200
+        return jsonify(DEFAULT_CODING_PROBLEMS), 200
 
 @coding_bp.route("/api/coding/room/create", methods=["POST"])
 @coding_bp.route("/coding/room/create", methods=["POST"])
