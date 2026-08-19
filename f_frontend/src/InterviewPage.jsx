@@ -230,6 +230,15 @@ const InterviewPage = () => {
       if (stored) setUser(JSON.parse(stored));
       const savedAts = localStorage.getItem(`ats_score_${sid}`);
       if (savedAts) setAtsScore(savedAts);
+
+      // Restore chat history & feedbacks
+      const savedHistory = localStorage.getItem(`interview_chat_history_${sid}`);
+      if (savedHistory) {
+        const parsedHist = JSON.parse(savedHistory);
+        if (Array.isArray(parsedHist) && parsedHist.length > 0) {
+          setAllFeedbacks(parsedHist);
+        }
+      }
     } catch { /* silent */ }
 
     // Auto-recover draft response if internet disconnected
@@ -245,6 +254,15 @@ const InterviewPage = () => {
       localStorage.setItem(`interview_autosave_${sessionId}`, response);
     }
   }, [response, sessionId]);
+
+  // Persist allFeedbacks chat history to localStorage whenever updated
+  useEffect(() => {
+    if (sessionId && Array.isArray(allFeedbacks) && allFeedbacks.length > 0) {
+      try {
+        localStorage.setItem(`interview_chat_history_${sessionId}`, JSON.stringify(allFeedbacks));
+      } catch { /* silent */ }
+    }
+  }, [allFeedbacks, sessionId]);
 
   // ── Webcam setup ───────────────────────────────────────────────────────
   const startWebcam = async () => {

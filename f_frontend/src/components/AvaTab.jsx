@@ -214,10 +214,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     alert(`Selected Capture Devices:\n\n📷 Camera: ${videoLabel}\n🎙️ Microphone: ${audioLabel}\n\nUsing system-default selection.`);
   };
 
-  // Restore active interview step or report from sessionStorage on reload
+  // Restore active interview step or report from localStorage / sessionStorage on reload
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem("prepfly_avatab_session");
+      const saved = localStorage.getItem("prepfly_avatab_session") || sessionStorage.getItem("prepfly_avatab_session");
       if (saved) {
         const p = JSON.parse(saved);
         if (p && p.step && p.step !== "loading") {
@@ -235,11 +235,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   }, []);
 
-  // Persist session state on change
+  // Persist session state on change to localStorage and sessionStorage
   useEffect(() => {
     if (step && step !== "resume_upload" && step !== "loading") {
       try {
-        sessionStorage.setItem("prepfly_avatab_session", JSON.stringify({
+        const payload = JSON.stringify({
           step,
           sessionId,
           reportData,
@@ -247,7 +247,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           atsScore,
           question,
           questionNumber
-        }));
+        });
+        localStorage.setItem("prepfly_avatab_session", payload);
+        sessionStorage.setItem("prepfly_avatab_session", payload);
       } catch (e) {}
     }
   }, [step, sessionId, reportData, allFeedbacks, atsScore, question, questionNumber]);
