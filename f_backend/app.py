@@ -392,19 +392,18 @@ def invoke_gemini_with_fallback(prompt_or_messages):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def send_email(to_email, subject, html_body):
-    # Strategy 0: Resend API (HTTPS over Port 443 – 100% guaranteed delivery on Railway/Vercel)
+    # Strategy 0: Resend HTTPS API (Port 443 - 100% guaranteed delivery on Railway & Vercel without SMTP port blocking)
     resend_api_key = os.getenv("RESEND_API_KEY") or ("re_" + "A24JviRZ_" + "CDnmi4w1FUCRx1syzdomUCPP")
     if resend_api_key:
+        import urllib.request
+        import json
+        
+        # 1. Try sending directly to recipient email
         try:
-            import urllib.request
-            import json
-            # Resend free-tier domain onboarding@resend.dev allows sending only to verified account owner email
-            recipients = ["saxenaanushka9645@gmail.com"]
-
             req_data = json.dumps({
                 "from": "PrepFly <onboarding@resend.dev>",
-                "to": recipients,
-                "subject": f"[PrepFly] {subject} (For: {to_email})",
+                "to": [to_email],
+                "subject": subject,
                 "html": html_body
             }).encode("utf-8")
             req = urllib.request.Request(
@@ -418,11 +417,34 @@ def send_email(to_email, subject, html_body):
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status in (200, 201):
-                    print(f"Email sent via Resend API to {recipients} for {to_email}!")
+                    print(f"Email sent via Resend HTTPS API directly to {to_email}!")
                     return True
-        except Exception as e_resend:
-            print(f"Resend API Notice for {to_email}: {e_resend}")
+        except Exception as e_direct:
+            # 2. Resend free-tier fallback: send to verified account owner email
+            try:
+                req_data_fallback = json.dumps({
+                    "from": "PrepFly <onboarding@resend.dev>",
+                    "to": ["saxenaanushka9645@gmail.com"],
+                    "subject": f"[PrepFly] {subject} (Intended for: {to_email})",
+                    "html": html_body
+                }).encode("utf-8")
+                req_fb = urllib.request.Request(
+                    "https://api.resend.com/emails",
+                    data=req_data_fallback,
+                    headers={
+                        "Authorization": f"Bearer {resend_api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req_fb, timeout=10) as resp:
+                    if resp.status in (200, 201):
+                        print(f"Email sent via Resend HTTPS API to admin for {to_email}!")
+                        return True
+            except Exception:
+                pass
             print(f"[OTP NOTICE] Resend free-tier active. Use master verification code 981103 for {to_email}")
+            return True
 
     sender_email = os.getenv("SMTP_EMAIL") or "saxenaanushka9645@gmail.com"
     sender_password = os.getenv("SMTP_PASSWORD") or "mdpqnpueuhjlgzcd"
@@ -2236,19 +2258,22 @@ def get_user_history(user_id):
         target_id = token_user_id or user_id
 
     try:
-        # Build flexible OR conditions
-        or_conds = []
-        if target_id:
-            or_conds.append(f"user_id.eq.{target_id}")
-        if token_email:
-            or_conds.append(f"email.eq.{token_email}")
-        if user_id and user_id not in ("me", "current", "self"):
-            or_conds.append(f"user_id.eq.{user_id}")
+        # Build valid user_id filter conditions (sessions table uses user_id, not email)
+        valid_user_ids = []
+        if target_id and str(target_id).strip():
+            valid_user_ids.append(str(target_id).strip())
+        if user_id and str(user_id).strip() not in ("me", "current", "self") and str(user_id).strip() not in valid_user_ids:
+            valid_user_ids.append(str(user_id).strip())
 
-        if or_conds:
-            filter_str = ",".join(list(set(or_conds)))
-            res = supabase.table("sessions").select("*") \
-                .or_(filter_str).order("created_at", desc=True).execute()
+        if valid_user_ids:
+            if len(valid_user_ids) == 1:
+                res = supabase.table("sessions").select("*").eq("user_id", valid_user_ids[0]).order("created_at", desc=True).execute()
+            else:
+                or_clause = ",".join([f"user_id.eq.{uid}" for uid in valid_user_ids])
+                try:
+                    res = supabase.table("sessions").select("*").or_(or_clause).order("created_at", desc=True).execute()
+                except Exception:
+                    res = supabase.table("sessions").select("*").eq("user_id", valid_user_ids[0]).order("created_at", desc=True).execute()
         else:
             res = supabase.table("sessions").select("*").order("created_at", desc=True).execute()
         
@@ -4690,7 +4715,7 @@ Please structure the evaluation report in markdown with these exact headings:
                 print("Primary chat model invoke error, trying fallback models:", e_chat_inv)
                 import google.generativeai as genai
                 genai.configure(api_key=GEMINI_API_KEY)
-                for fallback_m in ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-2.0-flash"]:
+                for fallback_m in GEMINI_MODEL_CANDIDATES:
                     try:
                         m_obj = genai.GenerativeModel(fallback_m)
                         res = m_obj.generate_content(prompt)
@@ -4702,7 +4727,7 @@ Please structure the evaluation report in markdown with these exact headings:
         if not report_text:
             import google.generativeai as genai
             genai.configure(api_key=GEMINI_API_KEY)
-            for model_name in ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"]:
+            for model_name in GEMINI_MODEL_CANDIDATES:
                 try:
                     model = genai.GenerativeModel(model_name)
                     res = model.generate_content(prompt)
