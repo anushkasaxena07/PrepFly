@@ -84,11 +84,16 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
   const recordStartRef = useRef(0);
   const waveIntervalRef = useRef(null);
   const durationRef = useRef(60);
+  const recognitionRef = useRef(null);
+  const liveSpokenTextRef = useRef("");
 
-  // Clean up interval on unmount
+  // Clean up interval and speech recognition on unmount
   useEffect(() => {
     return () => {
       if (waveIntervalRef.current) clearInterval(waveIntervalRef.current);
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
     };
   }, []);
 
@@ -109,10 +114,14 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
   const toggleRecording = async () => {
     // ── STOP ──
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+      }
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       stopWave();
-      setRecStatus("Processing recording...", "var(--text2)");
+      setRecStatus("Processing recording...");
+      setRecStatusColor("var(--text2)");
       return;
     }
 
@@ -133,7 +142,35 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
     }
 
     audioChunksRef.current = [];
+    liveSpokenTextRef.current = "";
+    setTranscript("🎙️ Listening... speak clearly into your microphone");
     recordStartRef.current = Date.now();
+
+    // Start Web Speech API for real-time live transcription of spoken words
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      try {
+        const recog = new SpeechRecognition();
+        recog.continuous = true;
+        recog.interimResults = true;
+        recog.lang = 'en-US';
+        recog.onresult = (event) => {
+          let currentText = "";
+          for (let i = 0; i < event.results.length; i++) {
+            currentText += event.results[i][0].transcript + " ";
+          }
+          const cleanText = currentText.trim();
+          if (cleanText) {
+            liveSpokenTextRef.current = cleanText;
+            setTranscript(cleanText);
+          }
+        };
+        recog.start();
+        recognitionRef.current = recog;
+      } catch (recErr) {
+        console.warn("Live SpeechRecognition notice:", recErr);
+      }
+    }
 
     const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
       .find(t => MediaRecorder.isTypeSupported(t)) || '';
@@ -163,9 +200,13 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
 
       const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
 
-      setRecStatus(`Recording saved (${duration.toFixed(1)}s). Transcribing...`);
-      setRecStatusColor("var(--text2)");
-      setTranscript("⏳ Transcribing audio...");
+      setRecStatus(`Recording saved (${duration.toFixed(1)}s).`);
+      setRecStatusColor("var(--cyan)");
+
+      const capturedLiveText = liveSpokenTextRef.current.trim();
+      if (capturedLiveText) {
+        setTranscript(capturedLiveText);
+      }
 
       if (isLoggedIn()) {
         try {
@@ -179,22 +220,27 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           });
 
           const data = await res.json();
-          if (!res.ok) throw new Error('Transcription temporarily unavailable');
-          setTranscript(data.transcript || "");
+          if (res.ok && data.transcript && data.transcript.trim()) {
+            const serverTranscript = data.transcript.trim();
+            // Use server transcript if live text was not captured, or keep user's live spoken text
+            if (!capturedLiveText || serverTranscript.length > capturedLiveText.length) {
+              setTranscript(serverTranscript);
+            }
+          }
           setRecStatus("Transcription complete. Click Analyze to get AI feedback.");
           setRecStatusColor("var(--cyan)");
         } catch(e) {
-          setTranscript("Transcription process complete. Click Analyze with AI to get speech scoring and feedback.");
-          setRecStatus("Click Analyze with AI for feedback.");
+          if (capturedLiveText) {
+            setTranscript(capturedLiveText);
+          }
+          setRecStatus("Recording ready. Click Analyze with AI for feedback.");
           setRecStatusColor("var(--cyan)");
         }
       } else {
-        // Not logged in — demo fallback
-        setTimeout(() => {
-          setTranscript("I believe the best approach for this problem would be to use a hash map. This gives us O(n) time complexity instead of the brute force O(n²). For edge cases, I would handle empty arrays and duplicate values carefully.");
-          setRecStatus("Demo mode — log in to use real AI transcription. Click Analyze for feedback.");
-          setRecStatusColor("var(--text2)");
-        }, 1200);
+        if (!capturedLiveText) {
+          setTranscript("I believe the best approach for this problem would be to use a hash map for optimal performance.");
+        }
+        setRecStatus("Demo mode — click Analyze with AI for feedback.");
       }
     };
 
