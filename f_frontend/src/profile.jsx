@@ -122,10 +122,13 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
     setLoading(true); setError(null);
     try {
       const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const targetUserId = user._id || user.id || user.user_id;
       const res = await axios.put(`${BACKEND_URL}/update-profile`, {
-        user_id: user._id, ...user,
+        user_id: targetUserId, ...user,
       });
-      localStorage.setItem("user", JSON.stringify(user));
+      const updatedUser = (res.data && res.data.user) ? { ...user, ...res.data.user } : user;
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
       setSaved(true);
       setIsEditing(false);
     } catch (err) {
