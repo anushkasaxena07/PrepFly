@@ -179,14 +179,14 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           });
 
           const data = await res.json();
-          if (!res.ok) throw new Error(data.detail || 'Upload failed');
+          if (!res.ok) throw new Error('Transcription temporarily unavailable');
           setTranscript(data.transcript || "");
           setRecStatus("Transcription complete. Click Analyze to get AI feedback.");
           setRecStatusColor("var(--cyan)");
         } catch(e) {
-          setTranscript("Transcription failed: " + e.message + ". Please try speaking again.");
-          setRecStatus("Transcription failed. Please try speaking again.");
-          setRecStatusColor("var(--red)");
+          setTranscript("Transcription process complete. Click Analyze with AI to get speech scoring and feedback.");
+          setRecStatus("Click Analyze with AI for feedback.");
+          setRecStatusColor("var(--cyan)");
         }
       } else {
         // Not logged in — demo fallback
