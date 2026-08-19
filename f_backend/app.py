@@ -1873,18 +1873,26 @@ def speech_to_text():
         )
         response = None
         last_err = None
-        
-        for m_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"]:
+
+        if chat_model:
             try:
-                active_model = ChatGoogleGenerativeAI(
-                    api_key=GEMINI_API_KEY, model=m_name, temperature=0.2
-                )
-                response = active_model.invoke([message])
-                if response and hasattr(response, 'content') and response.content:
-                    break
-            except Exception as e_m:
-                last_err = e_m
-                print(f"[SPEECH-TO-TEXT MODEL FALLBACK] Model '{m_name}' failed:", e_m)
+                response = chat_model.invoke([message])
+            except Exception as e_cm:
+                last_err = e_cm
+                print(f"[SPEECH-TO-TEXT PRIMARY NOTICE] Primary chat_model failed:", e_cm)
+        
+        if not response or not hasattr(response, 'content') or not response.content:
+            for m_name in GEMINI_MODEL_CANDIDATES:
+                try:
+                    active_model = ChatGoogleGenerativeAI(
+                        api_key=GEMINI_API_KEY, model=m_name, temperature=0.2
+                    )
+                    response = active_model.invoke([message])
+                    if response and hasattr(response, 'content') and response.content:
+                        break
+                except Exception as e_m:
+                    last_err = e_m
+                    print(f"[SPEECH-TO-TEXT MODEL FALLBACK] Model '{m_name}' failed:", e_m)
 
         if not response and last_err:
             raise last_err
