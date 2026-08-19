@@ -60,42 +60,70 @@ export function calculateSpeechMetrics(transcript, durationSeconds = 60) {
   if (wpm >= 125 && wpm <= 165) wpmScore = 95;
   else if (wpm >= 100 && wpm < 125) wpmScore = 80 + Math.round((wpm - 100) * 0.6);
   else if (wpm > 165 && wpm <= 190) wpmScore = 95 - Math.round((wpm - 165) * 0.8);
-  else if (wpm < 100) wpmScore = Math.max(30, 50 + Math.round(wpm * 0.3));
-  else wpmScore = Math.max(30, 70 - Math.round((wpm - 190) * 0.5));
+  else if (wpm < 100) wpmScore = Math.max(20, 40 + Math.round(wpm * 0.3));
+  else wpmScore = Math.max(20, 70 - Math.round((wpm - 190) * 0.5));
 
-  const fillerScore = Math.max(20, Math.round(100 - (fillersPerMin * 12)));
-  const vocabScore = Math.min(100, Math.max(40, Math.round(vocabDiversity * 1.5)));
+  // Filler score: factor in filler_ratio (% of total words)
+  const fillerRatio = fillerCount / Math.max(1, totalWords);
+  let fillerScore = 100;
+  if (fillerRatio > 0.15) {
+    fillerScore = Math.max(10, Math.round(100 - (fillerRatio * 320)));
+  } else {
+    fillerScore = Math.max(20, Math.round(100 - (fillersPerMin * 14) - (fillerRatio * 150)));
+  }
+
+  // Vocab score adjustment for short word count
+  let vocabScore = 50;
+  if (totalWords < 10) {
+    vocabScore = Math.min(50, Math.max(20, Math.round(vocabDiversity * 0.5)));
+  } else {
+    vocabScore = Math.min(100, Math.max(30, Math.round(vocabDiversity * 1.5)));
+  }
+
   const paceScore = 88;
 
-  const confidencePct = Math.round(
+  const baseConfidence = (
     wpmScore * 0.30 +
-    fillerScore * 0.30 +
+    fillerScore * 0.35 +
     vocabScore * 0.20 +
-    paceScore * 0.20
+    paceScore * 0.15
   );
+
+  // Short response completeness penalty
+  let confidencePct = baseConfidence;
+  if (totalWords < 15) {
+    const completenessFactor = Math.max(0.25, totalWords / 16.0);
+    confidencePct = Math.round(baseConfidence * completenessFactor);
+  } else {
+    confidencePct = Math.round(baseConfidence);
+  }
 
   const overallScore = Math.round(Math.max(1.0, Math.min(10.0, confidencePct / 10.0)) * 10) / 10;
 
   const tone = {
-    confidence: Math.max(30, Math.min(99, confidencePct)),
-    clarity: Math.max(30, Math.min(99, Math.round(fillerScore * 0.6 + wpmScore * 0.4))),
-    enthusiasm: Math.max(40, Math.min(95, Math.round(wpmScore * 0.5 + vocabScore * 0.5))),
-    nervousness: Math.max(5, Math.min(90, Math.round(fillersPerMin * 10)))
+    confidence: Math.max(20, Math.min(99, confidencePct)),
+    clarity: Math.max(20, Math.min(99, Math.round(fillerScore * 0.7 + wpmScore * 0.3))),
+    enthusiasm: Math.max(20, Math.min(95, Math.round(wpmScore * 0.5 + vocabScore * 0.5))),
+    nervousness: Math.max(5, Math.min(95, Math.round((fillerRatio * 200) + (100 - paceScore) * 0.5)))
   };
 
   const feedback = [];
 
+  if (totalWords < 10) {
+    feedback.push(`⚠️ Short response detected (${totalWords} words). Speak complete, detailed sentences for higher confidence scores.`);
+  }
+
   if (wpm >= 120 && wpm <= 165) {
-    feedback.push(`✅ Excellent speaking speed at ${wpm} WPM — easy to follow and articulate.`);
+    feedback.push(`✅ Excellent speaking speed at ${wpm} WPM — easy to follow.`);
   } else {
-    feedback.push(`✅ Articulated ${totalWords} words with a ${vocabDiversity}% vocabulary diversity ratio.`);
+    feedback.push(`✅ Vocabulary diversity ratio: ${vocabDiversity}%.`);
   }
 
   if (fillerCount === 0) {
     feedback.push("✅ Flawless delivery with 0 filler words detected!");
   } else {
     const listStr = Object.entries(breakdown).map(([w, c]) => `'${w}' (${c}x)`).join(", ");
-    feedback.push(`⚠️ Detected ${fillerCount} filler words (${listStr}). Practice taking silent pauses.`);
+    feedback.push(`⚠️ Detected ${fillerCount} filler words (${listStr}). Take silent pauses instead of fillers.`);
   }
 
   if (wpm < 110) {

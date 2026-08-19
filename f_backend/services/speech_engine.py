@@ -198,7 +198,7 @@ def compute_speech_metrics(
     vocab_info = analyze_vocabulary(cleaned_transcript)
 
     # 5. Deterministic Sub-scores (0-100)
-    # WPM score: ideal speed 130-160 WPM
+    # WPM score: ideal speed 125-165 WPM
     if 125 <= wpm <= 165:
         wpm_score = 95
     elif 100 <= wpm < 125:
@@ -206,35 +206,50 @@ def compute_speech_metrics(
     elif 165 < wpm <= 190:
         wpm_score = 95 - int((wpm - 165) * 0.8)
     elif wpm < 100:
-        wpm_score = max(30, 50 + int(wpm * 0.3))
+        wpm_score = max(20, 40 + int(wpm * 0.3))
     else:
-        wpm_score = max(30, 70 - int((wpm - 190) * 0.5))
+        wpm_score = max(20, 70 - int((wpm - 190) * 0.5))
 
-    # Filler score: 0 fillers = 100, 10+ fillers per min = 30
-    filler_score = max(20, round(100 - (fillers_per_min * 12)))
+    # Filler score: factor in both fillers_per_min AND filler_ratio (% of total words)
+    filler_ratio = filler_count / max(1, total_words)
+    if filler_ratio > 0.15:
+        # Over 15% of response is filler words -> heavy penalty
+        filler_score = max(10, round(100 - (filler_ratio * 320)))
+    else:
+        filler_score = max(20, round(100 - (fillers_per_min * 14) - (filler_ratio * 150)))
 
-    # Vocabulary score: diversity ratio (target ~55%+)
-    vocab_score = min(100, max(40, round(vocab_info["diversity_pct"] * 1.5)))
+    # Vocabulary score: diversity ratio (target ~55%+) with low word count adjustment
+    if total_words < 10:
+        vocab_score = min(50, max(20, round(vocab_info["diversity_pct"] * 0.5)))
+    else:
+        vocab_score = min(100, max(30, round(vocab_info["diversity_pct"] * 1.5)))
 
     # Pace score
     pace_score = 90 if pace_info["consistent"] else 65
 
     # 6. Overall Confidence & Score (0.0 - 10.0 scale)
-    confidence_pct = round(
+    base_confidence = (
         wpm_score * 0.30 +
-        filler_score * 0.30 +
+        filler_score * 0.35 +
         vocab_score * 0.20 +
-        pace_score * 0.20
+        pace_score * 0.15
     )
+
+    # Apply length/completeness scaling penalty for very short responses (< 15 words)
+    if total_words < 15:
+        completeness_factor = max(0.25, total_words / 16.0)
+        confidence_pct = round(base_confidence * completeness_factor)
+    else:
+        confidence_pct = round(base_confidence)
 
     overall_score = round(max(1.0, min(10.0, confidence_pct / 10.0)), 1)
 
     # Tone indicators derived from objective data
     tone = {
-        "confidence": max(30, min(99, confidence_pct)),
-        "clarity": max(30, min(99, round(filler_score * 0.6 + wpm_score * 0.4))),
-        "enthusiasm": max(40, min(95, round(wpm_score * 0.5 + vocab_score * 0.5))),
-        "nervousness": max(5, min(90, round((fillers_per_min * 10) + (100 - pace_score) * 0.5)))
+        "confidence": max(20, min(99, confidence_pct)),
+        "clarity": max(20, min(99, round(filler_score * 0.7 + wpm_score * 0.3))),
+        "enthusiasm": max(20, min(95, round(wpm_score * 0.5 + vocab_score * 0.5))),
+        "nervousness": max(5, min(95, round((filler_ratio * 200) + (100 - pace_score) * 0.5)))
     }
 
     return {
@@ -304,11 +319,14 @@ Return ONLY a JSON array of strings, e.g. ["✅ ...", "⚠️ ...", "📈 ...", 
     # Deterministic fallback feedback
     feedback = []
 
+    if metrics.get("total_words", 0) < 10:
+        feedback.append(f"⚠️ Short response detected ({metrics.get('total_words', 0)} words). Low completeness penalty applied. Speak complete, detailed sentences for higher confidence scores.")
+
     # Strength
     if metrics["wpm"] >= 120 and metrics["wpm"] <= 165:
         feedback.append(f"✅ Ideal speaking pace at {metrics['wpm']} WPM — clear and easy for interviewers to follow.")
     elif metrics["vocabulary_diversity"] >= 50:
-        feedback.append(f"✅ Strong vocabulary range with {metrics['vocabulary_diversity']}% unique word usage.")
+        feedback.append(f"✅ Vocabulary diversity ratio: {metrics['vocabulary_diversity']}%.")
     else:
         feedback.append(f"✅ Clear articulation with {metrics['total_words']} words delivered in your response.")
 
