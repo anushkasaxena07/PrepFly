@@ -425,12 +425,20 @@ def join_coding_room():
     data = request.get_json() or {}
     room_id = data.get("room_id")
     user_id = data.get("user_id", "guest")
+    user_name = data.get("user_name", "User")
+    role = data.get("role", "candidate")
 
     if not room_id:
         return jsonify({"error": "room_id is required"}), 400
 
+    participants = [
+        {"user_id": user_id, "name": user_name, "role": role, "active": True}
+    ]
+
     return jsonify({
-        "room_id": room_id, "user_id": user_id,
+        "room_id": room_id,
+        "user_id": user_id,
+        "participants": participants,
         "message": "Joined collaborative room successfully"
     }), 200
 
@@ -443,12 +451,30 @@ def sync_coding_room():
     if request.method == "POST":
         data = request.get_json() or {}
         room_id = data.get("room_id")
+        user_id = data.get("user_id", "guest")
+        user_name = data.get("user_name", "User")
         code = data.get("code", "")
-        language = data.get("language", "python")
-        return jsonify({"status": "synced", "room_id": room_id, "code": code, "language": language}), 200
+        language = data.get("lang") or data.get("language") or "python"
+
+        participants = [
+            {"user_id": user_id, "name": user_name, "role": "candidate", "active": True}
+        ]
+
+        return jsonify({
+            "status": "synced",
+            "room_id": room_id,
+            "current_code": code,
+            "current_lang": language,
+            "participants": participants
+        }), 200
 
     room_id = request.args.get("room_id")
-    return jsonify({"room_id": room_id, "code": "# Write code here\n", "language": "python"}), 200
+    return jsonify({
+        "room_id": room_id,
+        "current_code": "# Write code here\n",
+        "current_lang": "python",
+        "participants": []
+    }), 200
 
 @coding_bp.route("/api/coding/room/assign-question", methods=["POST"])
 @coding_bp.route("/coding/room/assign-question", methods=["POST"])

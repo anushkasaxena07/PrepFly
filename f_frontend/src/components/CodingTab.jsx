@@ -959,7 +959,10 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           if (data.problem) setCurrentProblem(data.problem);
           if (data.current_code) { setCode(data.current_code); codeRef.current = data.current_code; }
           if (data.current_lang) { setLang(data.current_lang); langRef.current = data.current_lang; }
-          if (data.participants) setRoomParticipants(data.participants);
+          if (data.participants) {
+            const parsed = Array.isArray(data.participants) ? data.participants : (typeof data.participants === 'string' ? JSON.parse(data.participants) : []);
+            setRoomParticipants(parsed);
+          }
           if (data.current_output) {
             setConsoleOut(data.current_output);
             setConsoleColor("var(--text2)");
@@ -1049,7 +1052,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       
       if (res.ok) {
         const data = await res.json();
-        setRoomParticipants(data.participants || []);
+        const parsedP = Array.isArray(data.participants) ? data.participants : (typeof data.participants === 'string' ? JSON.parse(data.participants) : []);
+        setRoomParticipants(parsedP);
         
         const timeSinceType = Date.now() - lastTypedRef.current;
         // Update local editor if server code comes from another participant or differs
@@ -1491,22 +1495,22 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               {/* Connected participants list */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px" }}>
                 <div style={{display:"flex", gap:"-4px", marginRight: "6px"}}>
-                  {roomParticipants.map((p, idx) => {
+                  {(Array.isArray(roomParticipants) ? roomParticipants : []).map((p, idx) => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-                    const isSelf = p.user_id === myId;
+                    const isSelf = p?.user_id === myId;
                     return (
                       <div 
-                        key={p.user_id} 
+                        key={p?.user_id || idx} 
                         className="c-av" 
                         style={{
-                          background: p.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
-                          border: isSelf ? "2px solid #f59e0b" : p.active ? "2px solid var(--cyan)" : "2px solid transparent",
+                          background: p?.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
+                          border: isSelf ? "2px solid #f59e0b" : p?.active ? "2px solid var(--cyan)" : "2px solid transparent",
                           color: "#fff",
                           marginLeft: idx > 0 ? "-6px" : 0
                         }}
-                        title={`${p.name}${isSelf ? ' (You)' : ''} · ${p.role} · ${p.active ? 'Active' : 'Idle'}`}
+                        title={`${p?.name || 'User'}${isSelf ? ' (You)' : ''} · ${p?.role || 'participant'} · ${p?.active ? 'Active' : 'Idle'}`}
                       >
-                        {(p.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
+                        {(p?.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
                       </div>
                     );
                   })}
@@ -1514,7 +1518,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <span className="text-xs text-muted" style={{maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
                   {(() => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-                    const others = roomParticipants.filter(p => p.user_id !== myId && p.active);
+                    const safeList = Array.isArray(roomParticipants) ? roomParticipants : [];
+                    const others = safeList.filter(p => p && p.user_id !== myId && p.active);
                     if (others.length === 0) return "You're the only one here";
                     return `${others.map(p => p.name).join(", ")} also editing`;
                   })()}
