@@ -348,20 +348,10 @@ def speech_to_text():
         except Exception as groq_err:
             print("Groq STT notice:", groq_err)
 
-    if not transcript:
-        # High quality fallback speech transcription response
-        sample_transcripts = [
-            "I believe the best approach for this technical requirement is to maintain clean modular architecture, optimize O(n) data lookup efficiency, and handle all edge cases carefully.",
-            "To solve this algorithmic problem, I would use an optimal hash structure for constant time access, validate boundary conditions, and write modular unit tests.",
-            "In my previous projects, maintaining strong collaboration, clear code documentation, and rapid iteration delivered the highest software quality and user satisfaction."
-        ]
-        import random
-        transcript = random.choice(sample_transcripts)
-
     return jsonify({
         "transcript": transcript,
         "text": transcript,
-        "status": "success"
+        "status": "success" if transcript else "no_speech"
     }), 200
 
 @interview_bp.route("/end-interview", methods=["POST"])

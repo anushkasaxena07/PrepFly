@@ -152,12 +152,13 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
         rec.lang = "en-US";
         rec.onresult = (e) => {
           let text = "";
-          for (let i = e.resultIndex; i < e.results.length; i++) {
-            text += e.results[i][0].transcript;
+          for (let i = 0; i < e.results.length; i++) {
+            text += e.results[i][0].transcript + " ";
           }
-          if (text.trim()) {
-            setTranscript(text);
-            webSpeechTranscriptRef.current = text;
+          const cleanText = text.trim();
+          if (cleanText) {
+            setTranscript(cleanText);
+            webSpeechTranscriptRef.current = cleanText;
           }
         };
         rec.start();
@@ -192,20 +193,17 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
       const duration = (Date.now() - recordStartRef.current) / 1000;
       durationRef.current = duration;
 
-      if (duration < 1.2 && !webSpeechTranscriptRef.current.trim()) {
-        setTranscript("Recording was too short. Please speak clearly into your microphone.");
-        setRecStatus("Recording too short. Please try again.");
-        setRecStatusColor("var(--red)");
+      const liveSpeech = webSpeechTranscriptRef.current.trim();
+      if (liveSpeech) {
+        setTranscript(liveSpeech);
+        setRecStatus("Transcription complete. Click Analyze with AI for feedback.");
+        setRecStatusColor("var(--cyan)");
         return;
       }
 
       const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
-
       setRecStatus(`Recording saved (${duration.toFixed(1)}s). Transcribing...`);
       setRecStatusColor("var(--text2)");
-      if (!webSpeechTranscriptRef.current.trim()) {
-        setTranscript("⏳ Transcribing audio...");
-      }
 
       try {
         const formData = new FormData();
@@ -221,18 +219,18 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           const data = await res.json();
           if (data.transcript || data.text) {
             setTranscript(data.transcript || data.text);
+            setRecStatus("Transcription complete. Click Analyze with AI for feedback.");
+            setRecStatusColor("var(--cyan)");
+            return;
           }
         }
       } catch (e) {
         console.warn("Backend STT notice:", e);
       }
 
-      if (!webSpeechTranscriptRef.current.trim() && (!transcript || transcript.startsWith("⏳"))) {
-        setTranscript("I believe the optimal solution for this requirement is to maintain clean modular components, optimize memory complexity, and test edge case boundary conditions.");
-      }
-
-      setRecStatus("Transcription complete. Click Analyze with AI for feedback.");
-      setRecStatusColor("var(--cyan)");
+      setTranscript("No speech detected. Please speak clearly into your microphone and try again.");
+      setRecStatus("No speech detected. Please try again.");
+      setRecStatusColor("var(--orange)");
     };
 
     recorder.start(250);
