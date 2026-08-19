@@ -71,8 +71,8 @@ def require_auth(roles=None, allow_optional=False):
                 except Exception as e:
                     print("[AUTH USER LOOKUP NOTICE]", e)
 
-            # Single device session validation
-            if user_id:
+            # Single device session validation (only enforced if token explicitly contains a session_id)
+            if user_id and token_session_id:
                 active_session = ACTIVE_USER_SESSIONS.get(user_id)
                 if not active_session and user_db and isinstance(user_db, dict):
                     db_sess = user_db.get("current_session_id")

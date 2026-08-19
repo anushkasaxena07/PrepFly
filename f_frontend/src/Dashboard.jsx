@@ -59,9 +59,10 @@ export default function Dashboard() {
   const [user, setUser] = useState(() => {
     try {
       const stored = localStorage.getItem("user");
-      return stored ? JSON.parse(stored) : null;
+      const parsed = stored ? JSON.parse(stored) : null;
+      return (parsed && typeof parsed === 'object') ? parsed : { name: "User", email: "", role: "candidate" };
     } catch {
-      return null;
+      return { name: "User", email: "", role: "candidate" };
     }
   });
   const [settings, setSettings] = useState({ name: "User", targetRole: "Software Engineer", voiceEnabled: true, detailLevel: "High" });
