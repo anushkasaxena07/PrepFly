@@ -2908,7 +2908,7 @@ def coding_submit():
         hidden_passed = 0
         
         # If it's a fallback language or Node is missing, perform AI-based simulation
-        if "not supported" in stderr or "Node.js not found" in stderr:
+        if "not supported" in stderr or "Node.js not found" in stderr or "fallback mode" in stderr:
             is_fallback = True
         else:
             # It was a real compilation/runtime error, we can directly return

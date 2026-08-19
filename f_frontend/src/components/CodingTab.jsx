@@ -1302,6 +1302,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setLang(newLang);
     langRef.current = newLang;
     lastLangChangedRef.current = Date.now();
+    lastTypedRef.current = Date.now();
+    isEditingRef.current = true;
     const template = currentProblem ? getDynamicStarterCode(currentProblem, newLang) : (defaultCodeTemplates[newLang] || "");
     setCode(template);
     codeRef.current = template;
