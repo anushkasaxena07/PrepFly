@@ -1,15 +1,20 @@
 import os
 import hmac
 import hashlib
+import sqlite3
 import uuid
 from datetime import datetime, timedelta
+from local_supabase import DB_FILE, SQLiteSupabaseMock
 
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID") or "rzp_test_demoKey123"
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET") or "demo_secret_key_123"
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_TG73JBAZeuYwAJ")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "s5A4lIvv2rFGSwJ78D0mR4Zo")
 
 def get_supabase_client():
-    from app import supabase
-    return supabase
+    try:
+        from app import supabase
+        return supabase
+    except Exception:
+        return SQLiteSupabaseMock()
 
 def create_razorpay_order(org_id, amount_inr=500.0):
     amount_paise = int(amount_inr * 100) # ₹500 = 50000 paise

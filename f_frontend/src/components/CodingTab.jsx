@@ -312,8 +312,8 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                   alignItems: "center",
                   gap: "4px"
                 }}>
-                  <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: u?.color || 'var(--cyan)' }}></span>
-                  👤 {u?.name || 'User'}: Ln {u?.cursor?.line || 1}, Col {u?.cursor?.col || 1}
+                  <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: u.color }}></span>
+                  👤 {u.name}: Ln {u.cursor.line}, Col {u.cursor.col}
                 </span>
               ))}
             </div>
@@ -372,7 +372,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
         >
           {lineNumbers.map(n => {
             const isUserLine = n === cursorPos.line;
-            const remoteOnLine = isRoomActive && Array.isArray(remoteUsers) ? remoteUsers.filter(u => u && u.cursor && u.cursor.line === n) : [];
+            const remoteOnLine = isRoomActive ? remoteUsers.filter(u => u.cursor.line === n) : [];
             let numColor = "rgba(255,255,255,0.3)";
             let fontWeight = 400;
 
@@ -397,14 +397,14 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                 }}
               >
                 {/* Render colored indicator dots for remote user cursors on line */}
-                {(Array.isArray(remoteOnLine) ? remoteOnLine : []).map(ru => (
-                  <span key={ru?.id || Math.random()} style={{
+                {remoteOnLine.map(ru => (
+                  <span key={ru.id} style={{
                     display: "inline-block",
                     width: "5px",
                     height: "5px",
                     borderRadius: "50%",
-                    background: ru?.color || 'var(--cyan)'
-                  }} title={`${ru?.name || 'User'}'s cursor`} />
+                    background: ru.color
+                  }} title={`${ru.name}'s cursor`} />
                 ))}
                 <span>{n}</span>
               </div>
@@ -443,9 +443,9 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
         />
 
         {/* LIVE MULTI-PARTICIPANT FLOATING CURSORS & NAME TAGS (CASE 2: ROOM ON ONLY) */}
-        {isRoomActive && (Array.isArray(remoteUsers) ? remoteUsers : []).filter(u => u && u.cursor).map(u => {
-          const lineY = (((u.cursor && u.cursor.line) || 1) - 1) * 20.8 + 12 - scrollTop;
-          const colX = Math.min(680, Math.max(0, (((u.cursor && u.cursor.col) || 1) - 1) * 7.8 + 64));
+        {isRoomActive && remoteUsers.map(u => {
+          const lineY = (u.cursor.line - 1) * 20.8 + 12 - scrollTop;
+          const colX = Math.min(680, Math.max(0, (u.cursor.col - 1) * 7.8 + 64));
           const isVisible = lineY >= -15 && lineY <= 345;
 
           if (!isVisible) return null;
@@ -486,7 +486,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                   alignItems: "center",
                   gap: "4px"
                 }}>
-                  <span>👤 {u?.name || 'User'}</span>
+                  <span>👤 {u.name}</span>
                   {u.isEditing && <span style={{ fontSize: "8px", opacity: 0.9 }}>✍️</span>}
                 </span>
               </div>
@@ -959,10 +959,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           if (data.problem) setCurrentProblem(data.problem);
           if (data.current_code) { setCode(data.current_code); codeRef.current = data.current_code; }
           if (data.current_lang) { setLang(data.current_lang); langRef.current = data.current_lang; }
-          if (data.participants) {
-            const parsed = Array.isArray(data.participants) ? data.participants : (typeof data.participants === 'string' ? JSON.parse(data.participants) : []);
-            setRoomParticipants(parsed);
-          }
+          if (data.participants) setRoomParticipants(data.participants);
           if (data.current_output) {
             setConsoleOut(data.current_output);
             setConsoleColor("var(--text2)");
@@ -987,12 +984,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const res = await apiFetch(url);
       if (res.ok) {
         const data = await res.json();
-        const problemsList = Array.isArray(data) ? data : (data.problems || []);
+        const problemsList = data.problems || [];
         setProblems(problemsList);
         
         const pendingPid = localStorage.getItem("selected_problem_id");
         if (pendingPid) {
-          const found = problemsList.find(p => (p.problem_id === pendingPid || p.id === pendingPid));
+          const found = problemsList.find(p => p.problem_id === pendingPid);
           if (found) {
             selectProblem(found);
             localStorage.removeItem("selected_problem_id");
@@ -1000,9 +997,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           }
         }
 
-        if (problemsList.length > 0) {
-          const defaultProb = problemsList.find(p => (p.problem_id === "prob_01" || p.problem_id === "two-sum" || p.id === "prob_01")) || problemsList[0];
-          selectProblem(defaultProb);
+        if (!currentProblem && problemsList.length > 0) {
+          const twoSum = problemsList.find(p => p.problem_id === "two-sum") || problemsList[0];
+          selectProblem(twoSum);
         }
       }
     } catch (e) {
@@ -1052,8 +1049,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       
       if (res.ok) {
         const data = await res.json();
-        const parsedP = Array.isArray(data.participants) ? data.participants : (typeof data.participants === 'string' ? JSON.parse(data.participants) : []);
-        setRoomParticipants(parsedP);
+        setRoomParticipants(data.participants || []);
         
         const timeSinceType = Date.now() - lastTypedRef.current;
         // Update local editor if server code comes from another participant or differs
@@ -1268,7 +1264,6 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     
     const formData = new FormData();
     formData.append("sheet", file);
-    formData.append("file", file);
     formData.append("user_id", user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "recruiter");
     
     try {
@@ -1495,22 +1490,22 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               {/* Connected participants list */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px" }}>
                 <div style={{display:"flex", gap:"-4px", marginRight: "6px"}}>
-                  {(Array.isArray(roomParticipants) ? roomParticipants : []).map((p, idx) => {
+                  {roomParticipants.map((p, idx) => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-                    const isSelf = p?.user_id === myId;
+                    const isSelf = p.user_id === myId;
                     return (
                       <div 
-                        key={p?.user_id || idx} 
+                        key={p.user_id} 
                         className="c-av" 
                         style={{
-                          background: p?.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
-                          border: isSelf ? "2px solid #f59e0b" : p?.active ? "2px solid var(--cyan)" : "2px solid transparent",
+                          background: p.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
+                          border: isSelf ? "2px solid #f59e0b" : p.active ? "2px solid var(--cyan)" : "2px solid transparent",
                           color: "#fff",
                           marginLeft: idx > 0 ? "-6px" : 0
                         }}
-                        title={`${p?.name || 'User'}${isSelf ? ' (You)' : ''} · ${p?.role || 'participant'} · ${p?.active ? 'Active' : 'Idle'}`}
+                        title={`${p.name}${isSelf ? ' (You)' : ''} · ${p.role} · ${p.active ? 'Active' : 'Idle'}`}
                       >
-                        {(p?.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
+                        {(p.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
                       </div>
                     );
                   })}
@@ -1518,10 +1513,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <span className="text-xs text-muted" style={{maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
                   {(() => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-                    const safeList = Array.isArray(roomParticipants) ? roomParticipants : [];
-                    const others = safeList.filter(p => p && p.user_id !== myId && p.active);
+                    const others = roomParticipants.filter(p => p.user_id !== myId && p.active);
                     if (others.length === 0) return "You're the only one here";
-                    return `${others.map(p => p?.name || p?.user_name || 'User').join(", ")} also editing`;
+                    return `${others.map(p => p.name).join(", ")} also editing`;
                   })()}
                 </span>
               </div>
@@ -1565,9 +1559,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 onChange={handleProblemChange}
               >
                 <option value="" disabled style={{ background: "#0c1220", color: "#8a9bc0" }}>Select Problem...</option>
-                {(Array.isArray(problems) ? problems : []).map(p => (
-                  <option key={p?.problem_id || Math.random()} value={p?.problem_id || ""} style={{ background: "#0c1220", color: "#f0f4fd" }}>
-                    {p?.title || "Problem"}
+                {problems.map(p => (
+                  <option key={p.problem_id} value={p.problem_id} style={{ background: "#0c1220", color: "#f0f4fd" }}>
+                    {p.title}
                   </option>
                 ))}
               </select>

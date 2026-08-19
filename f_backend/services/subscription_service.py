@@ -2,13 +2,17 @@ import os
 from datetime import datetime, timedelta
 
 def get_supabase():
-    import app
-    return app.supabase
+    try:
+        import app
+        return app.supabase
+    except Exception:
+        from local_supabase import SQLiteSupabaseMock
+        return SQLiteSupabaseMock()
 
 def get_org_subscription_status(org_id):
-    if not org_id or org_id in ["org_default", "global", "default"]:
+    if not org_id:
         return {
-            "organization_id": org_id or "org_default",
+            "organization_id": "org_default",
             "subscription_status": "TRIAL",
             "current_plan": "Trial",
             "days_remaining": 10,
@@ -21,12 +25,8 @@ def get_org_subscription_status(org_id):
         }
 
     supabase = get_supabase()
-    try:
-        res = supabase.table("organization").select("*").eq("id", org_id).execute()
-        rows = res.data if res and hasattr(res, "data") and res.data else []
-    except Exception as db_err:
-        print("Subscription service DB notice:", db_err)
-        rows = []
+    res = supabase.table("organization").select("*").eq("id", org_id).execute()
+    rows = res.data if res and hasattr(res, "data") and res.data else []
     org = rows[0] if rows else None
 
     now = datetime.utcnow()

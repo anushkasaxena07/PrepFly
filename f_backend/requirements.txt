@@ -1,9 +1,5 @@
 Flask
 flask-cors
-flask-limiter>=3.8.0
-PyJWT
-redis
-celery
 python-docx
 PyMuPDF
 langchain-google-genai
@@ -16,5 +12,3 @@ requests
 gunicorn
 openpyxl
 razorpay
-sentry-sdk[flask]
-httpx

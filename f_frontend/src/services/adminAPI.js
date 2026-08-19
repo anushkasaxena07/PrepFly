@@ -1,5 +1,3 @@
-import { handleSessionInvalidation } from '../utils/sessionUtils';
-
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 export const adminFetch = async (endpoint, options = {}) => {
@@ -24,13 +22,6 @@ export const adminFetch = async (endpoint, options = {}) => {
     ...options,
     headers
   });
-
-  if (res.status === 401) {
-    const data = await res.clone().json().catch(() => ({}));
-    if (data.code === "SESSION_SUPERSEEDED" || data.error?.includes("logged in from another device")) {
-      handleSessionInvalidation(data.error);
-    }
-  }
 
   if (res.status === 403) {
     throw new Error("403 Forbidden: You do not have permission to access another organization's data");

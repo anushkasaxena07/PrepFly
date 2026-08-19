@@ -1,7 +1,6 @@
+import json
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER
-from services.gemini import get_flash_model, get_pro_model
-from services.embedding_service import retrieve_grounded_context
 
 def classify_question_type(question: str, category: str = "") -> str:
     q_lower = f"{question} {category or ''}".lower()
@@ -15,12 +14,7 @@ def classify_question_type(question: str, category: str = "") -> str:
 
 
 def generate_dynamic_single_fallback(question, answer, q_type):
-    if isinstance(question, (list, tuple)):
-        question = question[0] if question else "General Question"
-    if not isinstance(question, str):
-        question = str(question)
-
-    ans_clean = str(answer or "").strip()
+    ans_clean = answer.strip()
     ans_lower = ans_clean.lower()
     q_lower = question.lower()
     
@@ -113,9 +107,7 @@ def generate_dynamic_single_fallback(question, answer, q_type):
     }
 
 
-def evaluate_response_comprehensive(resume_text, question, answer, chat_model=None, question_index=1, category=""):
-    if chat_model is None:
-        chat_model = get_flash_model()
+def evaluate_response_comprehensive(resume_text, question, answer, chat_model, question_index=1, category=""):
     ai_name = AI_INTERVIEWER["name"]
     q_type = classify_question_type(question, category)
 
@@ -178,26 +170,11 @@ def evaluate_response_comprehensive(resume_text, question, answer, chat_model=No
             }
         }
 
-    # Generate RAG Vector Embeddings to ground the evaluation and eliminate hallucinations
-    grounded_snippets = retrieve_grounded_context(f"{question} {answer}", resume_text, top_k=3)
-    if grounded_snippets:
-        rag_context_block = "\n".join([f"- [Relevance: {s['similarity_score']*100:.1f}%] {s['text']}" for s in grounded_snippets])
-    else:
-        rag_context_block = resume_text[:1000] if resume_text else "No background resume profile provided."
-
-    prompt = f"""You are a Senior Technical Interviewer evaluating a candidate response.
-
-STRICT ANTI-HALLUCINATION GROUNDING MANDATE:
-- Base your evaluation EXCLUSIVELY on the candidate's actual answer and the retrieved vector context below.
-- Do NOT assume skills, projects, or metrics not explicitly stated in the candidate answer or context.
-- If technical explanations are absent, score lower rather than hallucinating implied knowledge.
-
-RETRIEVED FACTUAL CONTEXT (Vector Similarity Ranked):
-{rag_context_block}
-
+    prompt = f"""You are a Senior Software Engineer Interviewer at a top product company evaluating a candidate response.
 Question Type: {q_type}
 Question: {question}
 Candidate Answer: {answer}
+Context: {resume_text[:400]}
 
 Perform a strict evidence-based analysis:
 1. Accuracy Score (0-100): 100=Completely correct, 70=Mostly correct, 50=Partial, 30=Major mistakes, 0=Wrong/No answer.
@@ -298,9 +275,7 @@ Return ONLY valid JSON:
         return generate_dynamic_single_fallback(question, answer, q_type)
 
 
-def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model=None, feedbacks=None):
-    if chat_model is None:
-        chat_model = get_pro_model()
+def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model, feedbacks=None):
     # 1. Count valid answers
     valid_count = 0
     for ans in (responses or []):
@@ -658,8 +633,6 @@ def enrich_report_with_grading(report: dict) -> dict:
 
 
 def evaluate_google_technical_correctness(question: str, answer: str, expected_concepts: str = "", difficulty: str = "Medium", experience_level: str = "1-3 Years", chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     if not answer or not answer.strip():
         return {
             "correctness": 0,
@@ -735,8 +708,6 @@ SCHEMA:
 
 
 def evaluate_google_l5_coding(question: str, candidate_code: str, execution_result: str = "", hidden_test_cases: str = "", expected_complexity: str = "O(N) Time, O(1) Space", chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     if not candidate_code or not candidate_code.strip():
         return {
             "correctness": "Incorrect",
@@ -809,8 +780,6 @@ SCHEMA:
 
 
 def evaluate_project_understanding(resume: str, question: str, answer: str, chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     if not answer or not answer.strip():
         return {
             "project_understanding": 0,
@@ -884,8 +853,6 @@ SCHEMA:
 
 
 def evaluate_senior_hr_behavioral(question: str, answer: str, chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     if not answer or not answer.strip():
         return {
             "star_structure": "Missing",
@@ -1107,8 +1074,6 @@ SCHEMA:
 
 
 def hiring_committee_synthesis(tech_eval: dict = None, coding_eval: dict = None, project_eval: dict = None, hr_eval: dict = None, comm_eval: dict = None, conf_eval: dict = None, chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     from services.grading_service import calculate_grade_info
 
     tech_eval = tech_eval or {}
@@ -1202,8 +1167,6 @@ SCHEMA:
 
 
 def generate_professional_report_json(overall_eval: dict, chat_model = None):
-    if chat_model is None:
-        chat_model = get_pro_model()
     from services.grading_service import calculate_grade_info
 
     overall_eval = overall_eval or {}

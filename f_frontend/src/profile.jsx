@@ -82,9 +82,9 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
           const res = await axios.get(`${BACKEND_URL}/user-stats/${userId}`);
           if (res.status === 200) {
             const data = res.data;
-            const totalSessions = (data.interviews?.total || data.interviews?.count || 0) + (data.coding?.total || data.coding?.count || 0) + (data.speech?.total || data.speech?.count || 0) + (data.resume?.total || data.resume?.latest_score || 0);
+            const totalSessions = (data.interviews?.total || 0) + (data.coding?.total || 0) + (data.speech?.total || 0) + (data.resume?.total || 0);
             setStats({
-              interviews: data.interviews?.total || data.interviews?.count || 0,
+              interviews: data.interviews?.total || 0,
               avgScore: data.interviews?.avg_score ? data.interviews.avg_score.toFixed(1) : "—",
               sessions: totalSessions
             });
@@ -122,13 +122,10 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
     setLoading(true); setError(null);
     try {
       const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-      const targetUserId = user._id || user.id || user.user_id;
       const res = await axios.put(`${BACKEND_URL}/update-profile`, {
-        user_id: targetUserId, ...user,
+        user_id: user._id, ...user,
       });
-      const updatedUser = (res.data && res.data.user) ? { ...user, ...res.data.user } : user;
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      localStorage.setItem("user", JSON.stringify(user));
       setSaved(true);
       setIsEditing(false);
     } catch (err) {

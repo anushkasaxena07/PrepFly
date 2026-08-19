@@ -17,7 +17,6 @@ import FeedbackManagement from './FeedbackManagement';
 import Support from './Support';
 import PlatformSettings from './PlatformSettings';
 import Profile from './Profile';
-import { superAdminFetch } from '../../services/superAdminAPI';
 
 export default function SuperAdminContainer() {
   const [activeTab, setActiveTabState] = useState(() => {
@@ -44,18 +43,6 @@ export default function SuperAdminContainer() {
     } catch (e) {
       console.error("Parse SuperAdmin session error:", e);
     }
-  }, []);
-
-  useEffect(() => {
-    const checkSuperAdminSession = async () => {
-      try {
-        await superAdminFetch("/superadmin/dashboard-stats");
-      } catch (e) {
-        // Handled by superAdminFetch 401 interceptor
-      }
-    };
-    const interval = setInterval(checkSuperAdminSession, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   const renderContent = () => {

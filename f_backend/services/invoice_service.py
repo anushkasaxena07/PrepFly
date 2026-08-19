@@ -2,8 +2,12 @@ import uuid
 from datetime import datetime
 
 def get_supabase():
-    import app
-    return app.supabase
+    try:
+        import app
+        return app.supabase
+    except Exception:
+        from local_supabase import SQLiteSupabaseMock
+        return SQLiteSupabaseMock()
 
 def generate_invoice(org_id, payment_id, amount=500.0):
     supabase = get_supabase()

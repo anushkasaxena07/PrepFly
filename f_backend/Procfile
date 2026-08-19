@@ -1,2 +1,0 @@
-web: gunicorn app:app --workers 2 --threads 4 -c gunicorn.conf.py
-worker: celery -A tasks.celery_app.celery_app worker --loglevel=info --autoscale=10,2

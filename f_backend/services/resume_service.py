@@ -5,8 +5,12 @@ import docx
 from datetime import datetime
 
 def get_supabase():
-    import app
-    return app.supabase
+    try:
+        import app
+        return app.supabase
+    except Exception:
+        from local_supabase import SQLiteSupabaseMock
+        return SQLiteSupabaseMock()
 
 def extract_text_from_pdf(filepath):
     text = ""
@@ -81,10 +85,7 @@ def save_cached_resume(text_hash, raw_text, structured_data, ats_score, missing_
     except Exception as e:
         print("Save resume cache error:", e)
 
-def parse_resume_content(raw_text, chat_model=None):
-    if chat_model is None:
-        from services.gemini import get_pro_model
-        chat_model = get_pro_model()
+def parse_resume_content(raw_text, chat_model):
     if not raw_text or not raw_text.strip():
         return {
             "structured_data": {},

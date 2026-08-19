@@ -1,8 +1,6 @@
 import random
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
-from services.gemini import get_flash_model
-from services.embedding_service import retrieve_grounded_context, build_grounded_prompt
 
 STAGES = [
     "Greeting & Icebreaker",
@@ -56,9 +54,7 @@ def get_current_stage(question_index, total_questions=5):
     else:
         return "Phase 7: Natural Wrap-up"
 
-def generate_dynamic_question(resume_text="", previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate", stage=None, **kwargs):
-    if chat_model is None:
-        chat_model = get_flash_model()
+def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate"):
     previous_questions = previous_questions or []
     responses = responses or []
     is_no_resume = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
@@ -120,28 +116,14 @@ STRICT MANDATE: Ask questions directly tied to candidate's past projects, achiev
         candidate_name=candidate_name
     )
 
-    # RAG Grounding: Generate vector embeddings for prompt & context chunks to prevent hallucination
-    query_intent = f"{stage_name} {category or ''} {last_answer or ''}"
-    grounded_snippets = retrieve_grounded_context(query_intent, resume_text, top_k=3)
-    if grounded_snippets:
-        rag_context_block = "\n".join([f"- [Factual Relevance: {s['similarity_score']*100:.1f}%] {s['text']}" for s in grounded_snippets])
-    else:
-        rag_context_block = resume_text[:1500] if resume_text else "No specific resume profile provided."
-
     prompt = f"""{system_prompt}
 
-STRICT RAG VECTOR GROUNDING MANDATE:
-Base your questions and acknowledgments EXCLUSIVELY on the retrieved vector context below.
-Do NOT invent, assume, or fabricate any experience, tools, projects, or metrics not present in the context.
-
-RETRIEVED VECTOR CONTEXT CHUNKS:
-{rag_context_block}
-
-CONVERSATION HISTORY:
+DYNAMIC CONTEXT DATA FOR THIS TURN:
+- conversation_history:
 {conv_history_str}
 
-LAST CANDIDATE ANSWER:
-"{last_answer or 'Initial turn'}"
+LATEST CANDIDATE RESPONSE:
+"{last_answer or 'None'}"
 
 {track_instruction}
 {phase_guidance}
@@ -261,28 +243,16 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
             
         return fallback_choice, stage_name, False
 
-def generate_hint(question, chat_model=None, resume_text="", **kwargs):
-    if chat_model is None:
-        chat_model = get_flash_model()
-    if isinstance(question, (list, tuple)):
-        question = question[0] if question else "General Question"
-    if not isinstance(question, str):
-        question = str(question)
-
-    if not hasattr(chat_model, "invoke") and hasattr(resume_text, "invoke"):
-        chat_model, resume_text = resume_text, chat_model
-
+def generate_hint(question, resume_text, chat_model):
     ai_name = AI_INTERVIEWER["name"]
     prompt = f"""You are {ai_name}, a supportive and professional AI interviewer. The candidate asked for a hint on this question:
 Question: {question}
-Candidate Profile/Resume: {str(resume_text)[:1000]}
+Candidate Profile/Resume: {resume_text[:1000]}
 
 Provide a small, helpful, 1-2 sentence hint that guides their thought process without giving away the complete answer directly."""
     try:
-        if chat_model and hasattr(chat_model, "invoke"):
-            response = chat_model.invoke([HumanMessage(content=prompt)])
-            return response.content.strip()
+        response = chat_model.invoke([HumanMessage(content=prompt)])
+        return response.content.strip()
     except Exception as e:
         print(f"Generate hint error: {e}")
-
-    return "Focus on breaking the problem down into core components and using the STAR framework (Situation, Task, Action, Result)."
+        return "Focus on breaking the problem down into core components and using the STAR framework (Situation, Task, Action, Result)."

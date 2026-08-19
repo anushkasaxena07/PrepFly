@@ -73,18 +73,6 @@ export default function AdminDashboardContainer() {
     }
   }, []);
 
-  useEffect(() => {
-    const checkAdminSession = async () => {
-      try {
-        await adminFetch("/admin/settings");
-      } catch (e) {
-        // Handled by adminFetch 401 interceptor
-      }
-    };
-    const interval = setInterval(checkAdminSession, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const handleTabChange = (tabId) => {
     if (isExpired && tabId !== 'subscription') {
       setActiveTab('subscription');
