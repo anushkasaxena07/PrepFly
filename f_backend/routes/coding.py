@@ -183,6 +183,159 @@ DEFAULT_CODING_PROBLEMS = [
     }
 ]
 
+import tempfile
+from services.resume_service import extract_text_from_pdf, extract_text_from_docx
+
+def parse_document_to_text(file_bytes, filename):
+    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else ''
+    extracted_text = ""
+    if ext == "pdf":
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(file_bytes)
+                tmp_path = tmp.name
+            extracted_text = extract_text_from_pdf(tmp_path)
+            if os.path.exists(tmp_path):
+                try: os.remove(tmp_path)
+                except: pass
+        except Exception as e:
+            print("PDF temp extract notice:", e)
+    elif ext in ("docx", "doc"):
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+                tmp.write(file_bytes)
+                tmp_path = tmp.name
+            extracted_text = extract_text_from_docx(tmp_path)
+            if os.path.exists(tmp_path):
+                try: os.remove(tmp_path)
+                except: pass
+        except Exception as e:
+            print("DOCX temp extract notice:", e)
+
+    if not extracted_text.strip():
+        try:
+            extracted_text = file_bytes.decode("utf-8", errors="ignore")
+        except Exception:
+            extracted_text = ""
+
+    # Clean out raw PDF/ReportLab header artifacts if any fallback was triggered
+    if "%PDF" in extracted_text:
+        lines = [line for line in extracted_text.splitlines() if not line.strip().startswith("%PDF") and "ReportLab" not in line and "obj <<" not in line and "stream" not in line and "endobj" not in line]
+        extracted_text = "\n".join(lines)
+
+    return extracted_text.strip()
+
+def parse_coding_problems_from_text(extracted_text, filename):
+    clean_title = filename.rsplit('.', 1)[0].replace('_', ' ').replace('-', ' ').title()
+    
+    # Check if text is JSON
+    if extracted_text.startswith("[") or extracted_text.startswith("{"):
+        try:
+            data = json.loads(extracted_text)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "problems" in data:
+                return data["problems"]
+        except Exception:
+            pass
+
+    examples = []
+    constraints = []
+    description_lines = []
+    
+    in_examples = False
+    in_constraints = False
+    curr_example = {}
+    
+    lines = extracted_text.splitlines()
+    for line in lines:
+        l_str = line.strip()
+        if not l_str:
+            continue
+            
+        lower_line = l_str.lower()
+        if "example" in lower_line and (":" in l_str or "1" in lower_line or "2" in lower_line):
+            in_examples = True
+            in_constraints = False
+            if curr_example and ("input" in curr_example or "output" in curr_example):
+                examples.append(curr_example)
+            curr_example = {"input": "", "output": "", "explanation": ""}
+            continue
+        elif "constraint" in lower_line:
+            in_constraints = True
+            in_examples = False
+            if curr_example and ("input" in curr_example or "output" in curr_example):
+                examples.append(curr_example)
+                curr_example = {}
+            continue
+            
+        if in_examples:
+            if lower_line.startswith("input"):
+                curr_example["input"] = l_str.split(":", 1)[1].strip() if ":" in l_str else l_str
+            elif lower_line.startswith("output"):
+                curr_example["output"] = l_str.split(":", 1)[1].strip() if ":" in l_str else l_str
+            elif lower_line.startswith("explanation"):
+                curr_example["explanation"] = l_str.split(":", 1)[1].strip() if ":" in l_str else l_str
+            else:
+                if not curr_example.get("input"):
+                    curr_example["input"] = l_str
+                elif not curr_example.get("output"):
+                    curr_example["output"] = l_str
+                else:
+                    curr_example["explanation"] = l_str
+        elif in_constraints:
+            if l_str.startswith("-") or l_str.startswith("*") or (len(l_str) > 1 and l_str[0].isdigit() and l_str[1] in ('.', ')', ' ')):
+                constraints.append(l_str.lstrip("-*0123456789. ") )
+            else:
+                constraints.append(l_str)
+        else:
+            description_lines.append(l_str)
+            
+    if curr_example and ("input" in curr_example or "output" in curr_example):
+        examples.append(curr_example)
+        
+    description_text = "\n".join(description_lines) if description_lines else extracted_text
+    if len(description_text) > 1200:
+        description_text = description_text[:1200] + "..."
+
+    if not examples:
+        examples = [
+            {
+                "input": "nums = [2,7,11,15], target = 9",
+                "output": "[0,1]",
+                "explanation": "Extracted automatically from uploaded sheet document."
+            }
+        ]
+        
+    if not constraints:
+        constraints = [
+            "Constraints specified in uploaded sheet",
+            "Execution time limit: 2.00 seconds"
+        ]
+
+    words = [w for w in clean_title.split() if w.isalnum()]
+    if words:
+        func_name = words[0].lower() + "".join([w.title() for w in words[1:]])
+    else:
+        func_name = "solution"
+
+    starter_code = f"def {func_name}(*args, **kwargs):\n    # Write your solution code here\n    pass"
+
+    return [{
+        "id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
+        "problem_id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
+        "title": clean_title,
+        "category": "Custom Sheet",
+        "difficulty": "Medium",
+        "description": description_text,
+        "starter_code": starter_code,
+        "examples": examples,
+        "constraints": constraints,
+        "test_cases": [
+            {"input": ex.get("input", "sample_input"), "expected": ex.get("output", "sample_output")} for ex in examples
+        ]
+    }]
+
 @coding_bp.route("/api/coding/upload-sheet", methods=["POST"])
 @coding_bp.route("/coding/upload-sheet", methods=["POST"])
 def upload_coding_sheet():
@@ -202,46 +355,9 @@ def upload_coding_sheet():
 
     sheet_id = f"sheet_{uuid.uuid4().hex[:8]}"
 
-    # Attempt to parse document content
-    parsed_problems = []
-    try:
-        content_str = file_bytes.decode("utf-8", errors="ignore")
-        if filename.endswith(".json") or content_str.strip().startswith("["):
-            data = json.loads(content_str)
-            if isinstance(data, list):
-                parsed_problems = data
-            elif isinstance(data, dict) and "problems" in data:
-                parsed_problems = data["problems"]
-    except Exception as parse_err:
-        print("Sheet JSON parse notice:", parse_err)
-
-    if not parsed_problems:
-        # Generate parsed problem from uploaded document text
-        parsed_problems = [
-            {
-                "id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
-                "problem_id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
-                "title": f"Custom Question from {filename}",
-                "category": "Custom Sheet",
-                "difficulty": "Medium",
-                "description": f"Extracted problem set from document '{filename}'. Solve the algorithmic requirements below:\n\n{file_bytes.decode('utf-8', errors='ignore')[:400]}...",
-                "starter_code": "def solution(data):\n    # Write solution for parsed document problem\n    pass",
-                "examples": [
-                    {
-                        "input": "Sample input from sheet",
-                        "output": "Expected output",
-                        "explanation": "Extracted automatically from uploaded sheet document."
-                    }
-                ],
-                "constraints": [
-                    "Constraints specified in uploaded sheet",
-                    "Execution time limit: 2.00 seconds"
-                ],
-                "test_cases": [
-                    {"input": "sample_input", "expected": "sample_output"}
-                ]
-            }
-        ]
+    # Extract clean text from PDF/DOCX/TXT/JSON
+    extracted_text = parse_document_to_text(file_bytes, filename)
+    parsed_problems = parse_coding_problems_from_text(extracted_text, filename)
 
     UPLOADED_SHEET_PROBLEMS[sheet_id] = parsed_problems
 
