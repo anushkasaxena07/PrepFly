@@ -891,10 +891,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
       try {
         console.log("Screen Share Started");
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: { displaySurface: 'browser' }, 
-          audio: false,
-          preferCurrentTab: false,
-          surfaceSwitching: 'include'
+          video: true, 
+          audio: false
         });
         const screenTrack = screenStream.getVideoTracks()[0];
 

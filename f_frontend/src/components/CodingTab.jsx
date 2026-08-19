@@ -82,16 +82,15 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
     if (!isScreenSharing) {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: { displaySurface: 'browser' }, 
-          audio: false,
-          preferCurrentTab: false,
-          surfaceSwitching: 'include'
+          video: true, 
+          audio: false
         });
         screenStreamRef.current = stream;
         setIsScreenSharing(true);
         setTimeout(() => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(e => console.warn("Video play notice:", e));
           }
         }, 100);
         stream.getVideoTracks()[0].onended = () => {
