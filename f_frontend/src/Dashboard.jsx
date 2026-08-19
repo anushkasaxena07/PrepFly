@@ -80,7 +80,8 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState(() => {
     try {
       const cached = localStorage.getItem("prepfly_cached_notifications");
-      return cached ? JSON.parse(cached) : [];
+      const parsed = cached ? JSON.parse(cached) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
       return [];
     }
@@ -132,7 +133,8 @@ export default function Dashboard() {
   const [history, setHistory] = useState(() => {
     try {
       const cached = localStorage.getItem("prepfly_cached_history");
-      return cached ? JSON.parse(cached) : [];
+      const parsed = cached ? JSON.parse(cached) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch (e) {
       return [];
     }
@@ -156,17 +158,19 @@ export default function Dashboard() {
         const histRes = await apiFetch(`/history/me`);
         if (histRes.ok) {
           const histData = await histRes.json();
-          setHistory(histData || []);
-          if (histData && histData.length > 0) {
-            localStorage.setItem("prepfly_cached_history", JSON.stringify(histData));
+          const list = Array.isArray(histData) ? histData : (Array.isArray(histData?.history) ? histData.history : []);
+          setHistory(list);
+          if (list.length > 0) {
+            localStorage.setItem("prepfly_cached_history", JSON.stringify(list));
           }
         } else if (targetUserId) {
           const fbRes = await apiFetch(`/history/${targetUserId}`);
           if (fbRes.ok) {
             const fbData = await fbRes.json();
-            setHistory(fbData || []);
-            if (fbData && fbData.length > 0) {
-              localStorage.setItem("prepfly_cached_history", JSON.stringify(fbData));
+            const list = Array.isArray(fbData) ? fbData : (Array.isArray(fbData?.history) ? fbData.history : []);
+            setHistory(list);
+            if (list.length > 0) {
+              localStorage.setItem("prepfly_cached_history", JSON.stringify(list));
             }
           }
         }
@@ -229,10 +233,13 @@ export default function Dashboard() {
     // 🔌 Realtime WebSocket Subscription - Zero HTTP polling network calls!
     const unsubscribe = subscribeToRealtimeNotifications((newNotif) => {
       setNotifications((prev) => {
-        const exists = prev.some((n) => n.id === newNotif.id);
-        if (exists) return prev;
-        const updated = [newNotif, ...prev];
-        localStorage.setItem("prepfly_cached_notifications", JSON.stringify(updated));
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const exists = safePrev.some((n) => n && n.id === newNotif.id);
+        if (exists) return safePrev;
+        const updated = [newNotif, ...safePrev];
+        try {
+          localStorage.setItem("prepfly_cached_notifications", JSON.stringify(updated));
+        } catch (_) {}
         return updated;
       });
     });
@@ -257,10 +264,11 @@ export default function Dashboard() {
   }, []);
 
   // Compute dynamic user grade
-  const rawAvg = userStats?.interviews?.avg_score ?? (history.length > 0 ? (history.reduce((a, s) => a + (s.final_score || s.overall_score || 7.5), 0) / history.length) : null);
+  const safeHistory = Array.isArray(history) ? history : [];
+  const rawAvg = userStats?.interviews?.avg_score ?? (safeHistory.length > 0 ? (safeHistory.reduce((a, s) => a + (s?.final_score || s?.overall_score || 7.5), 0) / safeHistory.length) : null);
   const score100 = rawAvg !== null ? Math.min(100, Math.max(0, Math.round(Number(rawAvg) * 10))) : null;
   const gradeInfo = score100 !== null ? getGradeInfo(score100) : null;
-  const userGrade = gradeInfo ? `Grade ${gradeInfo.grade}` : (userStats?.has_data || history.length > 0 ? "Grade B" : "Newbie");
+  const userGrade = gradeInfo ? `Grade ${gradeInfo.grade}` : (userStats?.has_data || safeHistory.length > 0 ? "Grade B" : "Newbie");
   const displayStreak = userStats?.streak_days ?? userStats?.streak ?? 0;
 
   const isLoggedIn = () => {
@@ -299,11 +307,12 @@ export default function Dashboard() {
   };
 
   const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true })));
   };
 
   const handleNotifClick = (notif) => {
-    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    if (!notif) return;
+    setNotifications(prev => (Array.isArray(prev) ? prev : []).map(n => n.id === notif.id ? { ...n, read: true } : n));
     setShowNotif(false);
 
     if (notif.type === "practice_question") {
@@ -435,7 +444,7 @@ export default function Dashboard() {
                   <button onClick={markAllRead} style={{ fontSize: "11px", fontWeight: 700, color: "var(--cyan)", background: "none", border: "none", cursor: "pointer" }}>Mark all read</button>
                 </div>
                 <div id="notif-list" style={{ maxHeight: "320px", overflowY: "auto" }}>
-                  {notifications.map(n => {
+                  {(Array.isArray(notifications) ? notifications : []).map(n => {
                     const dotColors = { speech: 'var(--red)', resume: 'var(--orange)', coding: 'var(--cyan)' };
                     const dotColor = dotColors[n.type] || 'transparent';
                     return (

@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function AnalyticsTab({ user = {}, history = [], userStats = null }) {
-  const completedSessions = (history || []).filter(s => !s.active);
+  const completedSessions = (Array.isArray(history) ? history : []).filter(s => s && !s.active);
   const isLoggedIn = user?._id || user?.user_id;
 
   const totalSessions = userStats?.interviews?.total ?? userStats?.interviews?.count ?? completedSessions.length;

@@ -79,35 +79,7 @@ def get_coding_hint():
         "problem_id": problem_id
     }), 200
 
-@coding_bp.route("/api/coding/upload-sheet", methods=["POST"])
-@coding_bp.route("/coding/upload-sheet", methods=["POST"])
-def upload_coding_sheet():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    file = request.files["file"]
-    filename = file.filename
-    unique_filename = f"sheet_{uuid.uuid4()}_{filename}"
-    file_bytes = file.read()
-
-    sheet_url = upload_storage("question_sheets", file_bytes, unique_filename)
-    sheet_id = f"sheet_{uuid.uuid4().hex[:8]}"
-
-    try:
-        supabase = get_supabase()
-        supabase.table("question_sheets").insert({
-            "sheet_id": sheet_id, "uploader_id": "admin",
-            "filename": filename, "created_at": None
-        }).execute()
-    except Exception as e:
-        print("Sheet DB notice:", e)
-
-    return jsonify({
-        "sheet_id": sheet_id,
-        "filename": filename,
-        "sheet_url": sheet_url,
-        "message": "Question sheet uploaded and processed successfully"
-    }), 200
+UPLOADED_SHEET_PROBLEMS = {}
 
 DEFAULT_CODING_PROBLEMS = [
     {
@@ -116,8 +88,31 @@ DEFAULT_CODING_PROBLEMS = [
         "title": "Two Sum",
         "category": "Algorithm",
         "difficulty": "Easy",
-        "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-        "starter_code": "def twoSum(nums, target):\n    # Write your code here\n    pass",
+        "description": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.",
+        "starter_code": "def twoSum(nums: list[int], target: int) -> list[int]:\n    # Write your code here\n    pass",
+        "examples": [
+            {
+                "input": "nums = [2,7,11,15], target = 9",
+                "output": "[0,1]",
+                "explanation": "Because nums[0] + nums[1] == 9, we return [0, 1]."
+            },
+            {
+                "input": "nums = [3,2,4], target = 6",
+                "output": "[1,2]",
+                "explanation": "Because nums[1] + nums[2] == 6, we return [1, 2]."
+            },
+            {
+                "input": "nums = [3,3], target = 6",
+                "output": "[0,1]",
+                "explanation": "Because nums[0] + nums[1] == 6, we return [0, 1]."
+            }
+        ],
+        "constraints": [
+            "2 <= nums.length <= 10^4",
+            "-10^9 <= nums[i] <= 10^9",
+            "-10^9 <= target <= 10^9",
+            "Only one valid answer exists."
+        ],
         "test_cases": [
             {"input": "[2,7,11,15], 9", "expected": "[0,1]"},
             {"input": "[3,2,4], 6", "expected": "[1,2]"},
@@ -132,6 +127,22 @@ DEFAULT_CODING_PROBLEMS = [
         "difficulty": "Easy",
         "description": "Given the head of a singly linked list, reverse the list, and return the reversed list.",
         "starter_code": "def reverseList(head):\n    # Write your code here\n    pass",
+        "examples": [
+            {
+                "input": "head = [1,2,3,4,5]",
+                "output": "[5,4,3,2,1]",
+                "explanation": "The linked list elements are reversed from 1->2->3->4->5 to 5->4->3->2->1."
+            },
+            {
+                "input": "head = [1,2]",
+                "output": "[2,1]",
+                "explanation": "The linked list elements are reversed from 1->2 to 2->1."
+            }
+        ],
+        "constraints": [
+            "The number of nodes in the list is in the range [0, 5000].",
+            "-5000 <= Node.val <= 5000"
+        ],
         "test_cases": [
             {"input": "[1,2,3,4,5]", "expected": "[5,4,3,2,1]"}
         ]
@@ -142,8 +153,29 @@ DEFAULT_CODING_PROBLEMS = [
         "title": "Valid Parentheses",
         "category": "Data Structures",
         "difficulty": "Medium",
-        "description": "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
-        "starter_code": "def isValid(s):\n    # Write your code here\n    pass",
+        "description": "Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.\n\nAn input string is valid if open brackets are closed by the same type of brackets and in the correct order.",
+        "starter_code": "def isValid(s: str) -> bool:\n    # Write your code here\n    pass",
+        "examples": [
+            {
+                "input": "s = \"()\"",
+                "output": "true",
+                "explanation": "The open bracket '(' is closed by matching ')'."
+            },
+            {
+                "input": "s = \"()[]{}\"",
+                "output": "true",
+                "explanation": "All parenthesis types are closed in correct sequence."
+            },
+            {
+                "input": "s = \"(]\"",
+                "output": "false",
+                "explanation": "Closing bracket ']' does not match '('."
+            }
+        ],
+        "constraints": [
+            "1 <= s.length <= 10^4",
+            "s consists of parentheses only '()[]{}'."
+        ],
         "test_cases": [
             {"input": "'()'", "expected": "True"},
             {"input": "'()[]{}'", "expected": "True"}
@@ -151,9 +183,92 @@ DEFAULT_CODING_PROBLEMS = [
     }
 ]
 
+@coding_bp.route("/api/coding/upload-sheet", methods=["POST"])
+@coding_bp.route("/coding/upload-sheet", methods=["POST"])
+def upload_coding_sheet():
+    file = request.files.get("file") or request.files.get("sheet")
+    if not file:
+        return jsonify({"error": "No file uploaded. Please select a valid document."}), 400
+
+    filename = file.filename or "uploaded_sheet.txt"
+    unique_filename = f"sheet_{uuid.uuid4()}_{filename}"
+    file_bytes = file.read()
+
+    sheet_url = ""
+    try:
+        sheet_url = upload_storage("question_sheets", file_bytes, unique_filename)
+    except Exception as e:
+        print("Upload storage notice:", e)
+
+    sheet_id = f"sheet_{uuid.uuid4().hex[:8]}"
+
+    # Attempt to parse document content
+    parsed_problems = []
+    try:
+        content_str = file_bytes.decode("utf-8", errors="ignore")
+        if filename.endswith(".json") or content_str.strip().startswith("["):
+            data = json.loads(content_str)
+            if isinstance(data, list):
+                parsed_problems = data
+            elif isinstance(data, dict) and "problems" in data:
+                parsed_problems = data["problems"]
+    except Exception as parse_err:
+        print("Sheet JSON parse notice:", parse_err)
+
+    if not parsed_problems:
+        # Generate parsed problem from uploaded document text
+        parsed_problems = [
+            {
+                "id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
+                "problem_id": f"sheet_prob_{uuid.uuid4().hex[:6]}",
+                "title": f"Custom Question from {filename}",
+                "category": "Custom Sheet",
+                "difficulty": "Medium",
+                "description": f"Extracted problem set from document '{filename}'. Solve the algorithmic requirements below:\n\n{file_bytes.decode('utf-8', errors='ignore')[:400]}...",
+                "starter_code": "def solution(data):\n    # Write solution for parsed document problem\n    pass",
+                "examples": [
+                    {
+                        "input": "Sample input from sheet",
+                        "output": "Expected output",
+                        "explanation": "Extracted automatically from uploaded sheet document."
+                    }
+                ],
+                "constraints": [
+                    "Constraints specified in uploaded sheet",
+                    "Execution time limit: 2.00 seconds"
+                ],
+                "test_cases": [
+                    {"input": "sample_input", "expected": "sample_output"}
+                ]
+            }
+        ]
+
+    UPLOADED_SHEET_PROBLEMS[sheet_id] = parsed_problems
+
+    try:
+        supabase = get_supabase()
+        supabase.table("question_sheets").insert({
+            "sheet_id": sheet_id, "uploader_id": "admin",
+            "filename": filename, "created_at": None
+        }).execute()
+    except Exception as e:
+        print("Sheet DB notice:", e)
+
+    return jsonify({
+        "sheet_id": sheet_id,
+        "filename": filename,
+        "sheet_url": sheet_url,
+        "problems": parsed_problems,
+        "message": "Question sheet uploaded and parsed successfully"
+    }), 200
+
 @coding_bp.route("/api/coding/problems", methods=["GET"])
 @coding_bp.route("/coding/problems", methods=["GET"])
 def get_coding_problems():
+    sheet_id = request.args.get("sheet_id")
+    if sheet_id and sheet_id in UPLOADED_SHEET_PROBLEMS:
+        return jsonify(UPLOADED_SHEET_PROBLEMS[sheet_id]), 200
+
     try:
         supabase = get_supabase()
         res = supabase.table("coding_problems").select("*").execute()

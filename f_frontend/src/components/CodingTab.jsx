@@ -1264,6 +1264,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     
     const formData = new FormData();
     formData.append("sheet", file);
+    formData.append("file", file);
     formData.append("user_id", user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "recruiter");
     
     try {

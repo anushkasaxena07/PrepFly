@@ -64,9 +64,9 @@ class ResilientInterviewAIModel:
     def __init__(self, domain: str = "interview", model_candidates=None, temperature: float = 0.5):
         self.domain = domain
         self.model_candidates = model_candidates or [
+            "gemini-1.5-flash",
             "gemini-2.0-flash",
-            "gemini-1.5-flash-latest",
-            "gemini-2.0-flash-exp"
+            "gemini-1.5-pro"
         ]
         self.temperature = temperature
 
@@ -113,7 +113,7 @@ def get_flash_model(temperature: float = 0.6, domain: str = "interview"):
     """Phase 12: Live Interview Model (Resilient Gemini Flash with Dedicated Key)."""
     return ResilientInterviewAIModel(
         domain=domain,
-        model_candidates=["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash-exp"],
+        model_candidates=["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"],
         temperature=temperature
     )
 
@@ -121,7 +121,7 @@ def get_pro_model(temperature: float = 0.4, domain: str = "report"):
     """Phase 12: Final Report Model (Resilient Gemini Pro with Dedicated Key)."""
     return ResilientInterviewAIModel(
         domain=domain,
-        model_candidates=["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro-latest"],
+        model_candidates=["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
         temperature=temperature
     )
 
@@ -129,7 +129,7 @@ def get_coding_model(temperature: float = 0.3, domain: str = "coding"):
     """Dedicated Model for Coding Assessment Reviews and AI Hints."""
     return ResilientInterviewAIModel(
         domain=domain,
-        model_candidates=["gemini-2.0-flash", "gemini-1.5-flash-latest"],
+        model_candidates=["gemini-1.5-flash", "gemini-2.0-flash"],
         temperature=temperature
     )
 

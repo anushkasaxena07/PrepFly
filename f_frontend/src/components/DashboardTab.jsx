@@ -4,7 +4,7 @@ import { getGradeInfo } from '../utils/gradingSystem';
 export default function DashboardTab({ setActiveTab, user = {}, history = [], userStats = null }) {
   const userName = user?.full_name || user?.name || "Anushka";
 
-  const completedSessions = (history || []).filter(s => !s.active);
+  const completedSessions = (Array.isArray(history) ? history : []).filter(s => s && !s.active);
   const isLoggedIn = user?._id || user?.user_id;
   const hasData = userStats ? userStats.has_data : completedSessions.length > 0;
 
