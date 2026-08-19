@@ -836,8 +836,11 @@ const InterviewPage = () => {
         {interviewComplete && finalResult ? (() => {
           const score100 = finalResult.overall_score_100 || Math.round((finalResult.overall_score || 7.5) * 10);
           const gInfo = getGradeInfo(score100);
-          const sectionGrades = finalResult.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = finalResult.badges || getBadges(score100, sectionGrades);
+          const rawSectionGrades = finalResult.section_grades || computeSectionGrades(score100, allFeedbacks);
+          const sectionGrades = Array.isArray(rawSectionGrades)
+            ? rawSectionGrades.filter(s => s && typeof s === 'object')
+            : computeSectionGrades(score100, allFeedbacks);
+          const earnedBadges = Array.isArray(finalResult.badges) ? finalResult.badges.filter(b => b && typeof b === 'object') : getBadges(score100, sectionGrades);
           const topStrengths = finalResult.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
           const topImprovements = finalResult.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
           const prevScore100 = Number(localStorage.getItem("last_interview_score_100")) || Math.max(40, score100 - 6);
@@ -910,14 +913,14 @@ const InterviewPage = () => {
                 <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "16px" }}>Click on any dimension card below to view detailed FAANG-style behavioral evidence.</p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
                   {sectionGrades.map((sec, idx) => {
-                    const isSelected = selectedEvidenceDimension?.name === sec.name;
+                    const isSelected = !!selectedEvidenceDimension && selectedEvidenceDimension.name === sec?.name;
                     return (
                       <div 
                         key={idx} 
                         onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
                         style={{ 
                           background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
-                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${sec.color}33`, 
+                          border: isSelected ? `2.5px solid ${sec?.color || '#00e5c3'}` : `1px solid ${sec?.color || '#00e5c3'}33`, 
                           borderRadius: "12px", 
                           padding: "12px", 
                           textAlign: "center",
@@ -926,9 +929,9 @@ const InterviewPage = () => {
                           transform: isSelected ? "scale(1.03)" : "none"
                         }}
                       >
-                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                        <div style={{ fontSize: "18px", fontWeight: 900, color: sec.color, marginTop: "4px" }}>
-                          {sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span>
+                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec?.name || 'Dimension'}</div>
+                        <div style={{ fontSize: "18px", fontWeight: 900, color: sec?.color || '#00e5c3', marginTop: "4px" }}>
+                          {sec?.score || 0} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec?.grade || 'B'})</span>
                         </div>
                         <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
                           {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}
@@ -939,17 +942,17 @@ const InterviewPage = () => {
                 </div>
 
                 {/* Evidence Viewer Panel */}
-                {selectedEvidenceDimension && (
+                {selectedEvidenceDimension && selectedEvidenceDimension.name && (
                   <div style={{ 
                     marginTop: "20px", 
                     background: "rgba(255,255,255,0.015)", 
-                    border: `1.5px solid ${selectedEvidenceDimension.color}44`, 
+                    border: `1.5px solid ${selectedEvidenceDimension.color || '#00e5c3'}44`, 
                     borderRadius: "12px", 
                     padding: "16px",
                     textAlign: "left"
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color || '#00e5c3' }}>
                         🔍 Evidence Log: {selectedEvidenceDimension.name} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
                       </div>
                       <span style={{ 

@@ -312,8 +312,8 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                   alignItems: "center",
                   gap: "4px"
                 }}>
-                  <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: u.color }}></span>
-                  👤 {u.name}: Ln {u.cursor.line}, Col {u.cursor.col}
+                  <span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: u?.color || 'var(--cyan)' }}></span>
+                  👤 {u?.name || 'User'}: Ln {u?.cursor?.line || 1}, Col {u?.cursor?.col || 1}
                 </span>
               ))}
             </div>
@@ -397,14 +397,14 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                 }}
               >
                 {/* Render colored indicator dots for remote user cursors on line */}
-                {remoteOnLine.map(ru => (
-                  <span key={ru.id} style={{
+                {(Array.isArray(remoteOnLine) ? remoteOnLine : []).map(ru => (
+                  <span key={ru?.id || Math.random()} style={{
                     display: "inline-block",
                     width: "5px",
                     height: "5px",
                     borderRadius: "50%",
-                    background: ru.color
-                  }} title={`${ru.name}'s cursor`} />
+                    background: ru?.color || 'var(--cyan)'
+                  }} title={`${ru?.name || 'User'}'s cursor`} />
                 ))}
                 <span>{n}</span>
               </div>
@@ -486,7 +486,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
                   alignItems: "center",
                   gap: "4px"
                 }}>
-                  <span>👤 {u.name}</span>
+                  <span>👤 {u?.name || 'User'}</span>
                   {u.isEditing && <span style={{ fontSize: "8px", opacity: 0.9 }}>✍️</span>}
                 </span>
               </div>
