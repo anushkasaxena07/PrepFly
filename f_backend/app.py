@@ -338,17 +338,15 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # ─── Gemini / LangChain ────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "AIzaSyBYSdXjmLnimrFY7ujWfRDIwyk_8cm9Ywo"
 chat_model = None
-try:
-    chat_model = ChatGoogleGenerativeAI(
-        api_key=GEMINI_API_KEY, model="gemini-2.0-flash", temperature=0.6
-    )
-except Exception as e_chat:
+for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"]:
     try:
         chat_model = ChatGoogleGenerativeAI(
-            api_key=GEMINI_API_KEY, model="gemini-1.5-flash-latest", temperature=0.6
+            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6
         )
-    except Exception:
-        chat_model = None
+        print(f"[GEMINI INIT] Successfully initialized model '{model_name}'")
+        break
+    except Exception as e_chat:
+        print(f"[GEMINI INIT WARNING] Could not initialize model '{model_name}':", e_chat)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1835,8 +1833,25 @@ def speech_to_text():
                 },
             ]
         )
-        response = chat_model.invoke([message])
-        transcript = response.content.strip()
+        response = None
+        last_err = None
+        
+        for m_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"]:
+            try:
+                active_model = ChatGoogleGenerativeAI(
+                    api_key=GEMINI_API_KEY, model=m_name, temperature=0.2
+                )
+                response = active_model.invoke([message])
+                if response and hasattr(response, 'content') and response.content:
+                    break
+            except Exception as e_m:
+                last_err = e_m
+                print(f"[SPEECH-TO-TEXT MODEL FALLBACK] Model '{m_name}' failed:", e_m)
+
+        if not response and last_err:
+            raise last_err
+
+        transcript = response.content.strip() if response else ""
         
         # Clean up common AI prefixes if any
         if transcript.lower().startswith("transcript:"):
