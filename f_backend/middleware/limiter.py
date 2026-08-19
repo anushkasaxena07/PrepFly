@@ -13,6 +13,9 @@ limiter = Limiter(
     storage_uri=REDIS_URL,
     storage_options={"ssl_cert_reqs": None},
     default_limits=["5000 per day", "1000 per hour", "200 per minute"],
-    strategy="fixed-window",
-    exempt_when=lambda: request.method == "OPTIONS"
+    strategy="fixed-window"
 )
+
+@limiter.request_filter
+def exempt_options_and_health_requests():
+    return request.method == "OPTIONS" or request.path in ("/health", "/ready", "/system/health", "/system/ready")

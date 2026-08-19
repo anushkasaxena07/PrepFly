@@ -1,6 +1,6 @@
 Flask
 flask-cors
-flask-limiter
+flask-limiter>=3.8.0
 PyJWT
 redis
 celery
