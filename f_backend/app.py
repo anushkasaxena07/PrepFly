@@ -344,11 +344,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "
 chat_model = None
 
 GEMINI_MODEL_CANDIDATES = [
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro-latest",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash-8b"
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-latest"
 ]
 
 for model_name in GEMINI_MODEL_CANDIDATES:
@@ -1889,7 +1889,7 @@ def speech_to_text():
         genai.configure(api_key=GEMINI_API_KEY)
         
         transcript_text = ""
-        for m_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.5-flash-8b"]:
+        for m_name in GEMINI_MODEL_CANDIDATES:
             try:
                 g_model = genai.GenerativeModel(m_name)
                 res = g_model.generate_content([
