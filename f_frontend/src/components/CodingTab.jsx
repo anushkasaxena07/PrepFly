@@ -372,7 +372,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
         >
           {lineNumbers.map(n => {
             const isUserLine = n === cursorPos.line;
-            const remoteOnLine = isRoomActive ? remoteUsers.filter(u => u.cursor.line === n) : [];
+            const remoteOnLine = isRoomActive && Array.isArray(remoteUsers) ? remoteUsers.filter(u => u && u.cursor && u.cursor.line === n) : [];
             let numColor = "rgba(255,255,255,0.3)";
             let fontWeight = 400;
 
@@ -443,9 +443,9 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
         />
 
         {/* LIVE MULTI-PARTICIPANT FLOATING CURSORS & NAME TAGS (CASE 2: ROOM ON ONLY) */}
-        {isRoomActive && remoteUsers.map(u => {
-          const lineY = (u.cursor.line - 1) * 20.8 + 12 - scrollTop;
-          const colX = Math.min(680, Math.max(0, (u.cursor.col - 1) * 7.8 + 64));
+        {isRoomActive && (Array.isArray(remoteUsers) ? remoteUsers : []).filter(u => u && u.cursor).map(u => {
+          const lineY = (((u.cursor && u.cursor.line) || 1) - 1) * 20.8 + 12 - scrollTop;
+          const colX = Math.min(680, Math.max(0, (((u.cursor && u.cursor.col) || 1) - 1) * 7.8 + 64));
           const isVisible = lineY >= -15 && lineY <= 345;
 
           if (!isVisible) return null;
@@ -1521,7 +1521,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                     const safeList = Array.isArray(roomParticipants) ? roomParticipants : [];
                     const others = safeList.filter(p => p && p.user_id !== myId && p.active);
                     if (others.length === 0) return "You're the only one here";
-                    return `${others.map(p => p.name).join(", ")} also editing`;
+                    return `${others.map(p => p?.name || p?.user_name || 'User').join(", ")} also editing`;
                   })()}
                 </span>
               </div>
@@ -1565,9 +1565,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 onChange={handleProblemChange}
               >
                 <option value="" disabled style={{ background: "#0c1220", color: "#8a9bc0" }}>Select Problem...</option>
-                {problems.map(p => (
-                  <option key={p.problem_id} value={p.problem_id} style={{ background: "#0c1220", color: "#f0f4fd" }}>
-                    {p.title}
+                {(Array.isArray(problems) ? problems : []).map(p => (
+                  <option key={p?.problem_id || Math.random()} value={p?.problem_id || ""} style={{ background: "#0c1220", color: "#f0f4fd" }}>
+                    {p?.title || "Problem"}
                   </option>
                 ))}
               </select>
