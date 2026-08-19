@@ -395,8 +395,11 @@ def get_coding_problems():
     except Exception as e:
         return jsonify(DEFAULT_CODING_PROBLEMS), 200
 
+from middleware.limiter import limiter
+
 @coding_bp.route("/api/coding/room/create", methods=["POST"])
 @coding_bp.route("/coding/room/create", methods=["POST"])
+@limiter.exempt
 def create_coding_room():
     data = request.get_json() or {}
     room_id = f"room_{uuid.uuid4().hex[:6]}"
@@ -421,6 +424,7 @@ def create_coding_room():
 
 @coding_bp.route("/api/coding/room/join", methods=["POST"])
 @coding_bp.route("/coding/room/join", methods=["POST"])
+@limiter.exempt
 def join_coding_room():
     data = request.get_json() or {}
     room_id = data.get("room_id")
@@ -444,6 +448,7 @@ def join_coding_room():
 
 @coding_bp.route("/api/coding/room/sync", methods=["GET", "POST", "OPTIONS"])
 @coding_bp.route("/coding/room/sync", methods=["GET", "POST", "OPTIONS"])
+@limiter.exempt
 def sync_coding_room():
     if request.method == "OPTIONS":
         return jsonify({}), 200
@@ -478,6 +483,7 @@ def sync_coding_room():
 
 @coding_bp.route("/api/coding/room/assign-question", methods=["POST"])
 @coding_bp.route("/coding/room/assign-question", methods=["POST"])
+@limiter.exempt
 def assign_coding_question():
     data = request.get_json() or {}
     room_id = data.get("room_id")

@@ -1,4 +1,5 @@
 import os
+from flask import request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=REDIS_URL,
     storage_options={"ssl_cert_reqs": None},
-    default_limits=["200 per day", "50 per hour"],
-    strategy="fixed-window"
+    default_limits=["5000 per day", "1000 per hour", "200 per minute"],
+    strategy="fixed-window",
+    exempt_when=lambda: request.method == "OPTIONS"
 )

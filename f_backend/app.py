@@ -319,6 +319,19 @@ def trigger_sentry_test_error():
     division_by_zero = 1 / 0
     return jsonify({"result": division_by_zero}), 200
 
+from flask_limiter.errors import RateLimitExceeded
+
+@app.errorhandler(RateLimitExceeded)
+def handle_ratelimit_error(e):
+    origin = request.headers.get("Origin") or "*"
+    res = jsonify({"error": "Rate limit exceeded", "detail": str(e)})
+    res.status_code = 429
+    res.headers["Access-Control-Allow-Origin"] = origin
+    res.headers["Access-Control-Allow-Credentials"] = "true"
+    res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, X-Super-Admin, X-Organization-Id"
+    res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return res
+
 @app.errorhandler(Exception)
 def handle_global_exception(e):
     origin = request.headers.get("Origin") or "*"
