@@ -1,5 +1,9 @@
 import os
-import fitz
+import shutil
+try:
+    import pymupdf as fitz
+except Exception:
+    import fitz
 import uuid
 import random
 import base64
