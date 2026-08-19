@@ -926,6 +926,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const consoleOutRef = useRef(consoleOut);
   const editDebounceRef = useRef(null);
   const syncIntervalRef = useRef(null);
+  const lastLangChangedRef = useRef(0);
 
   // Keep refs in sync with state
   useEffect(() => { codeRef.current = code; }, [code]);
@@ -1059,7 +1060,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
             codeRef.current = data.current_code;
           }
         }
-        if (data.current_lang && data.current_lang !== langRef.current) {
+        const timeSinceLangChange = Date.now() - (lastLangChangedRef.current || 0);
+        if (data.current_lang && data.current_lang !== langRef.current && timeSinceLangChange > 4000) {
           setLang(data.current_lang);
           langRef.current = data.current_lang;
         }
@@ -1300,6 +1302,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const handleLangChange = (newLang) => {
     setLang(newLang);
     langRef.current = newLang;
+    lastLangChangedRef.current = Date.now();
     const template = currentProblem ? getDynamicStarterCode(currentProblem, newLang) : (defaultCodeTemplates[newLang] || "");
     setCode(template);
     codeRef.current = template;

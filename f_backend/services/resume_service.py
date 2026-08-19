@@ -34,7 +34,13 @@ def extract_text_from_pdf(filepath):
 def extract_text_from_docx(filepath):
     try:
         doc = docx.Document(filepath)
-        return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+        text_parts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if row_cells:
+                    text_parts.append(" | ".join(row_cells))
+        return "\n".join(text_parts).strip()
     except Exception as e:
         print(f"docx extract error: {e}")
         return ""

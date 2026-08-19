@@ -3214,6 +3214,33 @@ def extract_problems_heuristically(raw_text):
                 {"input": "Input details from document", "output": "Expected output details", "explanation": "Parsed custom problem from uploaded sheet."}
             ]
         })
+
+    if not problems:
+        first_line = raw_text.strip().split("\n")[0][:60] if raw_text.strip() else "Custom Sheet Problem"
+        problems.append({
+            "problem_id": f"custom-{uuid.uuid4().hex[:6]}",
+            "title": first_line,
+            "description": raw_text[:3500],
+            "constraints": ["1 <= N <= 10^5"],
+            "difficulty": "Medium",
+            "category": "Custom Document Sheet",
+            "starter_code": {
+                "python": "def solve(*args):\n    # Write your solution here\n    pass",
+                "javascript": "function solve(...args) {\n    // Write your solution here\n}"
+            },
+            "test_cases": [
+                {"input": "1\n2", "expected_output": "3", "is_hidden": False},
+                {"input": "0\n0", "expected_output": "0", "is_hidden": False},
+                {"input": "5\n5", "expected_output": "10", "is_hidden": False},
+                {"input": "-1\n1", "expected_output": "0", "is_hidden": True},
+                {"input": "10\n20", "expected_output": "30", "is_hidden": True},
+                {"input": "100\n200", "expected_output": "300", "is_hidden": True},
+                {"input": "50\n50", "expected_output": "100", "is_hidden": True}
+            ],
+            "examples": [
+                {"input": "Input details from document", "output": "Expected output details", "explanation": "Parsed custom problem from uploaded document sheet."}
+            ]
+        })
         
     return problems
 
