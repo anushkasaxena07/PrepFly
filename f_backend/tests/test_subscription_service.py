@@ -182,5 +182,194 @@ class TestSubscriptionService(unittest.TestCase):
         self.assertEqual(res_after.status_code, 200)
         self.assertTrue(res_after.get_json().get("done"))
 
+    def test_affirmative_consent_recording(self):
+        """Backend must only record consent_given=1 if the user actively provided consent."""
+        from app import app, _get_jwt_secret
+        import jwt
+        import uuid
+
+        client = app.test_client()
+        user_id = f"user_{uuid.uuid4().hex[:6]}"
+        token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from services.subscription_service import get_supabase
+        sb = get_supabase()
+
+        # 1. Without consent: consent_given must be 0
+        res_no_consent = client.post("/create-session-no-resume", headers=headers, json={
+            "role": "Backend Engineer"
+        })
+        self.assertEqual(res_no_consent.status_code, 200)
+        sess_id_no_consent = res_no_consent.get_json()["session_id"]
+        row_no_consent = sb.table("sessions").select("consent_given,consent_timestamp").eq("session_id", sess_id_no_consent).execute().data[0]
+        self.assertEqual(int(row_no_consent["consent_given"]), 0)
+        self.assertIsNone(row_no_consent["consent_timestamp"])
+
+        # 2. With affirmative consent: consent_given must be 1
+        res_consent = client.post("/create-session-no-resume", headers=headers, json={
+            "role": "Backend Engineer",
+            "consent": True
+        })
+        self.assertEqual(res_consent.status_code, 200)
+        sess_id_consent = res_consent.get_json()["session_id"]
+        row_consent = sb.table("sessions").select("consent_given,consent_timestamp").eq("session_id", sess_id_consent).execute().data[0]
+        self.assertEqual(int(row_consent["consent_given"]), 1)
+        self.assertIsNotNone(row_consent["consent_timestamp"])
+
+    def test_concurrent_next_question_rejected(self):
+        """Simultaneous /next requests on the same session must return HTTP 429."""
+        from app import app, _get_jwt_secret, _SESSION_IN_FLIGHT, _SESSION_IN_FLIGHT_LOCK
+        import jwt
+        import uuid
+
+        client = app.test_client()
+        user_id = f"user_{uuid.uuid4().hex[:6]}"
+        session_id = str(uuid.uuid4())
+        token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from services.subscription_service import get_supabase
+        sb = get_supabase()
+        sb.table("sessions").insert({
+            "session_id": session_id,
+            "user_id": user_id,
+            "resume_text": "Software engineer",
+            "questions": ["Q1"],
+            "responses": [],
+            "feedbacks": [],
+            "question_index": 1,
+            "active": True
+        }).execute()
+
+        # Simulate in-flight lock active on session_id
+        with _SESSION_IN_FLIGHT_LOCK:
+            _SESSION_IN_FLIGHT.add(session_id)
+
+        try:
+            res = client.post("/next", headers=headers, json={
+                "session_id": session_id,
+                "answer": "Concurrent attempt"
+            })
+            self.assertEqual(res.status_code, 429)
+            self.assertIn("Concurrent request in progress", res.get_json().get("error", ""))
+        finally:
+            with _SESSION_IN_FLIGHT_LOCK:
+                _SESSION_IN_FLIGHT.discard(session_id)
+
+    def test_hint_caching_avoids_repeated_llm_calls(self):
+        """Subsequent hint calls on the exact same question return cached hint."""
+        from app import app, _get_jwt_secret
+        import jwt
+        import uuid
+
+        client = app.test_client()
+        user_id = f"user_{uuid.uuid4().hex[:6]}"
+        session_id = str(uuid.uuid4())
+        token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from services.subscription_service import get_supabase
+        sb = get_supabase()
+        sb.table("sessions").insert({
+            "session_id": session_id,
+            "user_id": user_id,
+            "resume_text": "Experienced Python Engineer",
+            "questions": ["Explain how Python GIL works."],
+            "responses": [],
+            "feedbacks": [],
+            "question_index": 1,
+            "active": True
+        }).execute()
+
+        # 1st hint request generates hint
+        res1 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
+        self.assertEqual(res1.status_code, 200)
+        hint1 = res1.get_json()["hint"]
+
+        # 2nd hint request returns cached hint
+        res2 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
+        self.assertEqual(res2.status_code, 200)
+        self.assertTrue(res2.get_json().get("cached"))
+        self.assertEqual(res2.get_json()["hint"], hint1)
+
+    def test_exception_in_next_releases_session_lock(self):
+        """Even if an internal error occurs during /next, the finally block must release the in-flight lock."""
+        from app import app, _get_jwt_secret, _SESSION_IN_FLIGHT, _SESSION_IN_FLIGHT_LOCK
+        import jwt
+        import uuid
+        from unittest.mock import patch
+
+        client = app.test_client()
+        user_id = f"user_{uuid.uuid4().hex[:6]}"
+        session_id = str(uuid.uuid4())
+        token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from services.subscription_service import get_supabase
+        sb = get_supabase()
+        sb.table("sessions").insert({
+            "session_id": session_id,
+            "user_id": user_id,
+            "resume_text": "Experienced Python Engineer",
+            "questions": ["Q1"],
+            "responses": [],
+            "feedbacks": [],
+            "question_index": 1,
+            "active": True
+        }).execute()
+
+        # Simulate exception during evaluate_response_comprehensive
+        with patch("app.evaluate_response_comprehensive", side_effect=RuntimeError("Simulated LLM network error")):
+            res = client.post("/next", headers=headers, json={
+                "session_id": session_id,
+                "answer": "My answer that encounters a network error"
+            })
+            self.assertEqual(res.status_code, 500)
+
+        # Verify that lock is NOT held on session_id after exception
+        with _SESSION_IN_FLIGHT_LOCK:
+            self.assertNotIn(session_id, _SESSION_IN_FLIGHT)
+
+    def test_hint_invalidated_when_interview_advances(self):
+        """When an interview advances to question 2, the hint cache must be invalidated."""
+        from app import app, _get_jwt_secret
+        import jwt
+        import uuid
+
+        client = app.test_client()
+        user_id = f"user_{uuid.uuid4().hex[:6]}"
+        session_id = str(uuid.uuid4())
+        token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from services.subscription_service import get_supabase
+        sb = get_supabase()
+        sb.table("sessions").insert({
+            "session_id": session_id,
+            "user_id": user_id,
+            "resume_text": "Experienced Python Engineer",
+            "questions": ["Question 1: Explain Python GIL."],
+            "responses": [],
+            "feedbacks": [],
+            "question_index": 1,
+            "active": True
+        }).execute()
+
+        # 1. Generate hint for Q1
+        client.post("/get-hint", headers=headers, json={"session_id": session_id})
+
+        # 2. Advance to Q2 via /next
+        res_next = client.post("/next", headers=headers, json={
+            "session_id": session_id,
+            "answer": "GIL prevents multiple native threads from executing Python bytecodes simultaneously."
+        })
+        self.assertEqual(res_next.status_code, 200)
+
+        # 3. Check that cached_hints on session is reset
+        sess_data = sb.table("sessions").select("cached_hints").eq("session_id", session_id).execute().data[0]
+        cached_val = sess_data.get("cached_hints")
+        self.assertTrue(cached_val in [{}, "{}", None, ""] or len(cached_val or {}) == 0)
+
 if __name__ == "__main__":
     unittest.main()

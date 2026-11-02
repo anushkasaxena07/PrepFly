@@ -30,6 +30,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       try {
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('consent', 'true');
 
         const token = localStorage.getItem('access_token');
         const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";

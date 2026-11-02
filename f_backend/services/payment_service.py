@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from local_supabase import DB_FILE, SQLiteSupabaseMock
 
 import secrets
+import threading
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
@@ -76,6 +77,9 @@ def resolve_plan(plan_id=None, amount_inr=None):
 
     return SUBSCRIPTION_PLANS["ENTERPRISE_YEARLY"]
 
+_ORDER_VERIFY_LOCK = threading.Lock()
+_IN_FLIGHT_ORDERS = set()
+
 def create_razorpay_order(org_id, plan_id=None, amount_inr=None):
     if plan_id is None and amount_inr is None:
         plan_id = "ENTERPRISE_YEARLY"
@@ -99,6 +103,21 @@ def create_razorpay_order(org_id, plan_id=None, amount_inr=None):
     except Exception as e:
         print("Razorpay client notice (fallback order_id generated):", e)
 
+    # Persist authoritative order record in database
+    try:
+        supabase = get_supabase_client()
+        supabase.table("orders").insert({
+            "order_id": order_id,
+            "organization_id": org_id,
+            "plan_id": plan["id"],
+            "amount": amount_inr,
+            "currency": currency,
+            "status": "CREATED",
+            "created_at": datetime.utcnow().isoformat()
+        }).execute()
+    except Exception as e:
+        print("Authoritative order persistence notice:", e)
+
     return {
         "order_id": order_id,
         "plan_id": plan["id"],
@@ -114,102 +133,170 @@ def verify_razorpay_payment(org_id, razorpay_order_id, razorpay_payment_id, razo
     if not razorpay_order_id or not razorpay_payment_id or not razorpay_signature:
         raise ValueError("Missing payment verification fields")
 
-    plan = resolve_plan(plan_id=plan_id, amount_inr=amount_inr)
-    amount_inr = plan["amount"]
+    # Concurrency Lock: Prevent simultaneous verification requests from fulfilling the same order
+    with _ORDER_VERIFY_LOCK:
+        if razorpay_order_id in _IN_FLIGHT_ORDERS:
+            raise ValueError("Order verification already in progress")
+        _IN_FLIGHT_ORDERS.add(razorpay_order_id)
 
-    supabase = get_supabase_client()
-
-    # 1. Prevent duplicate payments / replay attacks on payment_id
     try:
-        res = supabase.table("payment").select("*").eq("razorpay_payment_id", razorpay_payment_id).execute()
-        if res and hasattr(res, "data") and isinstance(res.data, list) and len(res.data) > 0:
+        supabase = get_supabase_client()
+
+        # 1. Authoritative Plan Derivation & Tamper Check against orders table
+        order_row = None
+        try:
+            ord_res = supabase.table("orders").select("*").eq("order_id", razorpay_order_id).execute()
+            if ord_res and hasattr(ord_res, "data") and isinstance(ord_res.data, list) and len(ord_res.data) > 0:
+                order_row = ord_res.data[0]
+        except Exception:
+            pass
+
+        if order_row and isinstance(order_row, dict):
+            authoritative_plan_id = order_row.get("plan_id")
+            if plan_id and plan_id != authoritative_plan_id:
+                raise ValueError(f"Plan tampering detected: Order '{razorpay_order_id}' was created for '{authoritative_plan_id}', but '{plan_id}' was claimed.")
+            plan = SUBSCRIPTION_PLANS.get(authoritative_plan_id) or resolve_plan(plan_id=authoritative_plan_id)
+        else:
+            plan = resolve_plan(plan_id=plan_id, amount_inr=amount_inr)
+
+        amount_inr = plan["amount"]
+
+        # 2. Check for existing payment transaction (Idempotency vs Replay)
+        existing_pay = None
+        try:
+            res = supabase.table("payment").select("*").eq("razorpay_payment_id", razorpay_payment_id).execute()
+            if res and hasattr(res, "data") and isinstance(res.data, list) and len(res.data) > 0:
+                existing_pay = res.data[0]
+        except Exception:
+            pass
+
+        # 3. Check for existing order fulfillment
+        existing_order_pay = None
+        try:
+            res_ord = supabase.table("payment").select("*").eq("razorpay_order_id", razorpay_order_id).execute()
+            rows = res_ord.data if (res_ord and hasattr(res_ord, "data") and isinstance(res_ord.data, list)) else []
+            for r in rows:
+                if isinstance(r, dict) and r.get("status") == "Success":
+                    existing_order_pay = r
+                    break
+        except Exception:
+            pass
+
+        # Check for replay attack: payment_id already used for another transaction
+        if existing_pay and not (existing_order_pay and existing_pay.get("id") == existing_order_pay.get("id")):
             raise ValueError("Duplicate payment transaction detected")
-    except Exception as e:
-        if "Duplicate payment" in str(e):
-            raise e
 
-    # 2. Prevent duplicate order fulfillment on order_id
-    try:
-        res_ord = supabase.table("payment").select("*").eq("razorpay_order_id", razorpay_order_id).execute()
-        rows = res_ord.data if (res_ord and hasattr(res_ord, "data") and isinstance(res_ord.data, list)) else []
-        if any(r.get("status") == "Success" for r in rows if isinstance(r, dict)):
-            raise ValueError("Order already fulfilled")
-    except Exception as e:
-        if "Order already fulfilled" in str(e):
-            raise e
+        # Check for order fulfillment replay: order already fulfilled with another payment
+        if existing_order_pay and not (existing_pay and existing_pay.get("id") == existing_order_pay.get("id")):
+            raise ValueError("Order already fulfilled with a different transaction")
 
-    # 3. Server-side HMAC Signature Verification
-    body = f"{razorpay_order_id}|{razorpay_payment_id}"
-    generated_sig = hmac.new(
-        RAZORPAY_KEY_SECRET.encode(),
-        body.encode(),
-        hashlib.sha256
-    ).hexdigest()
+        # 4. Server-side HMAC Signature Verification
+        body = f"{razorpay_order_id}|{razorpay_payment_id}"
+        generated_sig = hmac.new(
+            RAZORPAY_KEY_SECRET.encode(),
+            body.encode(),
+            hashlib.sha256
+        ).hexdigest()
 
-    # Constant-time cryptographic HMAC verification
-    is_valid = secrets.compare_digest(generated_sig, razorpay_signature)
+        # Constant-time cryptographic HMAC verification
+        is_valid = secrets.compare_digest(generated_sig, razorpay_signature)
 
-    if not is_valid:
-        raise ValueError("Razorpay signature verification failed! Payment rejected.")
+        if not is_valid:
+            raise ValueError("Razorpay signature verification failed! Payment rejected.")
 
-    # 4. DATABASE UPDATE (Payment + Subscription Update + Invoice + Activity Log)
-    now = datetime.utcnow()
-    duration_days = plan.get("duration_days", 365)
-    expiry = now + timedelta(days=duration_days)
-    pay_id = f"pay_{uuid.uuid4().hex[:8]}"
-    invoice_number = f"INV-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+        # Idempotent Retry: Exact same order and payment already fulfilled -> Return success safely
+        if existing_pay and existing_order_pay and existing_pay.get("id") == existing_order_pay.get("id"):
+            # Ensure organization is active (safe recovery if org update failed earlier)
+            try:
+                supabase.table("organization").update({
+                    "subscription_status": "ACTIVE",
+                    "current_plan": plan["name"],
+                    "subscription_plan": plan["id"]
+                }).eq("id", org_id).execute()
+                supabase.table("orders").update({"status": "PAID"}).eq("order_id", razorpay_order_id).execute()
+            except Exception:
+                pass
+            return {
+                "status": "SUCCESS",
+                "message": f"Payment already verified and {plan['name']} active.",
+                "organization_id": org_id,
+                "payment_id": razorpay_payment_id,
+                "invoice_number": existing_pay.get("invoice_number", ""),
+                "invoice_id": existing_pay.get("id", ""),
+                "subscription_status": "ACTIVE",
+                "current_plan": plan["name"],
+                "plan_id": plan["id"],
+                "amount_inr": amount_inr,
+                "days_remaining": plan.get("duration_days", 365),
+                "is_idempotent_retry": True
+            }
 
-    try:
-        supabase.table("payment").insert({
-            "id": pay_id,
-            "organization_id": org_id,
-            "razorpay_order_id": razorpay_order_id,
-            "razorpay_payment_id": razorpay_payment_id,
-            "razorpay_signature": razorpay_signature,
-            "plan_id": plan["id"],
-            "amount": amount_inr,
-            "currency": "INR",
-            "invoice_number": invoice_number,
-            "status": "Success",
-            "payment_method": "Razorpay Standard Checkout",
-            "created_at": now.isoformat()
-        }).execute()
+        # 5. DATABASE UPDATE (Payment + Subscription Update + Invoice + Activity Log)
+        now = datetime.utcnow()
+        duration_days = plan.get("duration_days", 365)
+        expiry = now + timedelta(days=duration_days)
+        pay_id = f"pay_{uuid.uuid4().hex[:8]}"
+        invoice_number = f"INV-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
 
-        supabase.table("organization").update({
-            "subscription_status": "ACTIVE",
-            "subscription_start": now.isoformat(),
-            "subscription_expiry": expiry.isoformat(),
-            "current_plan": plan["name"],
-            "subscription_plan": plan["id"],
-            "updated_at": now.isoformat()
-        }).eq("id", org_id).execute()
+        try:
+            supabase.table("payment").insert({
+                "id": pay_id,
+                "organization_id": org_id,
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": razorpay_payment_id,
+                "razorpay_signature": razorpay_signature,
+                "plan_id": plan["id"],
+                "amount": amount_inr,
+                "currency": "INR",
+                "invoice_number": invoice_number,
+                "status": "Success",
+                "payment_method": "Razorpay Standard Checkout",
+                "created_at": now.isoformat()
+            }).execute()
 
-        inv_id = f"inv_{uuid.uuid4().hex[:8]}"
-        gst_amount = round(amount_inr * 0.18, 2)
-        supabase.table("invoice").insert({
-            "id": inv_id,
-            "payment_id": pay_id,
-            "organization_id": org_id,
-            "invoice_number": invoice_number,
-            "amount": amount_inr,
-            "gst": gst_amount,
-            "created_at": now.isoformat()
-        }).execute()
+            supabase.table("organization").update({
+                "subscription_status": "ACTIVE",
+                "subscription_start": now.isoformat(),
+                "subscription_expiry": expiry.isoformat(),
+                "current_plan": plan["name"],
+                "subscription_plan": plan["id"],
+                "updated_at": now.isoformat()
+            }).eq("id", org_id).execute()
 
-        supabase.table("activity_logs").insert({
-            "id": f"log_{uuid.uuid4().hex[:6]}",
-            "actor_id": org_id,
-            "actor_type": "ORGANIZATION_ADMIN",
-            "action": f"Subscription Purchase Successful ({plan['name']} - ₹{amount_inr} / {duration_days} Days)",
-            "ip_address": "127.0.0.1",
-            "details": f"Razorpay Payment ID: {razorpay_payment_id} | Invoice: {invoice_number} | Plan: {plan['id']}",
-            "created_at": now.isoformat()
-        }).execute()
+            inv_id = f"inv_{uuid.uuid4().hex[:8]}"
+            gst_amount = round(amount_inr * 0.18, 2)
+            supabase.table("invoice").insert({
+                "id": inv_id,
+                "payment_id": pay_id,
+                "organization_id": org_id,
+                "invoice_number": invoice_number,
+                "amount": amount_inr,
+                "gst": gst_amount,
+                "created_at": now.isoformat()
+            }).execute()
 
-        inv_data = {"id": inv_id, "invoice_number": invoice_number}
-    except Exception as db_err:
-        print("Database insert notice:", db_err)
-        inv_data = {"id": f"inv_{uuid.uuid4().hex[:8]}", "invoice_number": invoice_number}
+            supabase.table("activity_logs").insert({
+                "id": f"log_{uuid.uuid4().hex[:6]}",
+                "actor_id": org_id,
+                "actor_type": "ORGANIZATION_ADMIN",
+                "action": f"Subscription Purchase Successful ({plan['name']} - ₹{amount_inr} / {duration_days} Days)",
+                "ip_address": "127.0.0.1",
+                "details": f"Razorpay Payment ID: {razorpay_payment_id} | Invoice: {invoice_number} | Plan: {plan['id']}",
+                "created_at": now.isoformat()
+            }).execute()
+
+            try:
+                supabase.table("orders").update({"status": "PAID"}).eq("order_id", razorpay_order_id).execute()
+            except Exception:
+                pass
+
+            inv_data = {"id": inv_id, "invoice_number": invoice_number}
+        except Exception as db_err:
+            print("Database payment fulfillment error (failing closed):", db_err)
+            raise RuntimeError(f"Database error during payment activation: {db_err}")
+    finally:
+        with _ORDER_VERIFY_LOCK:
+            _IN_FLIGHT_ORDERS.discard(razorpay_order_id)
 
     # 5. Dispatch Email Confirmation
     try:

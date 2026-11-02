@@ -83,13 +83,18 @@ class TestBillingLifecycleIntegration(unittest.TestCase):
         self.assertIn("500", html_str)
         self.assertIn("90", html_str)  # 18% GST
 
-        # 7. Replay attack rejection test: verifying same payment_id a second time must fail
+        # 7. Replay attack rejection test: reusing same payment_id for a new order must fail
+        replay_sig = hmac.new(
+            RAZORPAY_KEY_SECRET.encode(),
+            f"order_replay_attempt_2|{payment_id}".encode(),
+            hashlib.sha256
+        ).hexdigest()
         with self.assertRaises(ValueError) as ctx:
             verify_razorpay_payment(
                 org_id=self.org_id,
-                razorpay_order_id=order_id,
+                razorpay_order_id="order_replay_attempt_2",
                 razorpay_payment_id=payment_id,
-                razorpay_signature=genuine_signature
+                razorpay_signature=replay_sig
             )
         self.assertIn("Duplicate payment", str(ctx.exception))
 

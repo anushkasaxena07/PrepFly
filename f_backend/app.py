@@ -555,17 +555,16 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 chat_model = None
 
 GEMINI_MODEL_CANDIDATES = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest"
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash"
 ]
 
 for model_name in GEMINI_MODEL_CANDIDATES:
     try:
         chat_model = ChatGoogleGenerativeAI(
-            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6
+            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=1, timeout=10
         )
         print(f"[GEMINI INIT] Successfully initialized model '{model_name}'")
         break
@@ -1855,6 +1854,8 @@ def upload_resume():
         parse_result = parse_resume_content(resume_text, chat_model)
 
         session_id   = str(uuid.uuid4())
+        raw_consent = request.form.get("consent") or request.form.get("consent_given")
+        user_consented = raw_consent in (True, 1, "true", "True", "1")
         session_data = {
             "session_id": session_id,
             "resume_text": resume_text,
@@ -1865,9 +1866,9 @@ def upload_resume():
             "active": True,
             "ats_score": parse_result.get("ats_score", 70),
             "structured_resume": json.dumps(parse_result.get("structured_data", {})),
-            "consent_given": 1,
-            "consent_timestamp": datetime.utcnow().isoformat(),
-            "privacy_policy_version": "DPDP-2023-v1.0"
+            "consent_given": 1 if user_consented else 0,
+            "consent_timestamp": datetime.utcnow().isoformat() if user_consented else None,
+            "privacy_policy_version": "DPDP-2023-v1.0" if user_consented else None
         }
         if user_id:
             session_data["user_id"] = user_id
@@ -1934,6 +1935,8 @@ def create_session_no_resume():
     resume_text = f"JOB PROFILE DETAILS (No Resume Provided):\nTarget Role: {role}\nRequired Tools & Technologies: {tools}\nExperience Level: {experience}\nCategory: {category}\nDifficulty: {difficulty}"
     session_id  = str(uuid.uuid4())
 
+    raw_consent = data.get("consent") or data.get("consent_given")
+    user_consented = raw_consent in (True, 1, "true", "True", "1")
     session_data = {
         "session_id": session_id,
         "resume_text": resume_text,
@@ -1944,9 +1947,9 @@ def create_session_no_resume():
         "active": True,
         "category": category,
         "difficulty": difficulty,
-        "consent_given": 1,
-        "consent_timestamp": datetime.utcnow().isoformat(),
-        "privacy_policy_version": "DPDP-2023-v1.0"
+        "consent_given": 1 if user_consented else 0,
+        "consent_timestamp": datetime.utcnow().isoformat() if user_consented else None,
+        "privacy_policy_version": "DPDP-2023-v1.0" if user_consented else None
     }
     if user_id:
         session_data["user_id"] = user_id
@@ -2028,6 +2031,9 @@ def start_interview():
         return jsonify({"error": str(e)}), 500
 
 
+_SESSION_IN_FLIGHT_LOCK = threading.Lock()
+_SESSION_IN_FLIGHT = set()
+
 @app.route("/next", methods=["POST"])
 @limiter.limit("10 per minute")
 def next_question():
@@ -2043,6 +2049,12 @@ def next_question():
     session, err = get_owned_session(session_id)
     if err:
         return err
+
+    # Concurrency Lock: Prevent concurrent requests on the same session from racing LLM quota
+    with _SESSION_IN_FLIGHT_LOCK:
+        if session_id in _SESSION_IN_FLIGHT:
+            return jsonify({"error": "Concurrent request in progress for this interview session. Please wait."}), 429
+        _SESSION_IN_FLIGHT.add(session_id)
 
     try:
         if not session.get("active", True):
@@ -2119,21 +2131,18 @@ def next_question():
             feedbacks.append(feedback)
             scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
 
-            def async_db_save():
-                try:
-                    supabase.table("sessions").update({
-                        "questions": questions,
-                        "responses": responses,
-                        "feedbacks": feedbacks,
-                        "scores": scores,
-                        "question_index": 5,
-                        "stage": "Phase 7: Natural Wrap-up"
-                    }).eq("session_id", session_id).execute()
-                except Exception as ex:
-                    print("Async DB save notice:", ex)
-
-            import threading
-            threading.Thread(target=async_db_save, daemon=True).start()
+            try:
+                supabase.table("sessions").update({
+                    "questions": questions,
+                    "responses": responses,
+                    "feedbacks": feedbacks,
+                    "scores": scores,
+                    "question_index": 5,
+                    "stage": "Phase 7: Natural Wrap-up",
+                    "cached_hints": "{}"
+                }).eq("session_id", session_id).execute()
+            except Exception as ex:
+                print("Session DB save notice:", ex)
 
             return jsonify({
                 "message": "Answer recorded. All 5 questions completed. Please proceed to final review.",
@@ -2177,21 +2186,19 @@ def next_question():
 
         questions.append(next_q)
 
-        # Async background update to DB so candidate gets response instantly (< 300ms)
-        def async_db_save():
-            try:
-                supabase.table("sessions").update({
-                    "questions": questions,
-                    "responses": responses,
-                    "feedbacks": feedbacks,
-                    "scores": scores,
-                    "question_index": question_index + 1,
-                    "stage": next_stage
-                }).eq("session_id", session_id).execute()
-            except Exception as ex:
-                print("Async DB save notice:", ex)
-
-        threading.Thread(target=async_db_save, daemon=True).start()
+        # Synchronous database update ensures question state & hint cache are committed atomically
+        try:
+            supabase.table("sessions").update({
+                "questions": questions,
+                "responses": responses,
+                "feedbacks": feedbacks,
+                "scores": scores,
+                "question_index": question_index + 1,
+                "stage": next_stage,
+                "cached_hints": "{}"
+            }).eq("session_id", session_id).execute()
+        except Exception as ex:
+            print("Session DB save notice:", ex)
 
         return jsonify({
             "message": "Answer recorded",
@@ -2207,6 +2214,9 @@ def next_question():
     except Exception as e:
         print(f"Next question error: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        with _SESSION_IN_FLIGHT_LOCK:
+            _SESSION_IN_FLIGHT.discard(session_id)
 
 
 @app.route("/get-hint", methods=["POST"])
@@ -2221,10 +2231,29 @@ def get_interview_hint():
     if err:
         return err
 
+    if not session.get("active", True):
+        return jsonify({"error": "Interview session already concluded"}), 400
+
     try:
         questions = session.get("questions") or []
         current_q = questions[-1] if questions else "Tell me about yourself."
+
+        # Hint Caching: Avoid redundant metered AI calls on repeated hint requests
+        cached_hints = session.get("cached_hints") or {}
+        if isinstance(cached_hints, str):
+            try:
+                cached_hints = json.loads(cached_hints)
+            except Exception:
+                cached_hints = {}
+        if current_q in cached_hints:
+            return jsonify({"hint": cached_hints[current_q], "question": current_q, "cached": True}), 200
+
         hint_text = generate_hint(current_q, session.get("resume_text", ""), chat_model)
+        cached_hints[current_q] = hint_text
+        try:
+            supabase.table("sessions").update({"cached_hints": json.dumps(cached_hints)}).eq("session_id", session_id).execute()
+        except Exception:
+            pass
 
         return jsonify({"hint": hint_text, "question": current_q}), 200
     except Exception as e:
@@ -2882,7 +2911,7 @@ def execute_sandbox_code(language, code, problem_id, user_id=None):
 
     is_prod = os.getenv("FLASK_ENV", "").lower() == "production" or os.getenv("ENVIRONMENT", "").lower() == "production"
     sandbox_secret = os.getenv("ISOLATED_SANDBOX_SECRET", "").strip()
-    if is_prod and (not sandbox_secret or sandbox_secret == "prepfly-sandbox-dev-secret-32-chars-long-minimum" or len(sandbox_secret) < 32):
+    if is_prod and (not sandbox_secret or sandbox_secret == "prepfly-sandbox-dev-secret-32-chars-long-minimum" or len(sandbox_secret) < 32):  # nosec B105
         raise RuntimeError("Production security violation: ISOLATED_SANDBOX_SECRET must be configured with at least 32 characters in production mode.")
 
     # Fetch problem test cases from database
@@ -4434,6 +4463,7 @@ def superadmin_candidates_summary():
 
 @app.route("/api/webrtc/ai-coach", methods=["POST"])
 @app.route("/webrtc/ai-coach", methods=["POST"])
+@limiter.limit("15 per minute")
 def webrtc_ai_coach_endpoint():
     data = request.get_json() or {}
     transcript = data.get("transcript", "").strip()
@@ -4701,6 +4731,7 @@ Please structure the evaluation report in markdown with these exact headings:
 
 @app.route("/api/resume/score", methods=["POST"])
 @app.route("/resume/score", methods=["POST"])
+@limiter.limit("10 per minute")
 def resume_score():
     data = request.get_json() or {}
     user_payload = _get_optional_user()
@@ -7393,6 +7424,30 @@ def admin_subscription():
     }), 200
 
 
+@app.route("/subscription/status", methods=["GET", "OPTIONS"])
+def public_subscription_status():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
+    org_id = request.args.get("org_id", "").strip() or request.args.get("organization_id", "").strip()
+    if not org_id:
+        p = _get_optional_user()
+        if p:
+            org_id = p.get("organization_id")
+    if not org_id:
+        org_id = "org_default"
+    status_data = get_org_subscription_status(org_id)
+    return jsonify(status_data), 200
+
+
+@app.route("/api/payment/record-failed", methods=["POST", "OPTIONS"])
+@app.route("/payment/record-failed", methods=["POST", "OPTIONS"])
+def payment_record_failed():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
+    data = request.get_json() or {}
+    return jsonify({"status": "acknowledged", "received": data}), 200
+
+
 @app.route("/api/subscription/status", methods=["GET"])
 @require_org_admin
 def get_subscription_status():
@@ -9155,6 +9210,7 @@ def get_current_support_user():
 
 
 @app.route("/api/support/upload", methods=["POST"])
+@limiter.limit("10 per minute")
 def support_file_upload():
     role, user_id, org_id = get_current_support_user()
     if not role:
@@ -9575,6 +9631,7 @@ os.makedirs(FEEDBACK_UPLOAD_FOLDER, exist_ok=True)
 
 @app.route("/api/feedback/upload", methods=["POST"])
 @app.route("/feedback/upload", methods=["POST"])
+@limiter.limit("10 per minute")
 def feedback_screenshot_upload():
     p = _get_optional_user()
     if not p:

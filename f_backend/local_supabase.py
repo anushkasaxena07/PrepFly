@@ -124,7 +124,8 @@ class SQLiteSupabaseMock:
             ("difficulty", "TEXT"),
             ("stage", "TEXT"),
             ("ats_score", "INTEGER"),
-            ("structured_resume", "TEXT")
+            ("structured_resume", "TEXT"),
+            ("cached_hints", "TEXT")
         ]
         for col_name, col_type in session_cols:
             try:
@@ -315,6 +316,8 @@ class SQLiteSupabaseMock:
                 cursor.execute(f"ALTER TABLE payment ADD COLUMN {_validate_ident(col_name)} {col_type}")
             except Exception:
                 pass
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_order_success ON payment(razorpay_order_id) WHERE status = 'Success'")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_rzp_pay_success ON payment(razorpay_payment_id) WHERE status = 'Success'")
 
         # 16b. invoice
         cursor.execute("""
@@ -636,6 +639,19 @@ class SQLiteSupabaseMock:
                 message TEXT,
                 attachment TEXT,
                 is_read INTEGER DEFAULT 0,
+                created_at TEXT
+            )
+        """)
+
+        # 28c2. orders (Payment Orders)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id TEXT PRIMARY KEY,
+                organization_id TEXT,
+                plan_id TEXT,
+                amount REAL,
+                currency TEXT,
+                status TEXT,
                 created_at TEXT
             )
         """)

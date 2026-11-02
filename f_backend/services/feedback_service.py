@@ -2,6 +2,7 @@ import json
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER
 from services.grading_service import calculate_grade_info, award_badges, compute_section_grades
+from services.ai_service import safe_invoke_llm
 
 def classify_question_type(question: str, category: str = "") -> str:
     q_lower = f"{question} {category or ''}".lower()
@@ -216,8 +217,10 @@ Return ONLY valid JSON:
 }}"""
 
     try:
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        content = response.content.strip()
+        content = safe_invoke_llm(chat_model, prompt)
+        if not content:
+            raise ValueError("No response from LLM for feedback evaluation")
+        content = content.strip()
         if content.startswith("```json"):
             content = content.replace("```json", "").replace("```", "").strip()
         elif content.startswith("```"):

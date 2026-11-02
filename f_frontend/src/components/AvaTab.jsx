@@ -131,6 +131,7 @@ const renderMarkdown = (text) => {
 };
 
 export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
+  const safeUser = user || {};
   // Steps: "resume_upload" -> "type_selection" -> "device_check" -> "loading" -> "live_call" -> "report"
   const [step, setStep] = useState("resume_upload");
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
@@ -154,9 +155,62 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const videoRefCall = useRef(null);
   const mediaStreamRef = useRef(null);
 
-  // Voice Speaking / Speech Rec state
+  // Voice Speaking / Speech Rec & Audio Meter state
   const [isSpeakingAnswer, setIsSpeakingAnswer] = useState(false);
   const recognitionRef = useRef(null);
+  const isListeningDesiredRef = useRef(false);
+  const finalTranscriptRef = useRef("");
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [hintText, setHintText] = useState("");
+  const [isLoadingHint, setIsLoadingHint] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animFrameRef = useRef(null);
+
+  const startAudioMeter = (stream) => {
+    if (!stream || stream.getAudioTracks().length === 0) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.5;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / dataArray.length;
+        const normalized = Math.min(100, Math.round((avg / 128) * 100));
+        setAudioLevel(normalized);
+        animFrameRef.current = requestAnimationFrame(tick);
+      };
+      animFrameRef.current = requestAnimationFrame(tick);
+    } catch (e) {
+      console.warn("Audio meter notice:", e);
+    }
+  };
+
+  const stopAudioMeter = () => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    analyserRef.current = null;
+    setAudioLevel(0);
+  };
 
   // Loading checklist items
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
@@ -222,6 +276,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         const p = JSON.parse(saved);
         if (p && p.step && p.step !== "loading") {
           if (p.step) setStep(p.step);
+          if (p.selectedType) setSelectedType(p.selectedType);
           if (p.sessionId) setSessionId(p.sessionId);
           if (p.reportData) setReportData(p.reportData);
           if (p.allFeedbacks) setAllFeedbacks(p.allFeedbacks);
@@ -241,6 +296,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       try {
         const payload = JSON.stringify({
           step,
+          selectedType,
           sessionId,
           reportData,
           allFeedbacks,
@@ -322,6 +378,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   // Step 3 -> 4: Start Interview & Loading Flow
   const triggerStartInterview = async () => {
+    if (!consentGiven) {
+      alert("Affirmative consent is required to process your voice and resume data with AI under DPDP Act 2023. Please check the consent box before starting.");
+      return;
+    }
     setStep("loading");
     setLoadingStepIndex(0);
 
@@ -341,6 +401,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (setupMode === "resume" && resumeFile) {
         const formData = new FormData();
         formData.append("resume", resumeFile);
+        formData.append("consent", "true");
         if (resolvedUserId) formData.append("user_id", resolvedUserId);
         const token = localStorage.getItem("access_token");
 
@@ -362,7 +423,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             tools: roleTools || "Algorithms, System Design, React, Python",
             experience: "1-3 Years",
             category: selectedType?.id || category || "Resume",
-            difficulty: difficulty || "Medium"
+            difficulty: difficulty || "Medium",
+            consent: true
           })
         });
         const data = await res.json();
@@ -420,12 +482,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       
       // 1. Exact match for popular female natural/online voices
       for (const keyword of femaleKeywords) {
-        const found = voices.find(v => v.name.toLowerCase().includes(keyword) && v.lang.startsWith("en"));
+        const found = voices.find(v => v?.name?.toLowerCase().includes(keyword) && v.lang.startsWith("en"));
         if (found) return found;
       }
       
       // 2. Any English female voice
-      const anyFemale = voices.find(v => v.name.toLowerCase().includes("female") && v.lang.startsWith("en"));
+      const anyFemale = voices.find(v => v?.name?.toLowerCase().includes("female") && v.lang.startsWith("en"));
       if (anyFemale) return anyFemale;
       
       // 3. Fallback to any English voice
@@ -492,52 +554,116 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       });
   };
 
-  // Voice Speech Recognition (Speaking Answer)
+  // Voice Speech Recognition (Speaking Answer) with continuous recovery
   const startVoiceRecognition = () => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    isListeningDesiredRef.current = true;
+    setIsSpeakingAnswer(true);
+
+    if (mediaStreamRef.current) {
+      startAudioMeter(mediaStreamRef.current);
+    }
+
+    if (!SpeechRec) {
+      console.warn("Web Speech API not available in this browser. Please type your response directly.");
+      return;
+    }
 
     try {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+      }
       const rec = new SpeechRec();
       rec.continuous = true;
       rec.interimResults = true;
       rec.lang = 'en-US';
 
       rec.onresult = (e) => {
-        let transcript = "";
-        for (let i = 0; i < e.results.length; i++) {
-          transcript += e.results[i][0].transcript + " ";
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const chunk = e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            finalTranscriptRef.current += (finalTranscriptRef.current ? " " : "") + chunk.trim();
+          } else {
+            interim += chunk;
+          }
         }
-        setAnswer(transcript.trim());
+        const currentTotal = (finalTranscriptRef.current + (interim ? " " + interim : "")).trim();
+        setAnswer(currentTotal);
       };
 
       rec.onend = () => {
-        setIsSpeakingAnswer(false);
+        if (isListeningDesiredRef.current) {
+          try {
+            rec.start();
+          } catch (e) {
+            setTimeout(() => {
+              if (isListeningDesiredRef.current) {
+                try { rec.start(); } catch {}
+              }
+            }, 300);
+          }
+        } else {
+          setIsSpeakingAnswer(false);
+          stopAudioMeter();
+        }
+      };
+
+      rec.onerror = (e) => {
+        console.warn("Voice speech rec notice:", e.error);
+        if (e.error === "no-speech" && isListeningDesiredRef.current) {
+          return;
+        }
       };
 
       rec.start();
       recognitionRef.current = rec;
-      setIsSpeakingAnswer(true);
     } catch (e) {
       console.warn("Voice speech rec start error:", e);
     }
   };
 
   const stopVoiceRecognition = () => {
+    isListeningDesiredRef.current = false;
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
       recognitionRef.current = null;
     }
     setIsSpeakingAnswer(false);
+    stopAudioMeter();
+  };
+
+  const handleRepeatQuestion = () => {
+    if (isAvaTalking || isAvaThinking) return;
+    playAvaSpeech(question);
+  };
+
+  const handleRequestHint = async () => {
+    if (!sessionId || isLoadingHint) return;
+    setIsLoadingHint(true);
+    try {
+      const res = await apiFetch("/get-hint", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId })
+      });
+      const data = await res.json();
+      if (data.hint) {
+        setHintText(data.hint);
+      }
+    } catch (err) {
+      console.warn("Hint error:", err);
+    } finally {
+      setIsLoadingHint(false);
+    }
   };
 
   // Submit Answer & Fetch Next Question
   const submitAnswerAndNext = async () => {
     stopVoiceRecognition();
-    if (!answer.trim()) return alert("Please speak your answer first.");
+    if (!answer.trim()) return alert("Please speak or type your answer first.");
     setIsAvaThinking(true);
-    setCaptionText("Evaluating your response...");
+    setCaptionText("Evaluating your response and preparing next question...");
+    setHintText("");
 
     try {
       const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
@@ -563,6 +689,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (data.feedback) {
         setAllFeedbacks(prev => [...prev, data.feedback]);
       }
+      finalTranscriptRef.current = "";
       setAnswer("");
       setIsAvaThinking(false);
 
@@ -647,7 +774,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       .rpt-box{background:rgba(12,18,32,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px;font-size:14px;color:#e2e8f0;white-space:pre-wrap;line-height:1.7}
       .ftr{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#64748b;text-align:center}
     </style></head><body>
-    <div class="hdr"><div class="brand">🚀 PrepFly Executive Evaluation (Ava)</div><div>Candidate: ${user.name||"Candidate"}<br/>Generated: ${new Date().toLocaleString()}</div></div>
+    <div class="hdr"><div class="brand">🚀 PrepFly Executive Evaluation (Ava)</div><div>Candidate: ${(safeUser?.name)||"Candidate"}<br/>Generated: ${new Date().toLocaleString()}</div></div>
     <div class="hero">
       <div class="grade-circle">${reportData?.grade || "B"}</div>
       <div>
@@ -705,7 +832,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                       <span style={{ fontSize: "24px" }}>📄</span>
                       <div style={{ textAlign: "left" }}>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>{resumeFile.name}</div>
+                        <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>{resumeFile?.name || 'Resume'}</div>
                         <div style={{ fontSize: "11px", color: "#00c4a7" }}>{(resumeFile.size / 1024).toFixed(1)} KB · Tailoring questions to your profile</div>
                       </div>
                     </div>
@@ -801,7 +928,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         {step === "device_check" && (
           <div style={{ maxWidth: "960px", margin: "20px auto" }}>
             <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{selectedType.name} Interview</h2>
+              <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{selectedType?.name || (setupMode === "non_resume" ? roleTitle : "AI Mock")} Interview</h2>
               <p style={{ fontSize: "13px", color: "var(--text2)", marginTop: "4px" }}>Enable and test your camera and microphone before joining.</p>
             </div>
 
@@ -813,7 +940,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 {!cameraOn && (
                   <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
-                      {user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                      {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
                     </div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
                   </div>
@@ -892,11 +1019,59 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Chrome and Safari are preferred for the best experience.</div>
                   </div>
                 </div>
+
+                {/* Explicit Affirmative Consent Card (DPDP Act 2023 / Privacy Compliance) */}
+                <div style={{
+                  background: "rgba(0,196,167,0.08)",
+                  border: "1px solid rgba(0,196,167,0.3)",
+                  borderRadius: "14px",
+                  padding: "14px 16px",
+                  marginTop: "6px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  textAlign: "left"
+                }}>
+                  <input
+                    type="checkbox"
+                    id="affirmative-consent-checkbox"
+                    checked={consentGiven}
+                    onChange={(e) => setConsentGiven(e.target.checked)}
+                    style={{
+                      marginTop: "3px",
+                      width: "18px",
+                      height: "18px",
+                      accentColor: "#00c4a7",
+                      cursor: "pointer"
+                    }}
+                  />
+                  <label htmlFor="affirmative-consent-checkbox" style={{ fontSize: "11px", color: "#e2e8f0", lineHeight: "1.5", cursor: "pointer" }}>
+                    <strong style={{ color: "#fff" }}>Affirmative Privacy & AI Consent (DPDP Act 2023):</strong> I explicitly consent to the recording and real-time processing of my voice, interview responses, and resume by PrepFly's AI interviewer (Ava) solely for candidate evaluation and scoring. I understand my data is confidential, is never used to train foundation models, and can be deleted upon request via my profile dashboard.
+                  </label>
+                </div>
               </div>
             </div>
 
-            <div style={{ textAlign: "center" }}>
-              <button onClick={triggerStartInterview} style={{ padding: "14px 44px", borderRadius: "30px", background: "linear-gradient(135deg,#00c4a7,#7c3aed)", border: "none", color: "#fff", fontWeight: 900, fontSize: "16px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }}>
+            <div style={{ textAlign: "center", marginTop: "16px" }}>
+              <button
+                type="button"
+                onClick={triggerStartInterview}
+                disabled={!consentGiven}
+                style={{
+                  padding: "14px 44px",
+                  borderRadius: "30px",
+                  background: consentGiven
+                    ? "linear-gradient(135deg,#00c4a7,#7c3aed)"
+                    : "rgba(255,255,255,0.12)",
+                  border: "none",
+                  color: consentGiven ? "#fff" : "rgba(255,255,255,0.4)",
+                  fontWeight: 900,
+                  fontSize: "16px",
+                  cursor: consentGiven ? "pointer" : "not-allowed",
+                  boxShadow: consentGiven ? "0 8px 24px rgba(0,196,167,0.4)" : "none",
+                  transition: "all 0.2s"
+                }}
+              >
                 Start interview
               </button>
             </div>
@@ -956,7 +1131,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 {!cameraOn && (
                   <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
-                      {user?.name ? user.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                      {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
                     </div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
                   </div>
@@ -964,7 +1139,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 
                 <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px", zIndex: 10 }}>
                   <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: cameraOn ? "#00c4a7" : "#ef4444" }}></span>
-                  🎥 {user?.name ? user.name.split(' ')[0] : 'Candidate'} (You)
+                  🎥 {safeUser?.name ? safeUser.name.split(' ')[0] : 'Candidate'} (You)
                 </div>
 
                 {/* Floating Media Controls Overlay */}
@@ -999,34 +1174,146 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
 
               {/* RIGHT 50%: AVA AI INTERVIEWER & VOICE SPEAKING PANEL */}
-              <div style={{ background: "rgba(12,18,32,0.9)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "24px", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "rgba(12,18,32,0.92)", border: "1px solid rgba(124,58,237,0.35)", borderRadius: "24px", padding: "22px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
                 
+                {/* Real-time Status Badge */}
+                <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "4px 12px", borderRadius: "16px", background: isAvaTalking ? "rgba(0,196,167,0.2)" : isSpeakingAnswer ? "rgba(16,185,129,0.2)" : isAvaThinking ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.08)", color: isAvaTalking ? "#00c4a7" : isSpeakingAnswer ? "#10b981" : isAvaThinking ? "#a78bfa" : "#94a3b8", border: isAvaTalking ? "1px solid rgba(0,196,167,0.4)" : isSpeakingAnswer ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(255,255,255,0.1)" }}>
+                      {isAvaTalking ? "🗣️ Ava Speaking" : isSpeakingAnswer ? "🎙️ Ava Listening" : isAvaThinking ? "⚡ Analyzing Response" : "Standby"}
+                    </span>
+                  </div>
+
+                  {/* Active soundwave bars for microphone */}
+                  {isSpeakingAnswer && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "3px", height: "18px" }}>
+                      {[0.35, 0.65, 1.0, 0.75, 0.45, 0.3].map((factor, idx) => (
+                        <div key={idx} style={{
+                          width: "3px",
+                          borderRadius: "3px",
+                          background: "linear-gradient(to top, #00c4a7, #10b981)",
+                          height: `${Math.max(5, Math.min(18, 5 + (audioLevel * factor * 0.25)))}px`,
+                          transition: "height 0.08s ease"
+                        }} />
+                      ))}
+                      <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700, marginLeft: "4px" }}>Mic Live</span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Ava Concentric Waves Orb */}
-                <div style={{ width: "220px", height: "220px", position: "relative", margin: "10px 0" }}>
+                <div style={{ width: "200px", height: "200px", position: "relative", margin: "6px 0" }}>
                   <CircleWavesAvatar isTalking={isAvaTalking} isThinking={isAvaThinking} />
                 </div>
 
-                {/* Subtitles / Spoken Question */}
-                <div style={{ width: "100%", textAlign: "center", padding: "16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", minHeight: "80px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>Ava (Senior Technical Recruiter)</div>
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff", lineHeight: "1.6" }}>
+                {/* Spoken Question & Prompt Card */}
+                <div style={{ width: "100%", padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", minHeight: "75px", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
+                    Ava · Question {questionNumber} of 5
+                  </div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff", lineHeight: "1.5" }}>
                     "{captionText || question || "Listening..."}"
                   </div>
-                </div>
 
-                {/* Voice Speaking Answer Area */}
-                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "10px", marginTop: "14px" }}>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <button onClick={isSpeakingAnswer ? stopVoiceRecognition : startVoiceRecognition} style={{ flex: 1, padding: "12px", borderRadius: "14px", background: isSpeakingAnswer ? "rgba(239,68,68,0.25)" : "rgba(124,58,237,0.2)", border: isSpeakingAnswer ? "1px solid #ef4444" : "1px solid rgba(124,58,237,0.4)", color: "#fff", fontWeight: 800, fontSize: "14px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                      {isSpeakingAnswer ? "🔴 Listening to your voice..." : "🎙️ Click to Speak Answer"}
+                  {/* Interactive Quick Actions (Repeat & Hint) */}
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={handleRepeatQuestion}
+                      disabled={isAvaTalking || isAvaThinking}
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "14px", padding: "4px 12px", color: "#e2e8f0", fontSize: "11px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
+                      title="Replay Ava's audio for this question"
+                    >
+                      🔄 Repeat Question
                     </button>
-                    
-                    <button onClick={submitAnswerAndNext} disabled={isAvaThinking} style={{ padding: "12px 24px", borderRadius: "14px", background: "#00c4a7", border: "none", color: "#000", fontWeight: 900, fontSize: "14px", cursor: "pointer" }}>
-                      {isAvaThinking ? "Evaluating..." : "Submit Spoken Answer →"}
+                    <button
+                      type="button"
+                      onClick={handleRequestHint}
+                      disabled={isLoadingHint || isAvaTalking || isAvaThinking}
+                      style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "14px", padding: "4px 12px", color: "#fbbf24", fontSize: "11px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
+                      title="Ask Ava for a hint"
+                    >
+                      {isLoadingHint ? "Fetching Hint..." : "💡 Need a Hint"}
                     </button>
                   </div>
 
-                  <input type="text" placeholder="Spoken transcript (or type if needed)..." value={answer} onChange={e => setAnswer(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "12px" }} />
+                  {/* Hint Pill if available */}
+                  {hintText && (
+                    <div style={{ marginTop: "10px", padding: "8px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "12px", fontSize: "12px", color: "#fef3c7", textAlign: "left", lineHeight: "1.4" }}>
+                      <strong style={{ color: "#fbbf24" }}>💡 Ava's Tip:</strong> {hintText}
+                    </div>
+                  )}
+                </div>
+
+                {/* Spoken Answer & Response Area */}
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                  <textarea
+                    rows={3}
+                    placeholder="Speak your answer naturally (transcription appears here in real-time). You can also edit or type directly..."
+                    value={answer}
+                    onChange={e => {
+                      setAnswer(e.target.value);
+                      finalTranscriptRef.current = e.target.value;
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: "14px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      color: "#fff",
+                      fontSize: "13px",
+                      fontFamily: "inherit",
+                      lineHeight: "1.5",
+                      resize: "none",
+                      outline: "none"
+                    }}
+                  />
+
+                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={isSpeakingAnswer ? stopVoiceRecognition : startVoiceRecognition}
+                      style={{
+                        flex: 1,
+                        padding: "11px 16px",
+                        borderRadius: "14px",
+                        background: isSpeakingAnswer ? "rgba(239,68,68,0.2)" : "rgba(124,58,237,0.2)",
+                        border: isSpeakingAnswer ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(124,58,237,0.5)",
+                        color: "#fff",
+                        fontWeight: 800,
+                        fontSize: "13px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {isSpeakingAnswer ? "⏸️ Pause Voice Mic" : "🎙️ Resume Voice Mic"}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={submitAnswerAndNext}
+                      disabled={isAvaThinking}
+                      style={{
+                        padding: "11px 22px",
+                        borderRadius: "14px",
+                        background: "linear-gradient(135deg, #00c4a7 0%, #00e5c3 100%)",
+                        border: "none",
+                        color: "#050811",
+                        fontWeight: 900,
+                        fontSize: "13px",
+                        cursor: "pointer",
+                        boxShadow: "0 0 20px rgba(0,196,167,0.4)",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {isAvaThinking ? "Evaluating..." : "Submit Answer →"}
+                    </button>
+                  </div>
                 </div>
 
               </div>
@@ -1173,7 +1460,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                       <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
-                        🔍 Evidence Log: {selectedEvidenceDimension.name} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
+                        🔍 Evidence Log: {selectedEvidenceDimension?.name || 'Evidence'} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
                       </div>
                       <span style={{ 
                         background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)", 

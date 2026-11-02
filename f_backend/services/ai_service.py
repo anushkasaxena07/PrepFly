@@ -1,7 +1,50 @@
+import os
 import json
 import random
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
+
+def safe_invoke_llm(chat_model, prompt_content):
+    if not chat_model:
+        return None
+
+    def _extract_text(content):
+        if not content:
+            return None
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict) and "text" in item:
+                    parts.append(item["text"])
+            return "\n".join(parts).strip()
+        return str(content).strip()
+
+    try:
+        res = chat_model.invoke([HumanMessage(content=prompt_content)])
+        if res and hasattr(res, "content"):
+            txt = _extract_text(res.content)
+            if txt:
+                return txt
+    except Exception as e_prim:
+        print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
+        api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
+        if api_key:
+            for alt_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                try:
+                    from langchain_google_genai import ChatGoogleGenerativeAI
+                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=1, timeout=10)
+                    res = alt_chat.invoke([HumanMessage(content=prompt_content)])
+                    if res and hasattr(res, "content"):
+                        txt = _extract_text(res.content)
+                        if txt:
+                            return txt
+                except Exception:
+                    continue
+    return None
 
 STAGES = [
     "Greeting & Icebreaker",
@@ -143,8 +186,9 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
 
     needs_followup = False
     try:
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        raw_output = response.content.strip()
+        raw_output = safe_invoke_llm(chat_model, prompt)
+        if not raw_output:
+            raise ValueError("No response from LLM candidates")
 
         if raw_output.startswith("```"):
             lines = raw_output.split("\n")
@@ -260,8 +304,9 @@ Provide a small, helpful, 1-2 sentence hint that guides their thought process wi
         pass
 
     try:
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        hint_text = response.content.strip()
+        hint_text = safe_invoke_llm(chat_model, prompt)
+        if not hint_text:
+            raise ValueError("No response from LLM for hint")
         try:
             from services.cache_service import save_cached_ai_response
             save_cached_ai_response(prompt, hint_text, ttl=86400)
