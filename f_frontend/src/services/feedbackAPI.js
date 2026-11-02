@@ -4,11 +4,10 @@ const getHeaders = (isSuperAdmin = false) => {
   const headers = {};
   if (isSuperAdmin) {
     const token = localStorage.getItem("superadmin_access_token");
-    headers["X-Super-Admin"] = "true";
     if (token) headers["Authorization"] = `Bearer ${token}`;
   } else {
     const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
-    const orgId = localStorage.getItem("admin_org_id") || "d258e381-6a6e-4376-8bf2-2865731b1939";
+    const orgId = localStorage.getItem("admin_org_id");
     if (token) headers["Authorization"] = `Bearer ${token}`;
     if (orgId) headers["X-Organization-Id"] = orgId;
   }

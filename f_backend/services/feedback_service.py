@@ -1,6 +1,7 @@
 import json
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER
+from services.grading_service import calculate_grade_info, award_badges, compute_section_grades
 
 def classify_question_type(question: str, category: str = "") -> str:
     q_lower = f"{question} {category or ''}".lower()

@@ -1,0 +1,57 @@
+name: PrepFly CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  backend-checks:
+    name: Backend Security, Lint, & Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f f_backend/requirements.txt ]; then pip install -r f_backend/requirements.txt; fi
+        pip install ruff bandit
+
+    - name: Static Analysis CI Guard (Syntax, Undefined Names, Redefinitions)
+      run: |
+        ruff check . --select F821,E9,F811
+
+
+    - name: Bandit Security Scan (Zero Hardcoded Password Findings B105/B106)
+      run: |
+        cd f_backend
+        python -m bandit -r . -x ./venv,./tests -t B105,B106
+
+    - name: Run Backend Test Suite
+      env:
+        ENVIRONMENT: test
+        FLASK_ENV: test
+        JWT_SECRET_KEY: test-secret-key-32-chars-long-for-testing-only-12345
+        SUPABASE_URL: https://test-project.supabase.co
+        SUPABASE_SERVICE_KEY: test-service-key-for-unit-testing
+        GEMINI_API_KEY: test-gemini-key
+        RAZORPAY_KEY_ID: rzp_test_dummy_id
+        RAZORPAY_KEY_SECRET: test_razorpay_secret_for_testing
+        SMTP_EMAIL: test@prepfly.io
+        SMTP_PASSWORD: test-smtp-password
+      run: |
+        cd f_backend
+        python run_all_tests.py
+
+    - name: Run Sandbox Worker Tests
+      run: |
+        python -m unittest discover -s sandbox_worker/tests -v

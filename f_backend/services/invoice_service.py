@@ -66,7 +66,7 @@ def get_invoice_html(invoice_id):
         <style>
             body {{ font-family: 'Inter', sans-serif; background: #080c14; color: #fff; padding: 40px; }}
             .card {{ max-width: 650px; margin: 0 auto; background: #0c1220; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }}
-            .header {{ display: flex; justify-space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 20px; }}
             .logo {{ font-size: 24px; font-weight: 900; color: #00f0c8; }}
             .title {{ font-size: 18px; font-weight: 700; color: #a0aec0; text-align: right; }}
             .meta-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }}
@@ -127,3 +127,21 @@ def get_invoice_html(invoice_id):
     </html>
     """
     return html, 200
+
+
+def generate_invoice_pdf(invoice_id):
+    """Generates official binary PDF bytes for a given invoice using PyMuPDF."""
+    html, status = get_invoice_html(invoice_id)
+    if status != 200:
+        return None, status
+    try:
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page(width=595, height=842)  # Standard A4
+        page.insert_htmlbox(pymupdf.Rect(30, 30, 565, 812), html)
+        pdf_bytes = doc.tobytes()
+        return pdf_bytes, 200
+    except Exception as e:
+        print("PDF generation notice:", e)
+        # Fallback to UTF-8 encoded HTML if PyMuPDF rendering encounters an issue
+        return html.encode("utf-8"), 200

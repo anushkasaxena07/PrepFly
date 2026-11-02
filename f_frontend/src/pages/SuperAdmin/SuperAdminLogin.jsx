@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { superAdminLogin } from '../../services/superAdminAPI';
 
 export default function SuperAdminLogin() {
-  const [email, setEmail] = useState("saxenaanushka9645@gmail.com");
-  const [password, setPassword] = useState("superadmin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

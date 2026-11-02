@@ -1,6 +1,15 @@
 import React from 'react';
+import { downloadInvoice } from '../../services/adminAPI';
 
 export default function InvoiceTable({ invoices = [] }) {
+  const handleDownload = async (invoiceId, invoiceNumber) => {
+    try {
+      await downloadInvoice(invoiceId, invoiceNumber || `Invoice-${invoiceId}`);
+    } catch (e) {
+      alert(e.message || "Failed to download invoice");
+    }
+  };
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
@@ -23,7 +32,14 @@ export default function InvoiceTable({ invoices = [] }) {
               <td style={{ padding: "12px 10px", color: "var(--text2)" }}>₹{inv.gst}</td>
               <td style={{ padding: "12px 10px", fontWeight: 900, color: "#00c4a7" }}>₹{(inv.amount + inv.gst).toFixed(2)}</td>
               <td style={{ padding: "12px 10px", textAlign: "right" }}>
-                <a className="btn btn-ghost btn-xs" href={`http://localhost:5000/api/invoice/${inv.id}`} target="_blank" rel="noreferrer">📥 View PDF</a>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => handleDownload(inv.id, inv.invoice_number)}
+                  style={{ cursor: "pointer", background: "none", border: "none", color: "var(--cyan)" }}
+                >
+                  📥 View PDF
+                </button>
               </td>
             </tr>
           ))}

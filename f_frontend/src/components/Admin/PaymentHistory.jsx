@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { adminFetch } from '../../services/adminAPI';
+import { adminFetch, downloadInvoice } from '../../services/adminAPI';
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 export default function PaymentHistory() {
   const [history, setHistory] = useState([]);
@@ -23,8 +25,12 @@ export default function PaymentHistory() {
     }
   };
 
-  const handleDownloadInvoice = (invoiceId) => {
-    window.open(`http://localhost:5000/api/invoice/${invoiceId}`, "_blank");
+  const handleDownloadInvoice = async (invoiceId) => {
+    try {
+      await downloadInvoice(invoiceId, `Invoice-${invoiceId}`);
+    } catch (e) {
+      alert(e.message || "Failed to download invoice");
+    }
   };
 
   if (loading) {

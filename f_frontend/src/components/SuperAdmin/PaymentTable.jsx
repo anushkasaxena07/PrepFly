@@ -1,3 +1,4 @@
+import { downloadInvoice } from '../../services/adminAPI';
 import React, { useState } from 'react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
@@ -44,8 +45,12 @@ export default function PaymentTable({ payments = [] }) {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadInvoice = (invoiceId) => {
-    window.open(`${BACKEND_URL}/api/invoice/download/${invoiceId}`, '_blank');
+  const handleDownloadInvoice = async (invoiceId) => {
+    try {
+      await downloadInvoice(invoiceId, `Invoice-${invoiceId}`);
+    } catch (e) {
+      alert(e.message || "Failed to download invoice");
+    }
   };
 
   return (

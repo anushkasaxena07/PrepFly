@@ -1,3 +1,4 @@
+import json
 import random
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
@@ -251,8 +252,22 @@ Candidate Profile/Resume: {resume_text[:1000]}
 
 Provide a small, helpful, 1-2 sentence hint that guides their thought process without giving away the complete answer directly."""
     try:
+        from services.cache_service import get_cached_ai_response, save_cached_ai_response
+        cached_hint = get_cached_ai_response(prompt)
+        if cached_hint:
+            return cached_hint
+    except Exception:
+        pass
+
+    try:
         response = chat_model.invoke([HumanMessage(content=prompt)])
-        return response.content.strip()
+        hint_text = response.content.strip()
+        try:
+            from services.cache_service import save_cached_ai_response
+            save_cached_ai_response(prompt, hint_text, ttl=86400)
+        except Exception:
+            pass
+        return hint_text
     except Exception as e:
         print(f"Generate hint error: {e}")
         return "Focus on breaking the problem down into core components and using the STAR framework (Situation, Task, Action, Result)."

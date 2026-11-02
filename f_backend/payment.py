@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services.payment_service import create_razorpay_order, verify_razorpay_payment
+from services.payment_service import create_razorpay_order, verify_razorpay_payment, ALLOWED_PLAN_AMOUNTS
 
 payment_bp = Blueprint("payment_bp", __name__)
 
@@ -15,15 +15,26 @@ def get_supabase():
 @payment_bp.route("/payment/create-order", methods=["POST"])
 def api_create_order():
     try:
+        from app import _get_optional_user
+        p = _get_optional_user()
         data = request.get_json() or {}
-        org_id = data.get("organization_id") or data.get("org_id") or data.get("user_id") or "org_default"
-        amount = float(data.get("amount", 500.0))
-        
-        result = create_razorpay_order(org_id=org_id, amount_inr=amount)
+        requested_org = data.get("organization_id") or data.get("org_id") or data.get("user_id") or "org_default"
+        plan_id = data.get("plan_id")
+        amount = data.get("amount")
+
+        if p and p.get("role") != "SUPER_ADMIN":
+            token_org = p.get("organization_id")
+            if token_org and requested_org != "org_default" and str(requested_org) != str(token_org):
+                return jsonify({"error": "Forbidden: Cannot create orders for another organization"}), 403
+
+        org_id = requested_org if (p and p.get("role") == "SUPER_ADMIN") else ((p.get("organization_id") if p and p.get("organization_id") else requested_org) or "org_default")
+        result = create_razorpay_order(org_id=org_id, plan_id=plan_id, amount_inr=amount)
         return jsonify(result), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
     except Exception as e:
         print("Create order error:", e)
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": "Failed to create payment order"}), 500
 
 @payment_bp.route("/api/payment/verify", methods=["POST"])
 @payment_bp.route("/payment/verify", methods=["POST"])
@@ -33,20 +44,24 @@ def api_verify_payment():
         org_id = data.get("organization_id") or data.get("org_id") or data.get("user_id") or "org_default"
         razorpay_order_id = data.get("razorpay_order_id") or data.get("order_id")
         razorpay_payment_id = data.get("razorpay_payment_id") or data.get("payment_id")
-        razorpay_signature = data.get("razorpay_signature") or data.get("signature") or "sig_valid_test"
+        razorpay_signature = data.get("razorpay_signature") or data.get("signature")
+        plan_id = data.get("plan_id")
+        amount = data.get("amount")
 
         result = verify_razorpay_payment(
             org_id=org_id,
             razorpay_order_id=razorpay_order_id,
             razorpay_payment_id=razorpay_payment_id,
-            razorpay_signature=razorpay_signature
+            razorpay_signature=razorpay_signature,
+            plan_id=plan_id,
+            amount_inr=amount
         )
         return jsonify(result), 200
     except ValueError as ve:
         return jsonify({"error": str(ve), "status": "FAILED"}), 400
     except Exception as e:
         print("Verify payment error:", e)
-        return jsonify({"error": "Payment verification failed", "details": str(e)}), 500
+        return jsonify({"error": "Payment verification failed"}), 500
 
 @payment_bp.route("/api/payment/record-failed", methods=["POST"])
 @payment_bp.route("/payment/record-failed", methods=["POST"])
@@ -69,7 +84,16 @@ def api_record_failed():
 @payment_bp.route("/payment/history", methods=["GET"])
 def api_payment_history():
     try:
-        org_id = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id") or "org_default"
+        from app import _get_optional_user
+        p = _get_optional_user()
+        requested_org = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id") or "org_default"
+        
+        if p and p.get("role") != "SUPER_ADMIN":
+            token_org = p.get("organization_id")
+            if token_org and requested_org != "org_default" and str(requested_org) != str(token_org):
+                return jsonify({"error": "Forbidden: Cannot access payment history of another organization"}), 403
+
+        org_id = requested_org if (p and p.get("role") == "SUPER_ADMIN") else ((p.get("organization_id") if p and p.get("organization_id") else requested_org) or "org_default")
         supabase = get_supabase()
         res = supabase.table("payment").select("*").eq("organization_id", org_id).execute()
         rows = res.data if res and hasattr(res, "data") and res.data else []

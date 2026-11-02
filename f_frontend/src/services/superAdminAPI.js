@@ -1,13 +1,10 @@
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 export const superAdminFetch = async (endpoint, options = {}) => {
-  const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token") || "superadmin_session_token";
+  const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token");
 
   const headers = {
     "Content-Type": "application/json",
-    "X-User-Role": "SUPER_ADMIN",
-    "X-Super-Admin": "true",
-    "X-Role": "SUPER_ADMIN",
     ...(options.headers || {})
   };
 
@@ -22,17 +19,6 @@ export const superAdminFetch = async (endpoint, options = {}) => {
       ...options,
       headers
     });
-
-    if (res.status === 403) {
-      console.warn(`[SuperAdminAPI Notice] 403 Forbidden received on ${urlPath}. Retrying with elevated credentials...`);
-      // Retry with explicit superadmin bearer token header
-      headers["Authorization"] = "Bearer superadmin_access_token";
-      const retryRes = await fetch(`${BACKEND_URL}${urlPath}`, {
-        ...options,
-        headers
-      });
-      if (retryRes.ok) return retryRes;
-    }
 
     return res;
   } catch (err) {
