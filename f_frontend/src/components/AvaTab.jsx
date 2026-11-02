@@ -20,10 +20,10 @@ const CircleWavesAvatar = ({ isTalking, isThinking }) => {
       <img src="/Circle Waves GIF by futur21.gif" alt="" onError={e => e.target.style.display='none'} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "contain", borderRadius: "50%", pointerEvents: "none" }} />
 
       {/* futur21 Concentric Expanding Waves */}
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00e5c3", animation: isTalking ? "futurWave1 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : isThinking ? "futurWave1 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : "futurWave1 5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite", animationDelay: "0s", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00b8ff", animation: isTalking ? "futurWave2 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : isThinking ? "futurWave2 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : "futurWave2 5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite", animationDelay: "0.55s", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #8b5cf6", animation: isTalking ? "futurWave3 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : isThinking ? "futurWave3 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : "futurWave3 5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite", animationDelay: "1.1s", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #ec4899", animation: isTalking ? "futurWave4 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : isThinking ? "futurWave4 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite" : "futurWave4 5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite", animationDelay: "1.65s", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00e5c3", animation: isTalking ? "futurWave1 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite" : isThinking ? "futurWave1 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite" : "futurWave1 5s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00b8ff", animation: isTalking ? "futurWave2 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite" : isThinking ? "futurWave2 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite" : "futurWave2 5s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #8b5cf6", animation: isTalking ? "futurWave3 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite" : isThinking ? "futurWave3 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite" : "futurWave3 5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #ec4899", animation: isTalking ? "futurWave4 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite" : isThinking ? "futurWave4 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite" : "futurWave4 5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite", pointerEvents: "none" }} />
 
       {/* Rotating Orb Rings */}
       <svg viewBox="0 0 200 200" style={{ width: "180px", height: "180px", position: "absolute", animation: isThinking ? "ringRotateClockwise 4s linear infinite" : isTalking ? "ringRotateClockwise 8s linear infinite" : "ringRotateClockwise 16s linear infinite" }}>
@@ -39,6 +39,92 @@ const CircleWavesAvatar = ({ isTalking, isThinking }) => {
       <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: isTalking ? "radial-gradient(circle, #00e5c3 0%, #00b8ff 45%, #8b5cf6 85%, #050811 100%)" : isThinking ? "radial-gradient(circle, #8b5cf6 0%, #00b8ff 55%, #050811 100%)" : "radial-gradient(circle, #00e5c3 0%, #081226 80%)", animation: isTalking ? "coreGlowPulse 0.7s ease-in-out infinite" : "coreGlowPulse 2.2s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 0 35px rgba(0, 229, 195, 0.6)", overflow: "hidden" }}>
         <img src="/Circle Waves GIF by futur21.gif" alt="" onError={e => e.target.style.display='none'} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
       </div>
+    </div>
+  );
+};
+
+const renderEvidenceCard = (item, isStrength, idx) => {
+  let rawTitle = typeof item === 'string' ? item : (item.title || "Observation");
+  let rawEvidence = typeof item === 'object' ? (item.evidence || "") : "";
+  
+  // Extract Turn or Question label
+  let turnBadge = null;
+  const turnMatch = rawTitle.match(/(Turn\s*\d+|Question\s*\d+|Q\d+)/i) || rawEvidence.match(/(Turn\s*\d+|Question\s*\d+|Q\d+)/i);
+  if (turnMatch) {
+    turnBadge = turnMatch[1].replace(/turn/i, "Question");
+  }
+
+  // Extract quoted candidate speech if present
+  let quote = null;
+  let observation = rawEvidence;
+  const quoteMatch = rawEvidence.match(/['"“](.*?)['"”]$/) || rawEvidence.match(/:\s*['"“](.*?)['"”]/);
+  if (quoteMatch) {
+    quote = quoteMatch[1];
+    observation = rawEvidence.replace(quoteMatch[0], "").trim();
+    if (observation.endsWith(":")) observation = observation.slice(0, -1).trim();
+  }
+
+  let cleanTitle = rawTitle;
+  if (cleanTitle.includes(": '")) {
+    const parts = cleanTitle.split(": '");
+    cleanTitle = parts[0];
+    if (!quote && parts[1]) {
+      quote = parts[1].replace(/['"]+$/, "");
+    }
+  }
+
+  return (
+    <div key={idx} style={{
+      background: isStrength ? "rgba(0,196,167,0.06)" : "rgba(245,158,11,0.06)",
+      border: isStrength ? "1px solid rgba(0,196,167,0.22)" : "1px solid rgba(245,158,11,0.22)",
+      borderRadius: "14px",
+      padding: "14px",
+      marginBottom: "12px",
+      textAlign: "left"
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
+        <strong style={{ color: "#fff", fontSize: "12.5px", lineHeight: "1.4", display: "flex", alignItems: "center", gap: "6px" }}>
+          <span>{isStrength ? "✅" : "⚠️"}</span>
+          <span>{cleanTitle}</span>
+        </strong>
+        {turnBadge && (
+          <span style={{
+            fontSize: "10px",
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            padding: "2px 8px",
+            borderRadius: "10px",
+            background: isStrength ? "rgba(0,229,195,0.15)" : "rgba(245,158,11,0.15)",
+            color: isStrength ? "#00e5c3" : "#f59e0b",
+            border: isStrength ? "1px solid rgba(0,229,195,0.3)" : "1px solid rgba(245,158,11,0.3)",
+            whiteSpace: "nowrap"
+          }}>
+            {turnBadge}
+          </span>
+        )}
+      </div>
+
+      {observation && observation.toLowerCase() !== cleanTitle.toLowerCase() && (
+        <div style={{ fontSize: "11.5px", color: "#94a3b8", marginBottom: quote ? "8px" : "0", lineHeight: "1.5" }}>
+          {observation}
+        </div>
+      )}
+
+      {quote && (
+        <div style={{
+          padding: "8px 12px",
+          background: "rgba(0,0,0,0.35)",
+          borderLeft: isStrength ? "3px solid #00c4a7" : "3px solid #f59e0b",
+          borderRadius: "0 8px 8px 0",
+          fontSize: "11px",
+          color: "#cbd5e1",
+          fontStyle: "italic",
+          lineHeight: "1.5"
+        }}>
+          "{quote}"
+        </div>
+      )}
     </div>
   );
 };
@@ -236,6 +322,26 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [isAvaThinking, setIsAvaThinking] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
   const [reportData, setReportData] = useState(null);
+  
+  // Hiregram Hands-Free Conversational Voice VAD
+  const [isHandsFree, setIsHandsFree] = useState(true);
+  const [autoSubmitCountdown, setAutoSubmitCountdown] = useState(null);
+  const silenceTimerRef = useRef(null);
+  const isHandsFreeRef = useRef(true);
+  const isAvaTalkingRef = useRef(false);
+  const isAvaThinkingRef = useRef(false);
+
+  useEffect(() => {
+    isHandsFreeRef.current = isHandsFree;
+  }, [isHandsFree]);
+
+  useEffect(() => {
+    isAvaTalkingRef.current = isAvaTalking;
+  }, [isAvaTalking]);
+
+  useEffect(() => {
+    isAvaThinkingRef.current = isAvaThinking;
+  }, [isAvaThinking]);
 
   const currentAudioRef = useRef(null);
   const timerRef = useRef(null);
@@ -554,7 +660,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       });
   };
 
-  // Voice Speech Recognition (Speaking Answer) with continuous recovery
+  // Voice Speech Recognition (Speaking Answer) with continuous recovery & Hiregram VAD
   const startVoiceRecognition = () => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     isListeningDesiredRef.current = true;
@@ -590,6 +696,25 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         }
         const currentTotal = (finalTranscriptRef.current + (interim ? " " + interim : "")).trim();
         setAnswer(currentTotal);
+
+        // Reset silence timer whenever speech is actively streaming
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        setAutoSubmitCountdown(null);
+
+        // Hiregram VAD: When candidate speaks meaningful words (>= 3 words) and pauses
+        const words = currentTotal.split(/\s+/).filter(Boolean);
+        if (isHandsFreeRef.current && words.length >= 3 && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
+          setAutoSubmitCountdown(2);
+          silenceTimerRef.current = setTimeout(() => {
+            if (isListeningDesiredRef.current && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
+              setAutoSubmitCountdown(null);
+              submitAnswerAndNext(currentTotal);
+            }
+          }, 2100);
+        }
       };
 
       rec.onend = () => {
@@ -610,10 +735,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       };
 
       rec.onerror = (e) => {
-        console.warn("Voice speech rec notice:", e.error);
+        // Silently tolerate no-speech pauses
         if (e.error === "no-speech" && isListeningDesiredRef.current) {
           return;
         }
+        console.warn("Voice speech rec notice:", e.error);
       };
 
       rec.start();
@@ -625,6 +751,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   const stopVoiceRecognition = () => {
     isListeningDesiredRef.current = false;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    setAutoSubmitCountdown(null);
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
       recognitionRef.current = null;
@@ -633,7 +764,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     stopAudioMeter();
   };
 
-  const handleRepeatQuestion = () => {
+    const handleRepeatQuestion = () => {
     if (isAvaTalking || isAvaThinking) return;
     playAvaSpeech(question);
   };
@@ -657,10 +788,23 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-  // Submit Answer & Fetch Next Question
-  const submitAnswerAndNext = async () => {
+  // Submit Answer & Fetch Next Question (hands-free auto submit compatible)
+  const submitAnswerAndNext = async (overrideAnswer = null) => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    setAutoSubmitCountdown(null);
+
+    const textToSubmit = (typeof overrideAnswer === "string" ? overrideAnswer : (answer || finalTranscriptRef.current || "")).trim();
+    if (!textToSubmit) {
+      if (!overrideAnswer) {
+        alert("Please speak or type your answer first.");
+      }
+      return;
+    }
+
     stopVoiceRecognition();
-    if (!answer.trim()) return alert("Please speak or type your answer first.");
     setIsAvaThinking(true);
     setCaptionText("Evaluating your response and preparing next question...");
     setHintText("");
@@ -671,7 +815,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         method: "POST",
         body: JSON.stringify({
           session_id: sessionId,
-          answer: answer.trim(),
+          answer: textToSubmit,
           category: chosenCategory,
           difficulty: difficulty || "Medium"
         })
@@ -704,10 +848,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     } catch (err) {
       alert("Error: " + err.message);
       setIsAvaThinking(false);
+      startVoiceRecognition();
     }
   };
 
-  // End Interview & Generate Report
+    // End Interview & Generate Report
   const endInterviewSession = async () => {
     stopVoiceRecognition();
     setIsAvaThinking(true);
@@ -795,12 +940,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   };
 
   const interviewTypes = [
-    { id: "HR", name: "HR & Behavioral", desc: "Dedicated HR screening mock focusing on communication, leadership, conflict resolution, situational judgment, and STAR method responses." },
-    { id: "DSA", name: "DSA & Algorithms", desc: "A focused data structures & algorithms interview designed to assess problem-solving skills." },
-    { id: "SystemDesign", name: "System Design", desc: "Scalability, microservices, load balancing, database schema, and high-availability architecture." },
-    { id: "Resume", name: "Resume Based", desc: "Guided conversation focused on your past experience, resume projects, and achievements." },
-    { id: "Fundamentals", name: "CS Fundamentals", desc: "Core concepts: data structures, algorithms, networking, DBMS, OOPS, and OS basics." },
-    { id: "MAANG", name: "MAANG / Big Tech", desc: "Rigorous algorithmic and system architecture screening inspired by top tech company rounds." }
+    { id: "MAANG", name: "MAANG / Big Tech", duration: "45 min", desc: "A big-tech screen: your resume, technical architecture, and deep algorithmic trade-offs." },
+    { id: "DSA", name: "DSA & Algorithms", duration: "20–45 min", desc: "Data structures, algorithms, complexity analysis, and live problem-solving reasoning." },
+    { id: "Resume", name: "Resume Deep-Dive", duration: "20 min", desc: "Every question comes directly from your uploaded resume, past projects, and tech stack." },
+    { id: "Fundamentals", name: "CS Fundamentals", duration: "15–45 min", desc: "Core computer science: Operating Systems, Computer Networks, DBMS, and OOP principles." },
+    { id: "Guesstimate", name: "Guesstimate", duration: "15–30 min", desc: "Size a market or engineering volume out loud, assumption by assumption." },
+    { id: "Puzzles", name: "Logic Puzzles", duration: "20 min", desc: "Classic analytical and logic puzzles, reasoned and communicated out loud." },
+    { id: "SystemDesign", name: "System Design", duration: "30–45 min", desc: "Scalability, microservices, caching, database sharding, and high-availability systems." },
+    { id: "HR", name: "HR & Behavioral", duration: "20 min", desc: "Culture fit, leadership, conflict resolution, and structured STAR-method storytelling." }
   ];
 
   return (
@@ -1109,7 +1256,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 16px", marginBottom: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "6px 14px", fontSize: "13px", fontWeight: 800, color: "#00c4a7" }}>
-                  ⏱️ Elapsed: {formatTimer(elapsedSeconds)}
+                  ⏱️ {formatTimer(elapsedSeconds)} / 15:00
                 </div>
                 <div style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "20px", padding: "6px 14px", fontSize: "12px", fontWeight: 800, color: "#a78bfa" }}>
                   Stage: {currentStage}
@@ -1117,7 +1264,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
 
               <button onClick={endInterviewSession} style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444", borderRadius: "24px", padding: "8px 20px", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
-                🚪 End Interview
+                🚪 End Interview & Evaluate
               </button>
             </div>
 
@@ -1179,6 +1326,26 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 {/* Real-time Status Badge */}
                 <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsHandsFree(!isHandsFree)}
+                      style={{
+                        background: isHandsFree ? "rgba(0,196,167,0.18)" : "rgba(255,255,255,0.08)",
+                        border: isHandsFree ? "1px solid rgba(0,196,167,0.4)" : "1px solid rgba(255,255,255,0.15)",
+                        color: isHandsFree ? "#00c4a7" : "#94a3b8",
+                        padding: "4px 12px",
+                        borderRadius: "20px",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                      title="Hiregram Style: Automatically submits and listens when you pause speaking"
+                    >
+                      <span>{isHandsFree ? "⚡ Hands-Free VAD: ON" : "✋ Hands-Free: OFF"}</span>
+                    </button>
                     <span style={{ fontSize: "11px", fontWeight: 800, padding: "4px 12px", borderRadius: "16px", background: isAvaTalking ? "rgba(0,196,167,0.2)" : isSpeakingAnswer ? "rgba(16,185,129,0.2)" : isAvaThinking ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.08)", color: isAvaTalking ? "#00c4a7" : isSpeakingAnswer ? "#10b981" : isAvaThinking ? "#a78bfa" : "#94a3b8", border: isAvaTalking ? "1px solid rgba(0,196,167,0.4)" : isSpeakingAnswer ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(255,255,255,0.1)" }}>
                       {isAvaTalking ? "🗣️ Ava Speaking" : isSpeakingAnswer ? "🎙️ Ava Listening" : isAvaThinking ? "⚡ Analyzing Response" : "Standby"}
                     </span>
@@ -1209,7 +1376,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 {/* Spoken Question & Prompt Card */}
                 <div style={{ width: "100%", padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", minHeight: "75px", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}>
                   <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
-                    Ava · Question {questionNumber} of 5
+                    Ava · Question {questionNumber} of 10 (~15 min)
                   </div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff", lineHeight: "1.5" }}>
                     "{captionText || question || "Listening..."}"
@@ -1247,6 +1414,42 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
                 {/* Spoken Answer & Response Area */}
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                  {autoSubmitCountdown !== null && (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 14px",
+                      borderRadius: "12px",
+                      background: "rgba(0,196,167,0.15)",
+                      border: "1px solid rgba(0,196,167,0.4)",
+                      fontSize: "12px",
+                      color: "#00e5c3",
+                      fontWeight: 700,
+                      animation: "coreGlowPulse 1.2s ease-in-out infinite"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3" }}></span>
+                        <span>🎙️ Answer captured · Ava answering in 2s (pause)...</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => submitAnswerAndNext(answer)}
+                        style={{
+                          background: "#00c4a7",
+                          color: "#050811",
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "3px 12px",
+                          fontWeight: 800,
+                          fontSize: "11px",
+                          cursor: "pointer"
+                        }}
+                      >
+                        Send Now →
+                      </button>
+                    </div>
+                  )}
                   <textarea
                     rows={3}
                     placeholder="Speak your answer naturally (transcription appears here in real-time). You can also edit or type directly..."
@@ -1492,39 +1695,29 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
               {/* TOP STRENGTHS & IMPROVEMENTS */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px", textAlign: "left" }}>
-                <div style={{ background: "rgba(0,196,167,0.06)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7", marginBottom: "10px" }}>💪 Top Strengths</h4>
-                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                <div style={{ background: "rgba(0,196,167,0.04)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "18px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>💪</span> Top Strengths
+                  </h4>
+                  <div>
                     {reportData.strengths && reportData.strengths.length > 0 && typeof reportData.strengths[0] === 'object' ? (
-                      reportData.strengths.map((str, idx) => (
-                        <li key={idx} style={{ marginBottom: "10px" }}>
-                          <strong style={{ color: "#fff", display: "block", fontSize: "12px" }}>✅ {str.title}</strong>
-                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", paddingLeft: "14px", marginTop: "2px" }}>↳ Evidence: {str.evidence}</span>
-                        </li>
-                      ))
+                      reportData.strengths.map((str, idx) => renderEvidenceCard(str, true, idx))
                     ) : (
-                      topStrengths.map((str, idx) => (
-                        <li key={idx} style={{ marginBottom: "4px" }}>✅ {str}</li>
-                      ))
+                      topStrengths.map((str, idx) => renderEvidenceCard(str, true, idx))
                     )}
-                  </ul>
+                  </div>
                 </div>
-                <div style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#f59e0b", marginBottom: "10px" }}>🎯 Focus Areas & Weaknesses</h4>
-                  <ul style={{ paddingLeft: "0", listStyle: "none", margin: 0, fontSize: "12px", color: "#e2e8f0", lineHeight: "1.8" }}>
+                <div style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "18px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#f59e0b", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🎯</span> Focus Areas & Weaknesses
+                  </h4>
+                  <div>
                     {reportData.weaknesses && reportData.weaknesses.length > 0 && typeof reportData.weaknesses[0] === 'object' ? (
-                      reportData.weaknesses.map((imp, idx) => (
-                        <li key={idx} style={{ marginBottom: "10px" }}>
-                          <strong style={{ color: "#fff", display: "block", fontSize: "12px" }}>⚠️ {imp.title}</strong>
-                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", paddingLeft: "14px", marginTop: "2px" }}>↳ Evidence: {imp.evidence}</span>
-                        </li>
-                      ))
+                      reportData.weaknesses.map((imp, idx) => renderEvidenceCard(imp, false, idx))
                     ) : (
-                      topImprovements.map((imp, idx) => (
-                        <li key={idx} style={{ marginBottom: "4px" }}>⚠️ {imp}</li>
-                      ))
+                      topImprovements.map((imp, idx) => renderEvidenceCard(imp, false, idx))
                     )}
-                  </ul>
+                  </div>
                 </div>
               </div>
 
@@ -1537,7 +1730,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
 
               <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
-                <button onClick={() => { try { sessionStorage.removeItem("prepfly_avatab_session"); } catch (_) {} setStep("type_selection"); setReportData(null); setAllFeedbacks([]); }} style={{ padding: "12px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Practice Another</button>
+                <button onClick={() => { try { sessionStorage.removeItem("prepfly_avatab_session"); } catch (_) {} setStep("resume_upload"); setReportData(null); setAllFeedbacks([]); setSessionId(null); }} style={{ padding: "12px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Practice Another</button>
                 <button onClick={downloadPDFReport} style={{ padding: "12px 28px", borderRadius: "12px", background: "linear-gradient(135deg,#00c4a7,#7c3aed)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>📄 Download PDF Report</button>
               </div>
             </div>

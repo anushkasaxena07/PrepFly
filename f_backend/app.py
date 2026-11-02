@@ -2023,7 +2023,7 @@ def start_interview():
             "question": first_q,
             "question_number": 1,
             "stage": stage,
-            "total_questions": 5
+            "total_questions": 10
         }), 200
 
     except Exception as e:
@@ -2071,14 +2071,14 @@ def next_question():
                 first_q, stage, _ = generate_dynamic_question(resume_text, [], 1, category=category, difficulty=difficulty, chat_model=chat_model, candidate_name=c_name)
                 questions = [first_q]
                 supabase.table("sessions").update({"questions": [first_q], "question_index": 1, "stage": stage}).eq("session_id", session_id).execute()
-                return jsonify({"question": first_q, "question_number": 1, "stage": stage, "total_questions": 5}), 200
+                return jsonify({"question": first_q, "question_number": 1, "stage": stage, "total_questions": 10}), 200
             
             curr_stage = get_current_stage(question_index)
             return jsonify({
                 "question": questions[-1],
                 "question_number": question_index,
                 "stage": curr_stage,
-                "total_questions": 5
+                "total_questions": 10
             }), 200
 
         current_q = questions[-1] if questions else "Tell me about yourself."
@@ -2104,23 +2104,31 @@ def next_question():
                 "next_question": current_q,
                 "question_number": question_index,
                 "stage": curr_stage,
-                "total_questions": 5
+                "total_questions": 10
             }), 200
 
-        # Enforce maximum 5 questions per interview session to bound AI costs
-        if len(responses) >= 5:
+        # Determine interview session question limit (default 10 for full 15-min interview, or 5 if bounded by session)
+        total_q_bound = session.get("total_questions")
+        if not total_q_bound:
+            if len(questions) <= 5 and (question_index >= 5 or len(responses) >= 4):
+                total_q_bound = len(questions) if len(questions) >= 5 else 5
+            else:
+                total_q_bound = 10
+
+        # Enforce maximum questions reached
+        if len(responses) >= total_q_bound:
             return jsonify({
-                "message": "Interview completed. All 5 questions have been answered. Please proceed to final review.",
+                "message": f"Interview completed. All {total_q_bound} questions have been answered. Please proceed to final review.",
                 "done": True,
                 "feedback": feedbacks[-1] if feedbacks else {},
                 "next_question": None,
-                "question_number": 5,
+                "question_number": total_q_bound,
                 "stage": "Phase 7: Natural Wrap-up",
                 "is_followup": False,
-                "total_questions": 5
+                "total_questions": total_q_bound
             }), 200
 
-        if question_index >= 5:
+        if question_index >= total_q_bound:
             feedback = evaluate_response_comprehensive(resume_text or "", current_q, answer, chat_model, question_index)
             if not isinstance(feedback, dict):
                 feedback = {"score": 7.0, "feedback": "Response recorded.", "accuracy_score": 70}
@@ -2137,7 +2145,7 @@ def next_question():
                     "responses": responses,
                     "feedbacks": feedbacks,
                     "scores": scores,
-                    "question_index": 5,
+                    "question_index": total_q_bound,
                     "stage": "Phase 7: Natural Wrap-up",
                     "cached_hints": "{}"
                 }).eq("session_id", session_id).execute()
@@ -2145,14 +2153,14 @@ def next_question():
                 print("Session DB save notice:", ex)
 
             return jsonify({
-                "message": "Answer recorded. All 5 questions completed. Please proceed to final review.",
+                "message": f"Answer recorded. All {total_q_bound} questions completed. Please proceed to final review.",
                 "done": True,
                 "feedback": feedback,
                 "next_question": None,
-                "question_number": 5,
+                "question_number": total_q_bound,
                 "stage": "Phase 7: Natural Wrap-up",
                 "is_followup": False,
-                "total_questions": 5
+                "total_questions": total_q_bound
             }), 200
 
         # Perform evaluation & dynamic question generation in parallel
@@ -2540,46 +2548,48 @@ def end_interview():
             return jsonify(f_report), 200
 
         scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
-        overall_score_10 = round(sum(scores) / len(scores), 1) if scores else 0.0
-        overall_score_100 = round(overall_score_10 * 10)
         
-        g_info = calculate_grade_info(overall_score_100)
+        from services.feedback_service import fast_compile_report
+        role = session.get("category", "Software Engineer")
+        track = session.get("category", "Resume Based")
+        difficulty = session.get("difficulty", "Medium")
 
-        # Update DB
+        # Compile evidence-backed report instantly from live feedbacks (<1ms)
+        report_json = fast_compile_report(
+            role=role,
+            track=track,
+            difficulty=difficulty,
+            experience_level="1-3 Years",
+            questions=questions,
+            responses=responses,
+            feedbacks=feedbacks
+        )
+
+        overall_score_100 = int(report_json.get("overall_score", 0))
+        overall_score_10 = round(overall_score_100 / 10.0, 1)
+        import json
+        report_str = json.dumps(report_json)
+
+        # Update DB immediately with completed final report
         try:
             supabase.table("sessions").update({
                 "final_score": overall_score_10,
                 "final_score_100": overall_score_100,
-                "final_grade": g_info["grade"],
-                "grade_label": g_info["label"],
-                "grade_color": g_info["color"],
-                "hiring_recommendation": g_info["rec"],
-                "performance_level": g_info["level"],
+                "final_grade": report_json.get("grade", "B"),
+                "grade_label": report_json.get("grade_label", "Average"),
+                "grade_color": report_json.get("grade_color", "#14b8a6"),
+                "hiring_recommendation": report_json.get("recommendation", "Neutral"),
+                "performance_level": report_json.get("performance_level", "Average"),
                 "active": False,
-                "final_report": "Generating your report…",
+                "final_report": report_str,
+                "report_json": report_json,
                 "scores": scores
             }).eq("session_id", session_id).execute()
         except Exception as e_db:
             print("Session update notice:", e_db)
 
-        # Start thread to generate report in background
-        threading.Thread(
-            target=generate_final_report_async,
-            args=(session_id, resume_text, questions, responses, feedbacks),
-            daemon=True
-        ).start()
-
-        return jsonify({
-            "overall_score": overall_score_10,
-            "overall_score_100": overall_score_100,
-            "grade": g_info["grade"],
-            "overall_grade": g_info["grade"],
-            "grade_label": g_info["label"],
-            "grade_color": g_info["color"],
-            "hiring_recommendation": g_info["rec"],
-            "performance_level": g_info["level"],
-            "report": "Generating your report…"
-        }), 200
+        # Return full completed report immediately so client has 0s delay
+        return jsonify(report_json), 200
 
     except Exception as e:
         print(f"End interview error: {e}")

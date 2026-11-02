@@ -1,6 +1,7 @@
 import os
 import json
 import random
+import re
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
 
@@ -85,18 +86,79 @@ PHASE_4_FALLBACKS = [
 ]
 
 def get_current_stage(question_index, total_questions=5):
-    if question_index == 1:
-        return "Phase 1: Greeting & Icebreaker"
-    elif question_index == 2:
-        return "Phase 2: Icebreaker & Background"
-    elif question_index == 3:
-        return "Phase 3: Transition into Resume"
-    elif question_index == 4:
-        return "Phase 4: Core Technical Discussion"
-    elif question_index == 5:
-        return "Phase 5: System Trade-offs & Deep Dive"
+    if total_questions == 5:
+        if question_index == 1:
+            return "Phase 1: Greeting & Icebreaker"
+        elif question_index == 2:
+            return "Phase 2: Icebreaker & Background"
+        elif question_index == 3:
+            return "Phase 3: Transition into Resume"
+        elif question_index == 4:
+            return "Phase 4: Core Technical Discussion"
+        elif question_index == 5:
+            return "Phase 5: System Trade-offs & Deep Dive"
+        else:
+            return "Phase 7: Natural Wrap-up"
     else:
-        return "Phase 7: Natural Wrap-up"
+        if question_index == 1:
+            return "Phase 1: Greeting & Icebreaker"
+        elif question_index == 2:
+            return "Phase 2: Background & Experience"
+        elif question_index == 3:
+            return "Phase 3: Resume Deep-Dive"
+        elif question_index == 4:
+            return "Phase 4: Architecture & Design Decisions"
+        elif question_index == 5:
+            return "Phase 5: Core Technical Concepts"
+        elif question_index == 6:
+            return "Phase 6: Performance & Optimization"
+        elif question_index == 7:
+            return "Phase 7: Reliability & Edge Cases"
+        elif question_index == 8:
+            return "Phase 8: Scale & Trade-offs"
+        elif question_index == 9:
+            return "Phase 9: Behavioral & Leadership (STAR)"
+        elif question_index >= 10:
+            return "Phase 10: Retrospective & Closing"
+        else:
+            return "Phase 10: Retrospective & Closing"
+
+def is_semantically_repetitive(new_q: str, existing_questions: list) -> bool:
+    """Detects exact duplicates and high semantic/keyword overlaps across questions."""
+    if not new_q or not existing_questions:
+        return False
+    
+    filler = {"tell", "about", "could", "would", "please", "describe", "explain", "what", "which", "your", "with", "have", "from", "that", "this", "some", "like", "how", "why"}
+    
+    def stem(w):
+        return re.sub(r'(ing|ed|es|s)$', '', w)
+        
+    clean_new = set(stem(w) for w in re.findall(r'\b[a-z]{3,}\b', new_q.lower())) - filler
+    if not clean_new:
+        return False
+
+    for old_q in existing_questions:
+        if not old_q:
+            continue
+        if new_q.strip().lower() == old_q.strip().lower():
+            return True
+            
+        clean_old = set(stem(w) for w in re.findall(r'\b[a-z]{3,}\b', old_q.lower())) - filler
+        if not clean_old:
+            continue
+        
+        common = clean_new.intersection(clean_old)
+        union = clean_new.union(clean_old)
+        
+        # If 2 or more key domain words match (e.g. ['project', 'resume'] or ['process', 'thread'])
+        if len(common) >= 2 and (len(common) / len(clean_new) >= 0.35 or len(common) / len(clean_old) >= 0.35):
+            return True
+            
+        similarity = len(common) / len(union) if union else 0
+        if similarity >= 0.35:
+            return True
+    return False
+
 
 def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate"):
     previous_questions = previous_questions or []
@@ -133,6 +195,12 @@ STRICT MANDATE: Ask questions on core CS pillars: Operating Systems (processes v
     elif "MAANG" in cat_clean or "BIG TECH" in cat_clean:
         track_instruction = """TRACK: MAANG / BIG TECH SCREENING
 STRICT MANDATE: Ask high-bar algorithmic edge cases, production outage handling, system resilience, and deep engineering trade-off questions expected at Big Tech companies."""
+    elif "GUESTIMATE" in cat_clean:
+        track_instruction = """TRACK: GUESTIMATE & ESTIMATION
+STRICT MANDATE: Ask a market-sizing or volume estimation problem. Evaluate structured top-down or bottom-up breakdown, realistic assumptions, and verbal articulation out loud."""
+    elif "PUZZLE" in cat_clean or "LOGIC" in cat_clean:
+        track_instruction = """TRACK: LOGIC PUZZLES
+STRICT MANDATE: Ask a classic analytical/logic puzzle. Evaluate logical deduction, test case formulation, and ability to communicate thoughts step-by-step without skipping assumptions."""
     else:
         track_instruction = """TRACK: RESUME BASED TECHNICAL INTERVIEW
 STRICT MANDATE: Ask questions directly tied to candidate's past projects, achievements, employment history, and specific tech stack listed in their resume."""
@@ -140,11 +208,23 @@ STRICT MANDATE: Ask questions directly tied to candidate's past projects, achiev
     if question_index == 1:
         phase_guidance = f"PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate using their name ({candidate_name}), introduce yourself as Ava (AI Recruiter), and ask a casual, low-stakes icebreaker question (e.g. how their day is going, how they are feeling today, or if they are ready to begin). STRICT MANDATE: DO NOT ask any technical, coding, or interview questions on this first turn. Keep it friendly, welcoming, and purely conversational."
     elif question_index == 2:
-        phase_guidance = f"PHASE: ICEBREAKER & BACKGROUND. Previous Candidate Answer: '{last_answer}'. React to what they said briefly and naturally (1 sentence), then ask about their background, what originally drew them to software engineering/development, or a general non-technical introductory question based on their resume/profile."
+        phase_guidance = f"PHASE: BACKGROUND & EXPERIENCE. Previous Candidate Answer: '{last_answer}'. React briefly and naturally (1 sentence), then ask about their professional background, what originally drew them into software engineering/development, or their primary technical domain."
     elif question_index == 3:
-        phase_guidance = f"PHASE: RESUME ANCHOR TRANSITION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition into their technical profile or core projects from the resume/profile. Ask them to describe a project they are proud of or their main tech stack."
-    elif question_index >= 5:
-        phase_guidance = f"PHASE: CLOSING / FINAL QUESTION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition towards closing or final high-level question."
+        phase_guidance = f"PHASE: RESUME PROJECT ANCHOR. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition into a core technical project from their resume/profile. Ask them to describe the problem it solved and their high-level architectural role."
+    elif question_index == 4:
+        phase_guidance = f"PHASE: ARCHITECTURAL DECISIONS & TECH STACK. Previous Candidate Answer: '{last_answer}'. Probe their technical choices on that project: why they chose specific tools/databases, how components communicated, and key constraints."
+    elif question_index == 5:
+        phase_guidance = f"PHASE: CORE TECHNICAL ROUND (Turn 5). Previous Candidate Answer: '{last_answer}'. Transition into a sharp technical question aligned with the TRACK MANDATE."
+    elif question_index == 6:
+        phase_guidance = f"PHASE: PERFORMANCE & CODE QUALITY. Previous Candidate Answer: '{last_answer}'. Probe on execution efficiency, algorithmic complexity, query caching, or latency optimization."
+    elif question_index == 7:
+        phase_guidance = f"PHASE: RELIABILITY, DEBUGGING & EDGE CASES. Previous Candidate Answer: '{last_answer}'. Ask how they handle unexpected production bugs, error boundaries, race conditions, or logging/monitoring."
+    elif question_index == 8:
+        phase_guidance = f"PHASE: SYSTEM SCALABILITY & TRADE-OFFS. Previous Candidate Answer: '{last_answer}'. Ask about scaling the solution (10x user growth, partitioning, asynchronous workers, or fault tolerance)."
+    elif question_index == 9:
+        phase_guidance = f"PHASE: BEHAVIORAL & OWNERSHIP (STAR METHOD). Ask a targeted behavioral/teamwork question: handling conflicting requirements, navigating disagreements with a peer or lead, or managing a tight release schedule."
+    elif question_index >= 10:
+        phase_guidance = f"PHASE: CLOSING RETROSPECTIVE & FUTURE OUTLOOK. Previous Candidate Answer: '{last_answer}'. Acknowledge their thoughtful answers throughout the interview. Ask a final high-level question (e.g. a technology they are excited to learn next, or what they consider their greatest engineering accomplishment), and prepare to close the session warmly."
     else:
         phase_guidance = f"PHASE: CORE ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Briefly acknowledge their answer, then ask ONE sharp question following the TRACK MANDATE."
 
@@ -160,17 +240,26 @@ STRICT MANDATE: Ask questions directly tied to candidate's past projects, achiev
         candidate_name=candidate_name
     )
 
+    prev_q_list = "\n".join(f"- {q}" for q in previous_questions) if previous_questions else "None (first turn)"
+
     prompt = f"""{system_prompt}
 
 DYNAMIC CONTEXT DATA FOR THIS TURN:
 - conversation_history:
 {conv_history_str}
 
+PREVIOUSLY ASKED QUESTIONS (DO NOT REPEAT):
+{prev_q_list}
+
 LATEST CANDIDATE RESPONSE:
 "{last_answer or 'None'}"
 
 {track_instruction}
 {phase_guidance}
+
+CRITICAL ANTI-REPETITION MANDATE:
+- You MUST NOT repeat, rephrase, or ask about the same topic, technology, or scenario as any question in PREVIOUSLY ASKED QUESTIONS.
+- Every question MUST explore a completely fresh angle, skill, or project from the candidate's background.
 
 Return ONLY valid JSON with no markdown codeblock wrapping:
 {{
@@ -232,9 +321,9 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
         if (q_text.startswith('"') and q_text.endswith('"')) or (q_text.startswith("'") and q_text.endswith("'")):
             q_text = q_text[1:-1].strip()
 
-        # Check for duplicate question
-        if q_text in previous_questions:
-            raise ValueError("Duplicate question generated by LLM")
+        # Check for exact or semantic duplicate question
+        if is_semantically_repetitive(q_text, previous_questions):
+            raise ValueError(f"Duplicate or overly similar question generated by LLM: {q_text}")
 
         return q_text, stage_name, needs_followup
     except Exception as e:
@@ -283,7 +372,7 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
                     "Looking back at your recent projects, what is one design decision you would implement differently today?"
                 ]
 
-            available = [q for q in track_fallbacks if q not in previous_questions]
+            available = [q for q in track_fallbacks if not is_semantically_repetitive(q, previous_questions)]
             fallback_choice = random.choice(available) if available else track_fallbacks[0]
             
         return fallback_choice, stage_name, False
