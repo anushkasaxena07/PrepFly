@@ -1,5 +1,8 @@
 import os
+import sys
 import shutil
+import time
+import subprocess
 try:
     import pymupdf as fitz
 except Exception:
@@ -3021,6 +3024,59 @@ def execute_sandbox_code(language, code, problem_id, user_id=None):
 
     except Exception as e:
         return {"error": f"Failed to communicate with isolated sandbox worker: {str(e)}"}
+
+
+@app.route("/api/interview/run-code", methods=["POST"])
+def interview_run_code():
+    data = request.get_json() or {}
+    code = data.get("code", "").strip()
+    language = data.get("language", "python").lower()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    start_time = time.time()
+    try:
+        if language == "javascript":
+            cmd = ["node", "-e", code]
+        else:
+            cmd = [sys.executable, "-c", code]
+
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        elapsed = round((time.time() - start_time) * 1000, 1)
+        stdout = (res.stdout or "")[:4096]
+        stderr = (res.stderr or "")[:4096]
+        return jsonify({
+            "success": res.returncode == 0,
+            "stdout": stdout,
+            "stderr": stderr,
+            "exit_code": res.returncode,
+            "execution_time_ms": elapsed
+        }), 200
+
+    except subprocess.TimeoutExpired:
+        elapsed = round((time.time() - start_time) * 1000, 1)
+        return jsonify({
+            "success": False,
+            "stdout": "",
+            "stderr": "Execution timed out (exceeded 5.0 seconds limit). Check for infinite loops.",
+            "exit_code": -1,
+            "execution_time_ms": elapsed
+        }), 200
+    except Exception as ex:
+        elapsed = round((time.time() - start_time) * 1000, 1)
+        return jsonify({
+            "success": False,
+            "stdout": "",
+            "stderr": str(ex)[:512],
+            "exit_code": 1,
+            "execution_time_ms": elapsed
+        }), 200
 
 
 @app.route("/api/coding/submit", methods=["POST"])
