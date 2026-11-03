@@ -182,7 +182,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
         {/* Header */}
         <div className="sec-header mb16" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: "4px" }}>HIREGRAM-ALIGNED RESUME SUITE</div>
+            <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: "4px" }}>PREPFLY ADVANCED RESUME SUITE</div>
             <h1 className="sec-title" style={{ fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0 }}>Resume AI Platform</h1>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
@@ -191,7 +191,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
           </div>
         </div>
 
-        {/* ── HIREGRAM RESUME AI MODE SELECTOR ── */}
+        {/* ── RESUME AI MODE SELECTOR ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(255,255,255,0.03)", padding: "6px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "24px" }}>
           <button
             type="button"
@@ -236,7 +236,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
             }}
           >
             <span style={{ fontSize: "16px" }}>✨</span>
-            <span>Option 2: AI Resume Improvement & Rewrite [Hiregram Style]</span>
+            <span>Option 2: AI Resume Improvement & Rewrite [ATS Optimized]</span>
           </button>
         </div>
 

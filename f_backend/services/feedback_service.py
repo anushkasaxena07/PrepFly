@@ -21,55 +21,98 @@ def generate_dynamic_single_fallback(question, answer, q_type):
     q_lower = question.lower()
     
     word_count = len(ans_clean.split())
+
+    # Check for early exit phrases
+    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
+    if any(ep in ans_lower for ep in exit_phrases):
+        return {
+            "feedback": "⚠️ Candidate requested to conclude the interview early.",
+            "score": 0.0,
+            "accuracy_score": 0,
+            "correctness": "Incomplete",
+            "answer_quality": "Early Exit",
+            "question_type": q_type,
+            "strength": "",
+            "improvement": "Candidate exited before providing a technical response.",
+            "tip": "Answer questions completely to receive an evaluation report.",
+            "summary": "Early exit requested (0/100).",
+            "ideal_answer": "Complete answers are required for scoring.",
+            "what_was_correct": "None",
+            "what_was_incorrect": "Candidate requested to end interview early.",
+            "what_to_add": "Technical explanations addressing the prompt.",
+            "common_mistakes": ["Exited interview early"],
+            "metrics": {
+                "communication": 0.0, "confidence": 0.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 0.0, "leadership": 0.0
+            }
+        }
+
+    # Check for negative or off-topic non-answers
+    is_off_topic = any(ot in ans_lower for ot in ["my day is bad", "bad day", "not good", "terrible", "don't want", "no thanks", "whatever"])
+    if is_off_topic:
+        return {
+            "feedback": "⚠️ Response was off-topic or non-technical. Maintain professional focus during the interview.",
+            "score": 1.0,
+            "accuracy_score": 10,
+            "correctness": "Incorrect",
+            "answer_quality": "Very Poor",
+            "question_type": q_type,
+            "strength": "",
+            "improvement": "Focus on the technical problem and provide structured reasoning.",
+            "tip": "Even during icebreakers, professional communication sets a positive interview tone.",
+            "summary": "Off-topic response recorded (10/100).",
+            "ideal_answer": "Provide a professional, relevant technical explanation.",
+            "what_was_correct": "None",
+            "what_was_incorrect": "Off-topic response",
+            "what_to_add": "Relevant domain concepts and structured examples",
+            "common_mistakes": ["Off-topic answer"],
+            "metrics": {
+                "communication": 1.0, "confidence": 1.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 1.0, "leadership": 0.0
+            }
+        }
     
     # Analyze keyword overlap to see if they address the question
     stop_words = {"what", "how", "why", "who", "which", "when", "where", "the", "a", "an", "is", "are", "was", "were", "to", "in", "of", "on", "for", "with", "about", "your", "you", "me", "tell"}
     q_words = [w.strip("?,.()\"'") for w in q_lower.split() if w.strip("?,.()\"'") not in stop_words]
     matched_words = [w for w in q_words if len(w) > 3 and w in ans_lower]
     
-    base_accuracy = 50
-    if word_count > 30:
-        base_accuracy = 80
-    elif word_count > 15:
-        base_accuracy = 70
-    elif word_count > 6:
-        base_accuracy = 60
-        
-    match_bonus = min(20, len(matched_words) * 5)
-    acc_score = min(95, base_accuracy + match_bonus)
-    
-    if any(skip in ans_lower for skip in ["don't know", "don't remember", "skip", "no idea", "not sure", "pardon"]):
-        acc_score = 30
+    if word_count < 4 or any(skip in ans_lower for skip in ["don't know", "don't remember", "skip", "no idea", "not sure", "pardon"]):
+        acc_score = 15
         correctness = "Incorrect"
         quality = "Poor"
-    elif acc_score >= 80:
-        correctness = "Correct"
-        quality = "Very Good"
-    elif acc_score >= 65:
-        correctness = "Partially Correct"
-        quality = "Good"
+        strength = ""
+        improvement = "Provide a substantive technical response using definitions and concrete examples."
+        tip = "Break down complex questions step-by-step."
+        summary = "Minimal or incomplete response provided."
     else:
-        correctness = "Partially Correct"
-        quality = "Average"
+        match_bonus = min(25, len(matched_words) * 8)
+        base_accuracy = 55 if word_count > 20 else (45 if word_count > 10 else 35)
+        acc_score = min(90, base_accuracy + match_bonus)
         
-    score_10 = round(acc_score / 10.0, 1)
-    
-    if correctness == "Incorrect" or word_count < 5:
-        strength = "Attempted to respond to the prompt."
-        improvement = "Provide a more complete response using technical definitions and concrete examples."
-        tip = "Explain your thought process step-by-step even if you don't know the exact syntax."
-        summary = "Minimal response provided."
-    else:
-        if matched_words:
-            strength = f"Mentioned key prompt concepts ({', '.join(matched_words[:3])}) clearly."
+        if acc_score >= 75:
+            correctness = "Correct"
+            quality = "Good"
+            strength = f"Addressed core concepts ({', '.join(matched_words[:2]) if matched_words else 'relevant topic'}) with clear intent."
+        elif acc_score >= 50:
+            correctness = "Partially Correct"
+            quality = "Average"
+            strength = ""
         else:
-            strength = "Expressed ideas with appropriate length and structure."
+            correctness = "Incorrect"
+            quality = "Below Average"
+            strength = ""
             
         improvement = f"Elaborate on implementation details, edge cases, and optimization trade-offs for {q_type} concepts."
         tip = "Discuss time/space complexity tradeoffs and real-world system applications."
-        summary = f"Good initial understanding of {q_type} question. Answered with {word_count} words."
+        summary = f"Answered {q_type} question with {word_count} words."
+        
+    score_10 = round(acc_score / 10.0, 1)
 
     feedback_str = f"✅ Strength: {strength}\n⚠️ Improve: {improvement}\n💡 Tip: {tip}\n📌 Quality: {quality} ({acc_score}/100)"
+    
     
     metrics = {
         "communication": min(10.0, score_10 + 0.5),
@@ -142,35 +185,58 @@ def evaluate_response_comprehensive(resume_text, question, answer, chat_model, q
             }
         }
 
-    # Early icebreaker turns (Question 1 & 2 short pleasantries)
-    if question_index in [1, 2] and len(answer.strip().split()) <= 4:
+    # Check for early exit phrases
+    ans_lower = answer.strip().lower()
+    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
+    if any(ep in ans_lower for ep in exit_phrases):
         return {
-            "score": 8,
-            "accuracy_score": 80,
-            "correctness": "Partially Correct",
-            "answer_quality": "Average",
+            "score": 0.0,
+            "accuracy_score": 0,
+            "correctness": "Incomplete",
+            "answer_quality": "Early Exit",
             "question_type": q_type,
-            "feedback": "✅ Strength: Clear and friendly introductory opening.\n⚠️ Improve: Provide more specific technical details and context.",
-            "strength": "Friendly, clear opening communication",
-            "improvement": "Elaborate with specific architectural or domain examples",
-            "tip": "Relax and state concrete project experiences",
-            "summary": "Brief icebreaker introduction.",
-            "ideal_answer": "Give a 60-second summary covering background, key tech stack, and notable project achievements.",
-            "what_was_correct": "Friendly introduction",
-            "what_was_incorrect": "Very brief answer",
-            "what_to_add": "Technical project highlights",
-            "common_mistakes": ["Answer too short"],
+            "feedback": "⚠️ Candidate requested to conclude the interview early.",
+            "strength": "",
+            "improvement": "Candidate exited before completing technical questions.",
+            "tip": "Complete at least 5 questions to receive a hiring evaluation.",
+            "summary": "Early exit requested (0/100).",
+            "ideal_answer": "Complete answers are required for scoring.",
+            "what_was_correct": "None",
+            "what_was_incorrect": "Candidate requested early exit",
+            "what_to_add": "Complete technical explanations",
+            "common_mistakes": ["Exited interview early"],
             "metrics": {
-                "communication": 8.0,
-                "confidence": 8.0,
-                "technical_knowledge": 7.5,
-                "resume_understanding": 8.0,
-                "project_explanation": 7.5,
-                "problem_solving": 7.5,
-                "behavioral": 8.0,
-                "leadership": 7.5
+                "communication": 0.0, "confidence": 0.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 0.0, "leadership": 0.0
             }
         }
+
+    # Handle icebreaker responses specifically
+    if question_index == 1:
+        if any(neg in ans_lower for neg in ["bad", "terrible", "not good", "awful", "sad"]):
+            return {
+                "score": 2.0,
+                "accuracy_score": 20,
+                "correctness": "Poor Communication",
+                "answer_quality": "Below Average",
+                "question_type": q_type,
+                "feedback": "⚠️ Acknowledged opening greeting with negative sentiment. Maintain professional composure.",
+                "strength": "",
+                "improvement": "Frame opening interactions professionally and positively.",
+                "tip": "Keep introductory pleasantries warm and constructive.",
+                "summary": "Negative opening tone recorded.",
+                "ideal_answer": "Acknowledge greeting professionally (e.g. 'Doing great, excited for this session!').",
+                "what_was_correct": "Responded to prompt",
+                "what_was_incorrect": "Negative opening tone",
+                "what_to_add": "Professional opening demeanor",
+                "common_mistakes": ["Negative introductory attitude"],
+                "metrics": {
+                    "communication": 2.0, "confidence": 2.0, "technical_knowledge": 0.0,
+                    "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                    "behavioral": 2.0, "leadership": 0.0
+                }
+            }
 
     prompt = f"""You are a Senior Software Engineer Interviewer at a top product company evaluating a candidate response.
 Question Type: {q_type}
@@ -568,12 +634,15 @@ def fast_compile_report(role, track, difficulty, experience_level, questions, re
     valid_indices = []
     poor_indices = []
 
+    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
     for idx, ans in enumerate(responses or []):
         if ans and str(ans).strip():
             clean_ans = str(ans).strip().lower().replace(".", "").replace(",", "").strip()
             if clean_ans not in ("[no response recorded]", "skipped", "skip", "i don't know", "none", "no response", ""):
-                if len(clean_ans.split()) >= 2:
-                    valid_count += 1
+                # Do not count exit requests or single-word pleasantries as technical answers
+                if not any(ep in clean_ans for ep in exit_phrases) and clean_ans not in ("my day is bad", "bad day", "not good", "fine"):
+                    if len(clean_ans.split()) >= 2:
+                        valid_count += 1
                     if len(clean_ans) < 25 or any(s in clean_ans for s in ["don't know", "skip", "no idea", "not sure", "pardon"]):
                         poor_indices.append(idx)
                     else:
@@ -654,7 +723,13 @@ def fast_compile_report(role, track, difficulty, experience_level, questions, re
             turn_ans = responses[idx] if (responses and idx < len(responses)) else ""
             turn_quote = turn_ans[:90] + "..." if len(turn_ans) > 90 else turn_ans
 
-            if str_text and str_text.lower() not in ("none", "n/a", ""):
+            turn_score = f.get("accuracy_score", f.get("score", 0))
+            if isinstance(turn_score, (int, float)) and turn_score <= 10:
+                turn_score = turn_score * 10
+            
+            # STRICT FILTER: Only award a strength if turn score was actually competent (>= 70) and meaningful!
+            disallowed = ("none", "n/a", "", "attempted to respond to the prompt.", "friendly, clear opening communication", "requested repetition")
+            if str_text and str_text.strip() and str_text.lower() not in disallowed and turn_score >= 70:
                 scored_strengths.append({
                     "title": str_text,
                     "evidence": f"Turn {idx+1}: '{turn_quote}'"
@@ -790,9 +865,9 @@ def fast_compile_report(role, track, difficulty, experience_level, questions, re
         "weaknesses": dyn_weaknesses,
         "speech_metrics": speech_metrics,
         "turn_evaluations": turn_evaluations,
-        "report": f"### Executive Summary\nThe candidate completed {valid_count} interview questions for the role of **{role}** ({difficulty} difficulty).\n\n"
+        "report": f"### Executive Summary\nThe candidate completed {valid_count} interview questions for the role of **{role if role and str(role).strip().lower() != 'none' else 'Software Engineer'}** ({difficulty if difficulty and str(difficulty).strip().lower() != 'none' else 'Medium'} difficulty).\n\n"
                   f"Overall performance scored **{avg_score}/100** based on real-time evidence evaluation. "
-                  f"Communication and core technical reasoning were demonstrated across {valid_count} turns."
+                  f"Communication and core technical reasoning were evaluated across {valid_count} turns."
     }
 
     return enrich_report_with_grading(report)
@@ -858,7 +933,7 @@ def enrich_report_with_grading(report: dict) -> dict:
     total_q = max(10, int(report.get("total_questions", 10)))
     completion_rate = min(1.0, valid_q_count / float(total_q))
 
-    # Hiregram Assessment Standard: Prorate score by completion rate
+    # PrepFly Assessment Standard: Prorate score by completion rate
     if valid_q_count == 0:
         score = 0
         g_info = {

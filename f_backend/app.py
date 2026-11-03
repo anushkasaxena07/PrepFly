@@ -2033,10 +2033,17 @@ def start_interview():
         )
         questions = [first_q]
 
+        save_cat = category or session.get("category") or "General Technical"
+        save_diff = difficulty or session.get("difficulty") or "Medium"
+        save_role = data.get("role") or session.get("role") or (f"{save_cat} Software Engineer" if save_cat not in ("Resume", "General Technical") else "Software Engineer")
+
         supabase.table("sessions").update({
             "questions": questions,
             "question_index": 1,
-            "stage": stage
+            "stage": stage,
+            "category": save_cat,
+            "difficulty": save_diff,
+            "role": save_role
         }).eq("session_id", session_id).execute()
 
         return jsonify({
@@ -2601,9 +2608,15 @@ def end_interview():
         scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
         
         from services.feedback_service import fast_compile_report
-        role = session.get("category", "Software Engineer")
-        track = session.get("category", "Resume Based")
-        difficulty = session.get("difficulty", "Medium")
+        role = session.get("role") or session.get("category") or "Software Engineer"
+        if not role or str(role).strip().lower() in ("none", ""):
+            role = "Software Engineer"
+        track = session.get("category") or "Resume Based"
+        if not track or str(track).strip().lower() in ("none", ""):
+            track = "Resume Based"
+        difficulty = session.get("difficulty") or "Medium"
+        if not difficulty or str(difficulty).strip().lower() in ("none", ""):
+            difficulty = "Medium" 
 
         # Compile evidence-backed report instantly from live feedbacks (<1ms)
         report_json = fast_compile_report(

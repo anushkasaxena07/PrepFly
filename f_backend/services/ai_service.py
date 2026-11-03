@@ -214,28 +214,81 @@ STRICT MANDATE: Ask a classic analytical/logic puzzle. Evaluate logical deductio
         track_instruction = """TRACK: RESUME BASED TECHNICAL INTERVIEW
 STRICT MANDATE: Ask questions directly tied to candidate's past projects, achievements, employment history, and specific tech stack listed in their resume."""
 
-    if question_index == 1:
-        phase_guidance = f"PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate using their name ({candidate_name}), introduce yourself as Ava (AI Recruiter), and ask a casual, low-stakes icebreaker question (e.g. how their day is going, how they are feeling today, or if they are ready to begin). STRICT MANDATE: DO NOT ask any technical, coding, or interview questions on this first turn. Keep it friendly, welcoming, and purely conversational."
-    elif question_index == 2:
-        phase_guidance = f"PHASE: BACKGROUND & EXPERIENCE. Previous Candidate Answer: '{last_answer}'. React briefly and naturally (1 sentence), then ask about their professional background, what originally drew them into software engineering/development, or their primary technical domain."
-    elif question_index == 3:
-        phase_guidance = f"PHASE: RESUME PROJECT ANCHOR. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition into a core technical project from their resume/profile. Ask them to describe the problem it solved and their high-level architectural role."
-    elif question_index == 4:
-        phase_guidance = f"PHASE: ARCHITECTURAL DECISIONS & TECH STACK. Previous Candidate Answer: '{last_answer}'. Probe their technical choices on that project: why they chose specific tools/databases, how components communicated, and key constraints."
-    elif question_index == 5:
-        phase_guidance = f"PHASE: CORE TECHNICAL ROUND (Turn 5). Previous Candidate Answer: '{last_answer}'. Transition into a sharp technical question aligned with the TRACK MANDATE."
-    elif question_index == 6:
-        phase_guidance = f"PHASE: PERFORMANCE & CODE QUALITY. Previous Candidate Answer: '{last_answer}'. Probe on execution efficiency, algorithmic complexity, query caching, or latency optimization."
-    elif question_index == 7:
-        phase_guidance = f"PHASE: RELIABILITY, DEBUGGING & EDGE CASES. Previous Candidate Answer: '{last_answer}'. Ask how they handle unexpected production bugs, error boundaries, race conditions, or logging/monitoring."
-    elif question_index == 8:
-        phase_guidance = f"PHASE: SYSTEM SCALABILITY & TRADE-OFFS. Previous Candidate Answer: '{last_answer}'. Ask about scaling the solution (10x user growth, partitioning, asynchronous workers, or fault tolerance)."
-    elif question_index == 9:
-        phase_guidance = f"PHASE: BEHAVIORAL & OWNERSHIP (STAR METHOD). Ask a targeted behavioral/teamwork question: handling conflicting requirements, navigating disagreements with a peer or lead, or managing a tight release schedule."
-    elif question_index >= 10:
-        phase_guidance = f"PHASE: CLOSING RETROSPECTIVE & FUTURE OUTLOOK. Previous Candidate Answer: '{last_answer}'. Acknowledge their thoughtful answers throughout the interview. Ask a final high-level question (e.g. a technology they are excited to learn next, or what they consider their greatest engineering accomplishment), and prepare to close the session warmly."
+    # Strict Topic & Track Alignment (No Hallucinations)
+    if is_no_resume:
+        track_instruction = f'''TRACK: JOB DESCRIPTION SPECIFIC TECHNICAL INTERVIEW
+STRICT MANDATE: Every question from Turn 2 onwards MUST be strictly and directly based on the provided Job Description and Target Role:
+{resume_text[:2500]}
+DO NOT ask questions on unrelated tools or technologies. Focus deeply on the exact skills, tech stack, and responsibilities demanded in the Job Description.'''
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate using their name ({candidate_name}), introduce yourself as Ava (AI Recruiter), and ask a casual, low-stakes icebreaker question. STRICT MANDATE: DO NOT ask any technical questions on this first turn. Keep it friendly and welcoming.'
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: TARGET JOB DESCRIPTION ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. React briefly (1 sentence), then ask a targeted technical question STRICTLY based on the requirements, tools, and architecture in the Job Description."
+    elif 'DSA' in cat_clean or 'ALGORITHM' in cat_clean:
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate ({candidate_name}), introduce yourself as Ava, and ask a casual icebreaker. DO NOT ask technical questions on Turn 1.'
+        elif question_index == 2:
+            phase_guidance = f"PHASE: DSA CODING PROBLEM 1. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then present a concrete Data Structures & Algorithms problem (Arrays, Strings, Hash Maps, or Two Pointers). Ask the candidate to explain their high-level approach and time/space complexity."
+        elif question_index == 3:
+            phase_guidance = f"PHASE: DSA FOLLOW-UP & OPTIMIZATION. Previous Candidate Answer: '{last_answer}'. Probe on edge cases, memory constraints, or optimizing from O(N^2) to O(N log N) or O(N)."
+        elif question_index == 4:
+            phase_guidance = f"PHASE: DSA CODING PROBLEM 2. Previous Candidate Answer: '{last_answer}'. Present a problem on Trees, Graphs, or Dynamic Programming/Recursion. Ask the candidate to walk through their algorithm step-by-step."
+        elif question_index == 5:
+            phase_guidance = f"PHASE: DSA TRADEOFFS & COMPLEXITY. Previous Candidate Answer: '{last_answer}'. Probe the worst-case time and space complexity, recursion stack depth, and data structure trade-offs."
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: ADVANCED DSA SCENARIO (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask a sharp DSA scenario testing algorithmic reasoning and complexity."
+    elif 'SYSTEM' in cat_clean or 'DESIGN' in cat_clean:
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate ({candidate_name}), introduce yourself as Ava, and ask a casual icebreaker. DO NOT ask technical questions on Turn 1.'
+        elif question_index == 2:
+            phase_guidance = f"PHASE: SYSTEM DESIGN ARCHITECTURE. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then present a core System Design challenge (e.g., Design a Distributed Rate Limiter, URL Shortener, or Notification System). Ask the candidate for functional/non-functional requirements and high-level component architecture."
+        elif question_index == 3:
+            phase_guidance = f"PHASE: DATA MODEL & STORAGE SCALING. Previous Candidate Answer: '{last_answer}'. Probe on database selection (SQL vs NoSQL), schema design, indexing, and data sharding/replication."
+        elif question_index == 4:
+            phase_guidance = f"PHASE: CACHING & PERFORMANCE. Previous Candidate Answer: '{last_answer}'. Ask about caching strategies (Redis/Memcached, eviction policies, cache stampede mitigation)."
+        elif question_index == 5:
+            phase_guidance = f"PHASE: HIGH AVAILABILITY & RESILIENCE. Previous Candidate Answer: '{last_answer}'. Probe on fault tolerance, circuit breakers, load balancing, and handling node crashes."
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: DISTRIBUTED SYSTEMS DEEP DIVE (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Probe message queues, eventual consistency, or microservice boundaries."
+    elif 'FUNDAMENTAL' in cat_clean or 'CS' in cat_clean or 'CORE' in cat_clean:
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Warm welcome from Ava. Casual icebreaker only.'
+        elif question_index == 2:
+            phase_guidance = f"PHASE: OPERATING SYSTEMS & CONCURRENCY. Previous Candidate Answer: '{last_answer}'. Ask a concrete OS question: processes vs threads, virtual memory, context switching, or race conditions and mutexes."
+        elif question_index == 3:
+            phase_guidance = f"PHASE: COMPUTER NETWORKS. Previous Candidate Answer: '{last_answer}'. Ask about TCP vs UDP, HTTP/HTTPS handshake, DNS resolution, or REST vs WebSocket protocols."
+        elif question_index == 4:
+            phase_guidance = f"PHASE: DATABASE MANAGEMENT SYSTEMS (DBMS). Previous Candidate Answer: '{last_answer}'. Ask about ACID transactions, B-Tree indexes, isolation levels, or SQL query optimization."
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: CS CORE PILLARS (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask about OOP design principles (SOLID), memory management, or distributed primitives."
+    elif 'HR' in cat_clean or 'BEHAVIORAL' in cat_clean:
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Warm welcome from Ava. Casual icebreaker only.'
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: BEHAVIORAL STAR SCENARIO (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask a targeted behavioral question using the STAR method: handling conflicting requirements, navigating disagreements, leading a project, or overcoming failure."
     else:
-        phase_guidance = f"PHASE: CORE ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Briefly acknowledge their answer, then ask ONE sharp question following the TRACK MANDATE."
+        if question_index == 1:
+            phase_guidance = f'PHASE: GREETING & CASUAL ICEBREAKER. Warm welcome to {candidate_name} from Ava. Ask a low-stakes icebreaker. No technical questions on Turn 1.'
+        elif question_index == 2:
+            phase_guidance = f"PHASE: RESUME BACKGROUND. Previous Candidate Answer: '{last_answer}'. Ask about their core engineering background and primary tech stack from their resume."
+        elif question_index == 3:
+            phase_guidance = f"PHASE: RESUME PROJECT DEEP DIVE. Previous Candidate Answer: '{last_answer}'. Dive into a specific project listed on their resume, asking them to describe the problem, architecture, and their personal contribution."
+        elif question_index == 4:
+            phase_guidance = f"PHASE: TECHNICAL ARCHITECTURE & DECISIONS. Previous Candidate Answer: '{last_answer}'. Probe architectural decisions, libraries/tools used, and trade-offs on that project."
+        elif question_index >= 10:
+            phase_guidance = f"PHASE: CLOSING RETROSPECTIVE. Previous Candidate Answer: '{last_answer}'. Acknowledge candidate responses and close warmly."
+        else:
+            phase_guidance = f"PHASE: RESUME TECHNICAL ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask a targeted technical question directly tied to technologies on their resume."
 
     resume_has_text = bool(resume_text and not is_no_resume)
     system_prompt = build_ava_system_prompt(

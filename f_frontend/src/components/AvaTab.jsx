@@ -323,7 +323,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [allFeedbacks, setAllFeedbacks] = useState([]);
   const [reportData, setReportData] = useState(null);
   
-  // Hiregram Hands-Free Conversational Voice VAD
+  // Hands-Free Conversational Voice VAD
   const [isHandsFree, setIsHandsFree] = useState(true);
   const [autoSubmitCountdown, setAutoSubmitCountdown] = useState(null);
   const silenceTimerRef = useRef(null);
@@ -334,11 +334,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   // Option 2: Job Description context without resume
   const [jobDescription, setJobDescription] = useState("");
 
-  // ── Hiregram Feature: Proctoring & Eye Contact Telemetry ──
+  // ── PrepFly Feature: Proctoring & Eye Contact Telemetry ──
   const [eyeContactPct, setEyeContactPct] = useState(0);
   const [tabSwitches, setTabSwitches] = useState(0);
 
-  // ── Hiregram Feature: Turn-by-Turn Audio Recording & Replay ──
+  // ── PrepFly Feature: Turn-by-Turn Audio Recording & Replay ──
   const [recordedAudios, setRecordedAudios] = useState({});
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -361,27 +361,67 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const currentAudioRef = useRef(null);
   const timerRef = useRef(null);
 
-  // Initialize and attach camera stream directly
+  // Initialize and attach camera stream directly with robust device fallbacks
   const setupCamera = async () => {
     try {
       if (!mediaStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 } });
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+          });
+        } catch (eBoth) {
+          console.warn("Combined video+audio getUserMedia failed, attempting separate requests:", eBoth);
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (eAudio) {
+            console.warn("Audio getUserMedia failed:", eAudio);
+          }
+          try {
+            const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            if (stream) {
+              vStream.getVideoTracks().forEach(t => stream.addTrack(t));
+            } else {
+              stream = vStream;
+            }
+          } catch (eVideo) {
+            console.warn("Video getUserMedia failed:", eVideo);
+          }
+        }
         mediaStreamRef.current = stream;
       }
-      const stream = mediaStreamRef.current;
 
-      if (videoRefDevice.current) {
-        videoRefDevice.current.srcObject = stream;
-        videoRefDevice.current.play().catch(() => {});
-      }
-      if (videoRefCall.current) {
-        videoRefCall.current.srcObject = stream;
-        videoRefCall.current.play().catch(() => {});
+      const stream = mediaStreamRef.current;
+      if (stream) {
+        if (videoRefDevice.current && videoRefDevice.current.srcObject !== stream) {
+          videoRefDevice.current.srcObject = stream;
+          videoRefDevice.current.play().catch(() => {});
+        }
+        if (videoRefCall.current && videoRefCall.current.srcObject !== stream) {
+          videoRefCall.current.srcObject = stream;
+          videoRefCall.current.play().catch(() => {});
+        }
       }
     } catch (err) {
       console.warn("Camera setup error:", err);
     }
   };
+
+  // Re-attach media stream when video elements mount or step changes
+  useEffect(() => {
+    if (mediaStreamRef.current) {
+      const stream = mediaStreamRef.current;
+      if (videoRefCall.current && videoRefCall.current.srcObject !== stream) {
+        videoRefCall.current.srcObject = stream;
+        videoRefCall.current.play().catch(() => {});
+      }
+      if (videoRefDevice.current && videoRefDevice.current.srcObject !== stream) {
+        videoRefDevice.current.srcObject = stream;
+        videoRefDevice.current.play().catch(() => {});
+      }
+    }
+  }, [step, cameraOn]);
 
   const showDeviceSettings = () => {
     const videoLabel = mediaStreamRef.current?.getVideoTracks()[0]?.label || "Default Camera";
@@ -603,10 +643,17 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       setSessionId(activeSessionId);
 
       const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
+      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
 
       const startRes = await apiFetch("/start-interview", {
         method: "POST",
-        body: JSON.stringify({ session_id: activeSessionId, category: chosenCategory, difficulty: difficulty || "Medium" })
+        body: JSON.stringify({ 
+          session_id: activeSessionId, 
+          category: chosenCategory, 
+          role: chosenRole,
+          difficulty: difficulty || "Medium",
+          job_description: jobDescription || ""
+        })
       });
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || "Failed to start interview");
@@ -722,7 +769,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       });
   };
 
-  // Voice Speech Recognition (Speaking Answer) with continuous recovery & Hiregram VAD
+  // Voice Speech Recognition (Speaking Answer) with continuous recovery & PrepFly VAD
   const startVoiceRecognition = () => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     isListeningDesiredRef.current = true;
@@ -766,7 +813,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         }
         setAutoSubmitCountdown(null);
 
-        // Hiregram VAD: When candidate speaks meaningful words (>= 3 words) and pauses
+        // PrepFly VAD: When candidate speaks meaningful words (>= 3 words) and pauses
         const words = currentTotal.split(/\s+/).filter(Boolean);
         if (isHandsFreeRef.current && words.length >= 3 && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
           setAutoSubmitCountdown(2);
@@ -797,8 +844,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       };
 
       rec.onerror = (e) => {
-        // Silently tolerate no-speech pauses
         if (e.error === "no-speech" && isListeningDesiredRef.current) {
+          return;
+        }
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          console.warn("Microphone access denied:", e.error);
+          alert("Microphone permission was blocked. Please click the lock or camera icon in your browser address bar to allow microphone access.");
+          setIsSpeakingAnswer(false);
           return;
         }
         console.warn("Voice speech rec notice:", e.error);
@@ -873,12 +925,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
     try {
       const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
+      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
       const res = await apiFetch("/next", {
         method: "POST",
         body: JSON.stringify({
           session_id: sessionId,
           answer: textToSubmit,
           category: chosenCategory,
+          role: chosenRole,
           difficulty: difficulty || "Medium"
         })
       });
@@ -921,9 +975,18 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     setCaptionText("Compiling your comprehensive executive evaluation report...");
 
     try {
+      const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
+      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
       const res = await apiFetch("/end-interview", {
         method: "POST",
-        body: JSON.stringify({ session_id: sessionId, eye_contact_pct: eyeContactPct, tab_switches: tabSwitches })
+        body: JSON.stringify({ 
+          session_id: sessionId, 
+          role: chosenRole,
+          category: chosenCategory,
+          difficulty: difficulty || "Medium",
+          eye_contact_pct: eyeContactPct, 
+          tab_switches: tabSwitches 
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "End interview failed");
@@ -1021,7 +1084,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         {step === "resume_upload" && (
           <div style={{ maxWidth: "860px", margin: "30px auto", background: "rgba(12,18,32,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "36px", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
             <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "6px" }}>HIREGRAM-POWERED VOICE AI</div>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "6px" }}>PREPFLY ADVANCED VOICE AI</div>
               <h2 style={{ fontSize: "28px", fontWeight: 900, marginBottom: "8px", color: "#fff" }}>Configure Your AI Interview</h2>
               <p style={{ fontSize: "14px", color: "var(--text2)", maxWidth: "560px", margin: "0 auto" }}>Choose your preferred interview setup mode below:</p>
             </div>
@@ -1467,7 +1530,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         alignItems: "center",
                         gap: "6px"
                       }}
-                      title="Hiregram Style: Automatically submits and listens when you pause speaking"
+                      title="Hands-free Voice: Automatically submits and listens when you pause speaking"
                     >
                       <span>{isHandsFree ? "⚡ Hands-Free VAD: ON" : "✋ Hands-Free: OFF"}</span>
                     </button>
@@ -1664,7 +1727,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
           let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
 
-          // Hiregram Proration Guard:
+          // PrepFly Proration Guard:
           // If candidate answered < 5 questions and score is not yet prorated, prorate by completion rate.
           // For early exit (e.g. 1 question), maximum possible score is 10/100.
           if (answeredCount === 0) {
@@ -1678,7 +1741,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             score100 = 0;
           }
 
-          // Hiregram Standardized Hiring Tiers
+          // PrepFly Standardized Hiring Tiers
           let gInfo;
           if (score100 === 0 || answeredCount === 0) {
             gInfo = {
@@ -1896,7 +1959,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
 
 
-              {/* ── HIREGRAM SPEECH & DELIVERY TELEMETRY DASHBOARD ── */}
+              {/* ── PREPFLY SPEECH & DELIVERY TELEMETRY DASHBOARD ── */}
               {(() => {
                 const isSpeechAbsent = hasNoResponses || !reportData.speech_metrics || (reportData.speech_metrics.total_words === 0 && (reportData.speech_metrics.wpm === 0 || !reportData.speech_metrics.wpm));
 
@@ -2022,7 +2085,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 );
               })()}
 
-              {/* ── HIREGRAM QUESTION-BY-QUESTION DEEP DIVE WITH STAFF BENCHMARKS ── */}
+              {/* ── QUESTION-BY-QUESTION DEEP DIVE WITH STAFF BENCHMARKS ── */}
               {reportData.turn_evaluations && reportData.turn_evaluations.length > 0 && (
                 <div style={{
                   background: "rgba(255,255,255,0.02)",

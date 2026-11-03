@@ -865,7 +865,7 @@ const InterviewPage = () => {
 
           let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
 
-          // Hiregram Proration Guard
+          // PrepFly Proration Guard
           if (answeredCount === 0) {
             score100 = 0;
           } else if (answeredCount < 5 && score100 > (answeredCount * 10)) {
