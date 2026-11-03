@@ -237,6 +237,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   // Device check toggles & webcam stream
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  const [hasCameraStream, setHasCameraStream] = useState(false);
+  const [cameraErrorMsg, setCameraErrorMsg] = useState("");
+  const [hasMicStream, setHasMicStream] = useState(false);
+  const [micErrorMsg, setMicErrorMsg] = useState("");
   const videoRefDevice = useRef(null);
   const videoRefCall = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -251,8 +255,30 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [isLoadingHint, setIsLoadingHint] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
   const audioContextRef = useRef(null);
+  const audioSourceRef = useRef(null);
   const analyserRef = useRef(null);
   const animFrameRef = useRef(null);
+
+  const bindStreamToVideo = (videoEl, stream) => {
+    if (!videoEl || !stream) return;
+    try {
+      videoEl.muted = true;
+      videoEl.defaultMuted = true;
+      videoEl.playsInline = true;
+      videoEl.autoplay = true;
+      if (videoEl.srcObject !== stream) {
+        videoEl.srcObject = stream;
+      }
+      const p = videoEl.play();
+      if (p && typeof p.catch === "function") {
+        p.catch(err => {
+          console.warn("Video playback deferred/notice:", err);
+        });
+      }
+    } catch (err) {
+      console.warn("Error binding stream to video:", err);
+    }
+  };
 
   const startAudioMeter = (stream) => {
     if (!stream || stream.getAudioTracks().length === 0) return;
@@ -266,7 +292,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (ctx.state === 'suspended') {
         ctx.resume().catch(() => {});
       }
+      if (analyserRef.current) return;
+
       const source = ctx.createMediaStreamSource(stream);
+      audioSourceRef.current = source;
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 64;
       analyser.smoothingTimeConstant = 0.5;
@@ -293,7 +322,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   };
 
   const stopAudioMeter = () => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioSourceRef.current) {
+      try { audioSourceRef.current.disconnect(); } catch {}
+      audioSourceRef.current = null;
+    }
     analyserRef.current = null;
     setAudioLevel(0);
   };
@@ -362,22 +398,27 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const timerRef = useRef(null);
 
   // Initialize and attach camera stream directly with robust device fallbacks
-  const setupCamera = async () => {
+  const setupCamera = async (forceReacquire = false) => {
     try {
-      if (!mediaStreamRef.current) {
-        let stream = null;
+      const hasLiveVideo = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
+      const hasLiveAudio = mediaStreamRef.current?.getAudioTracks().some(t => t.readyState === 'live');
+
+      if (forceReacquire || !mediaStreamRef.current || !hasLiveVideo || !hasLiveAudio) {
+        let stream = mediaStreamRef.current || null;
+        let acquiredVideo = false;
+        let acquiredAudio = false;
+
+        // 1. Try combined user media first (universal, robust constraints)
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            video: true,
+            audio: true
           });
+          acquiredVideo = stream.getVideoTracks().length > 0;
+          acquiredAudio = stream.getAudioTracks().length > 0;
         } catch (eBoth) {
-          console.warn("Combined video+audio getUserMedia failed, attempting separate requests:", eBoth);
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          } catch (eAudio) {
-            console.warn("Audio getUserMedia failed:", eAudio);
-          }
+          console.warn("Combined getUserMedia failed, attempting separate requests:", eBoth);
+          // 2. Try separate video
           try {
             const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
             if (stream) {
@@ -385,26 +426,48 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             } else {
               stream = vStream;
             }
-          } catch (eVideo) {
-            console.warn("Video getUserMedia failed:", eVideo);
+            acquiredVideo = true;
+          } catch (eVid) {
+            console.warn("Video only getUserMedia failed:", eVid);
+            setCameraErrorMsg("Camera access blocked or unavailable. Click 'Allow Camera & Mic' to retry.");
+          }
+          // 3. Try separate audio
+          try {
+            const aStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (stream) {
+              aStream.getAudioTracks().forEach(t => stream.addTrack(t));
+            } else {
+              stream = aStream;
+            }
+            acquiredAudio = true;
+          } catch (eAud) {
+            console.warn("Audio only getUserMedia failed:", eAud);
+            setMicErrorMsg("Microphone access blocked or unavailable. Click 'Reconnect Mic' to retry.");
           }
         }
-        mediaStreamRef.current = stream;
+
+        if (stream) {
+          mediaStreamRef.current = stream;
+          const liveV = stream.getVideoTracks().some(t => t.readyState === 'live');
+          const liveA = stream.getAudioTracks().some(t => t.readyState === 'live');
+          setHasCameraStream(liveV);
+          setHasMicStream(liveA);
+          if (liveV) setCameraErrorMsg("");
+          if (liveA) setMicErrorMsg("");
+        }
       }
 
       const stream = mediaStreamRef.current;
       if (stream) {
-        if (videoRefDevice.current && videoRefDevice.current.srcObject !== stream) {
-          videoRefDevice.current.srcObject = stream;
-          videoRefDevice.current.play().catch(() => {});
-        }
-        if (videoRefCall.current && videoRefCall.current.srcObject !== stream) {
-          videoRefCall.current.srcObject = stream;
-          videoRefCall.current.play().catch(() => {});
+        bindStreamToVideo(videoRefDevice.current, stream);
+        bindStreamToVideo(videoRefCall.current, stream);
+        if (stream.getAudioTracks().length > 0) {
+          startAudioMeter(stream);
         }
       }
     } catch (err) {
       console.warn("Camera setup error:", err);
+      setCameraErrorMsg(err.message || "Device access error");
     }
   };
 
@@ -412,14 +475,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   useEffect(() => {
     if (mediaStreamRef.current) {
       const stream = mediaStreamRef.current;
-      if (videoRefCall.current && videoRefCall.current.srcObject !== stream) {
-        videoRefCall.current.srcObject = stream;
-        videoRefCall.current.play().catch(() => {});
-      }
-      if (videoRefDevice.current && videoRefDevice.current.srcObject !== stream) {
-        videoRefDevice.current.srcObject = stream;
-        videoRefDevice.current.play().catch(() => {});
-      }
+      bindStreamToVideo(videoRefCall.current, stream);
+      bindStreamToVideo(videoRefDevice.current, stream);
     }
   }, [step, cameraOn]);
 
@@ -771,7 +828,6 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   // Voice Speech Recognition (Speaking Answer) with continuous recovery & PrepFly VAD
   const startVoiceRecognition = () => {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     isListeningDesiredRef.current = true;
     setIsSpeakingAnswer(true);
 
@@ -779,19 +835,28 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       startAudioMeter(mediaStreamRef.current);
     }
 
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
       console.warn("Web Speech API not available in this browser. Please type your response directly.");
       return;
     }
 
+    // Safely abort and nullify existing instance before creating a new one
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.abort();
+      } catch (err) {}
+      recognitionRef.current = null;
+    }
+
     try {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
       const rec = new SpeechRec();
       rec.continuous = true;
       rec.interimResults = true;
-      rec.lang = 'en-US';
+      rec.lang = navigator.language || 'en-US';
 
       rec.onresult = (e) => {
         let interim = "";
@@ -827,16 +892,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       };
 
       rec.onend = () => {
-        if (isListeningDesiredRef.current) {
-          try {
-            rec.start();
-          } catch (e) {
-            setTimeout(() => {
-              if (isListeningDesiredRef.current) {
-                try { rec.start(); } catch {}
-              }
-            }, 300);
-          }
+        // Continuous auto-recovery: Always instantiate a NEW SpeechRecognition instance!
+        if (isListeningDesiredRef.current && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
+          recognitionRef.current = null;
+          setTimeout(() => {
+            if (isListeningDesiredRef.current && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
+              startVoiceRecognition();
+            }
+          }, 150);
         } else {
           setIsSpeakingAnswer(false);
           stopAudioMeter();
@@ -844,20 +907,23 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       };
 
       rec.onerror = (e) => {
-        if (e.error === "no-speech" && isListeningDesiredRef.current) {
+        console.warn("Speech recognition notice:", e.error);
+        if (e.error === "no-speech") {
           return;
         }
         if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-          console.warn("Microphone access denied:", e.error);
-          alert("Microphone permission was blocked. Please click the lock or camera icon in your browser address bar to allow microphone access.");
+          setMicErrorMsg("Microphone access was denied. Please allow microphone permissions in your browser.");
           setIsSpeakingAnswer(false);
           return;
         }
-        console.warn("Voice speech rec notice:", e.error);
+        if (e.error === "network") {
+          console.warn("Speech recognition network notice. Reconnecting listener.");
+        }
       };
 
       rec.start();
       recognitionRef.current = rec;
+      setMicErrorMsg("");
     } catch (e) {
       console.warn("Voice speech rec start error:", e);
     }
@@ -871,7 +937,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
     setAutoSubmitCountdown(null);
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+      try {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.abort();
+      } catch {}
       recognitionRef.current = null;
     }
     setIsSpeakingAnswer(false);
@@ -1266,25 +1337,70 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px", marginBottom: "32px" }}>
               {/* Left: Camera Preview */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "20px", overflow: "hidden", position: "relative", height: "320px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <video ref={videoRefDevice} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraOn ? "block" : "none" }} />
+                <video
+                  ref={(el) => {
+                    videoRefDevice.current = el;
+                    if (el && mediaStreamRef.current) {
+                      bindStreamToVideo(el, mediaStreamRef.current);
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={(e) => {
+                    e.target.muted = true;
+                    e.target.play().catch(() => {});
+                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
+                />
                 
                 {!cameraOn && (
                   <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
                       {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Muted</div>
+                  </div>
+                )}
+
+                {cameraOn && (!hasCameraStream || cameraErrorMsg) && (
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #0b1120 0%, #050811 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px", textAlign: "center", zIndex: 5 }}>
+                    <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", marginBottom: "12px" }}>
+                      📷
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>Webcam Access Required</div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", maxWidth: "260px", marginBottom: "14px", lineHeight: "1.4" }}>
+                      {cameraErrorMsg || "Camera stream is inactive. Please allow browser camera and microphone permissions."}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setupCamera(true)}
+                      style={{ padding: "8px 18px", borderRadius: "20px", background: "linear-gradient(135deg, #00c4a7, #00e5c3)", border: "none", color: "#050811", fontWeight: 800, fontSize: "12px", cursor: "pointer", boxShadow: "0 0 15px rgba(0,196,167,0.3)", display: "flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <span>📹</span>
+                      <span>Allow Camera & Mic</span>
+                    </button>
                   </div>
                 )}
                 
                 {/* Floating Controls */}
                 <div style={{ position: "absolute", bottom: "16px", display: "flex", gap: "12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
                   <button 
+                    type="button"
                     onClick={() => {
                       const next = !cameraOn;
                       setCameraOn(next);
-                      if (mediaStreamRef.current) {
-                        mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = next);
+                      if (next) {
+                        const liveV = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
+                        if (!liveV) {
+                          setupCamera(true);
+                        } else {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = true);
+                        }
+                      } else {
+                        if (mediaStreamRef.current) {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
+                        }
                       }
                     }} 
                     style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
@@ -1293,11 +1409,21 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     {cameraOn ? "📷" : "🚫"}
                   </button>
                   <button 
+                    type="button"
                     onClick={() => {
                       const next = !micOn;
                       setMicOn(next);
-                      if (mediaStreamRef.current) {
-                        mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = next);
+                      if (next) {
+                        const liveA = mediaStreamRef.current?.getAudioTracks().some(t => t.readyState === 'live');
+                        if (!liveA) {
+                          setupCamera(true);
+                        } else {
+                          mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = true);
+                        }
+                      } else {
+                        if (mediaStreamRef.current) {
+                          mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = false);
+                        }
                       }
                     }} 
                     style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
@@ -1306,6 +1432,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     {micOn ? "🎙️" : "🔇"}
                   </button>
                   <button 
+                    type="button"
                     onClick={showDeviceSettings} 
                     style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
                     title="Device Settings"
@@ -1461,30 +1588,75 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               
               {/* LEFT 50%: CANDIDATE LIVE WEBCAM VIDEO */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "24px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <video ref={videoRefCall} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraOn ? "block" : "none" }} />
+                <video
+                  ref={(el) => {
+                    videoRefCall.current = el;
+                    if (el && mediaStreamRef.current) {
+                      bindStreamToVideo(el, mediaStreamRef.current);
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={(e) => {
+                    e.target.muted = true;
+                    e.target.play().catch(() => {});
+                  }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
+                />
                 
                 {!cameraOn && (
                   <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
                       {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Off</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Muted</div>
+                  </div>
+                )}
+
+                {cameraOn && (!hasCameraStream || cameraErrorMsg) && (
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #0b1120 0%, #050811 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", zIndex: 5 }}>
+                    <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", marginBottom: "12px" }}>
+                      📷
+                    </div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>Webcam Access Required</div>
+                    <div style={{ fontSize: "12px", color: "#94a3b8", maxWidth: "280px", marginBottom: "16px", lineHeight: "1.4" }}>
+                      {cameraErrorMsg || "Camera stream is inactive. Please allow browser camera and microphone permissions."}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setupCamera(true)}
+                      style={{ padding: "9px 20px", borderRadius: "20px", background: "linear-gradient(135deg, #00c4a7, #00e5c3)", border: "none", color: "#050811", fontWeight: 800, fontSize: "12px", cursor: "pointer", boxShadow: "0 0 15px rgba(0,196,167,0.3)", display: "flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <span>📹</span>
+                      <span>Allow Camera & Mic</span>
+                    </button>
                   </div>
                 )}
                 
                 <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px", zIndex: 10 }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: cameraOn ? "#00c4a7" : "#ef4444" }}></span>
+                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: (cameraOn && hasCameraStream) ? "#00c4a7" : "#ef4444" }}></span>
                   🎥 {safeUser?.name ? safeUser.name.split(' ')[0] : 'Candidate'} (You)
                 </div>
 
                 {/* Floating Media Controls Overlay */}
                 <div style={{ position: "absolute", bottom: "16px", right: "16px", display: "flex", gap: "10px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
                   <button 
+                    type="button"
                     onClick={() => {
                       const next = !cameraOn;
                       setCameraOn(next);
-                      if (mediaStreamRef.current) {
-                        mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = next);
+                      if (next) {
+                        const liveV = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
+                        if (!liveV) {
+                          setupCamera(true);
+                        } else {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = true);
+                        }
+                      } else {
+                        if (mediaStreamRef.current) {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
+                        }
                       }
                     }} 
                     style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -1493,11 +1665,23 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     {cameraOn ? "📷" : "🚫"}
                   </button>
                   <button 
+                    type="button"
                     onClick={() => {
                       const next = !micOn;
                       setMicOn(next);
-                      if (mediaStreamRef.current) {
-                        mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = next);
+                      if (next) {
+                        const liveA = mediaStreamRef.current?.getAudioTracks().some(t => t.readyState === 'live');
+                        if (!liveA) {
+                          setupCamera(true);
+                        } else {
+                          mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = true);
+                        }
+                        startVoiceRecognition();
+                      } else {
+                        if (mediaStreamRef.current) {
+                          mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = false);
+                        }
+                        stopVoiceRecognition();
                       }
                     }} 
                     style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -1683,6 +1867,35 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       }}
                     >
                       {isSpeakingAnswer ? "⏸️ Pause Voice Mic" : "🎙️ Resume Voice Mic"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        stopVoiceRecognition();
+                        setupCamera(true);
+                        setTimeout(() => {
+                          startVoiceRecognition();
+                        }, 350);
+                      }}
+                      style={{
+                        padding: "11px 16px",
+                        borderRadius: "14px",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        color: "#cbd5e1",
+                        fontWeight: 700,
+                        fontSize: "12.5px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        transition: "all 0.2s"
+                      }}
+                      title="Restart microphone capture and permissions"
+                    >
+                      🔄 Reconnect Mic
                     </button>
                     
                     <button
