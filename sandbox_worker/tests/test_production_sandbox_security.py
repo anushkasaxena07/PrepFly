@@ -178,7 +178,11 @@ print(f"CGROUP_MEM:{val}")
                 res = runner.run_submission("python", code, test_cases, "cgroup-verify")
                 self.assertIn("results", res)
                 case_res = res["results"][0]
-                self.assertEqual(case_res["status"], "success")
+                self.assertEqual(
+                    case_res["status"],
+                    "success",
+                    f"Execution failed with status '{case_res.get('status')}': {case_res.get('error')}"
+                )
                 self.assertIn(f"CGROUP_MEM:{config.MEMORY_LIMIT_BYTES}", case_res["output"])
 
     def test_09_docker_compose_configures_internal_network_bridge(self):

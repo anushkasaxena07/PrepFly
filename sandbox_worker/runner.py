@@ -56,6 +56,11 @@ def _safe_write_source(work_dir: str, filename: str, content: str) -> str:
                 os.fchown(fd, -1, 10001)
             except Exception:
                 pass
+        if hasattr(os, "fchmod") and os.name != "nt":
+            try:
+                os.fchmod(fd, 0o660)
+            except Exception:
+                pass
         with open(fd, "w", encoding="utf-8", closefd=True) as f:
             f.write(content)
     except Exception:
@@ -135,8 +140,11 @@ def _make_posix_limits(lang: str):
                 raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_AS: {e}")
 
         # 4. Mandatory Fork-bomb protection (Max processes)
+        # Multi-threaded runtimes like Node.js (libuv + V8 compiler threads) and Java require
+        # thread headroom on Linux, where RLIMIT_NPROC bounds total threads per UID.
         try:
-            resource.setrlimit(resource.RLIMIT_NPROC, (config.MAX_PROCESSES, config.MAX_PROCESSES))
+            nproc_limit = max(config.MAX_PROCESSES * 4, 64) if lang in ("javascript", "js", "node", "java") else config.MAX_PROCESSES
+            resource.setrlimit(resource.RLIMIT_NPROC, (nproc_limit, nproc_limit))
         except Exception as e:
             raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_NPROC: {e}")
 
@@ -252,8 +260,7 @@ class CodeRunner:
             # World permissions are strictly 000. Setgid ensures newly created files inherit sandboxgroup.
             if hasattr(os, "chown") and os.name != "nt":
                 try:
-                    if os.stat(work_dir).st_gid != 10001:
-                        os.chown(work_dir, -1, 10001)
+                    os.chown(work_dir, -1, 10001)
                     os.chmod(work_dir, 0o2770)
                 except Exception as e:
                     # FAIL CLOSED: Insecure fallback to world-writable strictly rejected

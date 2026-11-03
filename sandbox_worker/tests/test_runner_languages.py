@@ -74,8 +74,8 @@ console.log(num * 2);
         ]
         res = runner.run_submission("javascript", code, test_cases, "double-js")
         self.assertIn("results", res)
-        self.assertTrue(res["results"][0]["passed"])
-        self.assertTrue(res["results"][1]["passed"])
+        self.assertTrue(res["results"][0]["passed"], msg=f"JS execution failed: {res['results'][0]}")
+        self.assertTrue(res["results"][1]["passed"], msg=f"JS execution failed: {res['results'][1]}")
 
     def test_04_unsupported_language_rejection(self):
         """4. Unsupported language returns clean compilation_error."""

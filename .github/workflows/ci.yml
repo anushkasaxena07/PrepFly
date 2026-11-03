@@ -55,8 +55,10 @@ jobs:
 
     - name: Prepare Isolated Sandbox Scratch Directory
       run: |
+        sudo groupadd -g 10001 sandboxgroup || true
+        sudo usermod -aG sandboxgroup runner || true
         sudo mkdir -p /tmp/sandbox
-        sudo chown $USER:10001 /tmp/sandbox
+        sudo chown runner:sandboxgroup /tmp/sandbox
         sudo chmod 2770 /tmp/sandbox
 
     - name: Build Sandbox Runner Docker Image
@@ -65,4 +67,4 @@ jobs:
 
     - name: Run Sandbox Worker Tests
       run: |
-        python -m unittest discover -s sandbox_worker/tests -v
+        sg sandboxgroup -c "python -m unittest discover -s sandbox_worker/tests -v"

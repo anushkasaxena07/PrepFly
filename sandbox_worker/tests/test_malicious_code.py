@@ -146,7 +146,11 @@ except Exception as e:
             self.assertEqual(res.get("isolation_mode"), "container", "Execution was not performed in container mode!")
             case_res = res["results"][0]
             self.assertNotIn("CONNECTED", case_res["output"])
-            self.assertEqual(case_res["status"], "success")
+            self.assertEqual(
+                case_res["status"],
+                "success",
+                f"Execution failed with status '{case_res.get('status')}': {case_res.get('error')}"
+            )
             self.assertEqual(case_res["output"], "NETWORK_BLOCKED")
 
     def test_08_subclasses_reflection_defense(self):
