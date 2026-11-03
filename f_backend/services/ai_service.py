@@ -9,6 +9,10 @@ def safe_invoke_llm(chat_model, prompt_content):
     if not chat_model:
         return None
 
+    api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
+    if (isinstance(api_key, str) and (api_key.startswith("test-") or "dummy" in api_key.lower())) or os.getenv("ENVIRONMENT") == "test" or os.getenv("FLASK_ENV") == "test":
+        return None
+
     def _extract_text(content):
         if not content:
             return None
