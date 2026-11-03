@@ -331,30 +331,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const isAvaTalkingRef = useRef(false);
   const isAvaThinkingRef = useRef(false);
 
-  // ── Hiregram Feature: In-Call Split Code Editor (DSA / MAANG) ──
-  const [showCodeEditor, setShowCodeEditor] = useState(false);
-  const [codeLanguage, setCodeLanguage] = useState("python");
-  const [codeContent, setCodeContent] = useState(
-`# Write and test your solution live here
-# Ava evaluates both your code and your verbal explanation!
-
-def solve():
-    # Example: Two Sum
-    nums = [2, 7, 11, 15]
-    target = 9
-    seen = {}
-    for i, n in enumerate(nums):
-        diff = target - n
-        if diff in seen:
-            return [seen[diff], i]
-        seen[n] = i
-    return []
-
-print("Result:", solve())
-`
-  );
-  const [codeOutput, setCodeOutput] = useState(null);
-  const [isExecutingCode, setIsExecutingCode] = useState(false);
+  // Option 2: Job Description context without resume
+  const [jobDescription, setJobDescription] = useState("");
 
   // ── Hiregram Feature: Proctoring & Eye Contact Telemetry ──
   const [eyeContactPct, setEyeContactPct] = useState(88);
@@ -500,36 +478,6 @@ print("Result:", solve())
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  // ── Code Execution Sandbox Runner ──
-  const handleExecuteCode = async () => {
-    setIsExecutingCode(true);
-    setCodeOutput({ status: "running", text: "Compiling and executing in isolated sandbox..." });
-    try {
-      const res = await apiFetch("/api/interview/run-code", {
-        method: "POST",
-        body: JSON.stringify({
-          code: codeContent,
-          language: codeLanguage
-        })
-      });
-      const data = await res.json();
-      setCodeOutput({
-        status: data.success ? "success" : "error",
-        stdout: data.stdout || "",
-        stderr: data.stderr || "",
-        execution_time_ms: data.execution_time_ms || 0,
-        exit_code: data.exit_code
-      });
-    } catch (err) {
-      setCodeOutput({
-        status: "error",
-        stderr: "Sandbox runner error: " + err.message
-      });
-    } finally {
-      setIsExecutingCode(false);
-    }
   };
 
   // ── Turn Audio Recording ──
