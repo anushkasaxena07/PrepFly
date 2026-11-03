@@ -2542,8 +2542,25 @@ def end_interview():
                 "overall_grade": "F",
                 "grade_label": "Significant Improvement Required",
                 "grade_color": "#991b1b",
-                "hiring_recommendation": "Strong Reject",
-                "performance_level": "Not Ready",
+                "hiring_recommendation": "Strong Reject (No Responses Provided)",
+                "performance_level": "Unevaluated / Not Attempted",
+                "answered_questions_count": 0,
+                "speech_metrics": {
+                    "wpm": 0,
+                    "pacing_label": "No Speech Detected",
+                    "pacing_color": "#94a3b8",
+                    "total_words": 0,
+                    "filler_count": 0,
+                    "filler_breakdown": {},
+                    "vocabulary_diversity_pct": 0,
+                    "overused_words": []
+                },
+                "eye_contact_pct": 0,
+                "tab_switches": 0,
+                "strengths": [],
+                "weaknesses": [
+                    {"title": "No responses recorded", "evidence": "Candidate did not speak or answer any questions."}
+                ],
                 "section_grades": [
                     {"name": "Communication", "score": 0, "grade": "F", "color": "#991b1b"},
                     {"name": "Technical Knowledge", "score": 0, "grade": "F", "color": "#991b1b"},

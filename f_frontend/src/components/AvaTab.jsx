@@ -335,7 +335,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [jobDescription, setJobDescription] = useState("");
 
   // ── Hiregram Feature: Proctoring & Eye Contact Telemetry ──
-  const [eyeContactPct, setEyeContactPct] = useState(88);
+  const [eyeContactPct, setEyeContactPct] = useState(0);
   const [tabSwitches, setTabSwitches] = useState(0);
 
   // ── Hiregram Feature: Turn-by-Turn Audio Recording & Replay ──
@@ -1736,13 +1736,19 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           const confidence = score100 === 0 ? "None" : (reportData.confidence || (answeredCount < 3 ? "Low" : (answeredCount < 5 ? "Medium" : "High")));
           const recText = gInfo.rec || reportData.hiring_recommendation || reportData.recommendation;
 
-          const topStrengths = (score100 === 0 || isEarlyExit) 
-            ? ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."] 
-            : (reportData.top_strengths || ["Clear Communication", "Technical Understanding", "Structured Approach"]);
+          const hasNoResponses = answeredCount === 0 || score100 === 0;
 
-          const topImprovements = (score100 === 0 || isEarlyExit) 
-            ? [`Completed only ${answeredCount} of 10 questions. Ensure you complete the full interview to evaluate all 10 core dimensions.`] 
-            : (reportData.top_improvements || ["Provide deeper technical details", "Use STAR technique for behavioral questions", "Structure answers with clear outcomes"]);
+          const topStrengths = hasNoResponses
+            ? ["None identified: No responses provided during interview. Complete at least 5 questions to demonstrate strengths."]
+            : (isEarlyExit 
+                ? ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."] 
+                : (reportData.top_strengths || ["Clear Communication", "Technical Understanding", "Structured Approach"]));
+
+          const topImprovements = hasNoResponses
+            ? ["Candidate did not speak or answer any questions. Speak into the microphone or submit answers to get evaluated."]
+            : (isEarlyExit 
+                ? [`Completed only ${answeredCount} of 10 questions. Ensure you complete the full interview to evaluate all 10 core dimensions.`] 
+                : (reportData.top_improvements || ["Provide deeper technical details", "Use STAR technique for behavioral questions", "Structure answers with clear outcomes"]));
 
           return (
             <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>
@@ -1892,18 +1898,28 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
               {/* ── HIREGRAM SPEECH & DELIVERY TELEMETRY DASHBOARD ── */}
               {(() => {
-                const sm = reportData.speech_metrics || {
-                  wpm: 138,
-                  pacing_label: "Optimal (130-155 WPM)",
-                  pacing_color: "#10b981",
-                  total_words: 340,
-                  filler_count: 3,
-                  filler_breakdown: { "um": 2, "like": 1 },
-                  vocabulary_diversity_pct: 78
-                };
+                const isSpeechAbsent = hasNoResponses || !reportData.speech_metrics || (reportData.speech_metrics.total_words === 0 && (reportData.speech_metrics.wpm === 0 || !reportData.speech_metrics.wpm));
 
-                const eyePct = reportData.eye_contact_pct || eyeContactPct || 88;
-                const tabCount = reportData.tab_switches || tabSwitches || 0;
+                const sm = isSpeechAbsent ? {
+                  wpm: 0,
+                  pacing_label: "No Speech Detected",
+                  pacing_color: "#94a3b8",
+                  total_words: 0,
+                  filler_count: 0,
+                  filler_breakdown: {},
+                  vocabulary_diversity_pct: 0
+                } : (reportData.speech_metrics || {
+                  wpm: 0,
+                  pacing_label: "Not Evaluated",
+                  pacing_color: "#94a3b8",
+                  total_words: 0,
+                  filler_count: 0,
+                  filler_breakdown: {},
+                  vocabulary_diversity_pct: 0
+                });
+
+                const eyePct = hasNoResponses ? 0 : (reportData.eye_contact_pct !== undefined ? reportData.eye_contact_pct : (eyeContactPct || 0));
+                const tabCount = reportData.tab_switches !== undefined ? reportData.tab_switches : (tabSwitches || 0);
 
                 return (
                   <div style={{
@@ -1928,26 +1944,47 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       </span>
                     </div>
 
+                    {/* Notice if no speech was detected */}
+                    {isSpeechAbsent && (
+                      <div style={{
+                        background: "rgba(239, 68, 68, 0.08)",
+                        border: "1px solid rgba(239, 68, 68, 0.25)",
+                        borderRadius: "12px",
+                        padding: "10px 14px",
+                        marginBottom: "16px",
+                        fontSize: "12px",
+                        color: "#fca5a5",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}>
+                        <span>⚠️</span>
+                        <span><strong>No Verbal Responses Recorded:</strong> Candidate did not speak during this interview. Spoken answers are required to calculate speaking pace, filler words, and lexical range.</span>
+                      </div>
+                    )}
+
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
                       {/* WPM Pacing Card */}
                       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
                         <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Speaking Pace</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>
-                          {sm.wpm} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>WPM</span>
+                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : "#fff", marginTop: "4px" }}>
+                          {isSpeechAbsent ? 0 : sm.wpm} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>WPM</span>
                         </div>
-                        <div style={{ fontSize: "11px", fontWeight: 800, color: sm.pacing_color || "#10b981", marginTop: "2px" }}>
-                          ● {sm.pacing_label || "Optimal (130-155 WPM)"}
+                        <div style={{ fontSize: "11px", fontWeight: 800, color: isSpeechAbsent ? "#94a3b8" : (sm.pacing_color || "#10b981"), marginTop: "2px" }}>
+                          ● {isSpeechAbsent ? "No Speech Detected" : (sm.pacing_label || "Optimal (130-155 WPM)")}
                         </div>
                       </div>
 
                       {/* Filler Words Card */}
                       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
                         <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Filler Words</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: sm.filler_count > 6 ? "#f59e0b" : "#10b981", marginTop: "4px" }}>
-                          {sm.filler_count} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>detected</span>
+                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : (sm.filler_count > 6 ? "#f59e0b" : "#10b981"), marginTop: "4px" }}>
+                          {isSpeechAbsent ? 0 : sm.filler_count} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>detected</span>
                         </div>
                         <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
-                          {Object.keys(sm.filler_breakdown || {}).length > 0 ? (
+                          {isSpeechAbsent ? (
+                            <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700 }}>No speech recorded</span>
+                          ) : Object.keys(sm.filler_breakdown || {}).length > 0 ? (
                             Object.entries(sm.filler_breakdown).slice(0, 4).map(([w, c], idx) => (
                               <span key={idx} style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "8px" }}>
                                 {w}: {c}
@@ -1962,22 +1999,22 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       {/* Lexical Diversity */}
                       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
                         <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Vocabulary Richness</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>
-                          {sm.vocabulary_diversity_pct || 78}%
+                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : "#38bdf8", marginTop: "4px" }}>
+                          {isSpeechAbsent ? 0 : (sm.vocabulary_diversity_pct || 0)}%
                         </div>
                         <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                          Technical lexical range
+                          {isSpeechAbsent ? "No responses evaluated" : "Technical lexical range"}
                         </div>
                       </div>
 
                       {/* Eye Contact & Proctoring Integrity */}
                       <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
                         <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Visual & Focus Integrity</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: eyePct >= 80 ? "#10b981" : "#f59e0b", marginTop: "4px" }}>
-                          {eyePct}% <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>Eye Contact</span>
+                        <div style={{ fontSize: "22px", fontWeight: 900, color: hasNoResponses ? "#94a3b8" : (eyePct >= 80 ? "#10b981" : "#f59e0b"), marginTop: "4px" }}>
+                          {hasNoResponses ? "N/A" : `${eyePct}%`} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>{hasNoResponses ? "" : "Eye Contact"}</span>
                         </div>
-                        <div style={{ fontSize: "11px", color: tabCount === 0 ? "#10b981" : "#f59e0b", marginTop: "2px", fontWeight: 700 }}>
-                          {tabCount === 0 ? "✓ 100% Window Focus (0 Tab Switches)" : `⚠️ ${tabCount} Tab Switch(es) Detected`}
+                        <div style={{ fontSize: "11px", color: hasNoResponses ? "#94a3b8" : (tabCount === 0 ? "#10b981" : "#f59e0b"), marginTop: "2px", fontWeight: 700 }}>
+                          {hasNoResponses ? "Session Incomplete / Not Evaluated" : (tabCount === 0 ? "✓ 100% Window Focus (0 Tab Switches)" : `⚠️ ${tabCount} Tab Switch(es) Detected`)}
                         </div>
                       </div>
                     </div>
@@ -2117,11 +2154,15 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     <span>💪</span> Top Strengths
                   </h4>
                   <div>
-                    {reportData.strengths && reportData.strengths.length > 0 && typeof reportData.strengths[0] === 'object' ? (
+                    {hasNoResponses ? (
+                      <div style={{ padding: "12px", color: "#94a3b8", fontSize: "12px", fontStyle: "italic", lineHeight: "1.5" }}>
+                        No strengths identified. Candidate did not provide any spoken or written responses during the interview.
+                      </div>
+                    ) : (reportData.strengths && reportData.strengths.length > 0 && typeof reportData.strengths[0] === 'object' ? (
                       reportData.strengths.map((str, idx) => renderEvidenceCard(str, true, idx))
                     ) : (
                       topStrengths.map((str, idx) => renderEvidenceCard(str, true, idx))
-                    )}
+                    ))}
                   </div>
                 </div>
                 <div style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "18px" }}>

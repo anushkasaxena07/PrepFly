@@ -592,10 +592,23 @@ def fast_compile_report(role, track, difficulty, experience_level, questions, re
     if valid_count == 0:
         base_report = {
             "overall_score": 0.0,
+            "overall_score_100": 0,
             "report_type": "preliminary",
             "answered_questions_count": 0,
-            "recommendation": "Preliminary Evaluation (Requires ≥ 5 answered questions)",
+            "recommendation": "Strong Reject (No Responses Provided)",
             "confidence": "Low",
+            "speech_metrics": {
+                "wpm": 0,
+                "pacing_label": "No Speech Detected",
+                "pacing_color": "#94a3b8",
+                "total_words": 0,
+                "filler_count": 0,
+                "filler_breakdown": {},
+                "vocabulary_diversity_pct": 0,
+                "overused_words": []
+            },
+            "eye_contact_pct": 0,
+            "tab_switches": 0,
             "dimensions": [
                 {"name": "Communication", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
                 {"name": "Technical Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
@@ -695,42 +708,54 @@ def fast_compile_report(role, track, difficulty, experience_level, questions, re
     ]
 
     # Calculate speech & communication delivery metrics using speech_engine
-    speech_metrics = {
-        "wpm": 138,
-        "pacing_label": "Optimal (130-155 WPM)",
-        "pacing_color": "#10b981",
-        "total_words": 0,
-        "filler_count": 0,
-        "filler_breakdown": {},
-        "vocabulary_diversity_pct": 78,
-        "overused_words": []
-    }
-    try:
-        from services.speech_engine import compute_speech_metrics
-        full_transcript = " ".join([str(ans) for ans in (responses or []) if ans and str(ans).strip()])
-        total_w = len(full_transcript.split())
-        est_duration = max(30.0, (total_w / 135.0) * 60.0) if total_w > 0 else 60.0
-        sm = compute_speech_metrics(full_transcript, duration_seconds=est_duration)
-        wpm_val = sm.get("wpm", 138)
-        if wpm_val >= 165:
-            p_label, p_color = "Fast Pace (>160 WPM)", "#f59e0b"
-        elif wpm_val <= 115:
-            p_label, p_color = "Deliberate Pace (<115 WPM)", "#38bdf8"
-        else:
-            p_label, p_color = "Optimal (130-155 WPM)", "#10b981"
-            
+    full_transcript = " ".join([str(ans) for ans in (responses or []) if ans and str(ans).strip()])
+    total_w = len(full_transcript.split())
+    if total_w == 0:
         speech_metrics = {
-            "wpm": wpm_val,
-            "pacing_label": p_label,
-            "pacing_color": p_color,
-            "total_words": total_w,
-            "filler_count": sm.get("filler_count", 0),
-            "filler_breakdown": sm.get("filler_breakdown", {}),
-            "vocabulary_diversity_pct": sm.get("vocab_info", {}).get("diversity_pct", 78) if isinstance(sm.get("vocab_info"), dict) else 78,
-            "overused_words": sm.get("vocab_info", {}).get("overused_words", []) if isinstance(sm.get("vocab_info"), dict) else []
+            "wpm": 0,
+            "pacing_label": "No Speech Detected",
+            "pacing_color": "#94a3b8",
+            "total_words": 0,
+            "filler_count": 0,
+            "filler_breakdown": {},
+            "vocabulary_diversity_pct": 0,
+            "overused_words": []
         }
-    except Exception as ex:
-        print("Speech metrics calculation notice:", ex)
+    else:
+        try:
+            from services.speech_engine import compute_speech_metrics
+            est_duration = max(15.0, (total_w / 135.0) * 60.0)
+            sm = compute_speech_metrics(full_transcript, duration_seconds=est_duration)
+            wpm_val = sm.get("wpm", 0)
+            if wpm_val >= 165:
+                p_label, p_color = "Fast Pace (>160 WPM)", "#f59e0b"
+            elif wpm_val <= 115:
+                p_label, p_color = "Deliberate Pace (<115 WPM)", "#38bdf8"
+            else:
+                p_label, p_color = "Optimal (130-155 WPM)", "#10b981"
+                
+            speech_metrics = {
+                "wpm": wpm_val,
+                "pacing_label": p_label,
+                "pacing_color": p_color,
+                "total_words": total_w,
+                "filler_count": sm.get("filler_count", 0),
+                "filler_breakdown": sm.get("filler_breakdown", {}),
+                "vocabulary_diversity_pct": sm.get("vocab_info", {}).get("diversity_pct", 0) if isinstance(sm.get("vocab_info"), dict) else 0,
+                "overused_words": sm.get("vocab_info", {}).get("overused_words", []) if isinstance(sm.get("vocab_info"), dict) else []
+            }
+        except Exception as ex:
+            print("Speech metrics calculation notice:", ex)
+            speech_metrics = {
+                "wpm": 0,
+                "pacing_label": "Not Evaluated",
+                "pacing_color": "#94a3b8",
+                "total_words": total_w,
+                "filler_count": 0,
+                "filler_breakdown": {},
+                "vocabulary_diversity_pct": 0,
+                "overused_words": []
+            }
 
     # Build turn-by-turn evaluations with candidate quote and model benchmark answer
     turn_evaluations = []
@@ -914,15 +939,19 @@ def enrich_report_with_grading(report: dict) -> dict:
             report["badges"] = award_badges(score, report["section_grades"])
 
     # Strengths — keep only evidence-backed items with verified score >= 70
-    strengths = report.get("strengths") or []
-    if strengths and isinstance(strengths[0], dict):
-        report["top_strengths"] = [
-            f"{s.get('title')}: {s.get('evidence')}"
-            for s in strengths
-            if isinstance(s, dict) and s.get("title") and s.get("evidence")
-        ] or ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
+    if valid_q_count == 0 or score == 0:
+        report["top_strengths"] = ["None identified (no responses provided during interview)."]
+        report["strengths"] = []
     else:
-        report["top_strengths"] = strengths if strengths else ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
+        strengths = report.get("strengths") or []
+        if strengths and isinstance(strengths[0], dict):
+            report["top_strengths"] = [
+                f"{s.get('title')}: {s.get('evidence')}"
+                for s in strengths
+                if isinstance(s, dict) and s.get("title") and s.get("evidence")
+            ] or ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
+        else:
+            report["top_strengths"] = strengths if strengths else ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."]
 
     # Weaknesses — same rule
     improvements = report.get("weaknesses") or report.get("improvement_suggestions") or []
