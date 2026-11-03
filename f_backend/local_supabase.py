@@ -2,7 +2,16 @@ import sqlite3
 import json
 import os
 import uuid
+import re
 from datetime import datetime, timedelta
+
+IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+def _validate_ident(name: str) -> str:
+    if not isinstance(name, str) or not IDENT_RE.match(name.strip()):
+        raise ValueError(f"Invalid SQL identifier: {name!r}")
+    return name.strip()
+
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_db.sqlite")
 
 class SQLiteSupabaseMock:
@@ -14,8 +23,9 @@ class SQLiteSupabaseMock:
         self._init_db()
 
     def _get_conn(self):
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        conn = sqlite3.connect(self.db_path, timeout=60, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout = 60000")
         return conn
 
     def _init_db(self):
@@ -114,11 +124,12 @@ class SQLiteSupabaseMock:
             ("difficulty", "TEXT"),
             ("stage", "TEXT"),
             ("ats_score", "INTEGER"),
-            ("structured_resume", "TEXT")
+            ("structured_resume", "TEXT"),
+            ("cached_hints", "TEXT")
         ]
         for col_name, col_type in session_cols:
             try:
-                cursor.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE sessions ADD COLUMN {_validate_ident(col_name)} {col_type}")
             except Exception:
                 pass
         
@@ -214,7 +225,7 @@ class SQLiteSupabaseMock:
         """)
         for col in ["current_output", "last_editor", "last_editor_name"]:
             try:
-                cursor.execute(f"ALTER TABLE coding_rooms ADD COLUMN {col} TEXT")
+                cursor.execute(f"ALTER TABLE coding_rooms ADD COLUMN {_validate_ident(col)} TEXT")
             except Exception:
                 pass
 
@@ -302,9 +313,11 @@ class SQLiteSupabaseMock:
         ]
         for col_name, col_type in pay_cols:
             try:
-                cursor.execute(f"ALTER TABLE payment ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE payment ADD COLUMN {_validate_ident(col_name)} {col_type}")
             except Exception:
                 pass
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_order_success ON payment(razorpay_order_id) WHERE status = 'Success'")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_rzp_pay_success ON payment(razorpay_payment_id) WHERE status = 'Success'")
 
         # 16b. invoice
         cursor.execute("""
@@ -329,7 +342,7 @@ class SQLiteSupabaseMock:
         ]
         for col_name, col_type in inv_cols:
             try:
-                cursor.execute(f"ALTER TABLE invoice ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE invoice ADD COLUMN {_validate_ident(col_name)} {col_type}")
             except Exception:
                 pass
         conn.commit()
@@ -386,7 +399,7 @@ class SQLiteSupabaseMock:
         ]
         for col_name, col_type in org_cols:
             try:
-                cursor.execute(f"ALTER TABLE organization ADD COLUMN {col_name} {col_type}")
+                cursor.execute(f"ALTER TABLE organization ADD COLUMN {_validate_ident(col_name)} {col_type}")
             except Exception:
                 pass
         conn.commit()
@@ -448,7 +461,7 @@ class SQLiteSupabaseMock:
         # Run migrations for existing DBs
         for col_name in ["description", "starter_code", "test_cases", "constraints"]:
             try:
-                cursor.execute(f"ALTER TABLE question_bank ADD COLUMN {col_name} TEXT")
+                cursor.execute(f"ALTER TABLE question_bank ADD COLUMN {_validate_ident(col_name)} TEXT")
             except sqlite3.OperationalError:
                 pass
 
@@ -630,6 +643,19 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 28c2. orders (Payment Orders)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id TEXT PRIMARY KEY,
+                organization_id TEXT,
+                plan_id TEXT,
+                amount REAL,
+                currency TEXT,
+                status TEXT,
+                created_at TEXT
+            )
+        """)
+
         # 28d. feedback
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS feedback (
@@ -677,7 +703,7 @@ class SQLiteSupabaseMock:
                 "super_admin_01",
                 "Alex Vance (Platform Owner)",
                 "superadmin@interviewai.io",
-                generate_password_hash("superadmin123"),
+                generate_password_hash("mock_sa_pass_2026"),
                 "SUPER_ADMIN",
                 "https://lh3.googleusercontent.com/a/default_owner",
                 datetime.utcnow().isoformat()
@@ -689,7 +715,7 @@ class SQLiteSupabaseMock:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 "aiconfig_01",
-                "AIzaSyDemoKeyGemini123456",
+                "mock_local_key",
                 "sk-demo-openai-key-7890",
                 0.7,
                 2048,
@@ -759,7 +785,7 @@ class SQLiteSupabaseMock:
                 org_id,
                 "Prof. Marcus Vance",
                 "admin@stanford.edu",
-                generate_password_hash("admin123"),
+                generate_password_hash("mock_org_admin_pass_2026"),
                 "Organization Admin",
                 datetime.utcnow().isoformat()
             ))
@@ -886,7 +912,8 @@ class SQLiteSupabaseMock:
         conn.close()
 
     def table(self, name):
-        return QueryBuilder(self, name)
+        return QueryBuilder(self, _validate_ident(name))
+
 
 class MockStorageBucket:
     def __init__(self, bucket_name):
@@ -908,7 +935,7 @@ class DummyResult:
 class QueryBuilder:
     def __init__(self, client, table_name):
         self.client = client
-        self.table_name = table_name
+        self.table_name = _validate_ident(table_name)
         self.filters = []
         self.order_by = None
         self.limit_val = None
@@ -917,9 +944,15 @@ class QueryBuilder:
         self.on_conflict = None
         self._maybe_single = False
 
-    def select(self, columns="*"):
+    def select(self, columns="*", count=None):
         self.operation = "select"
+        if columns and columns != "*":
+            for c in str(columns).split(","):
+                c_clean = c.strip()
+                if c_clean:
+                    _validate_ident(c_clean)
         self.columns = columns
+        self.count_opt = count
         return self
 
     def insert(self, data):
@@ -943,23 +976,47 @@ class QueryBuilder:
         return self
 
     def eq(self, column, value):
-        self.filters.append(("eq", column, value))
+        self.filters.append(("eq", _validate_ident(column), value))
         return self
 
     def neq(self, column, value):
-        self.filters.append(("neq", column, value))
+        self.filters.append(("neq", _validate_ident(column), value))
         return self
 
     def in_(self, column, values):
-        self.filters.append(("in", column, values))
+        self.filters.append(("in", _validate_ident(column), values))
         return self
 
     def gte(self, column, value):
-        self.filters.append(("gte", column, value))
+        self.filters.append(("gte", _validate_ident(column), value))
+        return self
+
+    def gt(self, column, value):
+        self.filters.append(("gt", _validate_ident(column), value))
+        return self
+
+    def lt(self, column, value):
+        self.filters.append(("lt", _validate_ident(column), value))
+        return self
+
+    def lte(self, column, value):
+        self.filters.append(("lte", _validate_ident(column), value))
+        return self
+
+    def like(self, column, pattern):
+        self.filters.append(("like", _validate_ident(column), pattern))
+        return self
+
+    def ilike(self, column, pattern):
+        self.filters.append(("ilike", _validate_ident(column), pattern))
+        return self
+
+    def is_(self, column, value):
+        self.filters.append(("is", _validate_ident(column), value))
         return self
 
     def order(self, column, desc=False):
-        self.order_by = (column, desc)
+        self.order_by = (_validate_ident(column), desc)
         return self
 
     def limit(self, value):
@@ -970,8 +1027,22 @@ class QueryBuilder:
         self._maybe_single = True
         return self
 
+    def or_(self, filter_expr):
+        self.filters.append(("or", filter_expr, None))
+        return self
+
+
     def execute(self):
         conn = self.client._get_conn()
+        try:
+            return self._execute_internal(conn)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def _execute_internal(self, conn):
         cursor = conn.cursor()
         
         # Get list of columns in the SQLite table dynamically
@@ -983,19 +1054,61 @@ class QueryBuilder:
         filter_parts = []
         params = []
         for op, col, val in self.filters:
+            valid_col = _validate_ident(col) if op != "or" else None
             if op == "eq":
-                filter_parts.append(f"{col} = ?")
+                filter_parts.append(f"{valid_col} = ?")
                 params.append(val)
             elif op == "neq":
-                filter_parts.append(f"{col} != ?")
+                filter_parts.append(f"{valid_col} != ?")
                 params.append(val)
             elif op == "gte":
-                filter_parts.append(f"{col} >= ?")
+                filter_parts.append(f"{valid_col} >= ?")
                 params.append(val)
+            elif op == "gt":
+                filter_parts.append(f"{valid_col} > ?")
+                params.append(val)
+            elif op == "lt":
+                filter_parts.append(f"{valid_col} < ?")
+                params.append(val)
+            elif op == "lte":
+                filter_parts.append(f"{valid_col} <= ?")
+                params.append(val)
+            elif op in ("like", "ilike"):
+                filter_parts.append(f"{valid_col} LIKE ?")
+                params.append(val)
+            elif op == "is":
+                if val is None:
+                    filter_parts.append(f"{valid_col} IS NULL")
+                else:
+                    filter_parts.append(f"{valid_col} IS ?")
+                    params.append(val)
             elif op == "in":
                 placeholders = ",".join("?" for _ in val)
-                filter_parts.append(f"{col} IN ({placeholders})")
+                filter_parts.append(f"{valid_col} IN ({placeholders})")
                 params.extend(val)
+            elif op == "or":
+                sub_parts = []
+                for sub in col.split(","):
+                    sub_clean = sub.strip()
+                    matched = False
+                    for postgrest_op, sql_op in [
+                        (".eq.", "="), (".neq.", "!="), (".gte.", ">="),
+                        (".gt.", ">"), (".lte.", "<="), (".lt.", "<"),
+                        (".like.", "LIKE"), (".ilike.", "LIKE"), (".is.", "IS")
+                    ]:
+                        if postgrest_op in sub_clean:
+                            c, v = sub_clean.split(postgrest_op, 1)
+                            sub_parts.append(f"{_validate_ident(c.strip())} {sql_op} ?")
+                            params.append(v.strip())
+                            matched = True
+                            break
+                    if not matched and ".eq." in sub_clean:
+                        c, v = sub_clean.split(".eq.", 1)
+                        sub_parts.append(f"{_validate_ident(c.strip())} = ?")
+                        params.append(v.strip())
+                if sub_parts:
+                    filter_parts.append("(" + " OR ".join(sub_parts) + ")")
+
                 
         where_clause = ""
         if filter_parts:
@@ -1027,14 +1140,14 @@ class QueryBuilder:
         if self.operation == "select":
             cols = self.columns
             if cols != "*":
-                cols = ",".join(c.strip() for c in cols.split(","))
+                cols = ",".join(_validate_ident(c.strip()) for c in cols.split(","))
             
             sql = f"SELECT {cols} FROM {self.table_name} {where_clause}"
             if self.order_by:
                 col, desc = self.order_by
                 sql += f" ORDER BY {col} {'DESC' if desc else 'ASC'}"
             if self.limit_val:
-                sql += f" LIMIT {self.limit_val}"
+                sql += f" LIMIT {int(self.limit_val)}"
                 
             cursor.execute(sql, params)
             rows = cursor.fetchall()
@@ -1053,7 +1166,16 @@ class QueryBuilder:
                 if "created_at" in table_cols and "created_at" not in item:
                     item["created_at"] = datetime.utcnow().isoformat()
                 
-                keys = list(item.keys())
+                for k in list(item.keys()):
+                    valid_k = _validate_ident(k)
+                    if valid_k not in table_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE {self.table_name} ADD COLUMN {valid_k} TEXT")
+                            table_cols.append(valid_k)
+                        except Exception:
+                            pass
+
+                keys = [_validate_ident(k) for k in item.keys() if k in table_cols]
                 vals = [serialize_val(item[k]) for k in keys]
                 placeholders = ",".join("?" for _ in keys)
                 sql = f"INSERT INTO {self.table_name} ({','.join(keys)}) VALUES ({placeholders})"
@@ -1087,9 +1209,18 @@ class QueryBuilder:
             item = dict(self.data_to_write)
             if "updated_at" in table_cols and "updated_at" not in item:
                 item["updated_at"] = datetime.utcnow().isoformat()
+
+            for k in list(item.keys()):
+                valid_k = _validate_ident(k)
+                if valid_k not in table_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE {self.table_name} ADD COLUMN {valid_k} TEXT")
+                        table_cols.append(valid_k)
+                    except Exception:
+                        pass
             
-            keys = list(item.keys())
-            set_parts = [f"{k} = ?" for k in keys]
+            keys = [_validate_ident(k) for k in item.keys() if k in table_cols]
+            set_parts = [f"{_validate_ident(k)} = ?" for k in keys]
             vals = [serialize_val(item[k]) for k in keys]
             
             sql = f"UPDATE {self.table_name} SET {','.join(set_parts)} {where_clause}"
@@ -1121,8 +1252,10 @@ class QueryBuilder:
                 item = dict(item)
                 conflict_cols = []
                 if self.on_conflict:
-                    conflict_cols = [self.on_conflict] if isinstance(self.on_conflict, str) else list(self.on_conflict)
+                    raw_conflicts = [self.on_conflict] if isinstance(self.on_conflict, str) else list(self.on_conflict)
+                    conflict_cols = [_validate_ident(c) for c in raw_conflicts]
                 else:
+
                     if self.table_name == "sessions":
                         conflict_cols = ["session_id"]
                     elif self.table_name == "users":
@@ -1133,14 +1266,26 @@ class QueryBuilder:
                         conflict_cols = ["id"]
                     elif self.table_name in ["support_conversations", "support_messages", "feedback"]:
                         conflict_cols = ["id"]
+                    elif self.table_name in ["super_admin", "admin", "organization", "students"]:
+                        conflict_cols = ["email"] if "email" in item else ["id"]
                 
+                for k in list(item.keys()):
+                    valid_k = _validate_ident(k)
+                    if valid_k not in table_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE {self.table_name} ADD COLUMN {valid_k} TEXT")
+                            table_cols.append(valid_k)
+                        except Exception:
+                            pass
+
                 exists = False
                 exist_filters = []
                 exist_params = []
                 for col in conflict_cols:
-                    if col in item:
-                        exist_filters.append(f"{col} = ?")
-                        exist_params.append(item[col])
+                    valid_col = _validate_ident(col)
+                    if valid_col in item:
+                        exist_filters.append(f"{valid_col} = ?")
+                        exist_params.append(item[valid_col])
                 
                 if exist_filters:
                     check_sql = f"SELECT * FROM {self.table_name} WHERE " + " AND ".join(exist_filters)
@@ -1152,30 +1297,29 @@ class QueryBuilder:
                 if exists:
                     if "updated_at" in table_cols and "updated_at" not in item:
                         item["updated_at"] = datetime.utcnow().isoformat()
-                    keys = [k for k in item.keys() if k not in conflict_cols]
+                    keys = [_validate_ident(k) for k in item.keys() if k not in conflict_cols and k in table_cols]
                     if keys:
-                        set_parts = [f"{k} = ?" for k in keys]
+                        set_parts = [f"{_validate_ident(k)} = ?" for k in keys]
                         vals = [serialize_val(item[k]) for k in keys]
                         update_sql = f"UPDATE {self.table_name} SET {','.join(set_parts)} WHERE " + " AND ".join(exist_filters)
                         cursor.execute(update_sql, vals + exist_params)
                 else:
                     if "created_at" in table_cols and "created_at" not in item:
                         item["created_at"] = datetime.utcnow().isoformat()
-                    keys = list(item.keys())
+                    keys = [_validate_ident(k) for k in item.keys() if k in table_cols]
                     vals = [serialize_val(item[k]) for k in keys]
                     placeholders = ",".join("?" for _ in keys)
                     insert_sql = f"INSERT INTO {self.table_name} ({','.join(keys)}) VALUES ({placeholders})"
                     cursor.execute(insert_sql, vals)
                 
-                cursor.execute(f"SELECT * FROM {self.table_name} WHERE " + " AND ".join(exist_filters), exist_params)
-                r = cursor.fetchone()
-                if r:
-                    upserted_rows.append(deserialize_row(r))
+                if exist_filters:
+                    cursor.execute(f"SELECT * FROM {self.table_name} WHERE " + " AND ".join(exist_filters), exist_params)
+                    r = cursor.fetchone()
+                    if r:
+                        upserted_rows.append(deserialize_row(r))
             
             conn.commit()
             result_data = upserted_rows
-
-        conn.close()
         return DummyResult(result_data)
 
 try:

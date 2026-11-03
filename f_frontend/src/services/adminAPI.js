@@ -336,3 +336,39 @@ export const saveAdminSettings = async (settingsData) => {
   if (res.ok) return await res.json();
   throw new Error("Failed to save settings");
 };
+
+export const downloadInvoice = async (invoiceId, invoiceNumber = "invoice") => {
+  const token = localStorage.getItem("superadmin_access_token")
+    || localStorage.getItem("superadmin_token")
+    || localStorage.getItem("admin_access_token")
+    || localStorage.getItem("access_token")
+    || "";
+
+  if (!token) {
+    throw new Error("Authentication required to download invoice");
+  }
+
+  const res = await fetch(`${BACKEND_URL}/api/invoice/${invoiceId}?format=pdf`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/pdf"
+    }
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Download failed (HTTP ${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  const cleanNum = invoiceNumber ? invoiceNumber.replace(/[/\\?%*:|"<>]/g, "-") : `invoice_${invoiceId}`;
+  a.download = cleanNum.toLowerCase().endsWith(".pdf") ? cleanNum : `${cleanNum}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 30000);
+};

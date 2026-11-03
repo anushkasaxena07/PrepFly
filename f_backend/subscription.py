@@ -9,7 +9,16 @@ subscription_bp = Blueprint("subscription_bp", __name__)
 @subscription_bp.route("/subscription", methods=["GET"])
 def api_subscription_status():
     try:
-        org_id = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id") or "org_default"
+        from app import _get_optional_user
+        p = _get_optional_user()
+        requested_org = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id")
+        
+        if p and p.get("role") != "SUPER_ADMIN":
+            token_org = p.get("organization_id")
+            if token_org and requested_org and str(requested_org) != str(token_org):
+                return jsonify({"error": "Forbidden: Cannot access subscription of another organization"}), 403
+
+        org_id = requested_org if (p and p.get("role") == "SUPER_ADMIN") else ((p.get("organization_id") if p and p.get("organization_id") else requested_org) or "org_default")
         status = get_org_subscription_status(org_id)
         return jsonify(status), 200
     except Exception as e:

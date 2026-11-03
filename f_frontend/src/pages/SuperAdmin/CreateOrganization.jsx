@@ -12,7 +12,7 @@ export default function CreateOrganization({ onDone }) {
     subscription_plan: 'ENTERPRISE',
     admin_name: '',
     admin_email: '',
-    temp_password: 'admin123'
+    temp_password: ''
   });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -96,7 +96,7 @@ export default function CreateOrganization({ onDone }) {
 
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>TEMPORARY ADMIN PASSWORD</label>
-            <input type="password" value={form.temp_password} onChange={e => setForm({ ...form, temp_password: e.target.value })} placeholder="Default: admin123" style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="password" value={form.temp_password} onChange={e => setForm({ ...form, temp_password: e.target.value })} placeholder="Leave blank to auto-generate secure password" style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
           </div>
 
           <div style={{ gridColumn: "1 / -1", marginTop: "16px" }}>

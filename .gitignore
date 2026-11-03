@@ -31,6 +31,7 @@ build/
 
 # Local uploads and recordings
 f_backend/uploads/
+uploads/
 
 local_db.sqlite
 *.sqlite

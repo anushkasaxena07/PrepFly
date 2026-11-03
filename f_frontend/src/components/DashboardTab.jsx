@@ -18,56 +18,56 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
     ? (userStats.interviews.avg_score != null ? userStats.interviews.avg_score.toFixed(1) : "0.0")
     : (hasData && completedSessions.length > 0
         ? (completedSessions.reduce((acc, s) => acc + (s.final_score || 0), 0) / completedSessions.length).toFixed(1)
-        : (isLoggedIn ? "0.0" : "7.8"));
+        : "0.0");
 
   // 3. Interview readiness
   const displayReadiness = userStats?.interviews
     ? (userStats.interviews.readiness ?? 0)
-    : (hasData ? Math.min(100, Math.round(parseFloat(displayAvgScore || "0") * 10)) : (isLoggedIn ? 0 : 82));
+    : (hasData && completedSessions.length > 0 ? Math.min(100, Math.round(parseFloat(displayAvgScore || "0") * 10)) : 0);
 
-  // 4. Dynamic stats
-  const codingAccuracy = userStats?.coding
+  // 4. Dynamic stats (strictly from student records, never mock values)
+  const codingAccuracy = userStats?.coding?.has_data
     ? (userStats.coding.accuracy ?? 0)
-    : (hasData ? Math.min(100, Math.round(65 + ((parseFloat(displayAvgScore || "0") || 7.0) - 7.0) * 8)) : (isLoggedIn ? 0 : 73));
+    : 0;
 
-  const speechConfidence = userStats?.speech
+  const speechConfidence = userStats?.speech?.has_data
     ? (userStats.speech.confidence ?? 0)
-    : (hasData ? Math.min(100, Math.round(75 + ((parseFloat(displayAvgScore || "0") || 7.0) - 7.0) * 6)) : (isLoggedIn ? 0 : 87));
+    : 0;
 
   // Streak & Milestone Info
   const displayStreak = userStats
     ? (userStats.streak ?? 0)
-    : (hasData ? Math.min(30, completedSessions.length + 2) : (isLoggedIn ? 0 : 7));
+    : (completedSessions.length > 0 ? 1 : 0);
 
   const gradeACount = userStats
     ? ((userStats.grade_distribution?.A || 0) + (userStats.grade_distribution?.S || 0))
-    : (hasData ? completedSessions.filter(s => s.final_grade === 'A' || s.final_grade === 'S').length : (isLoggedIn ? 0 : 3));
+    : (hasData ? completedSessions.filter(s => s.final_grade === 'A' || s.final_grade === 'S').length : 0);
 
-  // Dynamic Insights calculation
+  // Dynamic Insights based strictly on student activity
   const baseInsights = [
     {
       type: "speech",
-      title: "Filler words detected frequently",
-      desc: 'You said "um", "uh", "like" 11 times in your last session. This signals nervousness to interviewers.',
+      title: "Speech AI Ready",
+      desc: "Record answers in Speech AI to track real-time speaking confidence, pace (WPM), and filler words.",
       cta: "Practice Speech AI →",
-      severity: "high",
+      severity: "low",
       icon: "🎤",
-      className: "insight-card sev-high ins-high"
+      className: "insight-card sev-low ins-low"
     },
     {
       type: "resume",
-      title: "Resume missing 4 JD keywords",
-      desc: "Kubernetes, Terraform, GraphQL, and Docker Swarm appear in your target JD but not on your resume.",
+      title: "Resume ATS Scanner Ready",
+      desc: "Upload your resume and job description to identify keyword matches and score resume compatibility.",
       cta: "Update Resume →",
-      severity: "med",
+      severity: "low",
       icon: "📄",
-      className: "insight-card sev-med ins-med"
+      className: "insight-card sev-low ins-low"
     },
     {
       type: "coding",
-      title: "Dynamic Programming up +18%",
-      desc: "Your DP accuracy improved significantly. LeetCode Medium problems are now your strong suit.",
-      cta: "Keep Practicing →",
+      title: "Coding Playground Open",
+      desc: "Solve standard coding questions and get automated runtime analytics and AI code reviews.",
+      cta: "Resume Practice →",
       severity: "low",
       icon: "💻",
       className: "insight-card sev-low ins-low"
@@ -134,25 +134,19 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
     });
   }
 
-  // Dynamic SVG Trend calculation
-  const defaultChartData = [
-    { final_score: 6.8, final_grade: 'B' },
-    { final_score: 7.2, final_grade: 'B+' },
-    { final_score: 7.9, final_grade: 'A' },
-    { final_score: 8.5, final_grade: 'A' },
-    { final_score: 8.9, final_grade: 'S' }
-  ];
+  // Dynamic SVG Trend calculation from real student records
   const chartSessions = completedSessions.length > 0 
     ? [...completedSessions].reverse().slice(-12)
-    : defaultChartData;
-  const hasChartData = true;
+    : [];
+  const hasChartData = chartSessions.length > 0;
   
   const chartPoints = chartSessions.map((s, index) => {
     const numPoints = chartSessions.length;
     const x = numPoints > 1 
       ? 22 + index * (520 / (numPoints - 1))
       : 22;
-    const score = s.final_score || 7.5;
+    const rawScore = typeof s.final_score === 'number' ? s.final_score : (typeof s.overall_score === 'number' ? s.overall_score : 0);
+    const score = Math.max(0, Math.min(10, rawScore));
     const y = 136 - (score * 9.9); // scale score 0..10 to Y range 136..37
     return { x, y, score, label: `S${index + 1}${s.final_grade === 'S' ? '★' : ''}` };
   });
@@ -162,9 +156,9 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
     ? `M22,140 ` + chartPoints.map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + ` L${chartPoints[chartPoints.length - 1].x.toFixed(1)},140 Z`
     : "";
 
-  // Dynamic metrics
-  const displayCoding = userStats ? userStats.coding.total : (hasData ? completedSessions.length : 0);
-  const displaySpeech = userStats ? userStats.speech.total : (hasData ? completedSessions.length : 0);
+  // Dynamic metrics strictly from student records
+  const displayCoding = userStats?.coding?.has_data ? userStats.coding.total : 0;
+  const displaySpeech = userStats?.speech?.has_data ? userStats.speech.total : 0;
 
   // Daily Goals calculation
   const goal1Pct = Math.min(100, Math.round((displayCoding / 2) * 100));
@@ -173,11 +167,11 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
   
   const goalsDone = (goal1Pct >= 100 ? 1 : 0) + (goal2Pct >= 100 ? 1 : 0) + (goal3Pct >= 100 ? 1 : 0);
 
-  // Skill Radar values
+  // Skill Radar values (honestly 0 when not practiced yet)
   const dsaSkill = codingAccuracy;
   const readinessSkill = displayReadiness;
   const speechSkill = speechConfidence;
-  const resumeSkill = userStats?.resume?.latest_score || (displayAvgScore * 10);
+  const resumeSkill = userStats?.resume?.has_data ? (userStats.resume.latest_score || 0) : 0;
 
   const getTimeBasedGreeting = () => {
     const hour = new Date().getHours();
@@ -316,7 +310,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                   <div className="continue-info">
                     <div className="continue-title">Ava AI Interview Coach</div>
                     <div className="continue-meta">Adaptive voice mock interview sessions</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(10, displayReadiness)}%`, "--p-start":"#9b6dff", "--p-end":"#00f0c8"}}></div></div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${displayReadiness}%`, "--p-start":"#9b6dff", "--p-end":"#00f0c8"}}></div></div>
                   </div>
                   <div className="continue-pct" style={{color:"var(--purple)"}}>{displayReadiness}%</div>
                   <div className="continue-arrow">›</div>
@@ -326,7 +320,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                   <div className="continue-info">
                     <div className="continue-title">Resume ATS Scanner</div>
                     <div className="continue-meta">Match resume keywords against target job descriptions</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(10, resumeSkill)}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${resumeSkill}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
                   </div>
                   <div className="continue-pct" style={{color:"var(--cyan)"}}>{resumeSkill}%</div>
                   <div className="continue-arrow">›</div>
@@ -484,7 +478,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                     <span style={{color:"var(--cyan)",fontWeight:700}}>{dsaSkill}%</span>
                   </div>
                   <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.5 × solve rate + 0.3 × difficulty + 0.2 × consistency</div>
-                  <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, dsaSkill)}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
+                  <div className="progress-bar"><div className="progress-fill" style={{width:`${dsaSkill}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
                 </div>
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
@@ -492,7 +486,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                     <span style={{color:"var(--purple)",fontWeight:700}}>{readinessSkill}%</span>
                   </div>
                   <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.4 × relevance + 0.3 × confidence + 0.2 × pace + 0.1 × completion</div>
-                  <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, readinessSkill)}%`, "--p-start":"#7c4fe0", "--p-end":"#9b6dff"}}></div></div>
+                  <div className="progress-bar"><div className="progress-fill" style={{width:`${readinessSkill}%`, "--p-start":"#7c4fe0", "--p-end":"#9b6dff"}}></div></div>
                 </div>
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
@@ -500,7 +494,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                     <span style={{color:"var(--gold)",fontWeight:700}}>{speechSkill}%</span>
                   </div>
                   <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.6 × speech confidence + 0.4 × pace score</div>
-                  <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, speechSkill)}%`, "--p-start":"#f59e0b", "--p-end":"#ffd166"}}></div></div>
+                  <div className="progress-bar"><div className="progress-fill" style={{width:`${speechSkill}%`, "--p-start":"#f59e0b", "--p-end":"#ffd166"}}></div></div>
                 </div>
                 <div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
@@ -508,7 +502,7 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                     <span style={{color:"var(--blue)",fontWeight:700}}>{resumeSkill}%</span>
                   </div>
                   <div style={{fontSize:"10px",color:"var(--text2)",marginBottom:"4px"}}>0.6 × keyword match + 0.25 × formatting + 0.15 × completeness</div>
-                  <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(5, resumeSkill)}%`, "--p-start":"#4d9fff", "--p-end":"#00f0c8"}}></div></div>
+                  <div className="progress-bar"><div className="progress-fill" style={{width:`${resumeSkill}%`, "--p-start":"#4d9fff", "--p-end":"#00f0c8"}}></div></div>
                 </div>
               </div>
             </section>

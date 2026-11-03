@@ -9,124 +9,164 @@ const SAMPLE_JDS = {
 };
 
 export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
+  const [activeMode, setActiveMode] = useState("score"); // "score" | "improve"
   const [resumeText, setResumeText] = useState("");
   const [jdText, setJdText] = useState("");
+  const [targetRole, setTargetRole] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("var(--text2)");
   const [isScoring, setIsScoring] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
   const [results, setResults] = useState(null);
+  const [improveResults, setImproveResults] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const fillSampleJD = (type) => {
     setJdText(SAMPLE_JDS[type] || "");
+    if (type === "fullstack") setTargetRole("Senior Full Stack Engineer");
+    else if (type === "ml") setTargetRole("Machine Learning Engineer");
+    else if (type === "backend") setTargetRole("Senior Backend Developer");
+    else if (type === "frontend") setTargetRole("Senior Frontend Developer");
   };
 
   const handleResumePDF = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setStatusMsg("⏳ Uploading PDF...");
+    setStatusMsg("⏳ Uploading and extracting resume text...");
     setStatusColor("var(--text2)");
 
-    if (isLoggedIn()) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('consent', 'true');
 
-        const token = localStorage.getItem('access_token');
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-        const res = await fetch(`${BACKEND_URL}/upload`, {
-          method: 'POST',
-          headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-          body: formData
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Upload failed');
-        
-        // Wait, does `/upload` return `resume_text` or similar? Let's check.
-        // If the backend has a specific PDF endpoint, let's hit that, else fallback.
-        // Wait, backend app.py has: @app.route("/upload", methods=["POST"])
-        setResumeText(data.resume_text || data.text || "");
-        const pagesText = data.page_count ? ` (${data.page_count} pages)` : "";
-        setStatusMsg(`✅ Resume text extracted${pagesText}. Review text below, then click Score.`);
-        setStatusColor("var(--cyan)");
-      } catch(err) {
-        setStatusMsg("❌ Upload failed: " + err.message + " — please paste your resume text manually.");
-        setStatusColor("var(--red)");
-      }
-    } else {
-      setStatusMsg("⚠️ Log in to use PDF extraction. Paste resume text manually.");
+      const token = localStorage.getItem('access_token');
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const res = await fetch(`${BACKEND_URL}/upload`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error || 'Upload failed');
+      
+      setResumeText(data.resume_text || data.text || "");
+      const pagesText = data.page_count ? ` (${data.page_count} pages)` : "";
+      setStatusMsg(`✅ Resume text extracted${pagesText}. Review below and choose Score or Improve.`);
+      setStatusColor("var(--cyan)");
+    } catch(err) {
+      setStatusMsg("❌ Upload notice: " + err.message + " — you can paste resume text directly.");
       setStatusColor("var(--orange)");
     }
   };
 
   const scoreResume = async () => {
     if (!resumeText.trim()) {
-      setStatusMsg("⚠️ Please paste your resume text first.");
+      setStatusMsg("⚠️ Please enter or upload your resume text first.");
       setStatusColor("var(--orange)");
       return;
     }
     if (!jdText.trim()) {
-      setStatusMsg("⚠️ Please enter a job description.");
+      setStatusMsg("⚠️ Please enter a job description or select a target role.");
       setStatusColor("var(--orange)");
       return;
     }
 
-    setStatusMsg("⏳ Scoring...");
+    setStatusMsg("⏳ Analyzing ATS keywords and rubric scores...");
     setStatusColor("var(--text2)");
     setIsScoring(true);
 
-    if (isLoggedIn()) {
-      try {
-        const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-        const res = await apiFetch('/api/resume/score', {
-          method: 'POST',
-          body: JSON.stringify({ resume_text: resumeText, job_description: jdText, user_id: resolvedUserId })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setResults(data);
-          setStatusMsg("");
-          setIsScoring(false);
-          scrollToResults();
-          return;
-        } else {
-          throw new Error(data.detail || 'Scoring failed');
-        }
-      } catch(err) {
-        setStatusMsg("❌ Scoring failed: " + err.message + " — showing local estimate instead.");
-        setStatusColor("var(--red)");
+    try {
+      const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
+      const res = await apiFetch('/api/resume/score', {
+        method: 'POST',
+        body: JSON.stringify({ resume_text: resumeText, job_description: jdText, user_id: resolvedUserId, consent: true })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResults(data);
+        setStatusMsg("");
+        setIsScoring(false);
+        scrollToResults('resume-results');
+        return;
+      } else {
+        throw new Error(data.detail || data.error || 'Scoring failed');
       }
+    } catch(err) {
+      console.warn("API score notice:", err);
     }
 
-    // Offline / demo fallback — uses the same deterministic engine as the backend
+    // Deterministic fallback
     const engineResult = calculateATSMatch(resumeText, jdText);
     setTimeout(() => {
       setResults(engineResult);
-      setStatusMsg(isLoggedIn() ? '' : '⚠️ Demo mode — log in for AI narrative suggestions.');
-      setStatusColor('var(--text2)');
+      setStatusMsg('');
       setIsScoring(false);
-      scrollToResults();
-    }, 900);
+      scrollToResults('resume-results');
+    }, 600);
   };
 
-  const scrollToResults = () => {
+  const improveResumeWithAI = async () => {
+    if (!resumeText.trim()) {
+      setStatusMsg("⚠️ Please paste or upload your resume text first.");
+      setStatusColor("var(--orange)");
+      return;
+    }
+
+    setStatusMsg("✨ AI is analyzing your resume against target requirements and rewriting high-impact bullet points...");
+    setStatusColor("var(--purple)");
+    setIsImproving(true);
+
+    try {
+      const res = await apiFetch('/api/resume/improve', {
+        method: 'POST',
+        body: JSON.stringify({
+          resume_text: resumeText,
+          job_description: jdText,
+          target_role: targetRole || "Software Engineer",
+          consent: true
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Resume improvement failed");
+
+      setImproveResults(data);
+      setStatusMsg("");
+      setIsImproving(false);
+      scrollToResults('resume-improve-results');
+    } catch (err) {
+      setStatusMsg("❌ AI Improvement notice: " + err.message);
+      setStatusColor("var(--red)");
+      setIsImproving(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (!improveResults?.full_improved_resume) return;
+    navigator.clipboard.writeText(improveResults.full_improved_resume);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const downloadImprovedResume = () => {
+    if (!improveResults?.full_improved_resume) return;
+    const blob = new Blob([improveResults.full_improved_resume], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Enhanced_Resume_${(targetRole || 'Software_Engineer').replace(/\s+/g, '_')}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const scrollToResults = (id) => {
     setTimeout(() => {
-      const el = document.getElementById('resume-results');
+      const el = document.getElementById(id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+    }, 120);
   };
 
-  const resetResumeScorer = () => {
-    setResults(null);
-    setTimeout(() => {
-      const el = document.getElementById('resume-input-panel');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  };
-
-  // buildDemoResumeResult removed — replaced by the deterministic atsEngine.js
-  // Both online (API) and offline (local) paths now use real skill matching.
-
-  const circumference = 238.8; // 2 * Math.PI * 38
+  const circumference = 238.8;
   const scorePercent = results ? results.ats_score : 0;
   const strokeDashoffset = circumference * (1 - scorePercent / 100);
 
@@ -137,92 +177,286 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
 
   return (
     <div id="page-resume" className="page active" role="tabpanel">
-      <div className="container">
-        <div className="sec-header mb16">
-          <div className="flex items-center gap8">
-            <h1 className="sec-title" style={{fontSize:"18px"}}>Resume AI Scoring</h1>
-            <span className="pill pill-cyan">ATS Match</span>
-            <span className="pill pill-purple">Skill Gap</span>
+      <div className="container" style={{ maxWidth: "1080px", margin: "0 auto", padding: "20px 0" }}>
+        
+        {/* Header */}
+        <div className="sec-header mb16" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: "4px" }}>PREPFLY ADVANCED RESUME SUITE</div>
+            <h1 className="sec-title" style={{ fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0 }}>Resume AI Platform</h1>
           </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <span className="pill pill-cyan">ATS Optimizer</span>
+            <span className="pill pill-purple">AI Bullet Rewriter</span>
+          </div>
+        </div>
+
+        {/* ── RESUME AI MODE SELECTOR ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(255,255,255,0.03)", padding: "6px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "24px" }}>
+          <button
+            type="button"
+            onClick={() => setActiveMode("score")}
+            style={{
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: activeMode === "score" ? "1.5px solid #00c4a7" : "1px solid transparent",
+              background: activeMode === "score" ? "linear-gradient(135deg, rgba(0,196,167,0.2), rgba(124,58,237,0.15))" : "transparent",
+              color: activeMode === "score" ? "#00c4a7" : "#94a3b8",
+              fontWeight: 800,
+              fontSize: "13px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              transition: "all 0.2s"
+            }}
+          >
+            <span style={{ fontSize: "16px" }}>📊</span>
+            <span>Option 1: ATS Resume Score & Keyword Match</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMode("improve")}
+            style={{
+              padding: "12px 18px",
+              borderRadius: "12px",
+              border: activeMode === "improve" ? "1.5px solid #a78bfa" : "1px solid transparent",
+              background: activeMode === "improve" ? "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(0,196,167,0.15))" : "transparent",
+              color: activeMode === "improve" ? "#a78bfa" : "#94a3b8",
+              fontWeight: 800,
+              fontSize: "13px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              transition: "all 0.2s"
+            }}
+          >
+            <span style={{ fontSize: "16px" }}>✨</span>
+            <span>Option 2: AI Resume Improvement & Rewrite [ATS Optimized]</span>
+          </button>
         </div>
 
         {/* INPUT PANEL */}
         <div className="g2 mb20" id="resume-input-panel">
           {/* Resume text */}
-          <div className="card">
-            <div style={{fontSize:"14px",fontWeight:800,marginBottom:"6px"}}>Your Resume</div>
-            <div className="text-xs text-muted mb12">Paste your resume text below, or upload a PDF</div>
+          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#fff" }}>Your Current Resume</div>
+            <div className="text-xs text-muted mb12">Paste your resume content below or upload your PDF file</div>
             <textarea 
               id="resume-text-input" 
               className="code-area" 
-              style={{minHeight:"220px",fontFamily:"'Cabinet Grotesk',sans-serif",fontSize:"12px",lineHeight:"1.65",resize:"vertical"}} 
-              placeholder="Paste your full resume here...&#10;&#10;Example:&#10;John Doe · Full Stack Engineer&#10;Skills: React, Node.js, PostgreSQL, AWS, Docker&#10;Experience: 3 years at Startup Inc. — built scalable APIs serving 500K users..."
+              style={{ minHeight: "240px", fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "14px", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }} 
+              placeholder="Paste your full resume here...&#10;&#10;Example:&#10;John Doe · Full Stack Engineer&#10;Skills: React, Node.js, PostgreSQL, AWS, Docker&#10;Experience: 3 years at Tech Inc. — built backend APIs and user interfaces..."
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
             />
-            <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"10px"}}>
-              <label style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"7px",padding:"9px",background:"rgba(155,109,255,0.07)",border:"1px dashed rgba(155,109,255,0.3)",borderRadius:"10px",cursor:"pointer",fontSize:"12px",fontWeight:700,color:"var(--purple)"}}>
-                <span>📎 Upload PDF</span>
-                <input type="file" accept=".pdf" style={{display:"none"}} onChange={handleResumePDF} />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px" }}>
+              <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "10px", background: "rgba(155,109,255,0.08)", border: "1px dashed rgba(155,109,255,0.35)", borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: "var(--purple)" }}>
+                <span>📎 Upload Resume PDF</span>
+                <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handleResumePDF} />
               </label>
-              <button className="btn btn-ghost btn-sm" onClick={() => setResumeText("")}>Clear</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setResumeText("")} style={{ borderRadius: "10px" }}>Clear</button>
             </div>
           </div>
 
-          {/* Job description */}
-          <div className="card">
-            <div style={{fontSize:"14px",fontWeight:800,marginBottom:"6px"}}>Job Description / Target Role</div>
-            <div className="text-xs text-muted mb12">Paste the JD or describe the role you're targeting</div>
+          {/* Job description / Target Role */}
+          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#fff" }}>Target Job Description & Role</div>
+            <div className="text-xs text-muted mb12">Target role title and requirements to tailor the analysis or AI rewrite</div>
+
+            {activeMode === "improve" && (
+              <div style={{ marginBottom: "12px" }}>
+                <input
+                  type="text"
+                  placeholder="Target Role (e.g. Senior Full Stack Engineer, ML Engineer)"
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "12px" }}
+                />
+              </div>
+            )}
+
             <textarea 
               id="jd-input" 
               className="code-area" 
-              style={{minHeight:"220px",fontFamily:"'Cabinet Grotesk',sans-serif",fontSize:"12px",lineHeight:"1.65",resize:"vertical"}} 
-              placeholder="Paste the job description here...&#10;&#10;Example:&#10;We're looking for a Senior Full Stack Engineer with:&#10;• 3+ years React/Next.js experience&#10;• Node.js, REST & GraphQL API design&#10;• AWS, Kubernetes, Terraform (DevOps)&#10;• PostgreSQL, Redis&#10;• Strong system design fundamentals..."
+              style={{ minHeight: activeMode === "improve" ? "190px" : "240px", fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "14px", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }} 
+              placeholder="Paste the target job description here...&#10;&#10;Example:&#10;We're looking for a Senior Full Stack Engineer with:&#10;• 3+ years React/Next.js experience&#10;• Node.js, REST & GraphQL API design&#10;• AWS, Kubernetes, CI/CD automation&#10;• PostgreSQL query optimization, Redis..."
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
             />
-            <div style={{marginTop:"10px"}}>
-              <div className="text-xs text-muted mb8">Or pick a common role:</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+            <div style={{ marginTop: "12px" }}>
+              <div className="text-xs text-muted mb8">Or pre-fill with a common role:</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('fullstack')}>Full Stack SDE</button>
                 <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('ml')}>ML Engineer</button>
-                <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('backend')}>Backend Engineer</button>
-                <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('frontend')}>Frontend Engineer</button>
+                <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('backend')}>Backend SDE</button>
+                <button className="btn btn-ghost btn-xs" onClick={() => fillSampleJD('frontend')}>Frontend SDE</button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Action Button & Loader */}
-        <div className="flex-col items-center gap10 mb24">
-          <button className="btn btn-primary" style={{padding:"12px 32px",fontSize:"14px",borderRadius:"12px"}} onClick={scoreResume} disabled={isScoring}>
-            {isScoring ? "⏳ Analyzing..." : "⚡ Score & Optimize Resume"}
-          </button>
+        {/* Action Button & Status Bar */}
+        <div className="flex-col items-center gap10 mb28" style={{ textAlign: "center" }}>
+          {activeMode === "score" ? (
+            <button 
+              className="btn btn-primary" 
+              style={{ padding: "14px 36px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", fontWeight: 800, cursor: isScoring ? "wait" : "pointer" }} 
+              onClick={scoreResume} 
+              disabled={isScoring}
+            >
+              {isScoring ? "⏳ Analyzing ATS Match..." : "⚡ Score & Analyze ATS Match"}
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary" 
+              style={{ padding: "14px 40px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #a78bfa, #00c4a7)", color: "#fff", fontWeight: 900, cursor: isImproving ? "wait" : "pointer", boxShadow: "0 8px 30px rgba(167,139,250,0.3)" }} 
+              onClick={improveResumeWithAI} 
+              disabled={isImproving}
+            >
+              {isImproving ? "✨ AI is Rewriting Your Resume..." : "✨ Improve & Rewrite Resume with AI"}
+            </button>
+          )}
+
           {statusMsg && (
-            <div id="resume-score-status" className="text-sm font-semibold" style={{color: statusColor}}>
+            <div id="resume-score-status" className="text-sm font-semibold" style={{ color: statusColor, marginTop: "8px" }}>
               {statusMsg}
             </div>
           )}
         </div>
 
-        {/* RESULTS PANEL */}
-        {results && (
-          <div id="resume-results" style={{display:"block", borderTop:"1px solid var(--border)", paddingTop:"24px"}} className="fade-up">
-            <div className="sec-header mb16">
-              <div style={{fontSize:"15px",fontWeight:800}}>ATS Optimiser Analysis Results</div>
-              <button className="btn btn-ghost btn-xs" onClick={resetResumeScorer}>← Clear Results</button>
+        {/* ── OPTION 2 RESULTS: AI RESUME IMPROVEMENT & REWRITE PANEL ── */}
+        {improveResults && activeMode === "improve" && (
+          <div id="resume-improve-results" style={{ display: "block", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "32px", marginBottom: "40px" }} className="fade-up">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1px" }}>AI RESUME TRANSFORMATION REPORT</div>
+                <h3 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: "2px 0 0" }}>Enhanced Resume for {improveResults.target_role || "Target Role"}</h3>
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button 
+                  type="button" 
+                  onClick={copyToClipboard} 
+                  style={{ background: copied ? "#10b981" : "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", padding: "8px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                >
+                  {copied ? "✓ Copied!" : "📋 Copy Markdown"}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={downloadImprovedResume} 
+                  style={{ background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", padding: "8px 20px", borderRadius: "10px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
+                >
+                  📄 Download Resume (.md)
+                </button>
+              </div>
+            </div>
+
+            {/* ATS Score Projection Card */}
+            <div style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.12), rgba(0,196,167,0.12))", border: "1.5px solid rgba(0,196,167,0.35)", borderRadius: "20px", padding: "24px", marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>PROJECTED ATS COMPATIBILITY BOOST</div>
+                <div style={{ fontSize: "28px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>
+                  <span style={{ color: "#f87171", textDecoration: "line-through", marginRight: "10px" }}>{improveResults.original_ats_score}/100</span>
+                  ➔ <span style={{ color: "#00c4a7", marginLeft: "10px" }}>{improveResults.projected_ats_score}/100</span>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#10b981", marginLeft: "12px", background: "rgba(16,185,129,0.15)", padding: "4px 10px", borderRadius: "12px", border: "1px solid rgba(16,185,129,0.3)" }}>
+                    +{improveResults.projected_ats_score - improveResults.original_ats_score}% Increase
+                  </span>
+                </div>
+              </div>
+              <div style={{ maxWidth: "450px", fontSize: "13px", color: "#cbd5e1", lineHeight: "1.6" }}>
+                AI applied Google's XYZ formula, injected missing job keywords, and replaced passive verbs with quantifiable engineering accomplishments.
+              </div>
+            </div>
+
+            {/* Tailored Professional Summary */}
+            {improveResults.tailored_summary && (
+              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ fontSize: "12px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", marginBottom: "8px" }}>🎯 Tailored Professional Summary</div>
+                <p style={{ fontSize: "14px", color: "#e2e8f0", lineHeight: "1.7", margin: 0 }}>{improveResults.tailored_summary}</p>
+              </div>
+            )}
+
+            {/* Injected Keywords Badges */}
+            {improveResults.key_injected_skills && improveResults.key_injected_skills.length > 0 && (
+              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "18px 20px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", marginBottom: "10px" }}>🔑 Injected High-Value ATS Keywords</div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {improveResults.key_injected_skills.map((skill, sIdx) => (
+                    <span key={sIdx} style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#c4b5fd", padding: "4px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 700 }}>
+                      + {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Before vs After Bullet Point Comparison */}
+            {improveResults.bullet_point_improvements && improveResults.bullet_point_improvements.length > 0 && (
+              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px", marginBottom: "28px", textAlign: "left" }}>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff", textTransform: "uppercase", marginBottom: "16px" }}>
+                  🔄 High-Impact Bullet Point Rewrites (Before vs After)
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {improveResults.bullet_point_improvements.map((b, bIdx) => (
+                    <div key={bIdx} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "16px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "10px" }}>
+                        <div style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "10px", padding: "12px" }}>
+                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#f87171", textTransform: "uppercase", marginBottom: "4px" }}>❌ Original Bullet</div>
+                          <div style={{ fontSize: "12.5px", color: "#cbd5e1", lineHeight: "1.5" }}>{b.original}</div>
+                        </div>
+                        <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "10px", padding: "12px" }}>
+                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#10b981", textTransform: "uppercase", marginBottom: "4px" }}>✅ AI High-Impact Rewrite</div>
+                          <div style={{ fontSize: "12.5px", color: "#fff", fontWeight: 600, lineHeight: "1.5" }}>{b.improved}</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: "#94a3b8", fontStyle: "italic", paddingLeft: "4px" }}>
+                        💡 <strong>Why it ranks higher:</strong> {b.impact_reason}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Complete Improved Resume Box */}
+            {improveResults.full_improved_resume && (
+              <div style={{ background: "rgba(12,18,32,0.95)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "20px", padding: "28px", textAlign: "left" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#00c4a7" }}>📄 Complete Enhanced Resume (Ready to Use)</div>
+                  <button type="button" onClick={copyToClipboard} style={{ background: copied ? "#10b981" : "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                    {copied ? "✓ Copied!" : "📋 Copy"}
+                  </button>
+                </div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "'Courier New', Courier, monospace", fontSize: "12.5px", lineHeight: "1.7", color: "#e2e8f0", maxHeight: "500px", overflowY: "auto" }}>
+                  {improveResults.full_improved_resume}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── OPTION 1 RESULTS: ATS SCORE ANALYSIS RESULTS PANEL ── */}
+        {results && activeMode === "score" && (
+          <div id="resume-results" style={{ display: "block", borderTop: "1px solid var(--border)", paddingTop: "24px" }} className="fade-up">
+            <div className="sec-header mb16" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800 }}>ATS Optimiser Analysis Results</div>
+              <button className="btn btn-ghost btn-xs" onClick={() => setResults(null)}>← Clear Results</button>
             </div>
 
             {/* AI Summary banner */}
             {results.ai_summary && (
-              <div className="card mb16" style={{background:"rgba(0,196,167,0.07)",border:"1px solid rgba(0,196,167,0.2)",padding:"14px 18px"}}>
-                <div style={{fontSize:"11px",fontWeight:700,color:"var(--cyan)",letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:"5px"}}>AI Recruiter Summary</div>
-                <div style={{fontSize:"13px",lineHeight:1.55,color:"var(--text2)"}}>{results.ai_summary}</div>
+              <div className="card mb16" style={{ background: "rgba(0,196,167,0.07)", border: "1px solid rgba(0,196,167,0.2)", padding: "14px 18px", borderRadius: "14px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--cyan)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "5px" }}>AI Recruiter Summary</div>
+                <div style={{ fontSize: "13px", lineHeight: 1.55, color: "var(--text2)" }}>{results.ai_summary}</div>
                 {results.meta && (
-                  <div style={{display:"flex",gap:"16px",flexWrap:"wrap",marginTop:"10px"}}>
-                    <span style={{fontSize:"11px",color:"var(--text3)"}}>⚙️ Engine: {results.meta.engine}</span>
-                    <span style={{fontSize:"11px",color:"var(--text3)"}}>🎯 Skills matched: {results.meta.total_matched_skills}/{results.meta.total_jd_skills}</span>
-                    {results.meta.resume_years && <span style={{fontSize:"11px",color:"var(--text3)"}}>📅 Exp. detected: {results.meta.resume_years} yrs</span>}
+                  <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "10px" }}>
+                    <span style={{ fontSize: "11px", color: "var(--text3)" }}>⚙️ Engine: {results.meta.engine || "Hybrid ATS"}</span>
+                    <span style={{ fontSize: "11px", color: "var(--text3)" }}>🎯 Skills matched: {results.meta.total_matched_skills}/{results.meta.total_jd_skills}</span>
+                    {results.meta.resume_years && <span style={{ fontSize: "11px", color: "var(--text3)" }}>📅 Exp. detected: {results.meta.resume_years} yrs</span>}
                   </div>
                 )}
               </div>
@@ -231,10 +465,10 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
             <div className="g-main mb20">
               {/* Left Column: ATS Score Circle & Keyword Grid */}
               <div className="flex-col gap16">
-                <div className="card flex items-center gap24" style={{padding:"24px", flexWrap:"wrap"}}>
+                <div className="card flex items-center gap24" style={{ padding: "24px", flexWrap: "wrap", borderRadius: "16px" }}>
                   {/* Circular Score Ring */}
-                  <div style={{position:"relative",width:"92px",height:"92px",flexShrink:0}}>
-                    <svg width="92" height="92" viewBox="0 0 92 92" style={{transform:"rotate(-90deg)"}}>
+                  <div style={{ position: "relative", width: "92px", height: "92px", flexShrink: 0 }}>
+                    <svg width="92" height="92" viewBox="0 0 92 92" style={{ transform: "rotate(-90deg)" }}>
                       <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8"/>
                       <circle 
                         id="ats-ring-fill" 
@@ -245,20 +479,20 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                         strokeDasharray={circumference} 
                         strokeDashoffset={strokeDashoffset} 
                         strokeLinecap="round" 
-                        style={{transition:"stroke-dashoffset 1s ease"}}
+                        style={{ transition: "stroke-dashoffset 1s ease" }}
                       />
                     </svg>
-                    <div id="ats-ring-num" style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",fontSize:"22px",fontWeight:"900"}}>{results.ats_score}</div>
+                    <div id="ats-ring-num" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "22px", fontWeight: "900" }}>{results.ats_score}</div>
                   </div>
                   
                   {/* Summary & Grade */}
                   <div>
                     <div className="text-xs text-muted mb4">ATS Compatibility Index</div>
-                    <div id="ats-score-display" style={{fontSize:"28px",fontWeight:900,color:"var(--cyan)",lineHeight:1.1}}>{results.ats_score}/100</div>
+                    <div id="ats-score-display" style={{ fontSize: "28px", fontWeight: 900, color: "var(--cyan)", lineHeight: 1.1 }}>{results.ats_score}/100</div>
                     <span 
                       id="ats-grade-pill" 
                       className={`pill ${gradeColors[results.overall_grade] || 'pill-gold'}`} 
-                      style={{marginTop:"6px", display:"inline-flex"}}
+                      style={{ marginTop: "6px", display: "inline-flex" }}
                     >
                       Grade {results.overall_grade} · {gradeLabels[results.overall_grade]}
                     </span>
@@ -266,7 +500,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                 </div>
 
                 {/* Keyword matched vs missing grid */}
-                <div className="card">
+                <div className="card" style={{ borderRadius: "16px" }}>
                   <div className="sec-sub fw7 mb12">JD Keyword Analysis</div>
                   <div className="kw-grid" id="kw-grid-result">
                     {(results.matched_keywords || []).map((k, i) => (
@@ -277,9 +511,9 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                     ))}
                     {(results.bonus_skills || []).length > 0 && (
                       <>
-                        <div style={{width:"100%",fontSize:"10px",fontWeight:700,color:"var(--purple)",letterSpacing:"0.07em",textTransform:"uppercase",marginTop:"8px",marginBottom:"2px"}}>Bonus skills (not required)</div>
+                        <div style={{ width: "100%", fontSize: "10px", fontWeight: 700, color: "var(--purple)", letterSpacing: "0.07em", textTransform: "uppercase", marginTop: "8px", marginBottom: "2px" }}>Bonus skills (not required)</div>
                         {results.bonus_skills.map((k, i) => (
-                          <span key={`bonus-${i}`} className="kw" style={{background:"rgba(139,92,246,0.12)",border:"1px solid rgba(139,92,246,0.3)",color:"var(--purple)"}}>+ {k}</span>
+                          <span key={`bonus-${i}`} className="kw" style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)", color: "var(--purple)" }}>+ {k}</span>
                         ))}
                       </>
                     )}
@@ -289,10 +523,10 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
 
               {/* Right Column: Skill Match Progress Bars */}
               <div className="flex-col gap16">
-                <div className="card">
+                <div className="card" style={{ borderRadius: "16px" }}>
                   <div className="sec-sub fw7 mb16">Skill Relevance Checklist</div>
                   <div id="skill-match-bars" className="flex-col gap12">
-                    {Object.keys(results.skill_match).map(k => {
+                    {Object.keys(results.skill_match || {}).map(k => {
                       const pct = results.skill_match[k];
                       const col = pct >= 80 ? 'linear-gradient(90deg,var(--cyan),var(--blue))' : pct >= 50 ? 'linear-gradient(90deg,var(--orange),#d97706)' : 'linear-gradient(90deg,var(--red),#dc2626)';
                       const tc  = pct >= 80 ? 'var(--cyan)' : pct >= 50 ? 'var(--orange)' : 'var(--red)';
@@ -300,9 +534,9 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                         <div key={k} className="skill-row">
                           <div className="skill-lbl">{k}</div>
                           <div className="skill-bg">
-                            <div className="skill-fg" style={{width: `${pct}%`, background: col}}></div>
+                            <div className="skill-fg" style={{ width: `${pct}%`, background: col }}></div>
                           </div>
-                          <div className="skill-pct" style={{color: tc}}>{pct}%</div>
+                          <div className="skill-pct" style={{ color: tc }}>{pct}%</div>
                         </div>
                       );
                     })}
@@ -312,32 +546,39 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
             </div>
 
             {/* Section Scores Grid */}
-            <div className="sec-header mb12">
-              <div className="sec-title">Section Scoring Breakdown</div>
-            </div>
-            <div className="g4 mb20" id="section-scores-row">
-              {Object.keys(results.section_scores).map(k => (
-                <div key={k} className="section-score">
-                  <div className="ss-val" style={{color: ssColors[k] || 'var(--cyan)'}}>{results.section_scores[k]}</div>
-                  <div className="ss-lbl">{k.charAt(0).toUpperCase() + k.slice(1)}</div>
+            {results.section_scores && (
+              <>
+                <div className="sec-header mb12">
+                  <div className="sec-title">Section Scoring Breakdown</div>
                 </div>
-              ))}
-            </div>
+                <div className="g4 mb20" id="section-scores-row">
+                  {Object.keys(results.section_scores).map(k => (
+                    <div key={k} className="section-score">
+                      <div className="ss-val" style={{ color: ssColors[k] || 'var(--cyan)' }}>{results.section_scores[k]}</div>
+                      <div className="ss-lbl">{k.charAt(0).toUpperCase() + k.slice(1)}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Improvement tips list */}
-            <div className="card mb24">
-              <div style={{fontSize:"14px",fontWeight:800,marginBottom:"12px"}}>AI Recommendations & Improvement Tips</div>
-              <div className="flex-col gap8" id="improvement-tips">
-                {results.improvement_tips.map((t, i) => (
-                  <div key={i} className="tip-row">
-                    <span style={{color: tipColors[i % 4]}}>→</span>
-                    <span dangerouslySetInnerHTML={{__html: t}}></span>
-                  </div>
-                ))}
+            {results.improvement_tips && results.improvement_tips.length > 0 && (
+              <div className="card mb24" style={{ borderRadius: "16px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "12px" }}>AI Recommendations & Improvement Tips</div>
+                <div className="flex-col gap8" id="improvement-tips">
+                  {results.improvement_tips.map((t, i) => (
+                    <div key={i} className="tip-row">
+                      <span style={{ color: tipColors[i % 4] }}>→</span>
+                      <span dangerouslySetInnerHTML={{ __html: t }}></span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
+
       </div>
     </div>
   );

@@ -1311,8 +1311,8 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
             <div className="flex-col gap8">
               {sessionsHistory.map((s, idx) => {
                 const date = s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Recent';
-                const score10 = s.scores && s.scores.length ? (s.scores.reduce((a,b)=>a+b, 0) / s.scores.length) : (s.overall_score || s.final_score || 7.5);
-                const score100 = s.final_score_100 || Math.round(Number(score10) * 10);
+                const score10 = (s.scores && s.scores.length) ? (s.scores.reduce((a,b)=>a+b, 0) / s.scores.length) : (typeof s.final_score === 'number' ? s.final_score : (typeof s.overall_score === 'number' ? s.overall_score : 0));
+                const score100 = typeof s.final_score_100 === 'number' ? s.final_score_100 : Math.round(Number(score10) * 10);
                 const gInfo = getGradeInfo(score100);
                 const qCount = s.questions ? s.questions.length : 5;
                 

@@ -71,7 +71,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
     try {
       const token = localStorage.getItem("superadmin_access_token");
       const res = await fetch(`${BACKEND_URL}/api/superadmin/organizations`, {
-        headers: { "X-Super-Admin": "true", ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
+        headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
       });
       if (res.ok) {
         const data = await res.json();

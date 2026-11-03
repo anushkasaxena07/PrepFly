@@ -1,6 +1,64 @@
+import os
+import json
 import random
+import re
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
+from services.topic_engine import (
+    validate_topic_question,
+    validate_jd_question,
+    is_hr_or_non_technical_role,
+    get_curated_fallback_question,
+    normalize_topic_identifier
+)
+
+def safe_invoke_llm(chat_model, prompt_content):
+    if not chat_model:
+        return None
+
+    api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
+    if (isinstance(api_key, str) and (api_key.startswith("test-") or "dummy" in api_key.lower())) or os.getenv("ENVIRONMENT") == "test" or os.getenv("FLASK_ENV") == "test":
+        return None
+
+    def _extract_text(content):
+        if not content:
+            return None
+        if isinstance(content, str):
+            return content.strip()
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                elif isinstance(item, dict) and "text" in item:
+                    parts.append(item["text"])
+            return "\n".join(parts).strip()
+        return str(content).strip()
+
+    try:
+        res = chat_model.invoke([HumanMessage(content=prompt_content)])
+        if res and hasattr(res, "content"):
+            txt = _extract_text(res.content)
+            if txt:
+                return txt
+    except Exception as e_prim:
+        api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
+        if not api_key or (isinstance(api_key, str) and (api_key.startswith("test-") or "dummy" in api_key.lower())) or os.getenv("ENVIRONMENT") == "test":
+            return None
+        print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
+        if api_key:
+            for alt_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+                try:
+                    from langchain_google_genai import ChatGoogleGenerativeAI
+                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=1, timeout=10)
+                    res = alt_chat.invoke([HumanMessage(content=prompt_content)])
+                    if res and hasattr(res, "content"):
+                        txt = _extract_text(res.content)
+                        if txt:
+                            return txt
+                except Exception:
+                    continue
+    return None
 
 STAGES = [
     "Greeting & Icebreaker",
@@ -41,27 +99,122 @@ PHASE_4_FALLBACKS = [
 ]
 
 def get_current_stage(question_index, total_questions=5):
-    if question_index == 1:
-        return "Phase 1: Greeting & Icebreaker"
-    elif question_index == 2:
-        return "Phase 2: Icebreaker & Background"
-    elif question_index == 3:
-        return "Phase 3: Transition into Resume"
-    elif question_index == 4:
-        return "Phase 4: Core Technical Discussion"
-    elif question_index == 5:
-        return "Phase 5: System Trade-offs & Deep Dive"
+    if total_questions == 5:
+        if question_index == 1:
+            return "Phase 1: Greeting & Icebreaker"
+        elif question_index == 2:
+            return "Phase 2: Icebreaker & Background"
+        elif question_index == 3:
+            return "Phase 3: Transition into Resume"
+        elif question_index == 4:
+            return "Phase 4: Core Technical Discussion"
+        elif question_index == 5:
+            return "Phase 5: System Trade-offs & Deep Dive"
+        else:
+            return "Phase 7: Natural Wrap-up"
     else:
-        return "Phase 7: Natural Wrap-up"
+        if question_index == 1:
+            return "Phase 1: Greeting & Icebreaker"
+        elif question_index == 2:
+            return "Phase 2: Background & Experience"
+        elif question_index == 3:
+            return "Phase 3: Resume Deep-Dive"
+        elif question_index == 4:
+            return "Phase 4: Architecture & Design Decisions"
+        elif question_index == 5:
+            return "Phase 5: Core Technical Concepts"
+        elif question_index == 6:
+            return "Phase 6: Performance & Optimization"
+        elif question_index == 7:
+            return "Phase 7: Reliability & Edge Cases"
+        elif question_index == 8:
+            return "Phase 8: Scale & Trade-offs"
+        elif question_index == 9:
+            return "Phase 9: Behavioral & Leadership (STAR)"
+        elif question_index >= 10:
+            return "Phase 10: Retrospective & Closing"
+        else:
+            return "Phase 10: Retrospective & Closing"
 
-def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate"):
+def is_semantically_repetitive(new_q: str, existing_questions: list) -> bool:
+    """Detects exact duplicates and high semantic/keyword overlaps across questions."""
+    if not new_q or not existing_questions:
+        return False
+    
+    filler = {"tell", "about", "could", "would", "please", "describe", "explain", "what", "which", "your", "with", "have", "from", "that", "this", "some", "like", "how", "why"}
+    
+    def stem(w):
+        return re.sub(r'(ing|ed|es|s)$', '', w)
+        
+    clean_new = set(stem(w) for w in re.findall(r'\b[a-z]{3,}\b', new_q.lower())) - filler
+    if not clean_new:
+        return False
+
+    for old_q in existing_questions:
+        if not old_q:
+            continue
+        if new_q.strip().lower() == old_q.strip().lower():
+            return True
+            
+        clean_old = set(stem(w) for w in re.findall(r'\b[a-z]{3,}\b', old_q.lower())) - filler
+        if not clean_old:
+            continue
+        
+        common = clean_new.intersection(clean_old)
+        union = clean_new.union(clean_old)
+        
+        # If 2 or more key domain words match (e.g. ['project', 'resume'] or ['process', 'thread'])
+        if len(common) >= 2 and (len(common) / len(clean_new) >= 0.35 or len(common) / len(clean_old) >= 0.35):
+            return True
+            
+        similarity = len(common) / len(union) if union else 0
+        if similarity >= 0.35:
+            return True
+    return False
+
+
+def generate_dynamic_question(
+    resume_text,
+    previous_questions=None,
+    question_index=1,
+    last_score=None,
+    last_answer=None,
+    category=None,
+    difficulty=None,
+    responses=None,
+    chat_model=None,
+    candidate_name="Candidate",
+    role=None,
+    job_description=None,
+    allowed_topics=None
+):
     previous_questions = previous_questions or []
     responses = responses or []
-    is_no_resume = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
     stage_name = get_current_stage(question_index)
     ai_name = AI_INTERVIEWER["name"]
 
-    # 1. Handle Voice / Text Commands (Repeat & Hint)
+    # Identify Mode & Role Context
+    is_no_resume = bool(
+        (resume_text and ("No Resume Provided" in resume_text or "JOB DESCRIPTION" in resume_text or "JOB PROFILE" in resume_text))
+        or (job_description and not resume_text)
+    )
+    effective_role = role or (category if category and "Software" in category else "Software Engineer")
+    effective_jd = job_description or (resume_text if is_no_resume else "")
+    is_hr = is_hr_or_non_technical_role(effective_role, effective_jd) or (
+        category and "HR" in category.upper() and "DSA" not in category.upper()
+    )
+
+    # 1. Turn 1 GUARANTEE: Warm greeting and casual, low-stakes icebreaker (No technical jargon on Turn 1)
+    if question_index == 1:
+        first_name = candidate_name.strip().split()[0] if candidate_name and candidate_name.strip() and candidate_name.lower() != "candidate" else ""
+        name_str = f" {first_name}" if first_name else ""
+        if is_hr:
+            greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's really wonderful to meet you! Before we dive into questions for the {effective_role} role, how are you feeling today and how is your day going so far?"
+        else:
+            greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's really wonderful to meet you! Before we dive into questions for the {effective_role} role, how are you feeling today and how is your day going so far?"
+        return greeting, "Phase 1: Greeting & Icebreaker", False
+
+    # 2. Handle Voice / Text Commands (Repeat)
     if last_answer and last_answer.strip().lower() in ["repeat", "can you repeat the question", "pardon"]:
         if previous_questions:
             return previous_questions[-1], "Repeat", False
@@ -73,41 +226,59 @@ def generate_dynamic_question(resume_text, previous_questions=None, question_ind
         history_lines.append(f"Turn {idx+1} Q: {q}\nTurn {idx+1} Candidate A: {ans if ans else '[Pending]'}")
     conv_history_str = "\n\n".join(history_lines) if history_lines else "None (Initial Turn)"
 
+    # Build explicit track & phase guidance based on selected topics / JD
     cat_clean = (category or "").upper()
-    if "HR" in cat_clean or "BEHAVIORAL" in cat_clean:
-        track_instruction = """TRACK: HR & BEHAVIORAL INTERVIEW
-STRICT MANDATE: Ask EXCLUSIVELY behavioral, leadership, teamwork, conflict resolution, situational judgment, and STAR-method questions (Situation, Task, Action, Result). DO NOT ask technical coding or syntax questions."""
+    if is_no_resume:
+        if is_hr:
+            track_instruction = f"""TRACK: HUMAN RESOURCES (HR) & TALENT MANAGEMENT INTERVIEW
+STRICT MANDATE: Every question from Turn 2 onwards MUST be strictly and directly based on the provided HR Job Description and Target Role: {effective_role}
+{effective_jd[:2500]}
+DO NOT ask software engineering, programming, coding, algorithmic, or technical architecture questions under any circumstance.
+Focus exclusively on HR responsibilities: talent acquisition, employee relations, onboarding, compliance (POSH/statutory), performance management, and HR operations."""
+            phase_guidance = f"PHASE: HR JOB DESCRIPTION ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then ask an authentic HR scenario or workflow question strictly grounded in the Job Description."
+        else:
+            track_instruction = f"""TRACK: JOB DESCRIPTION SPECIFIC INTERVIEW FOR ROLE: {effective_role}
+STRICT MANDATE: Every question from Turn 2 onwards MUST be strictly and directly based on the provided Job Description and Target Role:
+{effective_jd[:2500]}
+DO NOT ask questions on unrelated tools, technologies, or imaginary projects not mentioned in the Job Description.
+DO NOT invent candidate experience or pretend to have read an uploaded resume."""
+            phase_guidance = f"PHASE: TARGET JOB DESCRIPTION ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. React briefly (1 sentence), then ask a targeted question STRICTLY assessing the skills, tools, and responsibilities demanded in the Job Description."
     elif "DSA" in cat_clean or "ALGORITHM" in cat_clean:
         track_instruction = """TRACK: DATA STRUCTURES & ALGORITHMS (DSA)
-STRICT MANDATE: Ask questions on data structures (Arrays, Binary Trees, Graphs, Hash Maps, Dynamic Programming), Big-O time/space complexity, and algorithmic trade-offs."""
+STRICT MANDATE: Ask EXCLUSIVELY on data structures (Arrays, Hash Maps, Trees, Graphs, Heaps, Dynamic Programming), algorithmic problem solving, edge cases, and Big-O time/space complexity.
+DO NOT ask high-level system design, computer networks, database ACID, or behavioral questions."""
+        if question_index == 2:
+            phase_guidance = f"PHASE: DSA CODING PROBLEM 1. Previous Candidate Answer: '{last_answer}'. Present a concrete DSA problem (Arrays, Strings, Hash Maps, or Two Pointers). Ask for approach and time/space complexity."
+        elif question_index == 3:
+            phase_guidance = f"PHASE: DSA FOLLOW-UP & OPTIMIZATION. Previous Candidate Answer: '{last_answer}'. Probe edge cases, memory constraints, or optimizing algorithmic complexity."
+        elif question_index == 4:
+            phase_guidance = f"PHASE: DSA CODING PROBLEM 2. Previous Candidate Answer: '{last_answer}'. Present a problem on Trees, Graphs, or Dynamic Programming/Recursion."
+        else:
+            phase_guidance = f"PHASE: DSA TRADEOFFS & COMPLEXITY (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Probe worst-case time/space complexity and algorithmic trade-offs."
     elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
         track_instruction = """TRACK: SYSTEM DESIGN & ARCHITECTURE
-STRICT MANDATE: Ask questions on distributed systems, microservices, database sharding/indexing, load balancers, caching (Redis), message queues (Kafka), and high availability."""
+STRICT MANDATE: Ask EXCLUSIVELY on distributed systems, microservices, load balancers, database sharding/indexing, caching (Redis), message queues (Kafka), and high availability.
+DO NOT ask coding syntax, leetcode problems, or behavioral STAR questions."""
+        phase_guidance = f"PHASE: SYSTEM DESIGN ARCHITECTURE (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Probe high-scale architectural design, data modeling, caching, and resilience."
     elif "FUNDAMENTAL" in cat_clean or "CS" in cat_clean or "CORE" in cat_clean:
-        track_instruction = """TRACK: CS FUNDAMENTALS
-STRICT MANDATE: Ask questions on core CS pillars: Operating Systems (processes vs threads), Computer Networks (TCP/UDP, DNS), DBMS (ACID, indexing), and OOPS concepts."""
-    elif "MAANG" in cat_clean or "BIG TECH" in cat_clean:
-        track_instruction = """TRACK: MAANG / BIG TECH SCREENING
-STRICT MANDATE: Ask high-bar algorithmic edge cases, production outage handling, system resilience, and deep engineering trade-off questions expected at Big Tech companies."""
+        track_instruction = """TRACK: COMPUTER SCIENCE FUNDAMENTALS
+STRICT MANDATE: Ask EXCLUSIVELY on core CS pillars: Operating Systems (processes vs threads, virtual memory), Computer Networks (TCP/UDP, DNS, HTTP/S), DBMS (ACID, indexing, transactions), and OOP/SOLID design.
+DO NOT ask large-scale distributed system design or generic HR questions."""
+        phase_guidance = f"PHASE: CS FUNDAMENTALS CORE (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask a concrete CS fundamentals question."
+    elif "HR" in cat_clean or "BEHAVIORAL" in cat_clean or is_hr:
+        track_instruction = """TRACK: HR & BEHAVIORAL INTERVIEW
+STRICT MANDATE: Ask EXCLUSIVELY behavioral, leadership, teamwork, conflict resolution, situational judgment, and STAR-method questions (Situation, Task, Action, Result).
+DO NOT ask technical coding, syntax, or systems architecture questions."""
+        phase_guidance = f"PHASE: BEHAVIORAL STAR SCENARIO (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Ask a targeted behavioral question using the STAR method."
     else:
-        track_instruction = """TRACK: RESUME BASED TECHNICAL INTERVIEW
-STRICT MANDATE: Ask questions directly tied to candidate's past projects, achievements, employment history, and specific tech stack listed in their resume."""
-
-    if question_index == 1:
-        phase_guidance = f"PHASE: GREETING & CASUAL ICEBREAKER. Say a warm welcome to the candidate using their name ({candidate_name}), introduce yourself as Ava (AI Recruiter), and ask a casual, low-stakes icebreaker question (e.g. how their day is going, how they are feeling today, or if they are ready to begin). STRICT MANDATE: DO NOT ask any technical, coding, or interview questions on this first turn. Keep it friendly, welcoming, and purely conversational."
-    elif question_index == 2:
-        phase_guidance = f"PHASE: ICEBREAKER & BACKGROUND. Previous Candidate Answer: '{last_answer}'. React to what they said briefly and naturally (1 sentence), then ask about their background, what originally drew them to software engineering/development, or a general non-technical introductory question based on their resume/profile."
-    elif question_index == 3:
-        phase_guidance = f"PHASE: RESUME ANCHOR TRANSITION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition into their technical profile or core projects from the resume/profile. Ask them to describe a project they are proud of or their main tech stack."
-    elif question_index >= 5:
-        phase_guidance = f"PHASE: CLOSING / FINAL QUESTION. Previous Candidate Answer: '{last_answer}'. Briefly acknowledge, then transition towards closing or final high-level question."
-    else:
-        phase_guidance = f"PHASE: CORE ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Briefly acknowledge their answer, then ask ONE sharp question following the TRACK MANDATE."
+        track_instruction = f"""TRACK: RESUME BASED INTERVIEW FOR {effective_role}
+STRICT MANDATE: Ask questions directly tied to candidate's past projects, achievements, and tech stack from their resume without drifting into unselected topics."""
+        phase_guidance = f"PHASE: RESUME PROJECT ROUND (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Dive into a specific project from their resume."
 
     resume_has_text = bool(resume_text and not is_no_resume)
     system_prompt = build_ava_system_prompt(
-        role=category or "Software Engineer",
-        track=category or "Resume Based",
+        role=effective_role,
+        track=category or ("HR & Behavioral" if is_hr else "Resume Based"),
         difficulty=difficulty or "Medium",
         experience_level="1-3 Years",
         duration_minutes=20,
@@ -116,11 +287,16 @@ STRICT MANDATE: Ask questions directly tied to candidate's past projects, achiev
         candidate_name=candidate_name
     )
 
+    prev_q_list = "\n".join(f"- {q}" for q in previous_questions) if previous_questions else "None (first turn)"
+
     prompt = f"""{system_prompt}
 
 DYNAMIC CONTEXT DATA FOR THIS TURN:
 - conversation_history:
 {conv_history_str}
+
+PREVIOUSLY ASKED QUESTIONS (DO NOT REPEAT):
+{prev_q_list}
 
 LATEST CANDIDATE RESPONSE:
 "{last_answer or 'None'}"
@@ -128,10 +304,14 @@ LATEST CANDIDATE RESPONSE:
 {track_instruction}
 {phase_guidance}
 
+CRITICAL ANTI-REPETITION & TOPIC INTEGRITY MANDATE:
+- You MUST NOT repeat, rephrase, or ask about the same topic or scenario as any question in PREVIOUSLY ASKED QUESTIONS.
+- The question MUST strictly conform to the allowed topic constraints.
+
 Return ONLY valid JSON with no markdown codeblock wrapping:
 {{
   "acknowledgment": "<1 short sentence reacting to their previous answer, or empty string if first question>",
-  "message": "<what Ava actually says out loud this turn — acknowledgment + question combined into natural speech>",
+  "message": "<what Ava actually says out loud this turn - acknowledgment + question combined into natural speech>",
   "question_type": "resume | project | technical | behavioral | followup | closing",
   "stage": "greeting | resume_discussion | project_deepdive | technical | behavioral | closing",
   "difficulty_delta": "increase | decrease | same",
@@ -142,36 +322,28 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
 
     needs_followup = False
     try:
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        raw_output = response.content.strip()
+        raw_output = safe_invoke_llm(chat_model, prompt)
+        if not raw_output:
+            raise ValueError("No response from LLM candidates")
 
+        raw_output = raw_output.strip()
         if raw_output.startswith("```"):
-            lines = raw_output.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            raw_output = "\n".join(lines).strip()
+            lines_out = raw_output.split("\n")
+            if lines_out[0].startswith("```"):
+                lines_out = lines_out[1:]
+            if lines_out and lines_out[-1].startswith("```"):
+                lines_out = lines_out[:-1]
+            raw_output = "\n".join(lines_out).strip()
 
         q_text = ""
         try:
             parsed = json.loads(raw_output)
-            if isinstance(parsed, str):
-                try:
-                    parsed = json.loads(parsed)
-                except Exception:
-                    pass
             if isinstance(parsed, dict):
-                msg = parsed.get("message", "").strip()
-                ack = parsed.get("acknowledgment", "").strip()
-                q_text = msg if msg else ack
-                if parsed.get("stage"):
-                    stage_name = parsed["stage"]
-                needs_followup = bool(parsed.get("is_followup"))
-            else:
-                q_text = str(parsed)
+                q_text = parsed.get("message") or parsed.get("question") or ""
+                needs_followup = bool(parsed.get("is_followup", False))
+            elif isinstance(parsed, str):
+                q_text = parsed
         except Exception:
-            import re
             msg_match = re.search(r'"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', raw_output)
             if msg_match:
                 q_text = msg_match.group(1).replace('\\"', '"').replace('\\n', ' ').strip()
@@ -179,7 +351,6 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
                 q_text = raw_output
 
         if q_text.startswith('{') and '"message"' in q_text:
-            import re
             msg_match = re.search(r'"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', q_text)
             if msg_match:
                 q_text = msg_match.group(1).replace('\\"', '"').replace('\\n', ' ').strip()
@@ -187,61 +358,48 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
         if (q_text.startswith('"') and q_text.endswith('"')) or (q_text.startswith("'") and q_text.endswith("'")):
             q_text = q_text[1:-1].strip()
 
-        # Check for duplicate question
-        if q_text in previous_questions:
-            raise ValueError("Duplicate question generated by LLM")
+        # Check for semantic repetition
+        if is_semantically_repetitive(q_text, previous_questions):
+            raise ValueError(f"Duplicate or overly similar question generated by LLM: {q_text}")
+
+        # ── MANDATORY TOPIC & JD VALIDATION GATE ──────────────────────────
+        if is_no_resume:
+            is_valid, reason = validate_jd_question(q_text, effective_role, effective_jd)
+            if not is_valid:
+                print(f"[REJECTED NON-JD QUESTION] {reason}. Regenerating from curated bank.")
+                q_text = get_curated_fallback_question(
+                    category=category or ("HR_JOB_DESCRIPTION" if is_hr else "GENERAL"),
+                    role=effective_role,
+                    job_description=effective_jd,
+                    question_index=question_index,
+                    previous_questions=previous_questions
+                )
+        else:
+            topics_to_check = allowed_topics or [category or "GENERAL"]
+            is_valid, detected_topic, reason = validate_topic_question(q_text, topics_to_check)
+            if not is_valid:
+                print(f"[REJECTED OFF-TOPIC QUESTION] {reason}. Regenerating from curated bank.")
+                q_text = get_curated_fallback_question(
+                    category=category or "DSA",
+                    role=effective_role,
+                    job_description=effective_jd,
+                    question_index=question_index,
+                    previous_questions=previous_questions
+                )
 
         return q_text, stage_name, needs_followup
+
     except Exception as e:
-        print(f"Dynamic question generation notice ({e}), selecting phase-appropriate question:")
-
-        if question_index == 1:
-            fallback_choice = random.choice(PHASE_1_GREETINGS)
-        elif question_index == 2:
-            fallback_choice = random.choice(PHASE_2_ICEBREAKERS)
-        elif question_index == 3:
-            fallback_choice = random.choice(PHASE_3_TRANSITIONS)
-        else:
-            # Pick non-repeating track-appropriate fallback
-            if "HR" in cat_clean or "BEHAVIORAL" in cat_clean:
-                track_fallbacks = [
-                    "Tell me about a situation where you had a disagreement with a teammate or project lead. How did you resolve it?",
-                    "Describe a time when a project deadline was unexpectedly moved up. How did you prioritize and deliver?",
-                    "Tell me about a time when you received constructive feedback. What steps did you take to improve?"
-                ]
-            elif "DSA" in cat_clean or "ALGORITHM" in cat_clean:
-                track_fallbacks = [
-                    "How would you design a data structure that supports insert, delete, and getRandom in O(1) time complexity?",
-                    "Explain how you would detect a cycle in a directed graph or linked list, and what space complexity it requires.",
-                    "Compare Dynamic Programming and Greedy approaches — when would a greedy choice fail for an optimization problem?"
-                ]
-            elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
-                track_fallbacks = [
-                    "How would you design a scalable rate limiting service for an API handling 100k requests per second?",
-                    "Explain database sharding vs partitioning, and how you prevent hot spots in distributed storage.",
-                    "How do message queues like Kafka ensure message ordering and fault tolerance in microservices?"
-                ]
-            elif "FUNDAMENTAL" in cat_clean or "CS" in cat_clean or "CORE" in cat_clean:
-                track_fallbacks = [
-                    "What is the difference between a process and a thread, and how does the OS handle context switching?",
-                    "Explain the difference between TCP and UDP, and why video streaming might prefer one over the other.",
-                    "What are the ACID properties in database transactions, and how does Isolation prevent race conditions?"
-                ]
-            elif "MAANG" in cat_clean or "BIG TECH" in cat_clean:
-                track_fallbacks = [
-                    "How would you design a globally distributed cache with sub-millisecond latency and multi-region consistency?",
-                    "Describe how you would diagnose and mitigate a cascading failure in a microservices ecosystem during peak load."
-                ]
-            else:
-                track_fallbacks = [
-                    "Tell me about the most complex technical project you've worked on, and the architectural trade-offs you made.",
-                    "Looking back at your recent projects, what is one design decision you would implement differently today?"
-                ]
-
-            available = [q for q in track_fallbacks if q not in previous_questions]
-            fallback_choice = random.choice(available) if available else track_fallbacks[0]
-            
+        print(f"Dynamic question generation fallback notice ({e}), selecting strictly validated topic question:")
+        fallback_choice = get_curated_fallback_question(
+            category=category or ("HR_JOB_DESCRIPTION" if is_hr else "DSA"),
+            role=effective_role,
+            job_description=effective_jd,
+            question_index=question_index,
+            previous_questions=previous_questions
+        )
         return fallback_choice, stage_name, False
+
 
 def generate_hint(question, resume_text, chat_model):
     ai_name = AI_INTERVIEWER["name"]
@@ -251,8 +409,23 @@ Candidate Profile/Resume: {resume_text[:1000]}
 
 Provide a small, helpful, 1-2 sentence hint that guides their thought process without giving away the complete answer directly."""
     try:
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        return response.content.strip()
+        from services.cache_service import get_cached_ai_response, save_cached_ai_response
+        cached_hint = get_cached_ai_response(prompt)
+        if cached_hint:
+            return cached_hint
+    except Exception:
+        pass
+
+    try:
+        hint_text = safe_invoke_llm(chat_model, prompt)
+        if not hint_text:
+            raise ValueError("No response from LLM for hint")
+        try:
+            from services.cache_service import save_cached_ai_response
+            save_cached_ai_response(prompt, hint_text, ttl=86400)
+        except Exception:
+            pass
+        return hint_text
     except Exception as e:
         print(f"Generate hint error: {e}")
         return "Focus on breaking the problem down into core components and using the STAR framework (Situation, Task, Action, Result)."

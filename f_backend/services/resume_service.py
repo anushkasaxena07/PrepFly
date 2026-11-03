@@ -49,6 +49,14 @@ def compute_text_hash(text):
     return hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
 
 def get_cached_resume(text_hash):
+    try:
+        from services.cache_service import cache_manager
+        fast_cached = cache_manager.get(f"resume:{text_hash}")
+        if fast_cached:
+            return fast_cached
+    except Exception:
+        pass
+
     supabase = get_supabase()
     try:
         res = supabase.table("parsed_resumes").select("*").eq("hash", text_hash).execute()
@@ -64,13 +72,19 @@ def get_cached_resume(text_hash):
                 try: m_info = json.loads(m_info)
                 except: m_info = []
 
-            return {
+            result = {
                 "id": row.get("id"),
                 "raw_text": row.get("raw_text"),
                 "structured_data": s_data or {},
                 "ats_score": row.get("ats_score", 70),
                 "missing_info": m_info or []
             }
+            try:
+                from services.cache_service import cache_manager
+                cache_manager.set(f"resume:{text_hash}", result, ttl=86400)
+            except Exception:
+                pass
+            return result
     except Exception as e:
         print("Get cached resume notice:", e)
     return None
@@ -79,7 +93,7 @@ def save_cached_resume(text_hash, raw_text, structured_data, ats_score, missing_
     supabase = get_supabase()
     res_id = f"res_{text_hash[:12]}"
     try:
-        supabase.table("parsed_resumes").upsert({
+        record = {
             "id": res_id,
             "hash": text_hash,
             "raw_text": raw_text,
@@ -87,7 +101,20 @@ def save_cached_resume(text_hash, raw_text, structured_data, ats_score, missing_
             "ats_score": ats_score,
             "missing_info": json.dumps(missing_info) if isinstance(missing_info, list) else missing_info,
             "created_at": datetime.utcnow().isoformat()
-        }).execute()
+        }
+        supabase.table("parsed_resumes").upsert(record).execute()
+        try:
+            from services.cache_service import cache_manager
+            cache_data = {
+                "id": res_id,
+                "raw_text": raw_text,
+                "structured_data": structured_data if isinstance(structured_data, dict) else json.loads(structured_data),
+                "ats_score": ats_score,
+                "missing_info": missing_info if isinstance(missing_info, list) else json.loads(missing_info)
+            }
+            cache_manager.set(f"resume:{text_hash}", cache_data, ttl=86400)
+        except Exception:
+            pass
     except Exception as e:
         print("Save resume cache error:", e)
 

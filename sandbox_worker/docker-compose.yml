@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  sandbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prepfly-sandbox-worker
+    restart: unless-stopped
+    
+    # Restrict container resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+          pids: 100
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+
+    # Hardened Linux Security Bounds
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /app/scratch:rw,noexec,nosuid,size=64m
+
+    environment:
+      - ISOLATED_SANDBOX_SECRET=${ISOLATED_SANDBOX_SECRET:-prepfly-sandbox-dev-secret-32-chars-long-minimum}
+      - SANDBOX_CPU_LIMIT=2.0
+      - SANDBOX_WALL_LIMIT=4.0
+      - SANDBOX_MEM_LIMIT_BYTES=134217728
+      - SANDBOX_MAX_PROCS=16
+      - SANDBOX_CONCURRENT_WORKERS=4
+      - SANDBOX_QUEUE_CAPACITY=50
+
+    ports:
+      # Bind to loopback interface on the host to prevent public internet exposure
+      - "127.0.0.1:5050:5050"
+
+    networks:
+      - prepfly-internal
+
+networks:
+  prepfly-internal:
+    driver: bridge
+    internal: true  # Blocks outbound internet access from worker container

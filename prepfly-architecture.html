@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepFly Architecture Diagram</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --text-color: #f8fafc;
+            --card-bg: #1e293b;
+            --accent-color: #3b82f6;
+            --boundary-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        #network-container {
+            flex: 2;
+            height: 100%;
+            position: relative;
+        }
+
+        #network {
+            width: 100%;
+            height: 100%;
+        }
+
+        #details-panel {
+            flex: 1;
+            max-width: 400px;
+            background-color: var(--card-bg);
+            border-left: 1px solid var(--boundary-color);
+            padding: 24px;
+            overflow-y: auto;
+            box-shadow: -4px 0 15px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--boundary-color);
+            padding-bottom: 10px;
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--boundary-color);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: #60a5fa;
+            font-size: 1.1em;
+        }
+
+        .card p {
+            margin-bottom: 0;
+            font-size: 0.95em;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 6px;
+            margin-bottom: 6px;
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #93c5fd;
+        }
+
+        .tag.external {
+            background-color: rgba(245, 158, 11, 0.2);
+            color: #fcd34d;
+        }
+
+        .tag.boundary {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--boundary-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .legend h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.9em;
+            color: #94a3b8;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        /* Trust Boundary overlays */
+        .boundary-label {
+            position: absolute;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.3);
+            pointer-events: none;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        #empty-state {
+            text-align: center;
+            color: #64748b;
+            margin-top: 50px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="network-container">
+            <div id="network"></div>
+            <div class="legend">
+                <h4>Legend</h4>
+                <div class="legend-item"><div class="legend-color" style="background: #3b82f6;"></div> Frontend Client</div>
+                <div class="legend-item"><div class="legend-color" style="background: #10b981;"></div> Flask API Backend</div>
+                <div class="legend-item"><div class="legend-color" style="background: #8b5cf6;"></div> Supabase Infrastructure</div>
+                <div class="legend-item"><div class="legend-color" style="background: #f59e0b;"></div> External API</div>
+                <div class="legend-item" style="margin-top: 8px;"><div class="legend-color" style="background: #ef4444; width: 24px; height: 3px; border-radius: 0;"></div> Primary Path</div>
+            </div>
+            
+            <div class="boundary-label" style="top: 20px; left: 20px; color: #3b82f688;">Client Trust Boundary (Vercel)</div>
+            <div class="boundary-label" style="top: 20px; left: 35%; color: #10b98188;">Railway Cloud Boundary</div>
+            <div class="boundary-label" style="top: 20px; right: 20px; color: #f59e0b88;">External Trust Boundary</div>
+        </div>
+        
+        <div id="details-panel">
+            <div class="panel-header">
+                <h2>Component Details</h2>
+            </div>
+            <div id="card-content">
+                <div id="empty-state">
+                    Click on any node in the architecture diagram to view its details, trust boundaries, and role in the system.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const nodesData = [
+            { id: 1, label: 'React Frontend\n(Vercel)', group: 'client', title: 'User Interface', level: 1 },
+            { id: 2, label: 'Flask Backend\n(Railway)', group: 'backend', title: 'API & Orchestration', level: 2 },
+            { id: 3, label: 'Supabase DB\n(PostgreSQL)', group: 'db', title: 'PostgreSQL Database', level: 3 },
+            { id: 4, label: 'Supabase Auth', group: 'db', title: 'Authentication Service', level: 3 },
+            { id: 5, label: 'Supabase Storage', group: 'db', title: 'File Storage', level: 3 },
+            { id: 6, label: 'Google Gemini', group: 'external', title: 'AI Engine', level: 4 },
+            { id: 7, label: 'Judge0 API', group: 'external', title: 'Code Execution Engine', level: 4 },
+            { id: 8, label: 'Razorpay', group: 'external', title: 'Payment Gateway', level: 4 }
+        ];
+
+        const edgesData = [
+            { from: 1, to: 2, label: '1. API Request (Mock Interview)', arrows: 'to', color: { color: '#ef4444' }, width: 2, font: { align: 'top', color: '#cbd5e1' } },
+            { from: 2, to: 4, label: '2. Validate Auth', arrows: 'to, from', color: { color: '#ef4444' }, width: 2, font: { align: 'top', color: '#cbd5e1' } },
+            { from: 2, to: 3, label: '3. DB Query', arrows: 'to, from', color: { color: '#ef4444' }, width: 2, font: { align: 'top', color: '#cbd5e1' } },
+            { from: 2, to: 5, label: 'Fetch/Upload Resumes', arrows: 'to, from', dashes: true, color: { color: '#64748b' } },
+            { from: 2, to: 6, label: '4. AI Generates Response', arrows: 'to, from', color: { color: '#ef4444' }, width: 2, font: { align: 'top', color: '#cbd5e1' } },
+            { from: 2, to: 7, label: 'Code Execution (Assessments)', arrows: 'to, from', dashes: true, color: { color: '#64748b' } },
+            { from: 2, to: 8, label: 'Process Subscription Payments', arrows: 'to, from', dashes: true, color: { color: '#64748b' } },
+            { from: 2, to: 1, label: '5. JSON Response', arrows: 'to', color: { color: '#ef4444' }, width: 2, font: { align: 'bottom', color: '#cbd5e1' } }
+        ];
+
+        const componentDetails = {
+            1: {
+                title: "React Frontend (Vite/Tailwind)",
+                tags: ["Frontend", "Client Boundary", "Vercel"],
+                description: "The primary user interface built with React, Vite, and Tailwind CSS. Hosted on Vercel. Contains portals for Students, Admins, and Super Admins. Handles audio capturing, code editing, and UI rendering.",
+                trust: "Untrusted client zone. Inputs must be sanitized before processing in the backend.",
+                dependencies: ["Flask Backend API", "Supabase Auth (Client)"]
+            },
+            2: {
+                title: "Flask Backend (Python)",
+                tags: ["Backend", "Railway Cloud Boundary", "API Gateway"],
+                description: "Python Flask application hosted on Railway. Orchestrates mock interviews, forwards code to Judge0, processes resumes, handles Razorpay webhooks, and connects to Supabase infrastructure.",
+                trust: "Trusted backend zone. Enforces rate limiting and API authentication via Supabase Auth tokens.",
+                dependencies: ["Supabase PostgreSQL", "Supabase Auth", "Google Gemini", "Judge0", "Razorpay"]
+            },
+            3: {
+                title: "Supabase PostgreSQL",
+                tags: ["Database", "Supabase", "Infrastructure"],
+                description: "Relational database holding student data, interview history, performance metrics, question banks, organization data, and subscriptions.",
+                trust: "Trusted data zone.",
+                dependencies: []
+            },
+            4: {
+                title: "Supabase Auth",
+                tags: ["Authentication", "Supabase", "Infrastructure"],
+                description: "Handles user signups, logins, JWT generation, and multi-tenant isolation.",
+                trust: "Trusted auth boundary.",
+                dependencies: []
+            },
+            5: {
+                title: "Supabase Storage",
+                tags: ["Storage", "Supabase", "Infrastructure"],
+                description: "Object storage layer. Stores user resumes (PDFs) and potentially audio recordings or user avatars.",
+                trust: "Trusted data zone.",
+                dependencies: []
+            },
+            6: {
+                title: "Google Gemini",
+                tags: ["External Service", "Google API", "AI Model"],
+                description: "Core AI engine powering 'Ava' (AI Interviewer). Evaluates coding tasks, generates AI questions, and analyzes resumes for ATS compatibility.",
+                trust: "External trust boundary.",
+                dependencies: []
+            },
+            7: {
+                title: "Judge0 API",
+                tags: ["External Service", "Code Execution"],
+                description: "Robust code execution engine that securely compiles and runs user code submissions during coding assessments.",
+                trust: "External trust boundary. Runs untrusted user code in isolated sandboxes.",
+                dependencies: []
+            },
+            8: {
+                title: "Razorpay",
+                tags: ["External Service", "Payments"],
+                description: "Processes student and organization subscriptions and manages webhook callbacks to the Flask backend.",
+                trust: "External trust boundary. Handles sensitive payment processing.",
+                dependencies: []
+            }
+        };
+
+        const container = document.getElementById('network');
+        const data = {
+            nodes: new vis.DataSet(nodesData),
+            edges: new vis.DataSet(edgesData)
+        };
+        const options = {
+            nodes: {
+                shape: 'box',
+                margin: 15,
+                borderWidth: 2,
+                font: {
+                    color: '#ffffff',
+                    size: 14,
+                    face: 'Segoe UI',
+                    multi: true
+                },
+                shadow: true
+            },
+            groups: {
+                client: { color: { background: '#1e3a8a', border: '#3b82f6' } },
+                backend: { color: { background: '#064e3b', border: '#10b981' } },
+                db: { color: { background: '#4c1d95', border: '#8b5cf6' } },
+                external: { color: { background: '#78350f', border: '#f59e0b' } }
+            },
+            edges: {
+                smooth: {
+                    type: 'cubicBezier',
+                    forceDirection: 'horizontal',
+                    roundness: 0.4
+                }
+            },
+            layout: {
+                hierarchical: {
+                    direction: 'LR',
+                    levelSeparation: 300,
+                    nodeSpacing: 150,
+                    treeSpacing: 200,
+                    sortMethod: 'directed'
+                }
+            },
+            physics: false,
+            interaction: {
+                hover: true,
+                zoomView: true,
+                dragView: true
+            }
+        };
+
+        const network = new vis.Network(container, data, options);
+
+        network.on("click", function (params) {
+            const cardContent = document.getElementById('card-content');
+            
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const info = componentDetails[nodeId];
+                
+                let tagsHtml = info.tags.map(tag => {
+                    let className = 'tag';
+                    if (tag.includes('Boundary') || tag.includes('External')) className += ' external';
+                    if (tag.includes('Backend') || tag.includes('Trusted')) className += ' boundary';
+                    return `<span class="${className}">${tag}</span>`;
+                }).join('');
+
+                let depsHtml = info.dependencies.length > 0 
+                    ? `<div style="margin-top: 15px;"><strong>Depends On:</strong><br><span style="color: #94a3b8; font-size: 0.9em;">${info.dependencies.join(', ')}</span></div>`
+                    : '';
+
+                cardContent.innerHTML = `
+                    <div class="card">
+                        <h3>${info.title}</h3>
+                        <div style="margin-bottom: 12px;">${tagsHtml}</div>
+                        <p><strong>Role:</strong> ${info.description}</p>
+                    </div>
+                    <div class="card">
+                        <h3 style="color: #10b981;">Trust & Boundaries</h3>
+                        <p>${info.trust}</p>
+                        ${depsHtml}
+                    </div>
+                `;
+            } else {
+                cardContent.innerHTML = `
+                    <div id="empty-state">
+                        Click on any node in the architecture diagram to view its details, trust boundaries, and role in the system.
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
