@@ -2,7 +2,7 @@ name: PrepFly CI
 
 on:
   push:
-    branches: [ "main", "master", "develop", "staging/*" ]
+    branches: [ "main", "master", "develop", "staging/*", "ai-inw" ]
   pull_request:
     branches: [ "main", "master", "develop", "staging/*" ]
 
