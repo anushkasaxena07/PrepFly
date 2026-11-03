@@ -13,6 +13,7 @@ jobs:
     env:
       ENVIRONMENT: test
       FLASK_ENV: test
+      SANDBOX_ISOLATION_MODE: process
       JWT_SECRET_KEY: test-secret-key-32-chars-long-for-testing-only-12345
       SUPABASE_URL: https://test-project.supabase.co
       SUPABASE_SERVICE_KEY: test-service-key-for-unit-testing
