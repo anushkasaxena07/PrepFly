@@ -33,6 +33,18 @@ if SANDBOX_DIR not in sys.path:
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
+# Ensure backend test environment defaults are configured so integration tests can run independently
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("FLASK_ENV", "test")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32-chars-long-for-testing-only-12345")
+os.environ.setdefault("SUPABASE_URL", "https://test-project.supabase.co")
+os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key-for-unit-testing")
+os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
+os.environ.setdefault("RAZORPAY_KEY_ID", "rzp_test_dummy_id")
+os.environ.setdefault("RAZORPAY_KEY_SECRET", "test_razorpay_secret_for_testing")
+os.environ.setdefault("SMTP_EMAIL", "test@prepfly.io")
+os.environ.setdefault("SMTP_PASSWORD", "test-smtp-password")
+
 from config import config
 from runner import runner, CodeRunner
 from server import app as sandbox_app, validate_sandbox_startup
