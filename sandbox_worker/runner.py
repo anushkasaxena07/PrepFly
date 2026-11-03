@@ -170,7 +170,7 @@ class CodeRunner:
         elif mode in ("microvm", "gvisor", "firecracker"):
             return "microvm" if docker_ok else "process"
         elif mode == "auto":
-            return "container" if docker_ok else "process"
+            return "process"
         return "process"
 
     def _setup_scratch_dir(self, effective_mode: str) -> str:

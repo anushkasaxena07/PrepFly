@@ -36,7 +36,6 @@ if BACKEND_DIR not in sys.path:
 # Ensure backend test environment defaults are configured so integration tests can run independently
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("FLASK_ENV", "test")
-os.environ.setdefault("SANDBOX_ISOLATION_MODE", "process")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32-chars-long-for-testing-only-12345")
 os.environ.setdefault("SUPABASE_URL", "https://test-project.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key-for-unit-testing")
