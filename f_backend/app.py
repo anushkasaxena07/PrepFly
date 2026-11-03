@@ -1844,6 +1844,14 @@ def upload_resume():
     if ext not in ("pdf", "docx"):
         return jsonify({"error": "Only PDF and DOCX files are supported"}), 400
 
+    raw_consent = request.form.get("consent") or request.form.get("consent_given")
+    user_consented = raw_consent in (True, 1, "true", "True", "1")
+    if not user_consented:
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to upload, parse, and evaluate your resume with AI."
+        }), 400
+
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{uuid.uuid4()}_{filename}")
     file.save(save_path)
 
@@ -1856,8 +1864,6 @@ def upload_resume():
         parse_result = parse_resume_content(resume_text, chat_model)
 
         session_id   = str(uuid.uuid4())
-        raw_consent = request.form.get("consent") or request.form.get("consent_given")
-        user_consented = raw_consent in (True, 1, "true", "True", "1")
         session_data = {
             "session_id": session_id,
             "resume_text": resume_text,
@@ -1868,9 +1874,9 @@ def upload_resume():
             "active": True,
             "ats_score": parse_result.get("ats_score", 70),
             "structured_resume": json.dumps(parse_result.get("structured_data", {})),
-            "consent_given": 1 if user_consented else 0,
-            "consent_timestamp": datetime.utcnow().isoformat() if user_consented else None,
-            "privacy_policy_version": "DPDP-2023-v1.0" if user_consented else None
+            "consent_given": 1,
+            "consent_timestamp": datetime.utcnow().isoformat(),
+            "privacy_policy_version": "DPDP-2023-v1.0"
         }
         if user_id:
             session_data["user_id"] = user_id
@@ -1940,6 +1946,12 @@ def create_session_no_resume():
 
     raw_consent = data.get("consent") or data.get("consent_given")
     user_consented = raw_consent in (True, 1, "true", "True", "1")
+    if not user_consented:
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to create an AI interview session."
+        }), 400
+
     session_data = {
         "session_id": session_id,
         "resume_text": resume_text,
@@ -1950,9 +1962,9 @@ def create_session_no_resume():
         "active": True,
         "category": category,
         "difficulty": difficulty,
-        "consent_given": 1 if user_consented else 0,
-        "consent_timestamp": datetime.utcnow().isoformat() if user_consented else None,
-        "privacy_policy_version": "DPDP-2023-v1.0" if user_consented else None
+        "consent_given": 1,
+        "consent_timestamp": datetime.utcnow().isoformat(),
+        "privacy_policy_version": "DPDP-2023-v1.0"
     }
     if user_id:
         session_data["user_id"] = user_id
@@ -1998,6 +2010,12 @@ def start_interview():
     session, err = get_owned_session(session_id)
     if err:
         return err
+
+    if not session.get("consent_given"):
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Interview session lacks valid affirmative consent."
+        }), 403
 
     if not session.get("active", True):
         return jsonify({"error": "Session not found or already completed"}), 404
@@ -2334,6 +2352,19 @@ def speech_to_text():
     if not audio_b64:
         return jsonify({"error": "No audio data provided"}), 400
 
+    raw_consent = (data.get("consent") or data.get("consent_given")) if request.is_json else (request.form.get("consent") or request.form.get("consent_given"))
+    user_consented = raw_consent in (True, 1, "true", "True", "1")
+    session_id = (data.get("session_id") if request.is_json else request.form.get("session_id"))
+    if not user_consented and session_id:
+        sess, _ = get_owned_session(str(session_id))
+        if sess and sess.get("consent_given"):
+            user_consented = True
+    if not user_consented:
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 is required for audio transcription."
+        }), 400
+
     if len(audio_b64) > 8 * 1024 * 1024:
         return jsonify({"error": "Audio payload exceeds maximum 8MB limit"}), 413
 
@@ -2659,6 +2690,11 @@ def save_recording():
             session, err = get_owned_session(session_id)
             if err:
                 return err
+            if not session.get("consent_given"):
+                return jsonify({
+                    "error": "Affirmative consent required",
+                    "message": "Interview session lacks valid affirmative consent for recording storage."
+                }), 403
 
             ext = os.path.splitext(secure_filename(uploaded_file.filename))[1].lower()
             if ext not in RECORDING_ALLOWED:
@@ -2680,6 +2716,11 @@ def save_recording():
             session, err = get_owned_session(session_id)
             if err:
                 return err
+            if not session.get("consent_given"):
+                return jsonify({
+                    "error": "Affirmative consent required",
+                    "message": "Interview session lacks valid affirmative consent for recording storage."
+                }), 403
 
             ext = "." + (mime_type.split("/")[-1].split(";")[0] if "/" in mime_type else "webm").lower()
             if ext not in RECORDING_ALLOWED:
@@ -2737,6 +2778,12 @@ def delete_session(session_id):
                 os.remove(rec_path)
             except Exception as ex:
                 print(f"Error removing recording file: {ex}")
+
+        try:
+            from services.cache_service import cache_manager
+            cache_manager.delete_pattern(f"*{session_id}*")
+        except Exception:
+            pass
 
         supabase.table("sessions").delete().eq("session_id", session_id).execute()
         return jsonify({"message": "Session deleted successfully"}), 200
@@ -2803,9 +2850,109 @@ def clear_user_history(user_id):
 
         # Delete all sessions for this user from database
         supabase.table("sessions").delete().eq("user_id", user_id).execute()
-        return jsonify({"message": "All interview history cleared successfully"}), 200
+
+        # Cascade delete across all child tables
+        for tbl in ["resume_scores", "speech_analyses", "coding_submissions", "student_feedbacks", "parsed_resumes"]:
+            try:
+                supabase.table(tbl).delete().eq("user_id", user_id).execute()
+            except Exception as e_tbl:
+                print(f"Notice deleting from {tbl}: {e_tbl}")
+
+        # Invalidate multi-tier cache
+        try:
+            from services.cache_service import cache_manager
+            cache_manager.delete_pattern(f"*{user_id}*")
+        except Exception:
+            pass
+
+        return jsonify({"message": "All interview history and associated personal data cleared successfully"}), 200
     except Exception as e:
         print(f"Clear history error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/user/account", methods=["DELETE"])
+@app.route("/user/account", methods=["DELETE"])
+def delete_user_account():
+    """
+    Self-Service User Account Deletion & Right-to-Erasure (DPDP Act 2023 / GDPR).
+    Permanently purges:
+    - User profile and authentication credentials (users / students)
+    - All interview sessions, transcripts, and evaluation scores (sessions)
+    - Audio recordings stored on local/cloud volumes
+    - Stored resume text, parsed data, and ATS scores (resume_scores, parsed_resumes)
+    - Speech analyses and transcripts (speech_analyses)
+    - Coding submissions (coding_submissions)
+    - Support tickets and feedbacks (student_feedbacks)
+    - Multi-tier cache entries (Redis & L1 Memory)
+    Note on statutory retention: In accordance with Indian Companies Act 2013 and GST rules,
+    financial transaction invoices (orders/invoices) are retained in an
+    anonymized audit state for statutory retention compliance (8 years).
+    """
+    p = getattr(request, "current_user", None) or _get_optional_user()
+    if not p:
+        return jsonify({"error": "Authentication required"}), 401
+
+    user_id = str(p.get("sub", ""))
+    if not user_id:
+        return jsonify({"error": "Invalid token identity"}), 400
+
+    try:
+        # 1. Cascade delete interview sessions and recording files
+        res = supabase.table("sessions").select("recording_path,session_id").eq("user_id", user_id).execute()
+        if res and res.data:
+            for row in res.data:
+                rec_path = row.get("recording_path")
+                if rec_path and os.path.exists(rec_path):
+                    try:
+                        os.remove(rec_path)
+                    except Exception:
+                        pass
+                sid = row.get("session_id")
+                if sid:
+                    try:
+                        from services.cache_service import cache_manager
+                        cache_manager.delete_pattern(f"*{sid}*")
+                    except Exception:
+                        pass
+
+        # 2. Delete candidate records across child tables
+        tables_to_purge = [
+            "sessions",
+            "resume_scores",
+            "speech_analyses",
+            "coding_submissions",
+            "student_feedbacks",
+            "parsed_resumes",
+            "students"
+        ]
+        for tbl in tables_to_purge:
+            try:
+                supabase.table(tbl).delete().eq("user_id", user_id).execute()
+            except Exception as e_del:
+                print(f"Account purge notice for {tbl}: {e_del}")
+
+        try:
+            supabase.table("students").delete().eq("id", user_id).execute()
+        except Exception:
+            pass
+
+        # 3. Purge user account
+        supabase.table("users").delete().eq("id", user_id).execute()
+
+        # 4. Invalidate all cache keys for user
+        try:
+            from services.cache_service import cache_manager
+            cache_manager.delete_pattern(f"*{user_id}*")
+        except Exception:
+            pass
+
+        return jsonify({
+            "status": "success",
+            "message": "User account and all personal data permanently deleted in compliance with DPDP Act 2023."
+        }), 200
+    except Exception as e:
+        print(f"Account deletion error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -4770,6 +4917,14 @@ def resume_score():
     if not resume_text or not job_description:
         return jsonify({"error": "resume_text and job_description are required"}), 400
 
+    raw_consent = data.get("consent") or data.get("consent_given")
+    user_consented = raw_consent in (True, 1, "true", "True", "1")
+    if not user_consented:
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to analyze and score resume data."
+        }), 400
+
     # ── Step 1: Deterministic ATS engine — real numbers, zero AI guessing ────
     from services.ats_engine import calculate_ats_match
     ats = calculate_ats_match(resume_text, job_description)
@@ -4892,6 +5047,14 @@ def speech_analyze():
 
     if not transcript:
         return jsonify({"error": "transcript is required"}), 400
+
+    raw_consent = data.get("consent") or data.get("consent_given")
+    user_consented = raw_consent in (True, 1, "true", "True", "1")
+    if not user_consented:
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to analyze speech data."
+        }), 400
 
     from services.speech_engine import compute_speech_metrics, generate_speech_feedback
 

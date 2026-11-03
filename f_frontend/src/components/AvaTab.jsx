@@ -417,15 +417,12 @@ print("Result:", solve())
       const saved = localStorage.getItem("prepfly_avatab_session") || sessionStorage.getItem("prepfly_avatab_session");
       if (saved) {
         const p = JSON.parse(saved);
-        if (p && p.step && p.step !== "loading") {
-          if (p.step) setStep(p.step);
-          if (p.selectedType) setSelectedType(p.selectedType);
-          if (p.sessionId) setSessionId(p.sessionId);
-          if (p.reportData) setReportData(p.reportData);
+        if (p && p.step === "report" && p.reportData) {
+          setStep("report");
+          setReportData(p.reportData);
           if (p.allFeedbacks) setAllFeedbacks(p.allFeedbacks);
+          if (p.sessionId) setSessionId(p.sessionId);
           if (p.atsScore) setAtsScore(p.atsScore);
-          if (p.question) setQuestion(p.question);
-          if (p.questionNumber) setQuestionNumber(p.questionNumber);
         }
       }
     } catch (e) {
@@ -646,6 +643,7 @@ print("Result:", solve())
             experience: "1-3 Years",
             category: selectedType?.id || category || "Resume",
             difficulty: difficulty || "Medium",
+            job_description: jobDescription || "",
             consent: true
           })
         });
@@ -1073,89 +1071,147 @@ print("Result:", solve())
 
         {/* ── STEP 1: RESUME OR NON-RESUME INTERVIEW SETUP ── */}
         {step === "resume_upload" && (
-          <div style={{ maxWidth: "800px", margin: "30px auto", background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "36px" }}>
-            <div style={{ textAlign: "center", marginBottom: "24px" }}>
-              <h2 style={{ fontSize: "24px", fontWeight: 900, marginBottom: "8px", color: "#fff" }}>Configure Your AI Interview</h2>
-              <p style={{ fontSize: "14px", color: "var(--text2)" }}>Choose between uploading your resume or setting custom non-resume topics.</p>
+          <div style={{ maxWidth: "860px", margin: "30px auto", background: "rgba(12,18,32,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "36px", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+            <div style={{ textAlign: "center", marginBottom: "28px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "6px" }}>HIREGRAM-POWERED VOICE AI</div>
+              <h2 style={{ fontSize: "28px", fontWeight: 900, marginBottom: "8px", color: "#fff" }}>Configure Your AI Interview</h2>
+              <p style={{ fontSize: "14px", color: "var(--text2)", maxWidth: "560px", margin: "0 auto" }}>Choose your preferred interview setup mode below:</p>
             </div>
 
-            {/* Mode Switcher Tabs */}
-            <div style={{ display: "flex", background: "rgba(255,255,255,0.04)", borderRadius: "14px", padding: "4px", marginBottom: "28px" }}>
-              <button onClick={() => setSetupMode("resume")} style={{ flex: 1, padding: "10px", borderRadius: "10px", border: "none", background: setupMode === "resume" ? "linear-gradient(135deg,#00c4a7,#7c3aed)" : "transparent", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "13px" }}>
-                📄 Resume Interview Mode
+            {/* 2 Distinct Setup Mode Option Tabs */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(255,255,255,0.03)", borderRadius: "16px", padding: "6px", marginBottom: "28px" }}>
+              <button 
+                type="button"
+                onClick={() => setSetupMode("resume")} 
+                style={{ 
+                  padding: "14px", 
+                  borderRadius: "12px", 
+                  border: setupMode === "resume" ? "1.5px solid #00c4a7" : "1px solid transparent", 
+                  background: setupMode === "resume" ? "linear-gradient(135deg, rgba(0,196,167,0.18), rgba(124,58,237,0.18))" : "transparent", 
+                  color: setupMode === "resume" ? "#00c4a7" : "#94a3b8", 
+                  fontWeight: 800, 
+                  cursor: "pointer", 
+                  fontSize: "13px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "all 0.2s"
+                }}
+              >
+                <span style={{ fontSize: "18px" }}>📄</span>
+                <span>Option 1: With Resume <strong>[Upload Resume]</strong></span>
               </button>
-              <button onClick={() => setSetupMode("non_resume")} style={{ flex: 1, padding: "10px", borderRadius: "10px", border: "none", background: setupMode === "non_resume" ? "linear-gradient(135deg,#00c4a7,#7c3aed)" : "transparent", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: "13px" }}>
-                ⚙️ Non-Resume / Custom Topics Mode
+
+              <button 
+                type="button"
+                onClick={() => setSetupMode("non_resume")} 
+                style={{ 
+                  padding: "14px", 
+                  borderRadius: "12px", 
+                  border: setupMode === "non_resume" ? "1.5px solid #00c4a7" : "1px solid transparent", 
+                  background: setupMode === "non_resume" ? "linear-gradient(135deg, rgba(0,196,167,0.18), rgba(124,58,237,0.18))" : "transparent", 
+                  color: setupMode === "non_resume" ? "#00c4a7" : "#94a3b8", 
+                  fontWeight: 800, 
+                  cursor: "pointer", 
+                  fontSize: "13px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  transition: "all 0.2s"
+                }}
+              >
+                <span style={{ fontSize: "18px" }}>📋</span>
+                <span>Option 2: Without Resume <strong>[With Job Description]</strong></span>
               </button>
             </div>
 
+            {/* OPTION 1 CONTENT: RESUME UPLOAD */}
             {setupMode === "resume" ? (
               <div style={{ textAlign: "center" }}>
                 {resumeFile ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "16px 20px", marginBottom: "28px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ fontSize: "24px" }}>📄</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "18px 22px", marginBottom: "28px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                      <span style={{ fontSize: "28px" }}>📄</span>
                       <div style={{ textAlign: "left" }}>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff" }}>{resumeFile?.name || 'Resume'}</div>
-                        <div style={{ fontSize: "11px", color: "#00c4a7" }}>{(resumeFile.size / 1024).toFixed(1)} KB · Tailoring questions to your profile</div>
+                        <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff" }}>{resumeFile?.name || 'Resume'}</div>
+                        <div style={{ fontSize: "12px", color: "#00c4a7" }}>{(resumeFile.size / 1024).toFixed(1)} KB · Ava will personalize questions to your projects & experience</div>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                       {previewResumeUrl && (
-                        <button onClick={() => window.open(previewResumeUrl, '_blank')} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "8px", width: "36px", height: "36px", color: "#fff", cursor: "pointer", fontSize: "16px" }} title="Preview Resume">👁️</button>
+                        <button type="button" onClick={() => window.open(previewResumeUrl, '_blank')} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "8px", width: "36px", height: "36px", color: "#fff", cursor: "pointer", fontSize: "16px" }} title="Preview Resume">👁️</button>
                       )}
-                      <button onClick={clearResume} style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", width: "36px", height: "36px", color: "#ef4444", cursor: "pointer", fontSize: "16px" }} title="Clear Resume">✕</button>
+                      <button type="button" onClick={clearResume} style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", width: "36px", height: "36px", color: "#ef4444", cursor: "pointer", fontSize: "16px" }} title="Clear Resume">✕</button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ border: "2px dashed rgba(0,196,167,0.3)", borderRadius: "20px", padding: "36px", marginBottom: "28px", position: "relative", cursor: "pointer" }}>
+                  <div style={{ border: "2px dashed rgba(0,196,167,0.35)", borderRadius: "20px", padding: "40px 24px", marginBottom: "28px", position: "relative", cursor: "pointer", background: "rgba(0,196,167,0.02)" }}>
                     <input type="file" accept=".pdf,.docx" onChange={handleFileUpload} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
-                    <div style={{ fontSize: "40px", marginBottom: "12px" }}>☁️</div>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff" }}>Click or Drag & Drop your resume (PDF/DOCX)</div>
-                    <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Your resume helps us tailor every question to your experience</div>
+                    <div style={{ fontSize: "44px", marginBottom: "14px" }}>☁️</div>
+                    <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>Click or Drag & Drop your resume (PDF or DOCX)</div>
+                    <div style={{ fontSize: "13px", color: "var(--text2)", marginTop: "6px" }}>Option 1: Ava tailors every behavioral and technical question directly to your resume projects</div>
                   </div>
                 )}
               </div>
             ) : (
-              /* Non-Resume Form */
-              <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "28px" }}>
+              /* OPTION 2 CONTENT: WITHOUT RESUME (WITH JOB DESCRIPTION) */
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px", textAlign: "left" }}>
                 <div>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Target Role Title</label>
-                  <input type="text" value={roleTitle} onChange={e => setRoleTitle(e.target.value)} placeholder="e.g. Senior Full Stack Software Engineer" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }} />
+                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Role Title</label>
+                  <input 
+                    type="text" 
+                    value={roleTitle} 
+                    onChange={e => setRoleTitle(e.target.value)} 
+                    placeholder="e.g. Senior Full Stack Engineer (React, Python, Microservices)" 
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }} 
+                  />
                 </div>
+
                 <div>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Tech Stack & Tools</label>
-                  <input type="text" value={roleTools} onChange={e => setRoleTools(e.target.value)} placeholder="e.g. React, Node.js, Python, System Design" style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }} />
+                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                    Job Description (JD) & Key Requirements
+                  </label>
+                  <textarea 
+                    value={jobDescription} 
+                    onChange={e => setJobDescription(e.target.value)} 
+                    placeholder="Paste the Job Description here (Responsibilities, Required Skills, Tech Stack, Qualifications)... Ava will tailor her questions to match this exact role!" 
+                    rows={5}
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px", resize: "vertical", fontFamily: "inherit" }} 
+                  />
                 </div>
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
-                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Category</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}>
-                      {["HR & Behavioral", "DSA", "System Design", "OOPS", "DBMS", "OS", "CN", "Core CS", "Company Specific"].map(c => <option key={c} value={c}>{c}</option>)}
+                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Core Focus Category</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }}>
+                      {["Full Stack / Generalist", "HR & Behavioral", "DSA & Algorithms", "System Design & Architecture", "OOPS & Clean Code", "DBMS & SQL", "OS & Networking", "Core CS"].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Difficulty</label>
-                    <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.1)", color: "#fff" }}>
-                      <option value="Easy">Easy</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Hard">Hard</option>
+                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Difficulty Level</label>
+                    <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }}>
+                      <option value="Easy">Junior / Associate (Easy)</option>
+                      <option value="Medium">Mid-Level / Standard (Medium)</option>
+                      <option value="Hard">Senior / Lead (Hard)</option>
                     </select>
                   </div>
                 </div>
               </div>
             )}
 
-            <div style={{ textAlign: "center", marginTop: "28px" }}>
+            <div style={{ textAlign: "center", marginTop: "20px" }}>
               <button 
+                type="button"
                 onClick={() => {
                   if (setupMode === "resume" && !resumeFile) {
-                    alert("Please upload your resume file (PDF/DOCX) first, or switch to Custom Topics Mode.");
+                    alert("Please upload your resume file (PDF/DOCX) first, or switch to Option 2: Without Resume [With Job Description].");
                     return;
                   }
                   setStep("type_selection");
                 }} 
-                style={{ padding: "14px 28px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} 
+                style={{ padding: "14px 32px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} 
                 title="Continue to Track Selection"
               >
                 Continue to Track Selection ➔
@@ -1381,26 +1437,7 @@ print("Result:", solve())
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCodeEditor(!showCodeEditor)}
-                  style={{
-                    background: showCodeEditor ? "rgba(0,196,167,0.2)" : "rgba(255,255,255,0.06)",
-                    border: showCodeEditor ? "1px solid #00c4a7" : "1px solid rgba(255,255,255,0.15)",
-                    color: showCodeEditor ? "#00c4a7" : "#e2e8f0",
-                    borderRadius: "20px",
-                    padding: "6px 14px",
-                    fontSize: "12px",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }}
-                  title="Toggle In-Call Live Code Editor (Hiregram DSA style)"
-                >
-                  <span>💻</span> {showCodeEditor ? "Hide Code Editor" : "Open Code Editor"}
-                </button>
+
 
                 <button onClick={endInterviewSession} style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444", borderRadius: "24px", padding: "8px 20px", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
                   🚪 End Interview & Evaluate
@@ -1409,7 +1446,7 @@ print("Result:", solve())
             </div>
 
             {/* SPLIT CONTAINER: 50-50 OR WITH CODE EDITOR */}
-            <div style={{ display: "grid", gridTemplateColumns: showCodeEditor ? "1fr 1.15fr" : "1fr 1fr", gap: "20px", flex: 1, minHeight: 0 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", flex: 1, minHeight: 0 }}>
               
               {/* LEFT 50%: CANDIDATE LIVE WEBCAM VIDEO */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "24px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1660,149 +1697,7 @@ print("Result:", solve())
                 </div>
 
               </div>
-              {/* HIREGRAM LIVE CODE EDITOR PANEL */}
-              {showCodeEditor && (
-                <div style={{
-                  background: "#080c14",
-                  border: "1px solid rgba(0,196,167,0.3)",
-                  borderRadius: "24px",
-                  padding: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                  overflow: "hidden"
-                }}>
-                  {/* Editor Header Bar */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7" }}>💻 In-Call IDE</span>
-                      <select
-                        value={codeLanguage}
-                        onChange={e => setCodeLanguage(e.target.value)}
-                        style={{
-                          background: "rgba(255,255,255,0.06)",
-                          border: "1px solid rgba(255,255,255,0.15)",
-                          color: "#fff",
-                          borderRadius: "8px",
-                          padding: "3px 8px",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          outline: "none"
-                        }}
-                      >
-                        <option value="python">Python 3</option>
-                        <option value="javascript">JavaScript (Node)</option>
-                      </select>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <button
-                        type="button"
-                        onClick={() => setCodeContent("# Write your solution here\n\ndef solve():\n    pass\n")}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "#94a3b8",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          cursor: "pointer"
-                        }}
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleExecuteCode}
-                        disabled={isExecutingCode}
-                        style={{
-                          background: "linear-gradient(135deg, #00c4a7, #00e5c3)",
-                          color: "#050811",
-                          border: "none",
-                          borderRadius: "8px",
-                          padding: "5px 14px",
-                          fontSize: "12px",
-                          fontWeight: 900,
-                          cursor: isExecutingCode ? "wait" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px"
-                        }}
-                      >
-                        {isExecutingCode ? "Executing..." : "▶ Run Code"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Code Area Textarea */}
-                  <div style={{ flex: 1, minHeight: "180px", display: "flex", flexDirection: "column" }}>
-                    <textarea
-                      value={codeContent}
-                      onChange={e => setCodeContent(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Tab") {
-                          e.preventDefault();
-                          const start = e.target.selectionStart;
-                          const end = e.target.selectionEnd;
-                          const val = codeContent.substring(0, start) + "    " + codeContent.substring(end);
-                          setCodeContent(val);
-                          setTimeout(() => {
-                            e.target.selectionStart = e.target.selectionEnd = start + 4;
-                          }, 0);
-                        }
-                      }}
-                      spellCheck={false}
-                      style={{
-                        width: "100%",
-                        flex: 1,
-                        background: "#050811",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: "12px",
-                        padding: "12px",
-                        color: "#38bdf8",
-                        fontFamily: "'Courier New', Courier, monospace",
-                        fontSize: "13px",
-                        lineHeight: "1.5",
-                        resize: "none",
-                        outline: "none"
-                      }}
-                    />
-                  </div>
-
-                  {/* Console Output */}
-                  <div style={{
-                    height: "110px",
-                    background: "rgba(0,0,0,0.6)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: "12px",
-                    padding: "8px 12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8" }}>Terminal Console</span>
-                      {codeOutput && (
-                        <span style={{ fontSize: "10px", fontWeight: 800, color: codeOutput.status === "success" ? "#10b981" : "#ef4444" }}>
-                          {codeOutput.status === "success" ? `Success (${codeOutput.execution_time_ms}ms)` : "Execution Error"}
-                        </span>
-                      )}
-                    </div>
-                    <pre style={{
-                      margin: 0,
-                      flex: 1,
-                      overflowY: "auto",
-                      fontFamily: "'Courier New', Courier, monospace",
-                      fontSize: "11px",
-                      color: codeOutput?.status === "error" ? "#f87171" : "#e2e8f0",
-                      whiteSpace: "pre-wrap"
-                    }}>
-                      {codeOutput ? (codeOutput.text || codeOutput.stdout || codeOutput.stderr || "Process finished with no output.") : "Click '▶ Run Code' to compile in sandbox."}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-            </div>
+              </div>
           </div>
         )}
 

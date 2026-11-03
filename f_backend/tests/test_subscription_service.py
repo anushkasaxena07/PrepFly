@@ -196,17 +196,22 @@ class TestSubscriptionService(unittest.TestCase):
         from services.subscription_service import get_supabase
         sb = get_supabase()
 
-        # 1. Without consent: consent_given must be 0
+        # 1. Without consent: Must be rejected server-side with HTTP 400 Bad Request
         res_no_consent = client.post("/create-session-no-resume", headers=headers, json={
             "role": "Backend Engineer"
         })
-        self.assertEqual(res_no_consent.status_code, 200)
-        sess_id_no_consent = res_no_consent.get_json()["session_id"]
-        row_no_consent = sb.table("sessions").select("consent_given,consent_timestamp").eq("session_id", sess_id_no_consent).execute().data[0]
-        self.assertEqual(int(row_no_consent["consent_given"]), 0)
-        self.assertIsNone(row_no_consent["consent_timestamp"])
+        self.assertEqual(res_no_consent.status_code, 400)
+        self.assertIn("consent", res_no_consent.get_json().get("error", "").lower())
 
-        # 2. With affirmative consent: consent_given must be 1
+        # 1b. With false consent: Must be rejected server-side with HTTP 400
+        res_false_consent = client.post("/create-session-no-resume", headers=headers, json={
+            "role": "Backend Engineer",
+            "consent": False
+        })
+        self.assertEqual(res_false_consent.status_code, 400)
+        self.assertIn("consent", res_false_consent.get_json().get("error", "").lower())
+
+        # 2. With affirmative consent: Must succeed with 200 and record consent_given = 1
         res_consent = client.post("/create-session-no-resume", headers=headers, json={
             "role": "Backend Engineer",
             "consent": True
