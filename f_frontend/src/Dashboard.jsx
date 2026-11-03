@@ -123,6 +123,8 @@ export default function Dashboard() {
   const [profileInitialSubTab, setProfileInitialSubTab] = useState("info");
 
   useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
     const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
     const fetchData = async () => {
       try {

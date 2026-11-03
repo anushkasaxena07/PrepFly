@@ -31,8 +31,10 @@ def safe_invoke_llm(chat_model, prompt_content):
             if txt:
                 return txt
     except Exception as e_prim:
-        print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
         api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
+        if not api_key or (isinstance(api_key, str) and (api_key.startswith("test-") or "dummy" in api_key.lower())) or os.getenv("ENVIRONMENT") == "test":
+            return None
+        print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
         if api_key:
             for alt_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
                 try:
