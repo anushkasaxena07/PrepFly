@@ -133,7 +133,7 @@ class TestSecurityRegressions(unittest.TestCase):
         create_res = self.client.post(
             "/create-session-no-resume",
             headers={"Authorization": f"Bearer {user_a_token}"},
-            json={"role": "Software Engineer"}
+            json={"role": "Software Engineer", "consent": True}
         )
         session_id = create_res.get_json().get("session_id")
         self.assertIsNotNone(session_id)

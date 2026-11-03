@@ -269,6 +269,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
       }
+      if (stream.getVideoTracks) {
+        stream.getVideoTracks().forEach(t => {
+          if (!t.enabled) t.enabled = true;
+        });
+      }
       const p = videoEl.play();
       if (p && typeof p.catch === "function") {
         p.catch(err => {
@@ -400,56 +405,75 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   // Initialize and attach camera stream directly with robust device fallbacks
   const setupCamera = async (forceReacquire = false) => {
     try {
-      const hasLiveVideo = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
-      const hasLiveAudio = mediaStreamRef.current?.getAudioTracks().some(t => t.readyState === 'live');
+      if (forceReacquire && mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        mediaStreamRef.current = null;
+      }
+
+      const hasLiveVideo = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
+      const hasLiveAudio = mediaStreamRef.current?.getAudioTracks().some(t => t.readyState === 'live' && t.enabled);
 
       if (forceReacquire || !mediaStreamRef.current || !hasLiveVideo || !hasLiveAudio) {
-        let stream = mediaStreamRef.current || null;
+        let stream = null;
         let acquiredVideo = false;
         let acquiredAudio = false;
 
-        // 1. Try combined user media first (universal, robust constraints)
+        // 1. Try combined user media with optimal camera & audio constraints
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
+            video: {
+              width: { ideal: 1280, max: 1920 },
+              height: { ideal: 720, max: 1080 },
+              facingMode: "user"
+            },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
           });
           acquiredVideo = stream.getVideoTracks().length > 0;
           acquiredAudio = stream.getAudioTracks().length > 0;
         } catch (eBoth) {
-          console.warn("Combined getUserMedia failed, attempting separate requests:", eBoth);
-          // 2. Try separate video
+          console.warn("Optimal getUserMedia failed, attempting basic combined:", eBoth);
+          // 2. Try basic combined
           try {
-            const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
-            if (stream) {
-              vStream.getVideoTracks().forEach(t => stream.addTrack(t));
-            } else {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            acquiredVideo = stream.getVideoTracks().length > 0;
+            acquiredAudio = stream.getAudioTracks().length > 0;
+          } catch (eBasic) {
+            console.warn("Basic combined getUserMedia failed, attempting separate requests:", eBasic);
+            // 3. Try separate video
+            try {
+              const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
               stream = vStream;
+              acquiredVideo = true;
+            } catch (eVid) {
+              console.warn("Video only getUserMedia failed:", eVid);
+              setCameraErrorMsg("Camera access unavailable. Ensure no other application (Zoom, Teams) is using your webcam, then click below.");
             }
-            acquiredVideo = true;
-          } catch (eVid) {
-            console.warn("Video only getUserMedia failed:", eVid);
-            setCameraErrorMsg("Camera access blocked or unavailable. Click 'Allow Camera & Mic' to retry.");
-          }
-          // 3. Try separate audio
-          try {
-            const aStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (stream) {
-              aStream.getAudioTracks().forEach(t => stream.addTrack(t));
-            } else {
-              stream = aStream;
+            // 4. Try separate audio
+            try {
+              const aStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              if (stream) {
+                aStream.getAudioTracks().forEach(t => stream.addTrack(t));
+              } else {
+                stream = aStream;
+              }
+              acquiredAudio = true;
+            } catch (eAud) {
+              console.warn("Audio only getUserMedia failed:", eAud);
+              setMicErrorMsg("Microphone access unavailable. Check browser permissions and click Reconnect Mic.");
             }
-            acquiredAudio = true;
-          } catch (eAud) {
-            console.warn("Audio only getUserMedia failed:", eAud);
-            setMicErrorMsg("Microphone access blocked or unavailable. Click 'Reconnect Mic' to retry.");
           }
         }
 
         if (stream) {
           mediaStreamRef.current = stream;
-          const liveV = stream.getVideoTracks().some(t => t.readyState === 'live');
-          const liveA = stream.getAudioTracks().some(t => t.readyState === 'live');
+          const liveV = stream.getVideoTracks().some(t => t.readyState === 'live' && t.enabled);
+          const liveA = stream.getAudioTracks().some(t => t.readyState === 'live' && t.enabled);
           setHasCameraStream(liveV);
           setHasMicStream(liveA);
           if (liveV) setCameraErrorMsg("");
@@ -536,7 +560,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   useEffect(() => {
     if (step === "device_check" || step === "live_call") {
-      setupCamera();
+      setupCamera(step === "live_call");
     }
   }, [step, cameraOn, micOn]);
 
@@ -699,8 +723,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
       setSessionId(activeSessionId);
 
-      const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
-      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
+      const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
+      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
 
       const startRes = await apiFetch("/start-interview", {
         method: "POST",
@@ -721,6 +745,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
       setTimeout(() => {
         setStep("live_call");
+        setupCamera(true);
         playAvaSpeech(startData.question);
       }, 1200);
 
@@ -780,14 +805,22 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         utterance.lang = 'en-US';
         utterance.rate = 0.96; // Human natural cadence
         utterance.pitch = 1.03; // Warm natural vocal pitch
-        utterance.onend = () => {
+        let speechSafetyTimer = null;
+        const onSpeechFinish = () => {
+          if (speechSafetyTimer) clearTimeout(speechSafetyTimer);
           setIsAvaTalking(false);
           startVoiceRecognition();
         };
-        utterance.onerror = () => {
-          setIsAvaTalking(false);
-          startVoiceRecognition();
-        };
+
+        const wordCount = (cleanedText || text).split(/\s+/).length;
+        const maxSpeechDurationMs = Math.max(3000, Math.min(25000, (wordCount / 2.2) * 1000 + 2500));
+        speechSafetyTimer = setTimeout(() => {
+          console.warn("SpeechSynthesis safety timeout triggered; auto-starting microphone listener.");
+          onSpeechFinish();
+        }, maxSpeechDurationMs);
+
+        utterance.onend = onSpeechFinish;
+        utterance.onerror = onSpeechFinish;
         window.speechSynthesis.speak(utterance);
       } else {
         setIsAvaTalking(false);
@@ -916,8 +949,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           setIsSpeakingAnswer(false);
           return;
         }
-        if (e.error === "network") {
-          console.warn("Speech recognition network notice. Reconnecting listener.");
+        if (e.error === "network" || e.error === "audio-capture") {
+          console.warn("Speech recognition network/audio notice. Listener will auto-reconnect.");
         }
       };
 
@@ -995,8 +1028,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     setHintText("");
 
     try {
-      const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
-      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
+      const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
+      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
       const res = await apiFetch("/next", {
         method: "POST",
         body: JSON.stringify({
@@ -1046,8 +1079,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     setCaptionText("Compiling your comprehensive executive evaluation report...");
 
     try {
-      const chosenCategory = selectedType?.id || (setupMode === "non_resume" ? category : "Resume");
-      const chosenRole = selectedType?.name || (setupMode === "non_resume" ? roleTitle : "Software Engineer");
+      const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
+      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
       const res = await apiFetch("/end-interview", {
         method: "POST",
         body: JSON.stringify({ 
@@ -1291,6 +1324,18 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     alert("Please upload your resume file (PDF/DOCX) first, or switch to Option 2: Without Resume [With Job Description].");
                     return;
                   }
+                  if (setupMode === "non_resume") {
+                    if (!roleTitle.trim()) {
+                      alert("Please specify your Target Job Role (e.g. HR Manager, Python Developer).");
+                      return;
+                    }
+                    if (!jobDescription.trim()) {
+                      alert("Please provide the Job Description or key skill requirements.");
+                      return;
+                    }
+                    setStep("device_check");
+                    return;
+                  }
                   setStep("type_selection");
                 }} 
                 style={{ padding: "14px 32px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} 
@@ -1351,7 +1396,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     e.target.muted = true;
                     e.target.play().catch(() => {});
                   }}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
                 />
                 
                 {!cameraOn && (
@@ -1391,12 +1436,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       const next = !cameraOn;
                       setCameraOn(next);
                       if (next) {
-                        const liveV = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
-                        if (!liveV) {
-                          setupCamera(true);
-                        } else {
-                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = true);
-                        }
+                        setupCamera(true);
                       } else {
                         if (mediaStreamRef.current) {
                           mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
@@ -1602,7 +1642,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     e.target.muted = true;
                     e.target.play().catch(() => {});
                   }}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
                 />
                 
                 {!cameraOn && (
@@ -1936,6 +1976,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             rawScore = Number(reportData.overall_score_100);
           } else if (reportData.overall_score !== undefined && reportData.overall_score !== null) {
             rawScore = Number(reportData.overall_score);
+          }
+          if (rawScore > 100) {
+            rawScore = rawScore / 10;
           }
 
           let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));

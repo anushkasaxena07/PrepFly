@@ -29,7 +29,8 @@ class TestInterviewLifecycleIntegration(unittest.TestCase):
             "tools": "AWS, Kubernetes, Terraform, Docker, Python",
             "experience": "3-5 Years",
             "category": "System Design",
-            "difficulty": "Hard"
+            "difficulty": "Hard",
+            "consent": True
         })
         self.assertEqual(create_res.status_code, 200)
         c_data = create_res.get_json()

@@ -36,8 +36,18 @@ def compute_section_grades(feedbacks: list, raw_metrics: dict = None) -> list:
     sentiment = raw_metrics.get("sentiment", "positive")
 
     total_q = len(feedbacks) if feedbacks else 1
-    avg_score_10 = sum([f.get("score", 7) for f in feedbacks]) / total_q if feedbacks else 7.5
-    base_100 = round(avg_score_10 * 10)
+    scores_100 = []
+    for f in (feedbacks or []):
+        sc = f.get("score", 7)
+        try:
+            sc_val = float(sc)
+            if sc_val > 10.0:
+                scores_100.append(min(100.0, max(0.0, sc_val)))
+            else:
+                scores_100.append(min(100.0, max(0.0, sc_val * 10.0)))
+        except (ValueError, TypeError):
+            scores_100.append(70.0)
+    base_100 = round(sum(scores_100) / len(scores_100)) if scores_100 else 70
 
     # Extract per-dimension averages from feedbacks where the AI returned them
     def avg_metric(key, fallback=None):

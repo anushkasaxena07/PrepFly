@@ -8,66 +8,54 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
   const hasData = userStats ? userStats.has_data : completedSessions.length > 0;
 
   // Avg Score
-  const avgNum = userStats?.interviews?.avg_score 
+  const avgNum = userStats?.interviews?.avg_score != null
     ? userStats.interviews.avg_score
     : (completedSessions.length > 0 
         ? (completedSessions.reduce((acc, s) => acc + (s.final_score || 0), 0) / completedSessions.length)
-        : 7.8);
-  const avgScore = avgNum.toFixed(1);
+        : 0);
+  const avgScore = (completedSessions.length > 0 || (userStats?.interviews?.total > 0)) ? avgNum.toFixed(1) : "0.0";
 
-  // Best Run (Mathematically guaranteed to be >= avgScore)
+  // Best Run (True Maximum from student records)
   const maxSessionScore = completedSessions.length > 0 
-    ? Math.max(...completedSessions.map(s => s.final_score || 0)) 
+    ? Math.max(...completedSessions.map(s => (typeof s.final_score === 'number' ? s.final_score : (s.overall_score || 0)))) 
     : 0;
-  const resumeScoreVal = userStats?.resume?.latest_score ? (userStats.resume.latest_score / 10) : 0;
-  const bestNum = Math.max(avgNum, maxSessionScore, resumeScoreVal, 8.9);
-  const bestRun = bestNum.toFixed(1);
+  const bestNum = maxSessionScore;
+  const bestRun = (completedSessions.length > 0 || (userStats?.interviews?.total > 0)) ? bestNum.toFixed(1) : "—";
 
   // Streak
-  const streak = userStats ? userStats.streak : (completedSessions.length > 0 ? Math.min(30, completedSessions.length + 1) : 5);
+  const streak = userStats ? (userStats.streak ?? 0) : (completedSessions.length > 0 ? 1 : 0);
 
-  // Grade distribution
+  // Grade distribution (Includes Grade F so true results are never hidden)
   const grades = { S: 0, A: 0, B: 0, C: 0, D: 0, F: 0 };
   if (userStats && userStats.grade_distribution && Object.keys(userStats.grade_distribution).length > 0) {
     Object.assign(grades, userStats.grade_distribution);
   } else if (completedSessions.length > 0) {
     completedSessions.forEach(s => {
-      const g = s.final_grade || 'B';
+      const g = (s.final_grade || 'F').toUpperCase();
       if (grades[g] !== undefined) {
         grades[g]++;
       }
     });
   }
-  if (Object.values(grades).every(v => v === 0)) {
-    grades.S = 1;
-    grades.A = 3;
-    grades.B = 2;
-  }
-  const gradeLetters = ['S', 'A', 'B', 'C', 'D'];
+  const gradeLetters = ['S', 'A', 'B', 'C', 'D', 'F'];
 
   // Latest session breakdown
   const latestSession = completedSessions[0];
   const feedbacks = latestSession?.feedbacks || [];
 
-  // Dynamic SVG Trend calculation
-  const defaultChartData = [
-    { final_score: 6.8, final_grade: 'B' },
-    { final_score: 7.2, final_grade: 'B+' },
-    { final_score: 7.9, final_grade: 'A' },
-    { final_score: 8.5, final_grade: 'A' },
-    { final_score: 8.9, final_grade: 'S' }
-  ];
+  // Dynamic SVG Trend calculation from real student records
   const chartSessions = completedSessions.length > 0 
     ? [...completedSessions].reverse().slice(-12)
-    : defaultChartData;
-  const hasChartData = true;
+    : [];
+  const hasChartData = chartSessions.length > 0;
   
   const chartPoints = chartSessions.map((s, index) => {
     const numPoints = chartSessions.length;
     const x = numPoints > 1 
       ? 25 + index * (460 / (numPoints - 1))
       : 25;
-    const score = s.final_score || 7.5;
+    const rawScore = typeof s.final_score === 'number' ? s.final_score : (typeof s.overall_score === 'number' ? s.overall_score : 0);
+    const score = Math.max(0, Math.min(10, rawScore));
     const y = 125 - (score * 9.8);
     return { x, y, score, label: `S${index + 1}${s.final_grade === 'S' ? '★' : ''}` };
   });
@@ -77,57 +65,88 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
     ? `M25,125 ` + chartPoints.map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ") + ` L${chartPoints[chartPoints.length - 1].x.toFixed(1)},125 Z`
     : "";
 
-  // Dynamic Focus Recommendations
-  const codingAcc = userStats?.coding?.accuracy || 0;
-  const speechConf = userStats?.speech?.confidence || 0;
-  const resumeScore = userStats?.resume?.latest_score || 0;
+  // Dynamic Focus Recommendations based purely on student records
+  const codingHasData = userStats?.coding?.has_data;
+  const speechHasData = userStats?.speech?.has_data;
+  const resumeHasData = userStats?.resume?.has_data;
+
+  const codingAcc = codingHasData ? (userStats.coding.accuracy || 0) : null;
+  const speechConf = speechHasData ? (userStats.speech.confidence || 0) : null;
+  const resumeScore = resumeHasData ? (userStats.resume.latest_score || 0) : null;
 
   const recommendations = [];
-  if (codingAcc < 70) {
-    recommendations.push({
-      icon: "💻",
-      title: "Coding & Algorithms",
-      subtitle: `Accuracy at ${codingAcc}%`,
-      desc: "Practice array & hashing problems to improve test pass rate in the coding room."
-    });
+  if (codingAcc !== null) {
+    if (codingAcc < 70) {
+      recommendations.push({
+        icon: "💻",
+        title: "Coding & Algorithms",
+        subtitle: `Accuracy at ${codingAcc}%`,
+        desc: "Practice array & hashing problems to improve test pass rate in the coding room."
+      });
+    } else {
+      recommendations.push({
+        icon: "💻",
+        title: "Algorithms Solid",
+        subtitle: `Accuracy at ${codingAcc}%`,
+        desc: "Great problem solving accuracy. Try LeetCode Medium/Hard challenges next."
+      });
+    }
   } else {
     recommendations.push({
       icon: "💻",
-      title: "Algorithms Solid",
-      subtitle: `Accuracy at ${codingAcc}%`,
-      desc: "Great problem solving accuracy. Try LeetCode Medium/Hard challenges next."
+      title: "Coding Playground Ready",
+      subtitle: "No Submissions Yet",
+      desc: "Solve algorithm challenges in the coding playground to unlock complexity benchmarks and pass rates."
     });
   }
 
-  if (speechConf < 75) {
-    recommendations.push({
-      icon: "🎤",
-      title: "Speech & Delivery",
-      subtitle: `Confidence at ${speechConf}%`,
-      desc: "Record answers in Speech AI to reduce filler words and improve speaking pace."
-    });
+  if (speechConf !== null) {
+    if (speechConf < 75) {
+      recommendations.push({
+        icon: "🎤",
+        title: "Speech & Delivery",
+        subtitle: `Confidence at ${speechConf}%`,
+        desc: "Record answers in Speech AI to reduce filler words and improve speaking pace."
+      });
+    } else {
+      recommendations.push({
+        icon: "🎤",
+        title: "Speech Confidence High",
+        subtitle: `Confidence at ${speechConf}%`,
+        desc: "Strong verbal delivery. Keep practicing mock sessions for STAR responses."
+      });
+    }
   } else {
     recommendations.push({
       icon: "🎤",
-      title: "Speech Confidence High",
-      subtitle: `Confidence at ${speechConf}%`,
-      desc: "Strong verbal delivery. Keep practicing mock sessions for STAR responses."
+      title: "Speech AI Analysis Ready",
+      subtitle: "No Speech Sessions Yet",
+      desc: "Record a sample answer in Speech AI to analyze real-time confidence, pace (WPM), and filler word count."
     });
   }
 
-  if (resumeScore < 80) {
-    recommendations.push({
-      icon: "📄",
-      title: "Resume ATS Match",
-      subtitle: `Latest score: ${resumeScore}%`,
-      desc: "Run a Resume AI scan against your target job profile to add missing technical keywords."
-    });
+  if (resumeScore !== null) {
+    if (resumeScore < 80) {
+      recommendations.push({
+        icon: "📄",
+        title: "Resume ATS Match",
+        subtitle: `Latest score: ${resumeScore}%`,
+        desc: "Run a Resume AI scan against your target job profile to add missing technical keywords."
+      });
+    } else {
+      recommendations.push({
+        icon: "📄",
+        title: "Resume Optimized",
+        subtitle: `ATS score: ${resumeScore}%`,
+        desc: "Resume keyword alignment is strong for target roles."
+      });
+    }
   } else {
     recommendations.push({
       icon: "📄",
-      title: "Resume Optimized",
-      subtitle: `ATS score: ${resumeScore}%`,
-      desc: "Resume keyword alignment is strong for target roles."
+      title: "Resume ATS Scanner Ready",
+      subtitle: "No Scans Yet",
+      desc: "Upload your resume and target job description to verify ATS keyword match rate and role alignment."
     });
   }
 
@@ -223,7 +242,7 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
               const count = grades[letter] || 0;
               const maxCount = Math.max(...gradeLetters.map(l => grades[l]), 1);
               const percentage = count > 0 ? (count / maxCount) * 100 : 0;
-              const colors = { S: "var(--gold)", A: "var(--cyan)", B: "var(--blue)", C: "var(--orange)", D: "var(--red)" };
+              const colors = { S: "var(--gold)", A: "var(--cyan)", B: "var(--blue)", C: "var(--orange)", D: "var(--red)", F: "#ef4444" };
               return (
                 <div key={letter} className="grade-row">
                   <div className="grade-letter" style={{color: colors[letter]}}>{letter}</div>
@@ -258,7 +277,11 @@ export default function AnalyticsTab({ user = {}, history = [], userStats = null
                 );
               })
             ) : (
-              <div className="text-xs text-muted" style={{padding: "8px 0"}}>No session question breakdown recorded yet.</div>
+              <div className="text-xs text-muted" style={{padding: "8px 0", lineHeight: "1.5"}}>
+              {latestSession 
+                ? `Latest session ended early before question completion (Score: ${latestSession.final_score ?? 0}/10, Grade: ${latestSession.final_grade || 'F'}). Complete at least 5 questions for a full turn-by-turn benchmark breakdown.`
+                : "No session question breakdown recorded yet."}
+            </div>
             )}
           </div>
         </div>

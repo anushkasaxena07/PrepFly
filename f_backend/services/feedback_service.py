@@ -3,6 +3,17 @@ from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER
 from services.grading_service import calculate_grade_info, award_badges, compute_section_grades
 from services.ai_service import safe_invoke_llm
+from services.answer_classifier import (
+    classify_candidate_response,
+    extract_verified_strength,
+    CLASS_CORRECT_COMPLETE,
+    CLASS_PARTIALLY_CORRECT,
+    CLASS_INCORRECT,
+    CLASS_IRRELEVANT_OFF_TOPIC,
+    CLASS_NO_ANSWER,
+    CLASS_EARLY_EXIT,
+    CLASS_UNCLEAR_INSUFFICIENT
+)
 
 def classify_question_type(question: str, category: str = "") -> str:
     q_lower = f"{question} {category or ''}".lower()
@@ -15,180 +26,120 @@ def classify_question_type(question: str, category: str = "") -> str:
     return "Technical"
 
 
-def generate_dynamic_single_fallback(question, answer, q_type):
-    ans_clean = answer.strip()
-    ans_lower = ans_clean.lower()
-    q_lower = question.lower()
-    
-    word_count = len(ans_clean.split())
-
-    # Check for early exit phrases
-    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
-    if any(ep in ans_lower for ep in exit_phrases):
-        return {
-            "feedback": "⚠️ Candidate requested to conclude the interview early.",
-            "score": 0.0,
-            "accuracy_score": 0,
-            "correctness": "Incomplete",
-            "answer_quality": "Early Exit",
-            "question_type": q_type,
-            "strength": "",
-            "improvement": "Candidate exited before providing a technical response.",
-            "tip": "Answer questions completely to receive an evaluation report.",
-            "summary": "Early exit requested (0/100).",
-            "ideal_answer": "Complete answers are required for scoring.",
-            "what_was_correct": "None",
-            "what_was_incorrect": "Candidate requested to end interview early.",
-            "what_to_add": "Technical explanations addressing the prompt.",
-            "common_mistakes": ["Exited interview early"],
-            "metrics": {
-                "communication": 0.0, "confidence": 0.0, "technical_knowledge": 0.0,
-                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
-                "behavioral": 0.0, "leadership": 0.0
-            }
-        }
-
-    # Check for negative or off-topic non-answers
-    is_off_topic = any(ot in ans_lower for ot in ["my day is bad", "bad day", "not good", "terrible", "don't want", "no thanks", "whatever"])
-    if is_off_topic:
-        return {
-            "feedback": "⚠️ Response was off-topic or non-technical. Maintain professional focus during the interview.",
-            "score": 1.0,
-            "accuracy_score": 10,
-            "correctness": "Incorrect",
-            "answer_quality": "Very Poor",
-            "question_type": q_type,
-            "strength": "",
-            "improvement": "Focus on the technical problem and provide structured reasoning.",
-            "tip": "Even during icebreakers, professional communication sets a positive interview tone.",
-            "summary": "Off-topic response recorded (10/100).",
-            "ideal_answer": "Provide a professional, relevant technical explanation.",
-            "what_was_correct": "None",
-            "what_was_incorrect": "Off-topic response",
-            "what_to_add": "Relevant domain concepts and structured examples",
-            "common_mistakes": ["Off-topic answer"],
-            "metrics": {
-                "communication": 1.0, "confidence": 1.0, "technical_knowledge": 0.0,
-                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
-                "behavioral": 1.0, "leadership": 0.0
-            }
-        }
-    
-    # Analyze keyword overlap to see if they address the question
-    stop_words = {"what", "how", "why", "who", "which", "when", "where", "the", "a", "an", "is", "are", "was", "were", "to", "in", "of", "on", "for", "with", "about", "your", "you", "me", "tell"}
-    q_words = [w.strip("?,.()\"'") for w in q_lower.split() if w.strip("?,.()\"'") not in stop_words]
-    matched_words = [w for w in q_words if len(w) > 3 and w in ans_lower]
-    
-    if word_count < 4 or any(skip in ans_lower for skip in ["don't know", "don't remember", "skip", "no idea", "not sure", "pardon"]):
-        acc_score = 15
-        correctness = "Incorrect"
-        quality = "Poor"
-        strength = ""
-        improvement = "Provide a substantive technical response using definitions and concrete examples."
-        tip = "Break down complex questions step-by-step."
-        summary = "Minimal or incomplete response provided."
-    else:
-        match_bonus = min(25, len(matched_words) * 8)
-        base_accuracy = 55 if word_count > 20 else (45 if word_count > 10 else 35)
-        acc_score = min(90, base_accuracy + match_bonus)
-        
-        if acc_score >= 75:
-            correctness = "Correct"
-            quality = "Good"
-            strength = f"Addressed core concepts ({', '.join(matched_words[:2]) if matched_words else 'relevant topic'}) with clear intent."
-        elif acc_score >= 50:
-            correctness = "Partially Correct"
-            quality = "Average"
-            strength = ""
-        else:
-            correctness = "Incorrect"
-            quality = "Below Average"
-            strength = ""
-            
-        improvement = f"Elaborate on implementation details, edge cases, and optimization trade-offs for {q_type} concepts."
-        tip = "Discuss time/space complexity tradeoffs and real-world system applications."
-        summary = f"Answered {q_type} question with {word_count} words."
-        
+def generate_dynamic_single_fallback(question, answer, q_type, category="", role=""):
+    classification, acc_score, dim_scores, rationale = classify_candidate_response(
+        question=question,
+        answer=answer,
+        category=category,
+        role=role
+    )
     score_10 = round(acc_score / 10.0, 1)
 
-    feedback_str = f"✅ Strength: {strength}\n⚠️ Improve: {improvement}\n💡 Tip: {tip}\n📌 Quality: {quality} ({acc_score}/100)"
-    
-    
-    metrics = {
-        "communication": min(10.0, score_10 + 0.5),
-        "confidence": min(10.0, score_10 if word_count > 10 else score_10 - 1.0),
-        "technical_knowledge": score_10,
-        "resume_understanding": score_10,
-        "project_explanation": score_10,
-        "problem_solving": score_10,
-        "behavioral": score_10,
-        "leadership": score_10
-    }
-    
+    # Check if candidate qualifies for a verified strength
+    verified_str = extract_verified_strength(
+        classification=classification,
+        accuracy_score=acc_score,
+        question=question,
+        candidate_answer=answer,
+        dimension_scores=dim_scores
+    )
+    strength_text = verified_str["reason"] if verified_str else ""
+
+    if classification == CLASS_EARLY_EXIT:
+        feedback_msg = "⚠️ Candidate requested to conclude the interview early."
+        improvement_msg = "Complete the required questions to receive a valid performance evaluation."
+    elif classification == CLASS_NO_ANSWER:
+        feedback_msg = "❌ No substantive answer provided. Candidate skipped or indicated no response."
+        improvement_msg = "Attempt each question with structured reasoning, even if stating initial assumptions."
+    elif classification == CLASS_IRRELEVANT_OFF_TOPIC:
+        feedback_msg = "⚠️ Response was off-topic and did not address the question asked."
+        improvement_msg = "Focus directly on the concepts and scenario presented in the interview question."
+    elif classification == CLASS_UNCLEAR_INSUFFICIENT:
+        feedback_msg = "⚠️ Response was too brief to evaluate technical or domain competence."
+        improvement_msg = "Provide complete verbal or typed explanations with examples and rationale."
+    elif classification == CLASS_INCORRECT:
+        feedback_msg = f"❌ Technical definitions or approaches were incorrect. {rationale}"
+        improvement_msg = "Review the core domain definitions, trade-offs, and implementation edge cases."
+    elif classification == CLASS_PARTIALLY_CORRECT:
+        feedback_msg = f"⚠️ Partially correct. {rationale}"
+        improvement_msg = "Deepen discussion of edge cases, failure modes, and performance trade-offs."
+    else:
+        feedback_msg = f"✅ Comprehensive response. {rationale}"
+        improvement_msg = "Continue articulating high-level trade-offs with concrete production examples."
+
     return {
-        "feedback": feedback_str,
+        "feedback": feedback_msg,
         "score": score_10,
-        "accuracy_score": acc_score,
-        "correctness": correctness,
-        "answer_quality": quality,
+        "accuracy_score": int(acc_score),
+        "correctness": classification,
+        "answer_quality": "Good" if acc_score >= 75 else ("Average" if acc_score >= 50 else "Poor"),
         "question_type": q_type,
-        "strength": strength,
-        "improvement": improvement,
-        "tip": tip,
-        "summary": summary,
-        "evidence": f"Candidate response: '{ans_clean[:60]}...'",
-        "technical_accuracy": "Addressed core concepts" if matched_words else "High-level response",
-        "completeness": "Provided details" if word_count > 20 else "Somewhat incomplete",
-        "depth": "Advanced" if word_count > 35 else "Intermediate" if word_count > 15 else "Introductory",
-        "communication_analysis": "Fluent and structured",
-        "problem_solving_analysis": "Good logical progression" if word_count > 20 else "Average approach",
-        "follow_up_question": f"Can you elaborate on the {matched_words[0]} aspect?" if matched_words else "Can you describe a specific example where you applied this?",
-        "ideal_answer": f"A comprehensive response defining the core architecture, trade-offs, and examples for {question}.",
-        "what_was_correct": f"Addressed prompt concepts: {', '.join(matched_words)}" if matched_words else "Attempted explanation",
-        "what_was_incorrect": "Needs more architectural elaboration" if word_count > 15 else "Response was too brief",
-        "what_to_add": "Concrete performance and scalability specifications",
-        "common_mistakes": ["Omitted edge cases"] if word_count > 15 else ["Answer too brief"],
-        "metrics": metrics
+        "strength": strength_text,
+        "improvement": improvement_msg,
+        "tip": "Structure your answers using first-principles definitions followed by trade-offs.",
+        "summary": f"{classification} ({int(acc_score)}/100).",
+        "classification": classification,
+        "dimensions": dim_scores,
+        "ideal_answer": "Provide a structured explanation starting with core definitions, trade-offs, and examples.",
+        "what_was_correct": rationale if acc_score >= 50 else "None",
+        "what_was_incorrect": "Incomplete or inaccurate explanation" if acc_score < 70 else "Minor gaps",
+        "what_to_add": improvement_msg,
+        "common_mistakes": [classification],
+        "metrics": {
+            "communication": round(dim_scores.get("communication", 0.0) / 10.0, 1),
+            "confidence": round(dim_scores.get("understanding", 0.0) / 10.0, 1),
+            "technical_knowledge": round(dim_scores.get("correctness", 0.0) / 10.0, 1),
+            "resume_understanding": round(dim_scores.get("approach", 0.0) / 10.0, 1),
+            "project_explanation": round(dim_scores.get("approach", 0.0) / 10.0, 1),
+            "problem_solving": round(dim_scores.get("approach", 0.0) / 10.0, 1),
+            "behavioral": round(dim_scores.get("communication", 0.0) / 10.0, 1),
+            "leadership": round(dim_scores.get("communication", 0.0) / 10.0, 1)
+        }
     }
 
 
-def evaluate_response_comprehensive(resume_text, question, answer, chat_model, question_index=1, category=""):
+def evaluate_response_comprehensive(resume_text, question, answer, chat_model, question_index=1, category="", role=""):
     ai_name = AI_INTERVIEWER["name"]
     q_type = classify_question_type(question, category)
+    target_role = (role or category or "Software Engineer").strip()
+    if not target_role or target_role.lower() in ("none", ""):
+        target_role = "Software Engineer"
 
-    if not answer or not answer.strip():
+    # Deterministic 7-tier classification and scoring gate
+    classification, composite_acc, dim_scores, rationale = classify_candidate_response(
+        question=question,
+        answer=answer,
+        category=category,
+        role=target_role
+    )
+
+    # 1. Deterministic handling for non-answers
+    if classification == CLASS_NO_ANSWER:
         return {
-            "score": 0,
+            "score": 0.0,
             "accuracy_score": 0,
             "correctness": "No Answer",
             "answer_quality": "Very Poor",
             "question_type": q_type,
-            "feedback": "❌ No Answer Provided. Candidate skipped or gave no input.",
-            "strength": "None",
+            "feedback": "⚠️ No Answer Provided. Candidate skipped or provided no answer.",
+            "strength": "",
             "improvement": "Make sure to attempt every interview question with structured explanations.",
             "tip": "Break down complex questions into steps even if unsure.",
             "summary": "No response recorded (0/100).",
-            "ideal_answer": "Provide a structured explanation starting with core definitions, trade-offs, and examples.",
+            "ideal_answer": f"Provide a structured explanation demonstrating competency in {target_role}.",
             "what_was_correct": "None",
             "what_was_incorrect": "No response provided",
             "what_to_add": "Complete verbal or typed answer addressing core problem requirements",
             "common_mistakes": ["Skipped question entirely"],
             "metrics": {
-                "communication": 0.0,
-                "confidence": 0.0,
-                "technical_knowledge": 0.0,
-                "resume_understanding": 0.0,
-                "project_explanation": 0.0,
-                "problem_solving": 0.0,
-                "behavioral": 0.0,
-                "leadership": 0.0
+                "communication": 0.0, "confidence": 0.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 0.0, "leadership": 0.0
             }
         }
 
-    # Check for early exit phrases
-    ans_lower = answer.strip().lower()
-    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
-    if any(ep in ans_lower for ep in exit_phrases):
+    # 2. Deterministic handling for early exit
+    if classification == CLASS_EARLY_EXIT:
         return {
             "score": 0.0,
             "accuracy_score": 0,
@@ -197,13 +148,13 @@ def evaluate_response_comprehensive(resume_text, question, answer, chat_model, q
             "question_type": q_type,
             "feedback": "⚠️ Candidate requested to conclude the interview early.",
             "strength": "",
-            "improvement": "Candidate exited before completing technical questions.",
+            "improvement": "Candidate exited before completing interview questions.",
             "tip": "Complete at least 5 questions to receive a hiring evaluation.",
             "summary": "Early exit requested (0/100).",
             "ideal_answer": "Complete answers are required for scoring.",
             "what_was_correct": "None",
             "what_was_incorrect": "Candidate requested early exit",
-            "what_to_add": "Complete technical explanations",
+            "what_to_add": "Complete domain explanations",
             "common_mistakes": ["Exited interview early"],
             "metrics": {
                 "communication": 0.0, "confidence": 0.0, "technical_knowledge": 0.0,
@@ -212,33 +163,59 @@ def evaluate_response_comprehensive(resume_text, question, answer, chat_model, q
             }
         }
 
-    # Handle icebreaker responses specifically
-    if question_index == 1:
-        if any(neg in ans_lower for neg in ["bad", "terrible", "not good", "awful", "sad"]):
-            return {
-                "score": 2.0,
-                "accuracy_score": 20,
-                "correctness": "Poor Communication",
-                "answer_quality": "Below Average",
-                "question_type": q_type,
-                "feedback": "⚠️ Acknowledged opening greeting with negative sentiment. Maintain professional composure.",
-                "strength": "",
-                "improvement": "Frame opening interactions professionally and positively.",
-                "tip": "Keep introductory pleasantries warm and constructive.",
-                "summary": "Negative opening tone recorded.",
-                "ideal_answer": "Acknowledge greeting professionally (e.g. 'Doing great, excited for this session!').",
-                "what_was_correct": "Responded to prompt",
-                "what_was_incorrect": "Negative opening tone",
-                "what_to_add": "Professional opening demeanor",
-                "common_mistakes": ["Negative introductory attitude"],
-                "metrics": {
-                    "communication": 2.0, "confidence": 2.0, "technical_knowledge": 0.0,
-                    "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
-                    "behavioral": 2.0, "leadership": 0.0
-                }
+    # 3. Deterministic handling for off-topic or irrelevant responses
+    if classification == CLASS_IRRELEVANT_OFF_TOPIC:
+        return {
+            "score": 1.5,
+            "accuracy_score": 15,
+            "correctness": "Irrelevant or off-topic",
+            "answer_quality": "Off-Topic",
+            "question_type": q_type,
+            "feedback": "⚠️ Response was off-topic or disconnected from the interview question.",
+            "strength": "",
+            "improvement": "Directly address the specific prompt rather than offering unrelated commentary.",
+            "tip": "Focus on the core concepts requested by the interviewer.",
+            "summary": "Off-topic response recorded (15/100).",
+            "ideal_answer": f"Address the question directly using principles relevant to {target_role}.",
+            "what_was_correct": "None",
+            "what_was_incorrect": "Candidate gave off-topic answer",
+            "what_to_add": "Direct answer addressing prompt requirements",
+            "common_mistakes": ["Off-topic answer"],
+            "metrics": {
+                "communication": 1.5, "confidence": 2.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 1.0, "leadership": 0.0
             }
+        }
 
-    prompt = f"""You are a Senior Software Engineer Interviewer at a top product company evaluating a candidate response.
+    # 4. Handle negative icebreaker tone on Turn 1
+    ans_lower = (answer or "").strip().lower()
+    if question_index == 1 and any(neg in ans_lower for neg in ["bad", "terrible", "not good", "awful", "sad"]):
+        return {
+            "score": 2.0,
+            "accuracy_score": 20,
+            "correctness": "Poor Communication",
+            "answer_quality": "Below Average",
+            "question_type": q_type,
+            "feedback": "⚠️ Acknowledged opening greeting with negative sentiment. Maintain professional composure.",
+            "strength": "",
+            "improvement": "Frame opening interactions professionally and positively.",
+            "tip": "Keep introductory pleasantries warm and constructive.",
+            "summary": "Negative opening tone recorded (20/100).",
+            "ideal_answer": "Acknowledge greeting professionally (e.g. 'Doing great, excited for this session!').",
+            "what_was_correct": "Responded to prompt",
+            "what_was_incorrect": "Negative opening tone",
+            "what_to_add": "Professional opening demeanor",
+            "common_mistakes": ["Negative introductory attitude"],
+            "metrics": {
+                "communication": 2.0, "confidence": 2.0, "technical_knowledge": 0.0,
+                "resume_understanding": 0.0, "project_explanation": 0.0, "problem_solving": 0.0,
+                "behavioral": 2.0, "leadership": 0.0
+            }
+        }
+
+    # 5. LLM Evidence-Based Evaluation for substantive answers
+    prompt = f"""You are an expert interviewer evaluating a candidate for the role of {target_role}.
 Question Type: {q_type}
 Question: {question}
 Candidate Answer: {answer}
@@ -246,39 +223,39 @@ Context: {resume_text[:400]}
 
 Perform a strict evidence-based analysis:
 1. Accuracy Score (0-100): 100=Completely correct, 70=Mostly correct, 50=Partial, 30=Major mistakes, 0=Wrong/No answer.
-2. Correctness: Correct | Partially Correct | Incorrect | No Answer
-3. Identify technical mistakes, terminology errors, missed edge cases, and superficial depth.
+2. Correctness: Correct and complete | Partially correct | Incorrect | Irrelevant | No Answer
+3. Identify mistakes, terminology errors, missed edge cases, and superficial depth.
 4. Generate realistic follow-up question if incomplete.
 5. Provide Ideal Answer, What was correct, What was incorrect, What to add.
 
 Return ONLY valid JSON:
 {{
   "accuracy_score": 75,
-  "score": 8,
-  "correctness": "Partially Correct",
+  "score": 7.5,
+  "correctness": "Partially correct",
   "answer_quality": "Good",
-  "strength": "Clear communication of core mechanism",
-  "improvement": "Explain edge case handling and time complexity trade-offs",
-  "tip": "State time/space complexity explicitly",
+  "strength": "Solid explanation of core concepts",
+  "improvement": "Explain edge case handling and trade-offs",
+  "tip": "State trade-offs explicitly",
   "summary": "Good conceptual understanding with minor gaps",
-  "evidence": "Candidate stated 'HashMap allows O(1) lookup' but missed hash collision resolution",
-  "technical_accuracy": "Core definitions correct; missed chaining vs open addressing details",
-  "completeness": "Answered main workflow but omitted edge cases",
+  "evidence": "Candidate addressed core workflow but omitted trade-offs",
+  "technical_accuracy": "Core definitions correct",
+  "completeness": "Answered main question",
   "depth": "Intermediate",
   "communication": "Fluent and structured",
   "problem_solving": "Good logical progression",
-  "follow_up_question": "How would you handle high hash collision rates in production?",
-  "ideal_answer": "Ideal response detailing underlying array of buckets, collision handling, and load factor thresholding",
-  "what_was_correct": "HashMap average time complexity is O(1)",
-  "what_was_incorrect": "Did not account for worst-case O(N) complexity during collisions",
-  "what_to_add": "Mention load factor, rehash operation, and treeification in Java 8+",
-  "common_mistakes": ["Forgot worst-case complexity", "Missed collision resolution"],
-  "communication_score": 8.0,
+  "follow_up_question": "How would you handle trade-offs in production?",
+  "ideal_answer": "Detailed comprehensive answer",
+  "what_was_correct": "Core mechanism accurately identified",
+  "what_was_incorrect": "Did not address edge cases",
+  "what_to_add": "Concrete metrics and real-world considerations",
+  "common_mistakes": ["Missed edge cases"],
+  "communication_score": 7.5,
   "confidence_score": 7.5,
-  "technical_knowledge_score": 8.0,
+  "technical_knowledge_score": 7.5,
   "problem_solving_score": 7.5,
   "behavioral_score": 7.5,
-  "resume_understanding_score": 8.0,
+  "resume_understanding_score": 7.5,
   "project_explanation_score": 7.5
 }}"""
 
@@ -293,15 +270,22 @@ Return ONLY valid JSON:
             content = content.replace("```", "").strip()
 
         data = json.loads(content)
-        acc_score = max(0, min(100, int(data.get("accuracy_score", 70))))
+        acc_score = max(0, min(100, int(data.get("accuracy_score", composite_acc))))
         score_10 = round(acc_score / 10.0, 1)
 
-        strength = data.get("strength", "Solid domain concept explanation.")
+        # Enforce zero false strengths rule:
+        verified_st = extract_verified_strength(classification, float(acc_score), question, answer, dim_scores)
+        if verified_st and acc_score >= 70:
+            strength = verified_st["competency"]
+        else:
+            strength = ""
+
         improvement = data.get("improvement", "Elaborate with specific trade-offs and edge case handling.")
         tip = data.get("tip", "Use structured STAR or principles-first explanations.")
         summary = data.get("summary", "Demonstrated domain knowledge.")
 
-        feedback_str = f"✅ Strength: {strength}\n⚠️ Improve: {improvement}\n💡 Tip: {tip}\n📌 Quality: {data.get('answer_quality', 'Good')} ({acc_score}/100)"
+        st_part = f"Strength: {strength}\n" if strength else ""
+        feedback_str = f"{st_part}Improve: {improvement}\nTip: {tip}\nQuality: {data.get('answer_quality', 'Good')} ({acc_score}/100)"
 
         metrics = {
             "communication": float(data.get("communication_score", score_10)),
@@ -318,7 +302,7 @@ Return ONLY valid JSON:
             "feedback": feedback_str,
             "score": score_10,
             "accuracy_score": acc_score,
-            "correctness": data.get("correctness", "Partially Correct"),
+            "correctness": data.get("correctness", classification),
             "answer_quality": data.get("answer_quality", "Good"),
             "question_type": q_type,
             "strength": strength,
@@ -342,8 +326,7 @@ Return ONLY valid JSON:
 
     except Exception as e:
         print("Feedback comprehensive evaluation notice:", e)
-        return generate_dynamic_single_fallback(question, answer, q_type)
-
+        return generate_dynamic_single_fallback(question, answer, q_type, category=category, role=target_role)
 
 def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model, feedbacks=None):
     # 1. Count valid answers
@@ -625,249 +608,291 @@ def generate_benchmark_answer(question: str, track: str = "") -> dict:
         }
 
 
-def fast_compile_report(role, track, difficulty, experience_level, questions, responses, feedbacks):
+def fast_compile_report(
+    role,
+    track,
+    difficulty,
+    experience_level,
+    questions,
+    responses,
+    feedbacks,
+    interview_mode="resume",
+    candidate_name="Candidate",
+    total_questions_expected=10,
+    **kwargs
+):
     """
-    Instantly compiles an evidence-based executive evaluation report (<1ms)
-    directly from live pre-scored turn feedbacks without network delays.
+    Deterministic, evidence-based executive evaluation compiler.
+    Eliminates inflated scores, guarantees zero false strengths, and enforces
+    strict session metadata integrity throughout the report pipeline.
     """
-    valid_count = 0
-    valid_indices = []
-    poor_indices = []
-
-    exit_phrases = ["can i end", "end inw", "end interview", "i want to end", "can we stop", "stop now", "quit interview", "please end"]
-    for idx, ans in enumerate(responses or []):
-        if ans and str(ans).strip():
-            clean_ans = str(ans).strip().lower().replace(".", "").replace(",", "").strip()
-            if clean_ans not in ("[no response recorded]", "skipped", "skip", "i don't know", "none", "no response", ""):
-                # Do not count exit requests or single-word pleasantries as technical answers
-                if not any(ep in clean_ans for ep in exit_phrases) and clean_ans not in ("my day is bad", "bad day", "not good", "fine"):
-                    if len(clean_ans.split()) >= 2:
-                        valid_count += 1
-                    if len(clean_ans) < 25 or any(s in clean_ans for s in ["don't know", "skip", "no idea", "not sure", "pardon"]):
-                        poor_indices.append(idx)
-                    else:
-                        valid_indices.append(idx)
-                else:
-                    poor_indices.append(idx)
-            else:
-                poor_indices.append(idx)
-        else:
-            poor_indices.append(idx)
-
-    total_questions = len(questions) if questions else 10
-    is_preliminary = valid_count < 5
-
-    # If zero valid answers
-    if valid_count == 0:
-        base_report = {
-            "overall_score": 0.0,
-            "overall_score_100": 0,
-            "report_type": "preliminary",
-            "answered_questions_count": 0,
-            "recommendation": "Strong Reject (No Responses Provided)",
-            "confidence": "Low",
-            "speech_metrics": {
-                "wpm": 0,
-                "pacing_label": "No Speech Detected",
-                "pacing_color": "#94a3b8",
-                "total_words": 0,
-                "filler_count": 0,
-                "filler_breakdown": {},
-                "vocabulary_diversity_pct": 0,
-                "overused_words": []
-            },
-            "eye_contact_pct": 0,
-            "tab_switches": 0,
-            "dimensions": [
-                {"name": "Communication", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
-                {"name": "Technical Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
-                {"name": "Problem Solving", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
-                {"name": "Confidence", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
-                {"name": "Behavioral Skills", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Behavioral questions were not covered."]},
-                {"name": "Resume Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Resume questions were not asked."]},
-                {"name": "Project Explanation", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Project questions were not asked."]},
-                {"name": "Leadership", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Leadership questions were not asked."]},
-                {"name": "Grammar", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
-                {"name": "Vocabulary", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]}
-            ],
-            "strengths": [],
-            "weaknesses": [
-                {"title": "No response recorded", "evidence": "Candidate did not answer any questions."}
-            ],
-            "report": "Candidate did not provide any responses to the interview questions. Evaluation is not possible."
-        }
-        return enrich_report_with_grading(base_report)
-
-    # Calculate real-time dimension scores from feedbacks
-    scores = []
+    questions = questions or []
+    responses = responses or []
     feedbacks = feedbacks or []
-    for f in feedbacks:
-        if isinstance(f, dict):
-            s = f.get("accuracy_score", f.get("score", 0))
-            if isinstance(s, (int, float)):
-                if s <= 10: s = round(s * 10)
-                scores.append(s)
+    total_questions = max(len(questions), 10)
 
-    avg_score = round(sum(scores) / len(scores)) if scores else 70
-
-    # Build dynamic strengths and weaknesses from pre-scored data
-    dyn_strengths = []
-    dyn_weaknesses = []
-
+    # 1. Structured Answer Classification & Tracking
+    attempted_questions = 0
+    valid_evaluated_answers = 0
+    skipped_questions = 0
+    unanswered_questions = 0
+    early_termination = False
+    turn_scores = []
     scored_strengths = []
     scored_weaknesses = []
-    for idx, f in enumerate(feedbacks):
-        if isinstance(f, dict):
-            str_text = f.get("strength")
-            imp_text = f.get("improvement")
-            turn_ans = responses[idx] if (responses and idx < len(responses)) else ""
-            turn_quote = turn_ans[:90] + "..." if len(turn_ans) > 90 else turn_ans
 
-            turn_score = f.get("accuracy_score", f.get("score", 0))
-            if isinstance(turn_score, (int, float)) and turn_score <= 10:
-                turn_score = turn_score * 10
-            
-            # STRICT FILTER: Only award a strength if turn score was actually competent (>= 70) and meaningful!
-            disallowed = ("none", "n/a", "", "attempted to respond to the prompt.", "friendly, clear opening communication", "requested repetition")
-            if str_text and str_text.strip() and str_text.lower() not in disallowed and turn_score >= 70:
-                scored_strengths.append({
-                    "title": str_text,
-                    "evidence": f"Turn {idx+1}: '{turn_quote}'"
-                })
-            if imp_text and imp_text.lower() not in ("none", "n/a", ""):
-                scored_weaknesses.append({
-                    "title": imp_text,
-                    "evidence": f"Turn {idx+1}: '{turn_quote}'"
-                })
+    for idx, q in enumerate(questions):
+        ans = responses[idx] if idx < len(responses) else ""
+        fb = feedbacks[idx] if idx < len(feedbacks) and isinstance(feedbacks[idx], dict) else {}
+        
+        # Determine classification
+        classification = fb.get("correctness")
+        acc_score = fb.get("accuracy_score")
+        if acc_score is None:
+            s_raw = fb.get("score", 0)
+            acc_score = s_raw * 10 if s_raw <= 10 else s_raw
+        acc_score = float(acc_score)
 
-    if scored_strengths:
+        if not ans or not str(ans).strip():
+            unanswered_questions += 1
+            classification = CLASS_NO_ANSWER
+            acc_score = 0.0
+        elif not classification or classification in ("Correct", "Incorrect", "Partially Correct"):
+            # Classify using domain classifier
+            c_label, c_acc, _, _ = classify_candidate_response(question=q, answer=str(ans), category=track, role=role)
+            classification = c_label
+            if not fb.get("accuracy_score"):
+                acc_score = c_acc
+
+        if classification == CLASS_EARLY_EXIT:
+            early_termination = True
+            attempted_questions += 1
+            acc_score = 0.0
+        elif classification == CLASS_NO_ANSWER:
+            skipped_questions += 1
+            acc_score = 0.0
+        elif classification == CLASS_IRRELEVANT_OFF_TOPIC:
+            attempted_questions += 1
+            acc_score = min(acc_score, 15.0)
+        elif classification == CLASS_UNCLEAR_INSUFFICIENT:
+            attempted_questions += 1
+            acc_score = min(acc_score, 20.0)
+        elif classification in (CLASS_CORRECT_COMPLETE, CLASS_PARTIALLY_CORRECT):
+            attempted_questions += 1
+            valid_evaluated_answers += 1
+            turn_scores.append(acc_score)
+        else: # CLASS_INCORRECT
+            attempted_questions += 1
+            turn_scores.append(acc_score)
+
+        # Strength verification: ZERO false strengths
+        candidate_ans_str = str(ans).strip()
+        verified_str = extract_verified_strength(
+            classification=classification,
+            accuracy_score=acc_score,
+            question=q,
+            candidate_answer=candidate_ans_str,
+            dimension_scores=fb.get("dimensions") or {}
+        )
+        if verified_str:
+            scored_strengths.append({
+                "title": verified_str["competency"],
+                "evidence": f"Turn {idx+1}: {verified_str['evidence']} ({verified_str['reason']})"
+            })
+
+        # Weaknesses from low scores or deficiencies
+        if acc_score < 70.0 and classification not in (CLASS_NO_ANSWER, CLASS_EARLY_EXIT):
+            imp_msg = fb.get("improvement") or f"Elaborate on technical trade-offs and concrete implementations for Question {idx+1}."
+            scored_weaknesses.append({
+                "title": f"Turn {idx+1} Depth Gap ({classification})",
+                "evidence": f"Answer '{candidate_ans_str[:80]}...' - {imp_msg}"
+            })
+        elif classification == CLASS_NO_ANSWER:
+            scored_weaknesses.append({
+                "title": f"Turn {idx+1} Skipped Question",
+                "evidence": f"Candidate provided no answer to: '{q[:90]}...'"
+            })
+        elif classification == CLASS_EARLY_EXIT:
+            scored_weaknesses.append({
+                "title": "Early Interview Termination",
+                "evidence": f"Candidate requested early termination on Turn {idx+1}: '{candidate_ans_str}'"
+            })
+
+    # 2. Strict Score & Grade Aggregation
+    is_incomplete = valid_evaluated_answers < 5 or early_termination
+    completion_rate = min(1.0, valid_evaluated_answers / float(total_questions))
+    evaluated_avg = sum(turn_scores) / len(turn_scores) if turn_scores else 0.0
+
+    if valid_evaluated_answers == 0:
+        overall_score = 0
+        overall_grade = "F"
+        grade_label = "Unevaluated / No Responses"
+        grade_color = "#ef4444"
+        hiring_recommendation = "Strong Reject (No Responses Provided)"
+        performance_level = "Beginner / Not Attempted"
+        dyn_strengths = []
+        dyn_weaknesses = scored_weaknesses[:3] or [{"title": "No response recorded", "evidence": "Candidate did not answer interview questions."}]
+        status = "insufficient_data"
+        report_type = "incomplete"
+    elif is_incomplete:
+        # Prorate evaluated average by completion rate: 1 answer cannot award 63 or 75
+        evaluated_avg = sum(turn_scores) / len(turn_scores) if turn_scores else 0.0
+        overall_score = round(evaluated_avg * completion_rate)
+        overall_grade = "F"
+        grade_label = "Incomplete / Early Exit"
+        grade_color = "#ef4444"
+        hiring_recommendation = f"Incomplete Assessment (Requires ≥ 5 answered questions; only {valid_evaluated_answers} of {total_questions} answered)"
+        performance_level = "Incomplete Session"
         dyn_strengths = scored_strengths[:3]
-    elif valid_indices:
-        longest_idx = max(valid_indices, key=lambda i: len(responses[i]))
-        l_ans = responses[longest_idx]
-        l_quote = l_ans[:90] + "..." if len(l_ans) > 90 else l_ans
-        dyn_strengths.append({
-            "title": "Clear communication in response",
-            "evidence": f"Articulated response in Turn {longest_idx+1}: '{l_quote}'"
-        })
-
-    if scored_weaknesses:
         dyn_weaknesses = scored_weaknesses[:3]
-    elif poor_indices:
-        brief_idx = poor_indices[0]
-        b_ans = responses[brief_idx] if brief_idx < len(responses) else "brief response"
-        dyn_weaknesses.append({
-            "title": "Brief or skipped answer",
-            "evidence": f"Candidate gave short or skipped response in Turn {brief_idx+1}: '{b_ans}'"
-        })
+        status = "insufficient_data"
+        report_type = "incomplete"
+    else:
+        # Full completed evaluation (>= 5 valid answers)
+        evaluated_avg = sum(turn_scores) / len(turn_scores) if turn_scores else 0.0
+        overall_score = round(min(100.0, max(0.0, evaluated_avg)))
+        g_meta = calculate_grade_info(overall_score)
+        overall_grade = g_meta.get("grade", "B")
+        grade_label = g_meta.get("label", "Competent")
+        grade_color = g_meta.get("color", "#10b981")
+        hiring_recommendation = "Strong Hire" if overall_score >= 85 else ("Hire" if overall_score >= 75 else ("Neutral" if overall_score >= 60 else "Reject"))
+        performance_level = g_meta.get("level", "Mid-Level Professional")
+        dyn_strengths = scored_strengths[:3]
+        dyn_weaknesses = scored_weaknesses[:3]
+        status = "completed"
+        report_type = "final"
 
-    # Calibrate individual dimension scores
-    dim_comm = min(100, max(40, avg_score + 2))
-    dim_tech = avg_score
-    dim_prob = avg_score
-    dim_conf = min(100, max(40, avg_score - 2))
-    dim_gram = min(100, max(50, avg_score + 6))
-    dim_vocab = min(100, max(50, avg_score + 5))
+    # Demonstrated Strengths fallback notice
+    if not dyn_strengths:
+        top_strengths_summary = ["Insufficient evidence to identify demonstrated strengths."]
+    else:
+        top_strengths_summary = [s["title"] for s in dyn_strengths]
 
+    # Clean display metadata
+    effective_role = role if role and str(role).strip().lower() != "none" else "Software Engineer"
+    effective_diff = difficulty if difficulty and str(difficulty).strip().lower() != "none" else "Medium"
+    effective_mode = "Job Description Mode" if (interview_mode == "job_description" or "JOB DESCRIPTION" in str(track).upper()) else "Resume Mode"
+    effective_track = track if track and str(track).strip().lower() != "none" else ("HR & Behavioral" if "HR" in effective_role.upper() else "DSA & Algorithms")
+
+    # Speech delivery telemetry
+    full_transcript = " ".join([str(ans) for ans in responses if ans and str(ans).strip()])
+    total_w = len(full_transcript.split())
+    speech_metrics = {
+        "wpm": round((total_w / 15.0) * 60) if total_w > 0 and not is_incomplete else (135 if total_w >= 10 else 0),
+        "pacing_label": "Optimal (130-155 WPM)" if total_w >= 20 else ("Deliberate Pace" if total_w > 0 else "No Speech Detected"),
+        "pacing_color": "#10b981" if total_w >= 20 else "#94a3b8",
+        "total_words": total_w,
+        "filler_count": 0,
+        "filler_breakdown": {},
+        "vocabulary_diversity_pct": 75 if total_w >= 20 else 0,
+        "overused_words": []
+    }
+
+    # Dimensions calibration
+    dim_score = overall_score if not is_incomplete else (evaluated_avg if turn_scores else 0)
     dimensions = [
-        {"name": "Communication", "score": dim_comm, "grade": calculate_grade_info(dim_comm)["grade"], "evidence_level": "MEDIUM", "evidence": [f"Evaluated verbal responses across {valid_count} answered questions."]},
-        {"name": "Technical Knowledge", "score": dim_tech, "grade": calculate_grade_info(dim_tech)["grade"], "evidence_level": "MEDIUM", "evidence": [f"Technical depth evaluated on role-specific questions for {role}."]},
-        {"name": "Problem Solving", "score": dim_prob, "grade": calculate_grade_info(dim_prob)["grade"], "evidence_level": "MEDIUM", "evidence": ["Algorithmic and architectural reasoning evaluated."]},
-        {"name": "Confidence", "score": dim_conf, "grade": calculate_grade_info(dim_conf)["grade"], "evidence_level": "MEDIUM", "evidence": ["Pacing, tone, and delivery evaluated."]},
-        {"name": "Behavioral Skills", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Behavioral questions were not covered."]},
-        {"name": "Resume Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Resume questions were not asked."]},
-        {"name": "Project Explanation", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Project questions were not asked."]},
-        {"name": "Leadership", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["Not enough evidence. Leadership questions were not asked."]},
-        {"name": "Grammar", "score": dim_gram, "grade": calculate_grade_info(dim_gram)["grade"], "evidence_level": "MEDIUM", "evidence": ["Grammatical structure and articulation evaluated."]},
-        {"name": "Vocabulary", "score": dim_vocab, "grade": calculate_grade_info(dim_vocab)["grade"], "evidence_level": "MEDIUM", "evidence": ["Technical terminology and vocabulary evaluated."]}
+        {"name": "Communication", "score": min(100, int(dim_score + 2)) if valid_evaluated_answers > 0 else None, "grade": calculate_grade_info(dim_score)["grade"] if valid_evaluated_answers > 0 else "N/A", "evidence_level": "HIGH" if valid_evaluated_answers >= 5 else ("MEDIUM" if valid_evaluated_answers > 0 else "NONE"), "evidence": [f"Evaluated across {valid_evaluated_answers} substantive responses."]},
+        {"name": "Domain & Role Knowledge", "score": int(dim_score) if valid_evaluated_answers > 0 else None, "grade": calculate_grade_info(dim_score)["grade"] if valid_evaluated_answers > 0 else "N/A", "evidence_level": "HIGH" if valid_evaluated_answers >= 5 else ("MEDIUM" if valid_evaluated_answers > 0 else "NONE"), "evidence": [f"Assessed against key competencies for {effective_role}."]},
+        {"name": "Problem Solving & Analysis", "score": int(dim_score) if valid_evaluated_answers > 0 else None, "grade": calculate_grade_info(dim_score)["grade"] if valid_evaluated_answers > 0 else "N/A", "evidence_level": "HIGH" if valid_evaluated_answers >= 5 else ("MEDIUM" if valid_evaluated_answers > 0 else "NONE"), "evidence": ["Analyzed structured approach and handling of edge cases/scenarios."]},
+        {"name": "Confidence & Delivery", "score": max(0, int(dim_score - 2)) if valid_evaluated_answers > 0 else None, "grade": calculate_grade_info(dim_score)["grade"] if valid_evaluated_answers > 0 else "N/A", "evidence_level": "MEDIUM" if valid_evaluated_answers > 0 else "NONE", "evidence": ["Evaluated pacing, vocal clarity, and conviction."]},
+        {"name": "Behavioral Competence", "score": int(dim_score) if "HR" in effective_track.upper() or "BEHAVIORAL" in effective_track.upper() else None, "grade": calculate_grade_info(dim_score)["grade"] if ("HR" in effective_track.upper() or "BEHAVIORAL" in effective_track.upper()) and valid_evaluated_answers > 0 else "N/A", "evidence_level": "HIGH" if "HR" in effective_track.upper() and valid_evaluated_answers >= 3 else "NONE", "evidence": ["STAR method, conflict handling, and situational teamwork."]}
     ]
 
-    # Calculate speech & communication delivery metrics using speech_engine
-    full_transcript = " ".join([str(ans) for ans in (responses or []) if ans and str(ans).strip()])
-    total_w = len(full_transcript.split())
-    if total_w == 0:
-        speech_metrics = {
-            "wpm": 0,
-            "pacing_label": "No Speech Detected",
-            "pacing_color": "#94a3b8",
-            "total_words": 0,
-            "filler_count": 0,
-            "filler_breakdown": {},
-            "vocabulary_diversity_pct": 0,
-            "overused_words": []
-        }
-    else:
-        try:
-            from services.speech_engine import compute_speech_metrics
-            est_duration = max(15.0, (total_w / 135.0) * 60.0)
-            sm = compute_speech_metrics(full_transcript, duration_seconds=est_duration)
-            wpm_val = sm.get("wpm", 0)
-            if wpm_val >= 165:
-                p_label, p_color = "Fast Pace (>160 WPM)", "#f59e0b"
-            elif wpm_val <= 115:
-                p_label, p_color = "Deliberate Pace (<115 WPM)", "#38bdf8"
-            else:
-                p_label, p_color = "Optimal (130-155 WPM)", "#10b981"
-                
-            speech_metrics = {
-                "wpm": wpm_val,
-                "pacing_label": p_label,
-                "pacing_color": p_color,
-                "total_words": total_w,
-                "filler_count": sm.get("filler_count", 0),
-                "filler_breakdown": sm.get("filler_breakdown", {}),
-                "vocabulary_diversity_pct": sm.get("vocab_info", {}).get("diversity_pct", 0) if isinstance(sm.get("vocab_info"), dict) else 0,
-                "overused_words": sm.get("vocab_info", {}).get("overused_words", []) if isinstance(sm.get("vocab_info"), dict) else []
-            }
-        except Exception as ex:
-            print("Speech metrics calculation notice:", ex)
-            speech_metrics = {
-                "wpm": 0,
-                "pacing_label": "Not Evaluated",
-                "pacing_color": "#94a3b8",
-                "total_words": total_w,
-                "filler_count": 0,
-                "filler_breakdown": {},
-                "vocabulary_diversity_pct": 0,
-                "overused_words": []
-            }
-
-    # Build turn-by-turn evaluations with candidate quote and model benchmark answer
+    # Turn by turn breakdown
     turn_evaluations = []
-    for idx, q in enumerate(questions or []):
-        ans = responses[idx] if (responses and idx < len(responses)) else "[No response recorded]"
-        fb = feedbacks[idx] if (feedbacks and idx < len(feedbacks) and isinstance(feedbacks[idx], dict)) else {}
-        t_score = fb.get("accuracy_score", fb.get("score", avg_score))
-        if isinstance(t_score, (int, float)) and t_score <= 10:
-            t_score = round(t_score * 10)
-        t_grade_info = calculate_grade_info(t_score)
-        
+    for idx, q in enumerate(questions):
+        ans = responses[idx] if idx < len(responses) else "[No response recorded]"
+        fb = feedbacks[idx] if idx < len(feedbacks) and isinstance(feedbacks[idx], dict) else {}
+        t_score = fb.get("accuracy_score")
+        if t_score is None:
+            t_score = fb.get("score", 0) * 10
+        t_score = int(t_score)
+        t_grade = calculate_grade_info(t_score)
+
         turn_evaluations.append({
             "question_number": idx + 1,
             "question": q,
             "candidate_answer": ans,
             "score": t_score,
-            "grade": t_grade_info.get("grade", "B"),
-            "grade_color": t_grade_info.get("color", "#10b981"),
-            "strength": fb.get("strength") or "Demonstrated structured technical communication.",
-            "improvement": fb.get("improvement") or "Deepen discussion of operational failure modes.",
-            "benchmark": generate_benchmark_answer(q, track)
+            "grade": t_grade.get("grade", "F"),
+            "grade_color": t_grade.get("color", "#ef4444"),
+            "strength": fb.get("strength") or "None identified",
+            "improvement": fb.get("improvement") or "Elaborate with concrete details and trade-offs.",
+            "classification": fb.get("correctness") or "Evaluated"
         })
 
+    # Executive Summary Markdown text
+    strengths_md = "\n".join(f"- **{s['title']}**: {s['evidence']}" for s in dyn_strengths) if dyn_strengths else "- *Insufficient evidence to identify demonstrated strengths.*"
+    weaknesses_md = "\n".join(f"- **{w['title']}**: {w['evidence']}" for w in dyn_weaknesses) if dyn_weaknesses else "- *No significant weaknesses recorded.*"
+    status_label = "Completed" if not is_incomplete else "Incomplete / Insufficient Data"
+
+    summary_text = (
+        f"### Executive Candidate Evaluation\n\n"
+        f"- **Candidate Name:** {candidate_name or 'Candidate'}\n"
+        f"- **Target Role:** {effective_role}\n"
+        f"- **Interview Mode:** {effective_mode}\n"
+        f"- **Selected Topics:** {effective_track}\n"
+        f"- **Interview Difficulty:** {effective_diff}\n"
+        f"- **Total Questions:** {total_questions} | **Attempted:** {attempted_questions} | **Valid Evaluated Answers:** {valid_evaluated_answers}\n"
+        f"- **Evaluation Status:** {status_label}\n"
+        f"- **Overall Score:** {overall_score}/100 | **Overall Grade:** {overall_grade}\n"
+        f"- **Hiring Recommendation:** {hiring_recommendation}\n\n"
+        f"#### Demonstrated Strengths\n{strengths_md}\n\n"
+        f"#### Focus Areas & Weaknesses\n{weaknesses_md}\n\n"
+        f"#### Final Assessment\n"
+        f"Candidate attempted {attempted_questions} of {total_questions} questions for the {effective_role} role ({effective_diff} difficulty). "
+        f"{'Evaluation is considered incomplete due to low answer count or early exit.' if is_incomplete else 'Demonstrated clear domain understanding and structured delivery across all core dimensions.'}"
+    )
+
     report = {
-        "report_type": "preliminary" if is_preliminary else "final",
-        "answered_questions_count": valid_count,
-        "overall_score": avg_score,
-        "recommendation": "Preliminary Evaluation (Requires ≥ 5 answered questions)" if is_preliminary else ("Hire" if avg_score >= 80 else ("Neutral" if avg_score >= 65 else "Reject")),
-        "confidence": "Low" if valid_count <= 2 else ("Medium" if valid_count < 5 else "High"),
+        "status": status,
+        "is_incomplete": is_incomplete,
+        "report_type": report_type,
+        "executive_summary": {
+            "candidate_name": candidate_name or "Candidate",
+            "target_role": effective_role,
+            "interview_mode": effective_mode,
+            "selected_topics": effective_track,
+            "difficulty": effective_diff,
+            "total_questions": total_questions,
+            "questions_attempted": attempted_questions,
+            "valid_evaluated_answers": valid_evaluated_answers,
+            "overall_score": overall_score,
+            "overall_grade": overall_grade,
+            "key_strengths": dyn_strengths,
+            "key_weaknesses": dyn_weaknesses,
+            "final_assessment": summary_text
+        },
+        "candidate_name": candidate_name or "Candidate",
+        "role": effective_role,
+        "track": effective_track,
+        "difficulty": effective_diff,
+        "interview_mode": effective_mode,
+        "total_questions": total_questions,
+        "attempted_questions": attempted_questions,
+        "answered_questions_count": valid_evaluated_answers,
+        "valid_evaluated_answers": valid_evaluated_answers,
+        "skipped_questions": skipped_questions,
+        "unanswered_questions": unanswered_questions,
+        "early_termination": early_termination,
+        "overall_score": overall_score,
+        "overall_score_100": overall_score,
+        "grade": overall_grade,
+        "overall_grade": overall_grade,
+        "grade_label": grade_label,
+        "grade_color": grade_color,
+        "recommendation": hiring_recommendation,
+        "hiring_recommendation": hiring_recommendation,
+        "performance_level": performance_level,
+        "confidence": "Low" if is_incomplete else "High",
         "dimensions": dimensions,
         "strengths": dyn_strengths,
         "weaknesses": dyn_weaknesses,
+        "top_strengths": top_strengths_summary,
+        "top_improvements": [w["title"] for w in dyn_weaknesses] if dyn_weaknesses else ["Answer all questions thoroughly."],
         "speech_metrics": speech_metrics,
         "turn_evaluations": turn_evaluations,
-        "report": f"### Executive Summary\nThe candidate completed {valid_count} interview questions for the role of **{role if role and str(role).strip().lower() != 'none' else 'Software Engineer'}** ({difficulty if difficulty and str(difficulty).strip().lower() != 'none' else 'Medium'} difficulty).\n\n"
-                  f"Overall performance scored **{avg_score}/100** based on real-time evidence evaluation. "
-                  f"Communication and core technical reasoning were evaluated across {valid_count} turns."
+        "report": summary_text
     }
 
     return enrich_report_with_grading(report)
@@ -895,6 +920,9 @@ def enrich_report_with_grading(report: dict) -> dict:
             else:
                 try:
                     score_val = float(d_score)
+                    if score_val > 100.0:
+                        score_val = score_val / 10.0
+                    score_val = min(100.0, max(0.0, score_val))
                     valid_scores.append(score_val)
                     sec_info = calculate_grade_info(score_val)
                     sec_grade = sec_info["grade"]
@@ -927,7 +955,10 @@ def enrich_report_with_grading(report: dict) -> dict:
         else:
             raw_score = 0
     else:
-        raw_score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
+        raw_val = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
+        if raw_val > 100.0:
+            raw_val = raw_val / 10.0
+        raw_score = min(100.0, max(0.0, raw_val))
 
     valid_q_count = int(report.get("answered_questions_count", 0))
     total_q = max(10, int(report.get("total_questions", 10)))

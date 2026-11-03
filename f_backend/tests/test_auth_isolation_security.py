@@ -242,7 +242,7 @@ class TestAuthIsolationSecurity(unittest.TestCase):
         create_res = self.client.post(
             "/create-session-no-resume",
             headers={"Authorization": f"Bearer {self.token_user_a}"},
-            json={"role": "Backend Engineer"}
+            json={"role": "Backend Engineer", "consent": True}
         )
         self.assertEqual(create_res.status_code, 200)
         session_id = create_res.get_json()["session_id"]
