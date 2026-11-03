@@ -1037,10 +1037,11 @@ print("Result:", solve())
     </style></head><body>
     <div class="hdr"><div class="brand">🚀 PrepFly Executive Evaluation (Ava)</div><div>Candidate: ${(safeUser?.name)||"Candidate"}<br/>Generated: ${new Date().toLocaleString()}</div></div>
     <div class="hero">
-      <div class="grade-circle">${reportData?.grade || "B"}</div>
+      <div class="grade-circle">${reportData?.grade || "F"}</div>
       <div>
         <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;font-weight:700">Overall Rating</div>
-        <div class="score-val">${reportData?.overall_score || 7.5} / 10</div>
+        <div class="score-val">${reportData?.overall_score_100 ?? reportData?.overall_score ?? 0} / 100</div>
+        <div style="font-size:12px;color:#cbd5e1;margin-top:4px">${reportData?.grade_label || "Candidate Evaluation"}</div>
       </div>
     </div>
     <div class="sec-title">Final Recruiter Evaluation Summary & Strengths</div>
@@ -1808,16 +1809,25 @@ print("Result:", solve())
         {/* ── REPORT PANEL ── */}
         {step === "report" && reportData && (() => {
           const answeredCount = reportData.answered_questions_count !== undefined 
-            ? reportData.answered_questions_count 
+            ? Number(reportData.answered_questions_count) 
             : (allFeedbacks ? allFeedbacks.length : 0);
 
-          let score100 = 0;
-          if (answeredCount > 0) {
-            score100 = reportData.overall_score_100 !== undefined && reportData.overall_score_100 !== null
-              ? Number(reportData.overall_score_100)
-              : (reportData.overall_score !== undefined && reportData.overall_score !== null
-                  ? Math.round(Number(reportData.overall_score) * 10)
-                  : 75);
+          let rawScore = 0;
+          if (reportData.overall_score_100 !== undefined && reportData.overall_score_100 !== null) {
+            rawScore = Number(reportData.overall_score_100);
+          } else if (reportData.overall_score !== undefined && reportData.overall_score !== null) {
+            rawScore = Number(reportData.overall_score);
+          }
+
+          let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
+
+          // Hiregram Proration Guard:
+          // If candidate answered < 5 questions and score is not yet prorated, prorate by completion rate.
+          // For early exit (e.g. 1 question), maximum possible score is 10/100.
+          if (answeredCount === 0) {
+            score100 = 0;
+          } else if (answeredCount < 5 && score100 > (answeredCount * 10)) {
+            score100 = Math.min(100, Math.max(0, Math.round(score100 * (answeredCount / 10))));
           }
 
           const allZero = reportData.section_grades && reportData.section_grades.length > 0 && reportData.section_grades.every(s => s.score === 0);
@@ -1825,44 +1835,105 @@ print("Result:", solve())
             score100 = 0;
           }
 
-          const gInfo = score100 === 0 ? {
-            grade: "F",
-            label: "Unevaluated / No Responses",
-            desc: "No responses attempted during interview",
-            color: "#ef4444",
-            bgColor: "rgba(239, 68, 68, 0.15)",
-            rec: "Strong Reject (No Responses Provided)",
-            level: "Beginner / Not Attempted",
-            score: 0
-          } : getGradeInfo(score100);
+          // Hiregram Standardized Hiring Tiers
+          let gInfo;
+          if (score100 === 0 || answeredCount === 0) {
+            gInfo = {
+              grade: "F",
+              label: "Unevaluated / No Responses",
+              desc: "No responses attempted during interview",
+              color: "#ef4444",
+              bgColor: "rgba(239, 68, 68, 0.15)",
+              rec: "Strong Reject (No Responses Provided)",
+              level: "Beginner / Not Attempted",
+              score: 0
+            };
+          } else if (answeredCount < 3) {
+            // Early exit after only 1-2 questions (e.g. candidate gave only 1 answer)
+            gInfo = {
+              grade: "F",
+              label: "Incomplete / Early Exit",
+              desc: `Only ${answeredCount} of 10 questions answered`,
+              color: "#ef4444",
+              bgColor: "rgba(239, 68, 68, 0.15)",
+              rec: `Strong Reject (Incomplete — only ${answeredCount} of 10 questions answered)`,
+              level: "Incomplete Session",
+              score: score100
+            };
+          } else if (answeredCount < 5) {
+            // Preliminary evaluation (3-4 questions)
+            const rawG = getGradeInfo(score100);
+            gInfo = {
+              ...rawG,
+              grade: rawG.grade.startsWith("A") || rawG.grade.startsWith("B") ? "D" : rawG.grade,
+              label: "Preliminary Assessment",
+              color: "#f59e0b",
+              bgColor: "rgba(245, 158, 11, 0.15)",
+              rec: "Preliminary Evaluation (Requires ≥ 5 answered questions)",
+              level: "Preliminary Evaluation",
+              score: score100
+            };
+          } else {
+            // Full evaluation (5+ questions)
+            gInfo = reportData.grade && reportData.grade_color ? {
+              grade: reportData.grade,
+              label: reportData.grade_label || "Evaluated Candidate",
+              color: reportData.grade_color,
+              bgColor: `${reportData.grade_color}22`,
+              rec: reportData.hiring_recommendation || reportData.recommendation || "Evaluated",
+              level: reportData.performance_level || "Standard Candidate",
+              score: score100
+            } : getGradeInfo(score100);
+          }
 
           const sectionGrades = reportData.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = score100 === 0 ? [] : (reportData.badges || getBadges(score100, sectionGrades));
-          const isPrelim = answeredCount < 5 && answeredCount > 0;
-          const confidence = score100 === 0 ? "None" : (reportData.confidence || (isPrelim ? "Low" : "High"));
-          const recText = score100 === 0 ? "Strong Reject (No Responses Provided)" : (reportData.hiring_recommendation || reportData.recommendation || (isPrelim ? "Preliminary Evaluation (Requires ≥ 5 answered questions)" : gInfo.rec));
+          const earnedBadges = (score100 === 0 || answeredCount < 5) ? [] : (reportData.badges || getBadges(score100, sectionGrades));
+          const isEarlyExit = answeredCount < 3 && answeredCount > 0;
+          const isPrelim = answeredCount < 5 && answeredCount >= 3;
+          const confidence = score100 === 0 ? "None" : (reportData.confidence || (answeredCount < 3 ? "Low" : (answeredCount < 5 ? "Medium" : "High")));
+          const recText = gInfo.rec || reportData.hiring_recommendation || reportData.recommendation;
 
-          const topStrengths = score100 === 0 
-            ? ["None identified (no responses provided)"] 
+          const topStrengths = (score100 === 0 || isEarlyExit) 
+            ? ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."] 
             : (reportData.top_strengths || ["Clear Communication", "Technical Understanding", "Structured Approach"]);
 
-          const topImprovements = score100 === 0 
-            ? ["Did not attempt questions during mock interview", "Ensure microphone and audio setup are active", "Provide detailed STAR-format spoken or written answers"] 
+          const topImprovements = (score100 === 0 || isEarlyExit) 
+            ? [`Completed only ${answeredCount} of 10 questions. Ensure you complete the full interview to evaluate all 10 core dimensions.`] 
             : (reportData.top_improvements || ["Provide deeper technical details", "Use STAR technique for behavioral questions", "Structure answers with clear outcomes"]);
 
           return (
             <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>
               
-              {/* PRELIMINARY CONFIDENCE BANNER */}
-              {isPrelim && (
-                <div style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "16px", padding: "14px 20px", marginBottom: "20px", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              {/* INCOMPLETE / PRELIMINARY CONFIDENCE BANNER */}
+              {(isEarlyExit || isPrelim) && (
+                <div style={{ 
+                  background: isEarlyExit ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)", 
+                  border: `1px solid ${isEarlyExit ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`, 
+                  borderRadius: "16px", 
+                  padding: "14px 20px", 
+                  marginBottom: "20px", 
+                  textAlign: "left", 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center" 
+                }}>
                   <div>
-                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#f59e0b", textTransform: "uppercase" }}>⚠️ Preliminary Evaluation</div>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: isEarlyExit ? "#ef4444" : "#f59e0b", textTransform: "uppercase" }}>
+                      {isEarlyExit ? "⚠️ Incomplete Interview (Early Exit)" : "⚠️ Preliminary Evaluation"}
+                    </div>
                     <div style={{ fontSize: "13px", color: "#e2e8f0", marginTop: "2px" }}>
-                      Questions Answered: <strong>{reportData.answered_questions_count || 1} / 10</strong> · Complete at least 5 questions for a full hiring recommendation.
+                      Questions Answered: <strong>{answeredCount} / 10</strong> · {isEarlyExit ? "At least 5 questions required for hiring assessment. Session marked incomplete." : "Complete at least 5 questions for a full hiring recommendation."}
                     </div>
                   </div>
-                  <span style={{ background: "#f59e0b22", color: "#f59e0b", fontSize: "11px", fontWeight: 900, padding: "4px 12px", borderRadius: "20px", border: "1px solid #f59e0b44" }}>
+                  <span style={{ 
+                    background: isEarlyExit ? "#ef444422" : "#f59e0b22", 
+                    color: isEarlyExit ? "#ef4444" : "#f59e0b", 
+                    fontSize: "11px", 
+                    fontWeight: 900, 
+                    padding: "4px 12px", 
+                    borderRadius: "20px", 
+                    border: `1px solid ${isEarlyExit ? "#ef444444" : "#f59e0b44"}` 
+                  }}>
                     Confidence: {confidence}
                   </span>
                 </div>
@@ -1871,9 +1942,11 @@ print("Result:", solve())
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "20px", marginBottom: "24px" }}>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
-                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`}</div>
-                  <div style={{ fontSize: "13px", color: isPrelim ? "#f59e0b" : gInfo.color, fontWeight: 800, marginTop: "4px" }}>📌 Hiring Recommendation: {recText}</div>
-                  <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700, marginTop: "2px" }}>Level: {isPrelim ? "Preliminary Evaluation" : gInfo.level}</div>
+                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>
+                    {isEarlyExit ? "Incomplete Assessment" : (isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`)}
+                  </div>
+                  <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "4px" }}>📌 Hiring Recommendation: {gInfo.rec || recText}</div>
+                  <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700, marginTop: "2px" }}>Level: {gInfo.level}</div>
                 </div>
 
                 <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `4px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 24px ${gInfo.color}44`, flexShrink: 0 }}>

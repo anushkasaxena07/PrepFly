@@ -852,15 +852,82 @@ const InterviewPage = () => {
 
       <div className="iv-page">
         {interviewComplete && finalResult ? (() => {
-          const score100 = finalResult.overall_score_100 || Math.round((finalResult.overall_score || 7.5) * 10);
-          const gInfo = getGradeInfo(score100);
+          const answeredCount = finalResult.answered_questions_count !== undefined 
+            ? Number(finalResult.answered_questions_count) 
+            : (allFeedbacks ? allFeedbacks.length : 0);
+
+          let rawScore = 0;
+          if (finalResult.overall_score_100 !== undefined && finalResult.overall_score_100 !== null) {
+            rawScore = Number(finalResult.overall_score_100);
+          } else if (finalResult.overall_score !== undefined && finalResult.overall_score !== null) {
+            rawScore = Number(finalResult.overall_score);
+          }
+
+          let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
+
+          // Hiregram Proration Guard
+          if (answeredCount === 0) {
+            score100 = 0;
+          } else if (answeredCount < 5 && score100 > (answeredCount * 10)) {
+            score100 = Math.min(100, Math.max(0, Math.round(score100 * (answeredCount / 10))));
+          }
+
+          let gInfo;
+          if (score100 === 0 || answeredCount === 0) {
+            gInfo = {
+              grade: "F",
+              label: "Unevaluated / No Responses",
+              desc: "No responses attempted during interview",
+              color: "#ef4444",
+              bgColor: "rgba(239, 68, 68, 0.15)",
+              rec: "Strong Reject (No Responses Provided)",
+              level: "Beginner / Not Attempted",
+              score: 0
+            };
+          } else if (answeredCount < 3) {
+            gInfo = {
+              grade: "F",
+              label: "Incomplete / Early Exit",
+              desc: `Only ${answeredCount} of 10 questions answered`,
+              color: "#ef4444",
+              bgColor: "rgba(239, 68, 68, 0.15)",
+              rec: `Strong Reject (Incomplete — only ${answeredCount} of 10 questions answered)`,
+              level: "Incomplete Session",
+              score: score100
+            };
+          } else if (answeredCount < 5) {
+            const rawG = getGradeInfo(score100);
+            gInfo = {
+              ...rawG,
+              grade: rawG.grade.startsWith("A") || rawG.grade.startsWith("B") ? "D" : rawG.grade,
+              label: "Preliminary Assessment",
+              color: "#f59e0b",
+              bgColor: "rgba(245, 158, 11, 0.15)",
+              rec: "Preliminary Evaluation (Requires ≥ 5 answered questions)",
+              level: "Preliminary Evaluation",
+              score: score100
+            };
+          } else {
+            gInfo = finalResult.grade && finalResult.grade_color ? {
+              grade: finalResult.grade,
+              label: finalResult.grade_label || "Evaluated Candidate",
+              color: finalResult.grade_color,
+              bgColor: `${finalResult.grade_color}22`,
+              rec: finalResult.hiring_recommendation || finalResult.recommendation || "Evaluated",
+              level: finalResult.performance_level || "Standard Candidate",
+              score: score100
+            } : getGradeInfo(score100);
+          }
+
           const sectionGrades = finalResult.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = finalResult.badges || getBadges(score100, sectionGrades);
-          const topStrengths = finalResult.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership", "Confident Speaker", "Excellent Resume Understanding"];
-          const topImprovements = finalResult.top_improvements || ["Reduce filler words", "Improve DSA explanations", "Improve STAR responses", "Increase confidence", "Speak with more structure"];
+          const earnedBadges = (score100 === 0 || answeredCount < 5) ? [] : (finalResult.badges || getBadges(score100, sectionGrades));
+          const topStrengths = finalResult.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership"];
+          const topImprovements = finalResult.top_improvements || ["Complete full 10 questions for deep assessment"];
           const prevScore100 = Number(localStorage.getItem("last_interview_score_100")) || Math.max(40, score100 - 6);
           const prevGInfo = getGradeInfo(prevScore100);
           const diffPct = prevScore100 > 0 ? Math.round(((score100 - prevScore100) / prevScore100) * 100) : 0;
+          const isEarlyExit = answeredCount < 3 && answeredCount > 0;
+          const isPrelim = answeredCount < 5 && answeredCount >= 3;
 
           return (
             <div className="iv-results">
@@ -869,7 +936,9 @@ const InterviewPage = () => {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "16px" }}>
                   <div style={{ textAlign: "left" }}>
                     <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
-                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{gInfo.label} Candidate</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>
+                      {isEarlyExit ? "Incomplete Assessment" : (isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`)}
+                    </div>
                     <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "2px" }}>📌 Hiring Recommendation: {gInfo.rec}</div>
                   </div>
 

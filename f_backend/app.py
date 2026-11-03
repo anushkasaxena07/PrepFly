@@ -2,7 +2,6 @@ import os
 import sys
 import shutil
 import time
-import subprocess
 try:
     import pymupdf as fitz
 except Exception:
@@ -1935,7 +1934,8 @@ def create_session_no_resume():
     category   = data.get("category", "Core CS").strip() or "Core CS"
     difficulty = data.get("difficulty", "Medium").strip() or "Medium"
 
-    resume_text = f"JOB PROFILE DETAILS (No Resume Provided):\nTarget Role: {role}\nRequired Tools & Technologies: {tools}\nExperience Level: {experience}\nCategory: {category}\nDifficulty: {difficulty}"
+    job_description = data.get("job_description", "").strip() or data.get("tools", "").strip() or "Algorithms, System Design, React, Python, SQL"
+    resume_text = f"TARGET JOB DESCRIPTION & ROLE PROFILE (No Resume Provided):\nTarget Role: {role}\nExperience Level: {experience}\nCategory: {category}\nDifficulty: {difficulty}\n\nJob Description & Key Requirements:\n{job_description}"
     session_id  = str(uuid.uuid4())
 
     raw_consent = data.get("consent") or data.get("consent_given")
@@ -3026,57 +3026,7 @@ def execute_sandbox_code(language, code, problem_id, user_id=None):
         return {"error": f"Failed to communicate with isolated sandbox worker: {str(e)}"}
 
 
-@app.route("/api/interview/run-code", methods=["POST"])
-def interview_run_code():
-    data = request.get_json() or {}
-    code = data.get("code", "").strip()
-    language = data.get("language", "python").lower()
 
-    if not code:
-        return jsonify({"error": "No code provided"}), 400
-
-    start_time = time.time()
-    try:
-        if language == "javascript":
-            cmd = ["node", "-e", code]
-        else:
-            cmd = [sys.executable, "-c", code]
-
-        res = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        elapsed = round((time.time() - start_time) * 1000, 1)
-        stdout = (res.stdout or "")[:4096]
-        stderr = (res.stderr or "")[:4096]
-        return jsonify({
-            "success": res.returncode == 0,
-            "stdout": stdout,
-            "stderr": stderr,
-            "exit_code": res.returncode,
-            "execution_time_ms": elapsed
-        }), 200
-
-    except subprocess.TimeoutExpired:
-        elapsed = round((time.time() - start_time) * 1000, 1)
-        return jsonify({
-            "success": False,
-            "stdout": "",
-            "stderr": "Execution timed out (exceeded 5.0 seconds limit). Check for infinite loops.",
-            "exit_code": -1,
-            "execution_time_ms": elapsed
-        }), 200
-    except Exception as ex:
-        elapsed = round((time.time() - start_time) * 1000, 1)
-        return jsonify({
-            "success": False,
-            "stdout": "",
-            "stderr": str(ex)[:512],
-            "exit_code": 1,
-            "execution_time_ms": elapsed
-        }), 200
 
 
 @app.route("/api/coding/submit", methods=["POST"])
@@ -8708,7 +8658,6 @@ def superadmin_test_ai_provider():
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    import time
     data = request.get_json() or {}
     provider = data.get("provider", "gemini").lower()
     api_key = data.get("api_key", "").strip()

@@ -163,11 +163,18 @@ def is_semantically_repetitive(new_q: str, existing_questions: list) -> bool:
 def generate_dynamic_question(resume_text, previous_questions=None, question_index=1, last_score=None, last_answer=None, category=None, difficulty=None, responses=None, chat_model=None, candidate_name="Candidate"):
     previous_questions = previous_questions or []
     responses = responses or []
-    is_no_resume = resume_text.startswith("JOB PROFILE DETAILS (No Resume Provided):")
+    is_no_resume = bool(resume_text and ("No Resume Provided" in resume_text or "JOB DESCRIPTION" in resume_text or "JOB PROFILE" in resume_text))
     stage_name = get_current_stage(question_index)
     ai_name = AI_INTERVIEWER["name"]
 
-    # 1. Handle Voice / Text Commands (Repeat & Hint)
+    # 1. Turn 1 GUARANTEE: Always start with a warm greeting and casual icebreaker!
+    if question_index == 1:
+        first_name = candidate_name.strip().split()[0] if candidate_name and candidate_name.strip() and candidate_name.lower() != "candidate" else ""
+        name_str = f" {first_name}" if first_name else ""
+        greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's really wonderful to meet you! Before we dive into technical questions, how are you feeling today and how is your day going so far?"
+        return greeting, "Phase 1: Greeting & Icebreaker", False
+
+    # 2. Handle Voice / Text Commands (Repeat & Hint)
     if last_answer and last_answer.strip().lower() in ["repeat", "can you repeat the question", "pardon"]:
         if previous_questions:
             return previous_questions[-1], "Repeat", False

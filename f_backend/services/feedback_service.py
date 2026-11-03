@@ -823,34 +823,76 @@ def enrich_report_with_grading(report: dict) -> dict:
         
         # Overall score = mean of ONLY assessed (non-null) dimensions
         if valid_scores:
-            score = round(sum(valid_scores) / len(valid_scores))
+            raw_score = round(sum(valid_scores) / len(valid_scores))
         else:
-            score = 0
+            raw_score = 0
     else:
-        score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
+        raw_score = float(report.get("overall_score") if report.get("overall_score") is not None else 0)
 
-    g_info = calculate_grade_info(score)
+    valid_q_count = int(report.get("answered_questions_count", 0))
+    total_q = max(10, int(report.get("total_questions", 10)))
+    completion_rate = min(1.0, valid_q_count / float(total_q))
 
-    valid_q_count = report.get("answered_questions_count", 0)
+    # Hiregram Assessment Standard: Prorate score by completion rate
+    if valid_q_count == 0:
+        score = 0
+        g_info = {
+            "score": 0,
+            "grade": "F",
+            "label": "Unevaluated / No Responses",
+            "desc": "No responses attempted during interview",
+            "color": "#ef4444",
+            "bgColor": "rgba(239, 68, 68, 0.15)",
+            "rec": "Strong Reject (No Responses Provided)",
+            "level": "Beginner / Not Attempted"
+        }
+    elif valid_q_count < 3:
+        # Incomplete / Early exit (e.g. only 1 question answered)
+        score = round(raw_score * completion_rate)
+        g_info = {
+            "score": int(score),
+            "grade": "F",
+            "label": "Incomplete / Early Exit",
+            "desc": f"Only {valid_q_count} of {total_q} questions answered",
+            "color": "#ef4444",
+            "bgColor": "rgba(239, 68, 68, 0.15)",
+            "rec": f"Strong Reject (Incomplete — only {valid_q_count} of {total_q} questions answered)",
+            "level": "Incomplete Session"
+        }
+    elif valid_q_count < 5:
+        # Preliminary (3-4 questions answered)
+        score = round(raw_score * completion_rate)
+        raw_g = calculate_grade_info(score)
+        g_info = {
+            "score": int(score),
+            "grade": raw_g["grade"] if raw_g["grade"] in ("D", "F") else "D",
+            "label": "Preliminary Assessment",
+            "desc": f"Answered {valid_q_count} of {total_q} questions",
+            "color": "#f59e0b",
+            "bgColor": "rgba(245, 158, 11, 0.15)",
+            "rec": "Preliminary Evaluation (Requires ≥ 5 answered questions)",
+            "level": "Preliminary Evaluation"
+        }
+    else:
+        # Full evaluation (5+ questions answered)
+        score = min(100.0, max(0.0, float(raw_score)))
+        g_info = calculate_grade_info(score)
+
     is_prelim = valid_q_count < 5 or report.get("report_type") == "preliminary"
 
-    report["overall_score"] = g_info["score"]
+    report["overall_score"] = int(g_info["score"])
+    report["overall_score_100"] = int(g_info["score"])
     report["grade"] = g_info["grade"]
     report["overall_grade"] = g_info["grade"]
     report["grade_label"] = g_info["label"]
     report["grade_color"] = g_info["color"]
-
+    report["hiring_recommendation"] = g_info["rec"]
+    report["recommendation"] = g_info["rec"]
+    report["performance_level"] = g_info["level"]
+    report["report_type"] = "preliminary" if is_prelim else "final"
+    report["confidence"] = "Low" if valid_q_count <= 2 else ("Medium" if valid_q_count < 5 else "High")
     if is_prelim:
-        report["report_type"] = "preliminary"
-        report["confidence"] = "Low" if valid_q_count <= 2 else "Medium"
-        report["hiring_recommendation"] = f"Preliminary Evaluation (Requires ≥ 5 answered questions)"
-        report["recommendation"] = report["hiring_recommendation"]
-        report["performance_level"] = "Preliminary Assessment"
-    else:
-        report["report_type"] = "final"
-        report["confidence"] = report.get("confidence", "High")
-        report["hiring_recommendation"] = report.get("recommendation") or g_info["rec"]
-        report["performance_level"] = g_info["level"]
+        report["badges"] = []
 
     if "section_grades" not in report:
         sections = compute_section_grades([], {"clarity": report.get("communication_score", 80), "wpm": report.get("transcript_analytics", {}).get("words_per_minute", 135)})
