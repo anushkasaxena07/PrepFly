@@ -92,34 +92,69 @@ def is_docker_available() -> bool:
         return False
 
 
-def _set_posix_limits():
-    """Applies POSIX resource limits to the child process before exec."""
+def _make_posix_limits(lang: str):
+    """
+    Applies POSIX resource limits to the child process before exec.
+    Language-aware resource limit enforcement:
+      - Mandatory limits (RLIMIT_CPU, RLIMIT_NPROC, RLIMIT_FSIZE, setsid, and RLIMIT_AS for non-JS)
+        fail closed and raise RuntimeError if they cannot be enforced.
+      - Node.js (V8): 64-bit V8 pointer compression requires a 4GB virtual address reservation
+        (PROT_NONE) at engine startup. Setting RLIMIT_AS to 128MB causes immediate ENOMEM in V8.
+        For JavaScript, memory is bounded by --max-old-space-size=128 in process mode, and by
+        kernel-enforced cgroups (--memory 128m) in container mode.
+      - Python, C, C++: RLIMIT_AS = 128MB is strictly enforced.
+      - Optional limits (RLIMIT_CORE): Dropping core dumps is attempted; failure is caught as optional.
+    """
     if not HAS_RESOURCE:
-        return
-    try:
-        # Create a new session / process group for clean killpg
+        return None
+
+    def _apply_limits():
+        # 1. Mandatory Session / Process Group creation for clean tree kill
         if hasattr(os, "setsid"):
-            os.setsid()
+            try:
+                os.setsid()
+            except Exception as e:
+                raise RuntimeError(f"Security configuration error: failed to establish new session (setsid): {e}")
 
-        # CPU time limit (seconds)
-        cpu_sec = int(config.CPU_TIME_LIMIT_SECONDS)
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu_sec, cpu_sec + 1))
+        # 2. Mandatory CPU time limit (seconds)
+        try:
+            cpu_sec = int(config.CPU_TIME_LIMIT_SECONDS)
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_sec, cpu_sec + 1))
+        except Exception as e:
+            raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_CPU: {e}")
 
-        # Memory limit (Virtual memory bytes)
-        mem_bytes = config.MEMORY_LIMIT_BYTES
-        resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+        # 3. Mandatory Memory limit (Virtual address space bytes)
+        # Note: --max-old-space-size=128 limits V8's heap, not total process memory.
+        # Production execution of untrusted code must require container isolation and kernel-enforced cgroups.
+        # For Python, C, and C++, RLIMIT_AS = 128 MB is strictly enforced.
+        if lang not in ("javascript", "js", "node"):
+            try:
+                mem_bytes = config.MEMORY_LIMIT_BYTES
+                resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+            except Exception as e:
+                raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_AS: {e}")
 
-        # Max child processes (Fork-bomb protection)
-        resource.setrlimit(resource.RLIMIT_NPROC, (config.MAX_PROCESSES, config.MAX_PROCESSES))
+        # 4. Mandatory Fork-bomb protection (Max processes)
+        try:
+            resource.setrlimit(resource.RLIMIT_NPROC, (config.MAX_PROCESSES, config.MAX_PROCESSES))
+        except Exception as e:
+            raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_NPROC: {e}")
 
-        # Max file size created (Bytes)
-        resource.setrlimit(resource.RLIMIT_FSIZE, (config.MAX_OUTPUT_BYTES * 2, config.MAX_OUTPUT_BYTES * 2))
+        # 5. Mandatory Output size protection (Max file size created)
+        try:
+            resource.setrlimit(resource.RLIMIT_FSIZE, (config.MAX_OUTPUT_BYTES * 2, config.MAX_OUTPUT_BYTES * 2))
+        except Exception as e:
+            raise RuntimeError(f"Security configuration error: failed to enforce mandatory RLIMIT_FSIZE: {e}")
 
-        # Drop core dumps
+        # 6. Optional platform-dependent limit: Drop core dumps
         if hasattr(resource, "RLIMIT_CORE"):
-            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    except Exception:
-        pass
+            try:
+                resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+            except Exception:
+                # RLIMIT_CORE is optional across varying Unix platforms
+                pass
+
+    return _apply_limits
 
 
 class CodeRunner:
@@ -217,7 +252,8 @@ class CodeRunner:
             # World permissions are strictly 000. Setgid ensures newly created files inherit sandboxgroup.
             if hasattr(os, "chown") and os.name != "nt":
                 try:
-                    os.chown(work_dir, -1, 10001)
+                    if os.stat(work_dir).st_gid != 10001:
+                        os.chown(work_dir, -1, 10001)
                     os.chmod(work_dir, 0o2770)
                 except Exception as e:
                     # FAIL CLOSED: Insecure fallback to world-writable strictly rejected
@@ -490,7 +526,7 @@ class CodeRunner:
         cmd = self._get_exec_command(lang, work_dir)
         start_time = time.perf_counter()
 
-        preexec = _set_posix_limits if os.name != "nt" else None
+        preexec = _make_posix_limits(lang) if (HAS_RESOURCE and os.name != "nt") else None
         proc = None
         status = "success"
         error_msg = None

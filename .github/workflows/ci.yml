@@ -21,6 +21,7 @@ jobs:
       RAZORPAY_KEY_SECRET: test_razorpay_secret_for_testing
       SMTP_EMAIL: test@prepfly.io
       SMTP_PASSWORD: test-smtp-password
+      SANDBOX_SCRATCH_DIR: /tmp/sandbox
 
     steps:
     - name: Checkout code
@@ -51,6 +52,16 @@ jobs:
       run: |
         cd f_backend
         python run_all_tests.py
+
+    - name: Prepare Isolated Sandbox Scratch Directory
+      run: |
+        sudo mkdir -p /tmp/sandbox
+        sudo chown $USER:10001 /tmp/sandbox
+        sudo chmod 2770 /tmp/sandbox
+
+    - name: Build Sandbox Runner Docker Image
+      run: |
+        docker build -t prepfly-sandbox-runner:latest sandbox_worker
 
     - name: Run Sandbox Worker Tests
       run: |

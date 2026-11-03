@@ -9,10 +9,12 @@ import unittest
 import os
 import sys
 import glob
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from runner import runner
+from config import config
+from runner import runner, is_docker_available
 from security import static_code_check
 
 class TestMaliciousCodeDefense(unittest.TestCase):
@@ -68,8 +70,8 @@ time.sleep(10)
 
     def test_04_scrubbed_environment_secret_isolation(self):
         """4. Child process receives a scrubbed environment with zero production secrets."""
-        # Set dummy secrets on test host environment
-        os.environ["JWT_SECRET_KEY"] = "super-secret-production-jwt-key"
+        # Set dummy secrets on test host environment (>= 32 chars)
+        os.environ["JWT_SECRET_KEY"] = "super-secret-production-jwt-key-32ch"
         os.environ["SUPABASE_SERVICE_KEY"] = "super-secret-supabase-admin-key"
         os.environ["RAZORPAY_KEY_SECRET"] = "super-secret-razorpay-key"
 
@@ -119,6 +121,12 @@ for i in range(100000):
 
     def test_07_network_socket_and_metadata_exfiltration_blocked(self):
         """7. Network connections and metadata endpoints are blocked or fail without crashing."""
+        if not is_docker_available():
+            self.fail(
+                "Container runtime is required to test network isolation, but Docker is not operational. "
+                "Failing explicitly: network isolation cannot be verified without container isolation."
+            )
+
         code = """
 import socket
 try:
@@ -130,10 +138,16 @@ except Exception as e:
     print("NETWORK_BLOCKED")
 """
         test_cases = [{"input": "", "expected_output": "NETWORK_BLOCKED"}]
-        res = runner.run_submission("python", code, test_cases, "net-test")
-        self.assertIn("results", res)
-        case_res = res["results"][0]
-        self.assertNotIn("CONNECTED", case_res["output"])
+        with patch.dict(os.environ, {"SANDBOX_ISOLATION_MODE": "container"}):
+            eff_mode = runner.get_isolation_mode()
+            self.assertEqual(eff_mode, "container", f"Expected effective isolation mode 'container', got '{eff_mode}'")
+            res = runner.run_submission("python", code, test_cases, "net-test")
+            self.assertIn("results", res)
+            self.assertEqual(res.get("isolation_mode"), "container", "Execution was not performed in container mode!")
+            case_res = res["results"][0]
+            self.assertNotIn("CONNECTED", case_res["output"])
+            self.assertEqual(case_res["status"], "success")
+            self.assertEqual(case_res["output"], "NETWORK_BLOCKED")
 
     def test_08_subclasses_reflection_defense(self):
         """8. Subclasses reflection dunder attributes are detected by static security analysis."""
@@ -158,7 +172,7 @@ print("clean run")
 
         # Verify no orphan prepfly_sandbox_* dirs remain in temp directory
         import tempfile
-        temp_dir = tempfile.gettempdir()
+        temp_dir = getattr(config, "SCRATCH_BASE_DIR", None) or tempfile.gettempdir()
         # All temp dirs created by this run should have been purged by finally: block
         active_sandboxes = glob.glob(os.path.join(temp_dir, "prepfly_sandbox_*"))
         self.assertEqual(len(active_sandboxes), 0)

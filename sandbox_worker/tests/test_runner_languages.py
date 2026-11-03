@@ -6,10 +6,11 @@ import unittest
 import os
 import sys
 import shutil
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from runner import runner
+from runner import runner, is_docker_available
 
 class TestRunnerLanguages(unittest.TestCase):
     def test_01_python_algorithm_execution(self):
@@ -83,6 +84,46 @@ console.log(num * 2);
         self.assertIn("results", res)
         self.assertEqual(res["results"][0]["status"], "compilation_error")
         self.assertIn("Unsupported language", res["results"][0]["error"])
+
+    @unittest.skipUnless(shutil.which("node") is not None, "Node.js not installed on test host")
+    def test_05_javascript_memory_exhaustion_defense(self):
+        """
+        5. JavaScript heap-exhaustion defense:
+        Verifies that attempting unbounded memory allocation triggers V8 heap exhaustion
+        under --max-old-space-size=128 and is terminated cleanly without crashing the worker host.
+        Under Docker container isolation, also verifies kernel-enforced cgroup termination.
+        Note: This verifies V8 heap limit enforcement, not total process virtual memory limit in process mode.
+        """
+        # Allocates objects in a tight loop to rapidly hit V8 heap ceiling without destabilizing the host
+        exhaustion_code = """
+const chunks = [];
+while (true) {
+    chunks.push(new Array(100000).fill("memory_bomb_data_string"));
+}
+"""
+        test_cases = [{"input": "", "expected_output": "success"}]
+        res = runner.run_submission("javascript", exhaustion_code, test_cases, "js-mem-exhaustion")
+        self.assertIn("results", res)
+        case_res = res["results"][0]
+        self.assertFalse(case_res["passed"], "Memory exhaustion code must not be reported as passed")
+        self.assertIn(
+            case_res["status"],
+            ("runtime_error", "memory_limit_exceeded", "time_limit_exceeded"),
+            f"Expected termination status for memory bomb, got {case_res['status']}"
+        )
+
+        # When Docker container isolation is operational, verify under container cgroup boundary
+        if is_docker_available():
+            with patch.dict(os.environ, {"SANDBOX_ISOLATION_MODE": "container"}):
+                c_res = runner.run_submission("javascript", exhaustion_code, test_cases, "js-cgroup-mem")
+                self.assertIn("results", c_res)
+                self.assertEqual(c_res.get("isolation_mode"), "container")
+                c_case = c_res["results"][0]
+                self.assertFalse(c_case["passed"])
+                self.assertIn(
+                    c_case["status"],
+                    ("runtime_error", "memory_limit_exceeded", "time_limit_exceeded")
+                )
 
 if __name__ == "__main__":
     unittest.main()

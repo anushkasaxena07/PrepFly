@@ -151,11 +151,35 @@ class TestProductionSandboxSecurity(unittest.TestCase):
     # 5 & 6. Network Disabling, Metadata Blocking & Secret Isolation
     # -------------------------------------------------------------------------
     def test_08_container_run_command_disables_network(self):
-        """Req 5: Container runner passes --network none to docker run."""
+        """Req 5: Container runner passes --network none, memory limits, and unprivileged user."""
         source_runner = inspect.getsource(runner._execute_container_case)
         self.assertIn('"--network", "none"', source_runner)
         self.assertIn('"--read-only"', source_runner)
         self.assertIn('"--user", "10001:10001"', source_runner)
+        self.assertIn('f"--memory={config.MEMORY_LIMIT_BYTES}"', source_runner)
+        self.assertIn('f"--memory-swap={config.MEMORY_LIMIT_BYTES}"', source_runner)
+
+    def test_08b_container_cgroup_memory_limit_verified(self):
+        """Req 4: Verify effective Linux kernel cgroup memory limit inside running container."""
+        from runner import is_docker_available
+        if is_docker_available():
+            code = """
+import os
+val = None
+for p in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"):
+    if os.path.exists(p):
+        with open(p, "r") as f:
+            val = f.read().strip()
+        break
+print(f"CGROUP_MEM:{val}")
+"""
+            test_cases = [{"input": "", "expected_output": f"CGROUP_MEM:{config.MEMORY_LIMIT_BYTES}"}]
+            with patch.dict(os.environ, {"SANDBOX_ISOLATION_MODE": "container"}):
+                res = runner.run_submission("python", code, test_cases, "cgroup-verify")
+                self.assertIn("results", res)
+                case_res = res["results"][0]
+                self.assertEqual(case_res["status"], "success")
+                self.assertIn(f"CGROUP_MEM:{config.MEMORY_LIMIT_BYTES}", case_res["output"])
 
     def test_09_docker_compose_configures_internal_network_bridge(self):
         """Req 5: docker-compose.yml configures internal: true on the network."""
@@ -205,8 +229,8 @@ class TestProductionSandboxSecurity(unittest.TestCase):
         res = runner.run_submission("python", code, test_cases, "cleanup-test")
         self.assertIn("results", res)
 
-        # Check that no prepfly_sandbox_* folders remain orphaned in system temp
-        temp_dir = tempfile.gettempdir()
+        # Check that no prepfly_sandbox_* folders remain orphaned in system or configured scratch temp
+        temp_dir = getattr(config, "SCRATCH_BASE_DIR", None) or tempfile.gettempdir()
         orphaned = glob.glob(os.path.join(temp_dir, "prepfly_sandbox_*"))
         self.assertEqual(len(orphaned), 0, f"Found orphaned sandbox directories: {orphaned}")
 
