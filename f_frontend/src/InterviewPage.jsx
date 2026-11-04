@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import AI_INTERVIEWER from "./config/aiInterviewerConfig";
 import { getGradeInfo, computeSectionGrades, getBadges } from "./utils/gradingSystem";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:5000" : "https://prepfly.up.railway.app");
+const BACKEND_URL = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+  ? "http://localhost:5000"
+  : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
 
 
 // ── futur21 Circle Waves Avatar for Ava AI ──────────────────────────────────

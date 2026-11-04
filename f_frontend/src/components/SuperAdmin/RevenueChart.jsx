@@ -1,12 +1,23 @@
 import React from 'react';
 
 export default function RevenueChart({ title, data = {} }) {
-  const labels = data.labels || ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-  const revenue = data.revenue || [18000, 24000, 31000, 29000, 38000, 41000, 42850];
+  let labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
+  let revenue = [18000, 24000, 31000, 29000, 38000, 41000, 42850];
+  let growthYoY = "+42% YoY Growth";
+
+  if (Array.isArray(data) && data.length > 0) {
+    labels = data.map(d => d.month || d.label || "");
+    revenue = data.map(d => Number(d.revenue || 0));
+  } else if (data && typeof data === 'object') {
+    if (Array.isArray(data.labels) && data.labels.length > 0) labels = data.labels;
+    if (Array.isArray(data.revenue) && data.revenue.length > 0) revenue = data.revenue.map(Number);
+    if (data.growth_yoy) growthYoY = data.growth_yoy;
+  }
+
   const maxRev = Math.max(...revenue, 50000);
 
   const points = revenue.map((val, idx) => {
-    const x = (idx / (labels.length - 1)) * 320 + 20;
+    const x = (idx / Math.max(1, labels.length - 1)) * 320 + 20;
     const y = 140 - (val / maxRev) * 110;
     return `${x},${y}`;
   }).join(" ");
@@ -17,7 +28,7 @@ export default function RevenueChart({ title, data = {} }) {
     <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>💰 {title || "Monthly Platform Revenue ($)"}</h3>
-        <span style={{ fontSize: "12px", color: "#00c4a7", fontWeight: 800 }}>+42% YoY Growth</span>
+        <span style={{ fontSize: "12px", color: "#00c4a7", fontWeight: 800 }}>{growthYoY}</span>
       </div>
 
       <svg viewBox="0 0 360 160" style={{ width: "100%", height: "auto" }}>
@@ -41,7 +52,7 @@ export default function RevenueChart({ title, data = {} }) {
 
         {/* X Labels */}
         {labels.map((lbl, idx) => {
-          const x = (idx / (labels.length - 1)) * 320 + 20;
+          const x = (idx / Math.max(1, labels.length - 1)) * 320 + 20;
           return (
             <text key={idx} x={x} y="155" fill="var(--text2)" fontSize="10" textAnchor="middle">
               {lbl}

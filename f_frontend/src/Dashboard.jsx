@@ -12,8 +12,15 @@ import AvaTab from "./components/AvaTab";
 import InterviewsTab from "./components/InterviewsTab";
 import AnalyticsTab from "./components/AnalyticsTab";
 import Profile from "./profile";
+import RoadmapTab from "./components/Intelligence/RoadmapTab";
+import ProgressDashboard from "./components/Intelligence/ProgressDashboard";
+import JobPreparationTab from "./components/Intelligence/JobPreparationTab";
+import AchievementsTab from "./components/Intelligence/AchievementsTab";
+import "./components/Intelligence/intelligence.css";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:5000" : "https://prepfly.up.railway.app");
+const BACKEND_URL = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
+  ? "http://localhost:5000"
+  : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
 
 
 export default function Dashboard() {
@@ -316,12 +323,15 @@ export default function Dashboard() {
 
         <div className="nav-center" role="tablist" aria-label="Page navigation">
           <button className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('dashboard')} disabled={isOrgExpired} role="tab">Dashboard</button>
+          <button className={`nav-link ${activeTab === 'roadmap' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('roadmap')} disabled={isOrgExpired} role="tab">Prep Roadmap</button>
           <button className={`nav-link ${activeTab === 'coding' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('coding')} disabled={isOrgExpired} role="tab">Coding</button>
           <button className={`nav-link ${activeTab === 'speech' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('speech')} disabled={isOrgExpired} role="tab">Speech AI</button>
           <button className={`nav-link ${activeTab === 'resume' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('resume')} disabled={isOrgExpired} role="tab">Resume AI</button>
           <button className={`nav-link ${activeTab === 'ava' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('ava')} disabled={isOrgExpired} role="tab">AI Interview</button>
           <button className={`nav-link ${activeTab === 'interviews' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('interviews')} disabled={isOrgExpired} role="tab">Interviews</button>
           <button className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('analytics')} disabled={isOrgExpired} role="tab">Analytics</button>
+          <button className={`nav-link ${activeTab === 'jobs' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('jobs')} disabled={isOrgExpired} role="tab">Job Prep</button>
+          <button className={`nav-link ${activeTab === 'achievements' ? 'active' : ''}`} onClick={() => !isOrgExpired && handleTabChange('achievements')} disabled={isOrgExpired} role="tab">Achievements</button>
         </div>
 
         <div className="nav-right">
@@ -489,12 +499,26 @@ export default function Dashboard() {
         ) : (
           <>
             {activeTab === "dashboard" && <DashboardTab setActiveTab={setActiveTab} user={user} history={history} userStats={userStats} />}
+            {activeTab === "roadmap" && <RoadmapTab onNavigateTab={(tab) => handleTabChange(tab)} />}
             {activeTab === "coding" && <CodingTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "speech" && <SpeechTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "resume" && <ResumeTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "ava" && <AvaTab apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
             {activeTab === "interviews" && <InterviewsTab setActiveTab={setActiveTab} apiFetch={apiFetch} isLoggedIn={isLoggedIn} user={user} />}
-            {activeTab === "analytics" && <AnalyticsTab user={user} history={history} userStats={userStats} />}
+            {activeTab === "analytics" && <ProgressDashboard onNavigateTab={(tab) => handleTabChange(tab)} />}
+            {activeTab === "jobs" && (
+              <JobPreparationTab
+                user={user}
+                onStartInterview={(sessionData) => {
+                  if (sessionData?.session_id) {
+                    sessionStorage.setItem("current_session_id", sessionData.session_id);
+                  }
+                  setActiveTab("ava");
+                }}
+              />
+            )}
+            {activeTab === "achievements" && <AchievementsTab />}
+            {false && <AnalyticsTab user={user} history={history} userStats={userStats} />}
             {activeTab === "profile" && <Profile onBackToDashboard={() => setActiveTab("dashboard")} setActiveTab={setActiveTab} apiFetch={apiFetch} initialSubTab={profileInitialSubTab} />}
           </>
         )}
