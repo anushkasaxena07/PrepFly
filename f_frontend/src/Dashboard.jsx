@@ -182,6 +182,7 @@ export default function Dashboard() {
   }, [user?._id, user?.email, activeTab]);
 
   const fetchLiveNotifications = useCallback(async () => {
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
       const targetUserId = user?._id || user?.id || localStorage.getItem("user_id") || user?.email;
       const orgId = user?.organization_id || localStorage.getItem("organization_id") || localStorage.getItem("admin_org_id") || "global";
@@ -199,8 +200,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLiveNotifications();
-    const timer = setInterval(fetchLiveNotifications, 12000);
-    return () => clearInterval(timer);
+    const timer = setInterval(fetchLiveNotifications, 30000);
+    const handleVisibility = () => {
+      if (!document.hidden) fetchLiveNotifications();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [fetchLiveNotifications]);
 
 

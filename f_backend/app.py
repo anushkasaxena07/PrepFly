@@ -204,7 +204,8 @@ CORS(app, resources={r"/*": {
     "origins": allowed_origins,
     "supports_credentials": True,
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Organization-Id"]
+    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Organization-Id"],
+    "max_age": 86400
 }})
 
 @app.errorhandler(Exception)
