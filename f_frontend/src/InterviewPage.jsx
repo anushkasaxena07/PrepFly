@@ -420,10 +420,20 @@ const InterviewPage = () => {
         try {
           const base64data = reader.result;
           const b64 = base64data.split(",")[1];
+          const token = localStorage.getItem("access_token");
           const res = await fetch(`${BACKEND_URL}/speech-to-text`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ audio_base64: b64, mime_type: "audio/webm" }),
+            headers: { 
+              "Content-Type": "application/json",
+              ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ 
+              audio_base64: b64, 
+              mime_type: "audio/webm",
+              consent: true,
+              consent_given: true,
+              session_id: sessionId
+            }),
           });
           const data = await res.json();
           if (data.transcript) {
