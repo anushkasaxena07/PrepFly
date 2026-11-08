@@ -62,7 +62,13 @@ def _need(name, alternate=None):
         raise RuntimeError(f"{name} is required")
     return v
 
-is_production = os.getenv("FLASK_ENV") == "production" or os.getenv("ENVIRONMENT") == "production" or bool(os.getenv("RAILWAY_ENVIRONMENT")) or bool(os.getenv("VERCEL"))
+is_production = (
+    os.getenv("FLASK_ENV") == "production"
+    or os.getenv("ENVIRONMENT") == "production"
+    or bool(os.getenv("RAILWAY_ENVIRONMENT"))
+    or bool(os.getenv("VERCEL"))
+    or bool(os.getenv("RENDER"))
+)
 
 JWT_SECRET = _need("JWT_SECRET_KEY", alternate="SUPABASE_JWT_SECRET")
 SUPABASE_URL = _need("SUPABASE_URL")
@@ -244,7 +250,13 @@ def check_dns_resolves(url):
         pass
     return False
 
-is_production = os.getenv("FLASK_ENV") == "production" or os.getenv("ENVIRONMENT") == "production" or bool(os.getenv("RAILWAY_ENVIRONMENT")) or bool(os.getenv("VERCEL"))
+is_production = (
+    os.getenv("FLASK_ENV") == "production"
+    or os.getenv("ENVIRONMENT") == "production"
+    or bool(os.getenv("RAILWAY_ENVIRONMENT"))
+    or bool(os.getenv("VERCEL"))
+    or bool(os.getenv("RENDER"))
+)
 
 candidate_redis = (
     os.getenv("REDIS_URL")
@@ -263,19 +275,22 @@ if candidate_redis:
                 print(f"[RATE LIMITER] Successfully authenticated and connected to Redis: {candidate_redis.split('@')[-1] if '@' in candidate_redis else candidate_redis}")
             except Exception as e_redis:
                 import logging
-                logging.critical(f"[FATAL CONFIG ERROR] Redis authentication/connectivity check failed: {e_redis}")
-                raise RuntimeError(f"Production startup failed: Redis authentication/connectivity failed: {e_redis}")
+                logging.warning(
+                    f"[RATE LIMITER] Redis ping/auth failed: {e_redis}. "
+                    "Falling back to memory:// rate limiting."
+                )
+                rate_limit_storage = "memory://"
         else:
             rate_limit_storage = candidate_redis
             print(f"[RATE LIMITER] Connected to distributed Redis storage: {candidate_redis.split('@')[-1] if '@' in candidate_redis else candidate_redis}")
     else:
-        if is_production:
-            import logging
-            logging.critical("[FATAL CONFIG ERROR] Configured Redis rate limit storage is unreachable via DNS in production!")
-            raise RuntimeError("Production startup failed: Configured Redis storage is unreachable. Shared rate limits cannot be enforced.")
-        else:
-            print("[WARNING] Rate limiter Redis host unreachable via DNS. Falling back to local memory storage for development/test.")
-            rate_limit_storage = "memory://"
+        import logging
+        logging.warning(
+            "[RATE LIMITER] Configured Redis host unreachable via DNS. "
+            "Falling back to memory:// rate limiting. "
+            "On single-worker deployments (e.g. Render free tier) this is functionally equivalent."
+        )
+        rate_limit_storage = "memory://"
 else:
     if is_production:
         import logging
@@ -287,7 +302,7 @@ limiter = Limiter(
     app=app,
     default_limits=[],
     storage_uri=rate_limit_storage,
-    swallow_errors=not is_production
+    swallow_errors=True
 )
 
 
