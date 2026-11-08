@@ -1320,17 +1320,29 @@ def get_owned_session(session_id):
         return None, (jsonify({"error": "Session not found"}), 404)
     res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
     s = res.data[0] if res and res.data else None
+    if not s and hasattr(supabase, "local_client") and supabase.local_client:
+        try:
+            lres = supabase.local_client.table("sessions").select("*").eq("session_id", session_id).execute()
+            if lres and lres.data:
+                s = lres.data[0]
+        except Exception:
+            pass
     if not s:
         return None, (jsonify({"error": "Session not found"}), 404)
 
     # Claim session if currently unowned or unassigned
-    if not s.get("user_id") or str(s.get("user_id")).strip().lower() in ("none", "", "null"):
-        s["user_id"] = str(p.get("sub"))
+    caller_sub = str(p.get("sub") or "").strip()
+    caller_id = str(p.get("id") or "").strip()
+    caller_email = str(p.get("email") or "").strip()
+    current_owner = str(s.get("user_id") or "").strip()
+
+    if not current_owner or current_owner.lower() in ("none", "", "null"):
+        s["user_id"] = caller_sub
         try:
-            supabase.table("sessions").update({"user_id": str(p.get("sub"))}).eq("session_id", session_id).execute()
+            supabase.table("sessions").update({"user_id": caller_sub}).eq("session_id", session_id).execute()
         except Exception as claim_err:
             print("Session claim notice:", claim_err)
-    elif str(s.get("user_id")) != str(p.get("sub")) and p.get("role") not in ("ADMIN", "SUPER_ADMIN"):
+    elif current_owner not in (caller_sub, caller_id, caller_email) and p.get("role") not in ("ADMIN", "SUPER_ADMIN"):
         return None, (jsonify({"error": "Session not found"}), 404)
 
     # Ensure list fields are always deserialized lists
