@@ -29,7 +29,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: PORT
-        value: 5000
+        value: 10000
       - key: ALLOW_SQLITE_FALLBACK
         value: "true"
 
