@@ -70,9 +70,16 @@ is_production = (
     or bool(os.getenv("RENDER"))
 )
 
+def _get_supabase_key():
+    for var in ("SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_KEY"):
+        val = os.getenv(var)
+        if val and val.strip():
+            return val.strip()
+    return _need("SUPABASE_SERVICE_KEY", alternate="SUPABASE_SERVICE_ROLE_KEY")
+
 JWT_SECRET = _need("JWT_SECRET_KEY", alternate="SUPABASE_JWT_SECRET")
 SUPABASE_URL = _need("SUPABASE_URL")
-SUPABASE_KEY = _need("SUPABASE_SERVICE_KEY", alternate="SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_KEY = _get_supabase_key()
 GEMINI_API_KEY = _need("GEMINI_API_KEY")
 RAZORPAY_KEY_ID = _need("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = _need("RAZORPAY_KEY_SECRET")
@@ -376,11 +383,14 @@ class SupabaseFallbackClient:
 
     @property
     def storage(self):
-        allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
-        if self._use_local or not self._real_client:
-            return self._local_client.storage
+        use_local = getattr(self, "_use_local", False)
+        real_client = getattr(self, "_real_client", None)
+        local_client = getattr(self, "_local_client", None)
+        allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (local_client is not None)
+        if use_local or not real_client:
+            return local_client.storage if local_client else None
         try:
-            return self._real_client.storage
+            return real_client.storage
         except Exception as e:
             if _is_production_mode() and not allow_fallback:
                 from flask import has_request_context, jsonify, make_response
@@ -389,15 +399,18 @@ class SupabaseFallbackClient:
                     resp = make_response(jsonify({"error": "Storage service unavailable", "status": 503}), 503)
                     raise ServiceUnavailable(response=resp)
                 raise RuntimeError(f"Supabase storage error: {e}") from e
-            return self._local_client.storage
+            return local_client.storage if local_client else None
 
     def table(self, name):
-        allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
-        if self._use_local or not self._real_client:
-            return self._local_client.table(name)
+        use_local = getattr(self, "_use_local", False)
+        real_client = getattr(self, "_real_client", None)
+        local_client = getattr(self, "_local_client", None)
+        allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (local_client is not None)
+        if use_local or not real_client:
+            return local_client.table(name) if local_client else None
         if _is_production_mode() and not allow_fallback:
             try:
-                real_t = self._real_client.table(name)
+                real_t = real_client.table(name)
                 return RealBuilderWrapper(self, name, real_t, None)
             except Exception as e:
                 from flask import has_request_context, jsonify, make_response
@@ -407,7 +420,7 @@ class SupabaseFallbackClient:
                     raise ServiceUnavailable(response=resp) from e
                 raise RuntimeError(f"Database service unavailable: {e}") from e
 
-        return RealBuilderWrapper(self, name, self._real_client.table(name), self._local_client.table(name) if self._local_client else None)
+        return RealBuilderWrapper(self, name, real_client.table(name), local_client.table(name) if local_client else None)
 
 
 
@@ -528,7 +541,7 @@ class RealBuilderWrapper:
                     pass
             return res
         except Exception as e:
-            allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
+            allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (self.local_builder is not None)
             if _is_production_mode() and not allow_fallback:
                 # In production, never silently fall back to local SQLite: return 503 instead
                 from flask import has_request_context, jsonify, make_response
@@ -10882,16 +10895,17 @@ def evaluate_report_generator_endpoint():
     return jsonify(report), 200
 
 
-@app.route("/health", methods=["GET"])
+@app.route("/", methods=["GET", "HEAD"])
+def root_endpoint():
+    return jsonify({
+        "status": "ok",
+        "service": "prepfly-api",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
 
 
-
-
-
-
-
-
-
+@app.route("/health", methods=["GET", "HEAD"])
 def health():
     return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()}), 200
 
