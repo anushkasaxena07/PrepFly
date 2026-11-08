@@ -197,6 +197,7 @@ if is_production:
     allowed_origins = [
         "https://prepfly.vercel.app",
         "https://prepfly-1.onrender.com",
+        re.compile(r"^https://.*\.vercel\.app$"),
         re.compile(r"^https://.*\.onrender\.com$"),
     ]
 else:
@@ -207,6 +208,7 @@ else:
         "http://127.0.0.1:5173",
         "https://prepfly.vercel.app",
         "https://prepfly-1.onrender.com",
+        re.compile(r"^https://.*\.vercel\.app$"),
         re.compile(r"^https://.*\.onrender\.com$"),
     ]
 
