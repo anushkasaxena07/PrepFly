@@ -16,36 +16,43 @@ DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_db.sql
 
 class SQLiteSupabaseMock:
     def __init__(self, db_path="local_db.sqlite"):
-        # Make path absolute to the directory where this script is located
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        self.db_path = os.path.join(dir_path, db_path)
+        if db_path in (":memory:", "file::memory:?cache=shared"):
+            self.db_path = ":memory:"
+            self._anchor_conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
+            self._anchor_conn.row_factory = sqlite3.Row
+        else:
+            dir_path = os.path.dirname(os.path.abspath(__file__))
+            self.db_path = os.path.join(dir_path, db_path) if not os.path.isabs(db_path) else db_path
+            self._anchor_conn = None
         self.storage = MockStorage()
         self._init_db()
 
     def _get_conn(self):
+        if self.db_path == ":memory:":
+            conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            return conn
         try:
             conn = sqlite3.connect(self.db_path, timeout=60, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA busy_timeout = 60000")
             return conn
         except Exception:
-            conn = sqlite3.connect(":memory:", timeout=60, check_same_thread=False)
+            if not self._anchor_conn:
+                self._anchor_conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
+            conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             return conn
 
     def _init_db(self):
+        conn = self._get_conn()
+        cursor = conn.cursor()
         try:
-            conn = self._get_conn()
-            cursor = conn.cursor()
-            try:
+            if self.db_path != ":memory:":
                 cursor.execute("PRAGMA journal_mode=WAL")
-            except Exception:
-                pass
-            conn.commit()
         except Exception:
-            self.db_path = ":memory:"
-            conn = self._get_conn()
-            cursor = conn.cursor()
+            pass
+        conn.commit()
         
         # 1. users
         cursor.execute("""

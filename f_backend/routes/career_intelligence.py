@@ -9,6 +9,7 @@ Exposes endpoints for:
 """
 
 from flask import Blueprint, request, jsonify
+from datetime import datetime, timezone
 import json
 
 from services.event_pipeline_service import EventPipelineService
@@ -279,4 +280,121 @@ def claim_achievement_reward(achievement_id):
         return jsonify({"error": str(ve)}), 400
     except Exception as ex:
         return jsonify({"error": f"Failed to claim reward: {str(ex)}"}), 500
+
+
+# =============================================================================
+# 6. Intelligent Company-Specific Preparation Engine Endpoints
+# =============================================================================
+
+@career_intelligence_bp.route("/company/<company_name>", methods=["GET"])
+def get_company_interview_intelligence(company_name):
+    """Retrieves company interview intelligence, round structures, verified sources, and topic relevance."""
+    role = request.args.get("role", "Software Engineer")
+    experience_level = request.args.get("experience_level", "Fresher")
+
+    try:
+        from services.company_intelligence_service import CompanyIntelligenceService
+        intel = CompanyIntelligenceService.get_company_intelligence(
+            company_name=company_name,
+            role=role,
+            experience_level=experience_level
+        )
+        return jsonify({"success": True, "data": intel}), 200
+    except Exception as ex:
+        return jsonify({"error": f"Failed to retrieve company intelligence: {str(ex)}"}), 500
+
+
+@career_intelligence_bp.route("/candidate/readiness", methods=["GET"])
+def get_candidate_readiness():
+    """Returns candidate readiness snapshot across skills, coding, Ava interviews, and study behavior."""
+    user_id = _resolve_user_id()
+    role = request.args.get("role", "Software Engineer")
+
+    try:
+        from services.candidate_readiness_service import CandidateReadinessService
+        snapshot = CandidateReadinessService.get_candidate_readiness_snapshot(
+            user_id=user_id,
+            target_role=role
+        )
+        return jsonify({"success": True, "data": snapshot}), 200
+    except Exception as ex:
+        return jsonify({"error": f"Failed to compute candidate readiness: {str(ex)}"}), 500
+
+
+@career_intelligence_bp.route("/company/gap-analysis", methods=["POST"])
+def compute_company_candidate_gaps():
+    """Computes Dimension A vs Dimension B gap analysis with 6-tier competency classification."""
+    data = request.get_json() or {}
+    user_id = _resolve_user_id(data)
+    company_name = data.get("company_name", "Target Company")
+    role = data.get("role", "Software Engineer")
+    experience_level = data.get("experience_level", "Fresher")
+    days_to_deadline = int(data.get("days_to_deadline", 30))
+
+    try:
+        from services.company_gap_service import CompanyCandidateGapService
+        gap_report = CompanyCandidateGapService.analyze_company_candidate_gaps(
+            user_id=user_id,
+            company_name=company_name,
+            role=role,
+            experience_level=experience_level,
+            days_to_deadline=days_to_deadline
+        )
+        return jsonify({"success": True, "data": gap_report}), 200
+    except Exception as ex:
+        return jsonify({"error": f"Failed to execute gap analysis: {str(ex)}"}), 500
+
+
+@career_intelligence_bp.route("/company/plan", methods=["POST", "GET"])
+def handle_company_preparation_plan():
+    """
+    POST: Generates or recalculates a personalized company-specific preparation roadmap.
+    GET: Retrieves the current active preparation plan with company intelligence and readiness context.
+    """
+    if request.method == "GET":
+        user_id = _resolve_user_id()
+        try:
+            plan = PersonalizedRoadmapEngine.get_or_create_roadmap(user_id)
+            return jsonify({"success": True, "data": plan}), 200
+        except Exception as ex:
+            return jsonify({"error": f"Failed to fetch plan: {str(ex)}"}), 500
+
+    data = request.get_json() or {}
+    user_id = _resolve_user_id(data)
+    company_name = data.get("company_name", "Target Company")
+    role = data.get("role", "Software Engineer")
+    experience_level = data.get("experience_level", "Fresher")
+    target_date = data.get("target_date") or data.get("target_interview_date")
+    daily_minutes = int(data.get("daily_minutes", 60))
+    study_days = data.get("study_days")
+    prep_style = data.get("prep_style", "mixed")
+    job_description = data.get("job_description")
+
+    # Validate inputs
+    if target_date:
+        try:
+            t_dt = datetime.strptime(str(target_date).strip()[:10], "%Y-%m-%d").date()
+            if t_dt < datetime.now(timezone.utc).date():
+                return jsonify({"error": "Target interview date cannot be in the past. Please select an upcoming date."}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD."}), 400
+
+    if daily_minutes < 15 or daily_minutes > 480:
+        return jsonify({"error": "Daily preparation time must be between 15 and 480 minutes."}), 400
+
+    try:
+        plan = PersonalizedRoadmapEngine.generate_company_personalized_plan(
+            user_id=user_id,
+            company_name=company_name,
+            role=role,
+            experience_level=experience_level,
+            target_date=target_date,
+            daily_minutes=daily_minutes,
+            study_days=study_days,
+            prep_style=prep_style,
+            job_description=job_description
+        )
+        return jsonify({"success": True, "data": plan}), 201
+    except Exception as ex:
+        return jsonify({"error": f"Failed to generate company preparation plan: {str(ex)}"}), 500
 
