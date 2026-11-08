@@ -1,8 +1,11 @@
 import os
 
-# Port binding: Render dynamically assigns PORT (defaulting to 10000 on Render)
-port = os.getenv("PORT", "10000")
-bind = f"0.0.0.0:{port}"
+# Port binding: Bind to both 10000 and 5000 (and $PORT) so Render port detection always succeeds
+env_port = os.getenv("PORT")
+ports = ["10000", "5000"]
+if env_port and env_port not in ports:
+    ports.append(env_port)
+bind = [f"0.0.0.0:{p}" for p in ports]
 
 # Process & concurrency model: Render sets WEB_CONCURRENCY=1 by default on free tier
 workers = int(os.getenv("WEB_CONCURRENCY", "1"))
