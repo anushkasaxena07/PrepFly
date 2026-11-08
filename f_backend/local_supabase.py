@@ -130,7 +130,15 @@ class SQLiteSupabaseMock:
             ("personality", "TEXT DEFAULT 'professional'"),
             ("knowledge_map", "TEXT DEFAULT '{}'"),
             ("idempotency_key", "TEXT"),
-            ("turn_count", "INTEGER DEFAULT 0")
+            ("turn_count", "INTEGER DEFAULT 0"),
+            ("role", "TEXT"),
+            ("interview_mode", "TEXT"),
+            ("total_questions", "INTEGER DEFAULT 10"),
+            ("consent_given", "INTEGER DEFAULT 1"),
+            ("consent_timestamp", "TEXT"),
+            ("privacy_policy_version", "TEXT"),
+            ("job_description", "TEXT"),
+            ("organization_id", "TEXT")
         ]
         for col_name, col_type in session_cols:
             try:
