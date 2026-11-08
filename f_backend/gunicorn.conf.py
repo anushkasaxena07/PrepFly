@@ -1,7 +1,7 @@
 import os
 
-# Port binding: Render dynamically assigns PORT (defaulting to 5000 for local)
-port = os.getenv("PORT", "5000")
+# Port binding: Render dynamically assigns PORT (defaulting to 10000 on Render)
+port = os.getenv("PORT", "10000")
 bind = f"0.0.0.0:{port}"
 
 # Process & concurrency model: Render sets WEB_CONCURRENCY=1 by default on free tier
