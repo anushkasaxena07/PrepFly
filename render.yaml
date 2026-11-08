@@ -30,6 +30,8 @@ services:
         value: production
       - key: PORT
         value: 5000
+      - key: ALLOW_SQLITE_FALLBACK
+        value: "true"
 
       # Cryptographic Security (Render automatically generates a secure 256-bit key)
       - key: JWT_SECRET_KEY

@@ -339,7 +339,13 @@ class SupabaseFallbackClient:
         self._real_client = None
         self._use_local = False
         
-        if _is_production_mode():
+        allow_fallback = (
+            bool(os.getenv("ALLOW_SQLITE_FALLBACK"))
+            or bool(os.getenv("SUPABASE_ALLOW_OFFLINE_FALLBACK"))
+            or bool(os.getenv("RENDER"))
+        )
+        
+        if _is_production_mode() and not allow_fallback:
             self._local_client = None
             if not url or not check_dns_resolves(url):
                 raise RuntimeError(f"Production startup aborted: Supabase host '{url}' DNS resolution failed or host is unreachable.")
@@ -356,53 +362,40 @@ class SupabaseFallbackClient:
         else:
             self._local_client = SQLiteSupabaseMock()
             if not url or not check_dns_resolves(url):
-                print(f"[WARNING] Supabase host '{url}' DNS resolution failed. Using local SQLite fallback database.")
+                import logging
+                logging.warning(f"[WARNING] Supabase host '{url}' DNS resolution failed or host is unreachable. Falling back to local SQLite database.")
                 self._use_local = True
             else:
                 try:
                     self._real_client = create_client(url, key)
                     print("[INFO] Connected to Supabase.")
                 except Exception as e:
-                    print(f"[WARNING] Failed to initialize Supabase client: {e}. Using local SQLite fallback database.")
+                    import logging
+                    logging.warning(f"[WARNING] Failed to initialize Supabase client: {e}. Using local SQLite fallback database.")
                     self._use_local = True
 
     @property
     def storage(self):
-        if _is_production_mode():
-            if not self._real_client:
-                from flask import has_request_context, jsonify, make_response
-                from werkzeug.exceptions import ServiceUnavailable
-                if has_request_context():
-                    resp = make_response(jsonify({"error": "Storage service unavailable", "status": 503}), 503)
-                    raise ServiceUnavailable(response=resp)
-                raise RuntimeError("Supabase storage is offline. Local SQLite fallback is disabled in production.")
-            try:
-                return self._real_client.storage
-            except Exception as e:
-                from flask import has_request_context, jsonify, make_response
-                from werkzeug.exceptions import ServiceUnavailable
-                if has_request_context():
-                    resp = make_response(jsonify({"error": "Storage service unavailable", "status": 503}), 503)
-                    raise ServiceUnavailable(response=resp) from e
-                raise RuntimeError(f"Supabase storage error: {e}") from e
-
-        if self._use_local:
+        allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
+        if self._use_local or not self._real_client:
             return self._local_client.storage
         try:
             return self._real_client.storage
-        except Exception:
-            self._use_local = True
-            return self._local_client.storage
-
-    def table(self, name):
-        if _is_production_mode():
-            if not self._real_client:
+        except Exception as e:
+            if _is_production_mode() and not allow_fallback:
                 from flask import has_request_context, jsonify, make_response
                 from werkzeug.exceptions import ServiceUnavailable
                 if has_request_context():
-                    resp = make_response(jsonify({"error": "Database service unavailable", "status": 503}), 503)
+                    resp = make_response(jsonify({"error": "Storage service unavailable", "status": 503}), 503)
                     raise ServiceUnavailable(response=resp)
-                raise RuntimeError("Supabase client is offline. Local SQLite fallback is disabled in production.")
+                raise RuntimeError(f"Supabase storage error: {e}") from e
+            return self._local_client.storage
+
+    def table(self, name):
+        allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
+        if self._use_local or not self._real_client:
+            return self._local_client.table(name)
+        if _is_production_mode() and not allow_fallback:
             try:
                 real_t = self._real_client.table(name)
                 return RealBuilderWrapper(self, name, real_t, None)
@@ -414,10 +407,7 @@ class SupabaseFallbackClient:
                     raise ServiceUnavailable(response=resp) from e
                 raise RuntimeError(f"Database service unavailable: {e}") from e
 
-        if self._use_local:
-            return self._local_client.table(name)
-        
-        return RealBuilderWrapper(self, name, self._real_client.table(name), self._local_client.table(name))
+        return RealBuilderWrapper(self, name, self._real_client.table(name), self._local_client.table(name) if self._local_client else None)
 
 
 
@@ -538,7 +528,8 @@ class RealBuilderWrapper:
                     pass
             return res
         except Exception as e:
-            if _is_production_mode():
+            allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))
+            if _is_production_mode() and not allow_fallback:
                 # In production, never silently fall back to local SQLite: return 503 instead
                 from flask import has_request_context, jsonify, make_response
                 from werkzeug.exceptions import ServiceUnavailable
