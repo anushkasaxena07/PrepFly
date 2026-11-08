@@ -1,0 +1,118 @@
+# ==============================================================================
+# PrepFly Production Blueprint for Render (render.yaml)
+# ==============================================================================
+# Infrastructure as Code (IaC) configuration for deploying PrepFly:
+#   1. prepfly-backend  : Python 3.11 / Flask WSGI API Service (Gunicorn)
+#   2. prepfly-frontend : React / Vite Single Page Application (Static CDN)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Flask Backend API Web Service
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: prepfly-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: f_backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 app:app
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # System & Runtime Settings
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - key: FLASK_ENV
+        value: production
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 5000
+      - key: ALLOW_SQLITE_FALLBACK
+        value: "true"
+
+      # Cryptographic Security (Render automatically generates a secure 256-bit key)
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+      # Supabase Cloud PostgreSQL & Auth
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
+      # Google OAuth Client ID (for backend token verification)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      # Google Gemini Generative AI
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Razorpay Payment Gateway & Webhooks
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # CORS Allowed Origins (Set to your frontend Render URL or custom domain)
+      - key: FRONTEND_URL
+        sync: false
+
+      # Optional Email Transport (Resend / SMTP)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+
+      # Optional Distributed Rate Limiting (Redis / Upstash)
+      - key: REDIS_URL
+        sync: false
+
+  # ----------------------------------------------------------------------------
+  # 2. React / Vite Frontend Static Site
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: prepfly-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    rootDir: f_frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+
+    # Single Page Application (SPA) client-side routing fallback
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    # Security & Popup Headers (Required for Google Auth & Payment modals)
+    headers:
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin-allow-popups
+      - path: /*
+        name: Cross-Origin-Embedder-Policy
+        value: unsafe-none
+
+    envVars:
+      # Automatically wire frontend to the backend service hostname
+      - key: VITE_BACKEND_URL
+        fromService:
+          type: web
+          name: prepfly-backend
+          property: hostURL
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_RAZORPAY_KEY_ID
+        sync: false

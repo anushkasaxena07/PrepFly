@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import AI_INTERVIEWER from '../config/aiInterviewerConfig';
+import AI_INTERVIEWER, { INTERVIEWER_PERSONALITIES, getInterviewerPersonality } from '../config/aiInterviewerConfig';
 import { getGradeInfo, computeSectionGrades, getBadges } from '../utils/gradingSystem';
 
 // ── futur21 Concentric Circle Waves Avatar for Ava ──────────────────────────
@@ -223,6 +223,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
   const [selectedType, setSelectedType] = useState(null);
   const [selectedEvidenceDimension, setSelectedEvidenceDimension] = useState(null);
+  const [selectedPersonality, setSelectedPersonality] = useState("professional");
+  const [useTextInput, setUseTextInput] = useState(false);
   
   // Non-Resume Form State
   const [roleTitle, setRoleTitle] = useState("Software Engineer");
@@ -733,6 +735,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           category: chosenCategory, 
           role: chosenRole,
           difficulty: difficulty || "Medium",
+          personality: selectedPersonality || "professional",
           job_description: jobDescription || ""
         })
       });
@@ -901,6 +904,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             interim += chunk;
           }
         }
+        // Barge-in Interruption: When candidate speaks while Ava is talking, interrupt playback
+        if (isAvaTalkingRef.current && (interim || chunk)) {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          if (currentAudioRef.current) {
+            try { currentAudioRef.current.pause(); } catch {}
+          }
+          setIsAvaTalking(false);
+          isAvaTalkingRef.current = false;
+        }
+
         const currentTotal = (finalTranscriptRef.current + (interim ? " " + interim : "")).trim();
         setAnswer(currentTotal);
 
@@ -1515,6 +1528,42 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   <div>
                     <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Supported browsers</div>
                     <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Chrome and Safari are preferred for the best experience.</div>
+                  </div>
+                </div>
+
+                {/* Interviewer Personality Selection */}
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "16px", textAlign: "left" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>🎭 Interviewer Personality</div>
+                    <span style={{ fontSize: "11px", color: "#00c4a7", fontWeight: 700 }}>Rubric score remains objective</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
+                    {INTERVIEWER_PERSONALITIES.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedPersonality(p.id)}
+                        style={{
+                          padding: "8px 6px",
+                          borderRadius: "10px",
+                          border: selectedPersonality === p.id ? "1.5px solid #00c4a7" : "1px solid rgba(255,255,255,0.08)",
+                          background: selectedPersonality === p.id ? "rgba(0,196,167,0.15)" : "rgba(255,255,255,0.02)",
+                          color: selectedPersonality === p.id ? "#00c4a7" : "#cbd5e1",
+                          cursor: "pointer",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "3px",
+                          textAlign: "center"
+                        }}
+                      >
+                        <span style={{ fontSize: "11px", fontWeight: 800 }}>{p.name.replace(" Ava", "")}</span>
+                        <span style={{ fontSize: "9px", color: "#94a3b8" }}>{p.badge}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "8px" }}>
+                    {getInterviewerPersonality(selectedPersonality).description}
                   </div>
                 </div>
 

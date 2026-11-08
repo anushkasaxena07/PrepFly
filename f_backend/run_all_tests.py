@@ -38,7 +38,7 @@ def run_suite():
     py_exe = venv_py if os.path.exists(venv_py) else sys.executable
     repo_root = os.path.dirname(BACKEND_DIR)
     check_dir = repo_root if os.path.exists(os.path.join(repo_root, "sandbox_worker")) else BACKEND_DIR
-    ruff_res = subprocess.run([py_exe, "-m", "ruff", "check", ".", "--select", "F821,E9,F811"], cwd=check_dir)
+    ruff_res = subprocess.run([py_exe, "-m", "ruff", "check", ".", "--no-cache", "--select", "F821,E9,F811"], cwd=check_dir)
     if ruff_res.returncode != 0:
         print(">>> STATIC INTEGRITY CHECK FAILED! Fix syntax errors, undefined names, or redefinitions.")
         return 1

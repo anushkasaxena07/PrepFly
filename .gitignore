@@ -35,3 +35,6 @@ uploads/
 
 local_db.sqlite
 *.sqlite
+
+*.db
+git_backups_immutable/

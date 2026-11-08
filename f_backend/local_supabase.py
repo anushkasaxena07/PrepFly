@@ -125,7 +125,12 @@ class SQLiteSupabaseMock:
             ("stage", "TEXT"),
             ("ats_score", "INTEGER"),
             ("structured_resume", "TEXT"),
-            ("cached_hints", "TEXT")
+            ("cached_hints", "TEXT"),
+            ("interview_state", "TEXT DEFAULT 'INITIALIZING'"),
+            ("personality", "TEXT DEFAULT 'professional'"),
+            ("knowledge_map", "TEXT DEFAULT '{}'"),
+            ("idempotency_key", "TEXT"),
+            ("turn_count", "INTEGER DEFAULT 0")
         ]
         for col_name, col_type in session_cols:
             try:
@@ -691,6 +696,418 @@ class SQLiteSupabaseMock:
                 updated_at TEXT
             )
         """)
+
+        # 30. candidate_profiles
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_profiles (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL UNIQUE,
+                target_company TEXT,
+                target_role TEXT NOT NULL,
+                experience_level TEXT NOT NULL,
+                target_interview_date TEXT,
+                preparation_duration_days INTEGER DEFAULT 30,
+                daily_study_hours REAL DEFAULT 2.0,
+                preferred_study_days TEXT,
+                current_skills TEXT,
+                preferred_language TEXT DEFAULT 'python',
+                preparation_goals TEXT,
+                strengths TEXT,
+                growth_areas TEXT,
+                status TEXT DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 31. skills
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skills (
+                skill_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                parent_skill_id TEXT,
+                difficulty TEXT NOT NULL,
+                description TEXT,
+                learning_objectives TEXT,
+                assessment_criteria TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 32. skill_prerequisites
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_prerequisites (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill_id TEXT NOT NULL,
+                prerequisite_skill_id TEXT NOT NULL,
+                is_mandatory INTEGER DEFAULT 1,
+                UNIQUE(skill_id, prerequisite_skill_id)
+            )
+        """)
+
+        # 33. role_skill_requirements
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS role_skill_requirements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                role_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                importance_weight REAL DEFAULT 1.0,
+                minimum_proficiency REAL DEFAULT 60.0,
+                UNIQUE(role_id, skill_id)
+            )
+        """)
+
+        # 34. candidate_skill_profiles
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_skill_profiles (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                proficiency REAL DEFAULT 0.0,
+                confidence REAL DEFAULT 0.0,
+                evidence_count INTEGER DEFAULT 0,
+                last_assessed TEXT,
+                historical_proficiency TEXT,
+                learning_trend TEXT DEFAULT 'stable',
+                strong_concepts TEXT,
+                growth_concepts TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, skill_id)
+            )
+        """)
+
+        # 35. skill_evidence
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_evidence (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                source_id TEXT,
+                score REAL NOT NULL,
+                weight REAL DEFAULT 1.0,
+                demonstrated_concepts TEXT,
+                missed_concepts TEXT,
+                misconceptions TEXT,
+                evidence_notes TEXT,
+                rubric_version TEXT DEFAULT 'v1',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 36. assessments
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessments (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                assessment_type TEXT NOT NULL,
+                target_role TEXT,
+                status TEXT DEFAULT 'pending',
+                score REAL,
+                total_questions INTEGER DEFAULT 0,
+                completed_questions INTEGER DEFAULT 0,
+                summary TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        """)
+
+        # 37. assessment_questions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_questions (
+                id TEXT PRIMARY KEY,
+                assessment_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                question_type TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                options TEXT,
+                correct_answer TEXT,
+                expected_concepts TEXT,
+                rubric TEXT,
+                order_index INTEGER DEFAULT 0
+            )
+        """)
+
+        # 38. assessment_attempts
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_attempts (
+                id TEXT PRIMARY KEY,
+                assessment_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                candidate_answer TEXT,
+                is_correct INTEGER,
+                score REAL,
+                evaluation_result TEXT,
+                identified_concepts TEXT,
+                missing_concepts TEXT,
+                misconceptions TEXT,
+                feedback TEXT,
+                evaluated_at TEXT NOT NULL
+            )
+        """)
+
+        # 39. roadmaps
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS roadmaps (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL UNIQUE,
+                target_role TEXT NOT NULL,
+                target_company TEXT,
+                current_version INTEGER DEFAULT 1,
+                total_days INTEGER DEFAULT 30,
+                total_activities INTEGER DEFAULT 0,
+                completed_activities INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 40. roadmap_versions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS roadmap_versions (
+                id TEXT PRIMARY KEY,
+                roadmap_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                version_number INTEGER NOT NULL,
+                change_reason TEXT NOT NULL,
+                trigger_event TEXT,
+                activities_snapshot TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 41. roadmap_activities
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS roadmap_activities (
+                id TEXT PRIMARY KEY,
+                roadmap_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                day_number INTEGER NOT NULL,
+                order_in_day INTEGER DEFAULT 1,
+                title TEXT NOT NULL,
+                description TEXT,
+                activity_type TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                estimated_minutes INTEGER DEFAULT 30,
+                learning_objective TEXT,
+                completion_criteria TEXT,
+                priority REAL DEFAULT 1.0,
+                due_date TEXT,
+                status TEXT DEFAULT 'pending',
+                is_pinned INTEGER DEFAULT 0,
+                recommendation_reason TEXT,
+                resource_payload TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 42. activity_attempts
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS activity_attempts (
+                id TEXT PRIMARY KEY,
+                activity_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                time_spent_minutes INTEGER DEFAULT 0,
+                performance_score REAL,
+                notes TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 43. revision_schedules
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS revision_schedules (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                interval_stage INTEGER DEFAULT 1,
+                next_revision_date TEXT NOT NULL,
+                last_reviewed_at TEXT,
+                status TEXT DEFAULT 'scheduled',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 44. interview_turns
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_turns (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                turn_number INTEGER NOT NULL,
+                question_text TEXT NOT NULL,
+                question_type TEXT,
+                stage TEXT,
+                candidate_response TEXT,
+                intent TEXT DEFAULT 'ANSWER',
+                decision TEXT DEFAULT 'NEXT_QUESTION',
+                score REAL DEFAULT 0.0,
+                accuracy_score INTEGER DEFAULT 0,
+                evaluation_json TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 45. interviewer_profiles
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interviewer_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                tone TEXT NOT NULL,
+                formality TEXT NOT NULL,
+                probing_intensity TEXT NOT NULL,
+                encouragement_frequency TEXT NOT NULL,
+                hint_policy TEXT NOT NULL,
+                system_prompt_modifier TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 46. candidate_resume_claims
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_resume_claims (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                claim_type TEXT NOT NULL,
+                claim_text TEXT NOT NULL,
+                provenance_section TEXT,
+                confidence REAL DEFAULT 1.0,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 47. preparation_events
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS preparation_events (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                source_module TEXT NOT NULL,
+                source_record_id TEXT,
+                payload_json TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 48. job_profiles
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_profiles (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                job_title TEXT NOT NULL,
+                company TEXT,
+                raw_text TEXT NOT NULL,
+                role_tier TEXT DEFAULT 'mid',
+                target_date TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 49. job_requirements
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_requirements (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                normalized_skill_id TEXT NOT NULL,
+                requirement_type TEXT NOT NULL,
+                is_required INTEGER DEFAULT 1,
+                importance_weight REAL DEFAULT 3.0,
+                evidence_text TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 50. job_tailored_questions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_tailored_questions (
+                id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                requirement_id TEXT,
+                question_text TEXT NOT NULL,
+                category TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                quality_score REAL DEFAULT 8.0,
+                evaluation_metrics TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 51. achievement_definitions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS achievement_definitions (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                trigger_event TEXT NOT NULL,
+                condition_type TEXT NOT NULL,
+                threshold_value REAL NOT NULL,
+                badge_icon TEXT NOT NULL,
+                reward_points INTEGER DEFAULT 50,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 52. user_achievements
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_achievements (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                achievement_id TEXT NOT NULL,
+                triggering_event_id TEXT,
+                unlocked_at TEXT NOT NULL,
+                reward_claimed INTEGER DEFAULT 0,
+                metadata_json TEXT,
+                UNIQUE(user_id, achievement_id)
+            )
+        """)
+
+        # 53. performance_snapshots
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS performance_snapshots (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                snapshot_type TEXT NOT NULL,
+                overall_readiness REAL NOT NULL,
+                category_scores_json TEXT NOT NULL,
+                sample_counts_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Seed Default Achievements
+        cursor.execute("SELECT COUNT(*) FROM achievement_definitions")
+        if cursor.fetchone()[0] == 0:
+            default_achievements = [
+                ("first_flight", "First Flight", "Completed your first Ava AI mock interview session.", "activity", "interview_completed", "count_gte", 1.0, "Award", 50),
+                ("interview_veteran_5", "Interview Veteran", "Completed 5 comprehensive interview simulations.", "activity", "interview_completed", "count_gte", 5.0, "Trophy", 100),
+                ("code_runner_10", "Code Runner", "Successfully solved 10 coding challenges in the sandbox.", "activity", "coding_attempt_completed", "count_gte", 10.0, "Terminal", 100),
+                ("algo_specialist_50", "Algorithm Specialist", "Successfully passed 50 coding challenge submissions.", "activity", "coding_attempt_completed", "count_gte", 50.0, "Cpu", 250),
+                ("high_performer_85", "High Performer", "Scored 85% or higher on an interview or technical assessment.", "proficiency", "assessment_completed", "score_gte", 85.0, "Zap", 150),
+                ("rapid_improver_15", "Rapid Improver", "Increased your verified baseline performance by +15% or more.", "improvement", "improvement_analyzed", "delta_gte", 15.0, "TrendingUp", 200),
+                ("target_ready", "Target Ready", "Analyzed a job description and created a tailored preparation plan.", "activity", "job_description_analyzed", "count_gte", 1.0, "Target", 75),
+                ("roadmap_pioneer", "Roadmap Pioneer", "Completed your first personalized roadmap activity.", "activity", "roadmap_task_completed", "count_gte", 1.0, "Compass", 50),
+                ("consistent_learner_7", "Consistent Learner", "Completed 7 roadmap activities on schedule.", "streak", "roadmap_task_completed", "count_gte", 7.0, "Flame", 150),
+                ("gap_closer", "Gap Closer", "Closed a critical skill gap required for your target job.", "mastery", "skill_gap_closed", "count_gte", 1.0, "CheckCircle2", 150)
+            ]
+            for ach in default_achievements:
+                cursor.execute("""
+                    INSERT INTO achievement_definitions
+                    (id, name, description, category, trigger_event, condition_type, threshold_value, badge_icon, reward_points, is_active, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                """, (*ach, datetime.utcnow().isoformat()))
 
         # Seed Default Super Admin Account
         cursor.execute("SELECT COUNT(*) FROM super_admin")
@@ -1326,3 +1743,10 @@ try:
     SQLiteSupabaseMock()
 except Exception as e:
     print("Auto DB init notice:", e)
+_default_mock_client = None
+
+def get_supabase_client():
+    global _default_mock_client
+    if _default_mock_client is None:
+        _default_mock_client = SQLiteSupabaseMock()
+    return _default_mock_client

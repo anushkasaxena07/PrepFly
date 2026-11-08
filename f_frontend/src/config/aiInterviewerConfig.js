@@ -28,4 +28,51 @@ export const AI_INTERVIEWER = {
   ]
 };
 
+export const INTERVIEWER_PERSONALITIES = [
+  {
+    id: "friendly",
+    name: "Friendly Ava",
+    badge: "Encouraging",
+    description: "Supportive, warm, and patient. Ideal for beginners or candidates with interview anxiety.",
+    tone: "Warm & Supportive",
+    probing: "Gentle Nudges"
+  },
+  {
+    id: "professional",
+    name: "Professional Ava",
+    badge: "Recommended",
+    description: "Objective, balanced, and structured corporate interviewer simulating standard tech rounds.",
+    tone: "Standard Corporate",
+    probing: "Balanced Inquiries"
+  },
+  {
+    id: "challenging",
+    name: "Challenging Ava",
+    badge: "Rigorous",
+    description: "Deep technical probing, scenario-based trade-offs, and critical boundary condition analysis.",
+    tone: "Direct & Inquisitive",
+    probing: "Stress-Test Assumptions"
+  },
+  {
+    id: "strict",
+    name: "Strict Ava",
+    badge: "No-Nonsense",
+    description: "Concise and formal. Demands precise definitions and zero conversational filler.",
+    tone: "Formal & Strict",
+    probing: "Exact Specifications"
+  },
+  {
+    id: "senior_engineer",
+    name: "Senior Staff Ava",
+    badge: "Staff / Principal",
+    description: "Architecture-first peer dialogue exploring high scale, production resilience, and operations.",
+    tone: "Senior Engineering Peer",
+    probing: "Production Constraints"
+  }
+];
+
+export const getInterviewerPersonality = (id) => {
+  return INTERVIEWER_PERSONALITIES.find(p => p.id === id) || INTERVIEWER_PERSONALITIES[1];
+};
+
 export default AI_INTERVIEWER;
