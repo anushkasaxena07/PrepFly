@@ -195,7 +195,9 @@ app.register_blueprint(career_intelligence_bp)
 # Local development ports are only permitted in non-production environments.
 if is_production:
     allowed_origins = [
-        "https://prepfly.vercel.app"
+        "https://prepfly.vercel.app",
+        "https://prepfly-1.onrender.com",
+        re.compile(r"^https://.*\.onrender\.com$"),
     ]
 else:
     allowed_origins = [
@@ -203,7 +205,9 @@ else:
         "http://localhost:5174",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
-        "https://prepfly.vercel.app"
+        "https://prepfly.vercel.app",
+        "https://prepfly-1.onrender.com",
+        re.compile(r"^https://.*\.onrender\.com$"),
     ]
 
 frontend_url_raw = os.getenv("FRONTEND_URL", "").strip()
