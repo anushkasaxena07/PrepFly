@@ -23,16 +23,29 @@ class SQLiteSupabaseMock:
         self._init_db()
 
     def _get_conn(self):
-        conn = sqlite3.connect(self.db_path, timeout=60, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout = 60000")
-        return conn
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=60, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA busy_timeout = 60000")
+            return conn
+        except Exception:
+            conn = sqlite3.connect(":memory:", timeout=60, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            return conn
 
     def _init_db(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        conn.commit()
+        try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("PRAGMA journal_mode=WAL")
+            except Exception:
+                pass
+            conn.commit()
+        except Exception:
+            self.db_path = ":memory:"
+            conn = self._get_conn()
+            cursor = conn.cursor()
         
         # 1. users
         cursor.execute("""
