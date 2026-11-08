@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS otps (
                 purpose TEXT
             );
 
-CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);
 
 CREATE TABLE IF NOT EXISTS otp_requests (
                 id BIGSERIAL PRIMARY KEY ,

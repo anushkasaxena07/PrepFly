@@ -931,13 +931,29 @@ class SQLiteSupabaseMock:
                 user_id TEXT NOT NULL,
                 skill_id TEXT NOT NULL,
                 interval_stage INTEGER DEFAULT 1,
-                next_revision_date TEXT NOT NULL,
+                next_due_at TEXT,
+                next_revision_date TEXT,
+                due_date TEXT,
                 last_reviewed_at TEXT,
-                status TEXT DEFAULT 'scheduled',
+                last_score REAL DEFAULT 0.0,
+                retrieval_attempts INTEGER DEFAULT 0,
+                easiness_factor REAL DEFAULT 2.5,
+                status TEXT DEFAULT 'ACTIVE',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
         """)
+        for col_name, col_type in [
+            ("next_due_at", "TEXT"),
+            ("due_date", "TEXT"),
+            ("last_score", "REAL DEFAULT 0.0"),
+            ("retrieval_attempts", "INTEGER DEFAULT 0"),
+            ("easiness_factor", "REAL DEFAULT 2.5"),
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE revision_schedules ADD COLUMN {_validate_ident(col_name)} {col_type}")
+            except Exception:
+                pass
 
         # 44. interview_turns
         cursor.execute("""
