@@ -377,6 +377,55 @@ export const intelligenceAPI = {
       body: JSON.stringify({ user_id: uid })
     });
     return handleResponse(res);
+  },
+
+  // 12. Intelligent Company-Specific Preparation Engine
+  async getCompanyIntelligence(company, role = "Software Engineer", level = "Fresher") {
+    const res = await fetch(
+      `${BACKEND_URL}/api/intelligence/company/${encodeURIComponent(company)}?role=${encodeURIComponent(role)}&experience_level=${encodeURIComponent(level)}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders()
+      }
+    );
+    return handleResponse(res);
+  },
+
+  async getCandidateReadiness(role = "Software Engineer") {
+    const res = await fetch(
+      `${BACKEND_URL}/api/intelligence/candidate/readiness?role=${encodeURIComponent(role)}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders()
+      }
+    );
+    return handleResponse(res);
+  },
+
+  async getCompanyGapAnalysis(payload) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/company/gap-analysis`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async generateCompanyPlan(payload) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/company/plan`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async getCompanyPlan() {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/company/plan`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
   }
 };
 

@@ -9,6 +9,9 @@ from typing import Dict, List, Optional, Any, Set
 from datetime import datetime, timedelta, timezone
 import json
 import uuid
+import logging
+
+logger = logging.getLogger("prepfly.roadmap")
 
 from local_supabase import get_supabase_client
 from services.skill_taxonomy_service import (
@@ -1443,4 +1446,299 @@ class PersonalizedRoadmapEngine:
             "total_activities": total_acts,
             "completed_activities": completed_acts,
             "completion_percentage": completion_pct
+        }
+
+    @classmethod
+    def generate_company_personalized_plan(
+        cls,
+        user_id: str,
+        company_name: str,
+        role: str = "Software Engineer",
+        experience_level: str = "Fresher",
+        target_date: Optional[str] = None,
+        daily_minutes: int = 60,
+        study_days: Optional[List[str]] = None,
+        prep_style: str = "mixed",
+        job_description: Optional[str] = None,
+        supabase_client=None
+    ) -> Dict[str, Any]:
+        """
+        Master orchestrator generating a complete, adaptive company-specific preparation plan
+        combining Dimension A (Candidate Readiness) with Dimension B (Company Interview Intelligence).
+        """
+        from services.company_gap_service import CompanyCandidateGapService
+        from services.company_intelligence_service import CompanyIntelligenceService
+        from services.candidate_readiness_service import CandidateReadinessService
+
+        supabase = supabase_client or get_supabase_client()
+        clean_company = (company_name or "Target Company").strip()
+        clean_role = (role or "Software Engineer").strip()
+        clean_level = (experience_level or "Fresher").strip()
+        daily_cap = max(30, int(daily_minutes or 60))
+
+        # 1. Calculate preparation timeline
+        today = datetime.now(timezone.utc).date()
+        days_to_deadline = 30
+        if target_date:
+            try:
+                t_dt = datetime.strptime(str(target_date).strip()[:10], "%Y-%m-%d").date()
+                diff = (t_dt - today).days
+                days_to_deadline = max(1, diff)
+            except Exception:
+                days_to_deadline = 30
+
+        total_days = min(60, max(3, days_to_deadline))
+
+        # 2. Execute Gap Analysis (Dimension A + Dimension B)
+        gap_result = CompanyCandidateGapService.analyze_company_candidate_gaps(
+            user_id=user_id,
+            company_name=clean_company,
+            role=clean_role,
+            experience_level=clean_level,
+            days_to_deadline=total_days,
+            supabase_client=supabase
+        )
+
+        company_profile = CompanyIntelligenceService.get_company_intelligence(
+            company_name=clean_company,
+            role=clean_role,
+            experience_level=clean_level
+        )
+
+        candidate_snapshot = CandidateReadinessService.get_candidate_readiness_snapshot(
+            user_id=user_id,
+            target_role=clean_role,
+            supabase_client=supabase
+        )
+
+        # 3. Retrieve any preserved activities
+        preserved_activities: List[Dict[str, Any]] = []
+        rm_res = supabase.table("roadmaps").select("*").eq("user_id", user_id).execute()
+        existing_rm = rm_res.data[0] if (rm_res and rm_res.data) else None
+        roadmap_id = existing_rm["id"] if existing_rm else f"rm_{uuid.uuid4().hex[:12]}"
+        next_version = (existing_rm.get("current_version", 0) + 1) if existing_rm else 1
+
+        if existing_rm:
+            act_res = supabase.table("roadmap_activities").select("*").eq("roadmap_id", roadmap_id).execute()
+            all_existing = act_res.data if (act_res and act_res.data) else []
+            preserved_activities = [
+                a for a in all_existing
+                if a.get("status") in ("completed", "COMPLETED") or a.get("is_pinned") in (1, True)
+            ]
+
+        # 4. Schedule Activities into Daily Plan with Strict Capacity Enforcement
+        scheduled_activities: List[Dict[str, Any]] = []
+        occupied_day_minutes: Dict[int, int] = {d: 0 for d in range(1, total_days + 1)}
+
+        # Incorporate preserved
+        completed_skills = set()
+        for act in preserved_activities:
+            d = min(total_days, max(1, act.get("day_number", 1)))
+            dur = int(act.get("estimated_minutes", 30))
+            occupied_day_minutes[d] = occupied_day_minutes.get(d, 0) + dur
+            act_copy = dict(act)
+            act_copy["activity_id"] = act_copy.get("activity_id") or act_copy.get("id")
+            scheduled_activities.append(act_copy)
+            if act.get("status") in ("completed", "COMPLETED"):
+                completed_skills.add(act.get("skill_id"))
+
+        # Build activity queue from prioritized gaps
+        top_gaps = gap_result.get("gaps", [])
+        rounds = company_profile.get("round_structure", [])
+
+        # Distribute company rounds as mock interview checkpoints
+        mock_days = {}
+        if total_days >= 7:
+            step_interval = max(3, total_days // max(1, len(rounds)))
+            for idx, r in enumerate(rounds):
+                day_target = min(total_days, (idx + 1) * step_interval)
+                mock_days[day_target] = r
+
+        act_idx = 1
+        for day in range(1, total_days + 1):
+            avail_today = daily_cap - occupied_day_minutes.get(day, 0)
+            if avail_today < 20:
+                continue
+
+            # Check if this day is a dedicated Company Mock Round Checkpoint
+            if day in mock_days and avail_today >= 45:
+                round_info = mock_days[day]
+                m_dur = min(avail_today, 45)
+                act_id = f"act_{uuid.uuid4().hex[:10]}"
+                scheduled_activities.append({
+                    "id": act_id,
+                    "activity_id": act_id,
+                    "roadmap_id": roadmap_id,
+                    "user_id": user_id,
+                    "day_number": day,
+                    "order_in_day": len([a for a in scheduled_activities if a.get("day_number") == day]) + 1,
+                    "skill_id": "soft_behavioral_star" if "behavioral" in round_info["name"].lower() or "googliness" in round_info["name"].lower() else "dsa_graphs_bfs_dfs",
+                    "title": f"Ava Mock: {clean_company} Round {round_info['round_number']} ({round_info['name']})",
+                    "description": f"Simulated interview round tailored to {clean_company}'s evaluation rubrics and {round_info['focus']}.",
+                    "activity_type": "MOCK_INTERVIEW",
+                    "difficulty": "Medium-to-Hard" if "senior" in clean_level.lower() else "Medium",
+                    "estimated_minutes": m_dur,
+                    "learning_objective": f"Practice under realistic {clean_company} round format: {round_info['focus']}.",
+                    "completion_criteria": f"Complete full 45-minute interactive interview with Ava and achieve >= 70% rubric score.",
+                    "priority": 95.0,
+                    "status": "pending",
+                    "is_pinned": 0,
+                    "company_relevance": 0.98,
+                    "resource_payload": json.dumps({
+                        "company": clean_company,
+                        "round_name": round_info["name"],
+                        "format": round_info.get("format", "Virtual 1-on-1"),
+                        "interview_mode": "company_mock"
+                    })
+                })
+                occupied_day_minutes[day] += m_dur
+                avail_today -= m_dur
+
+            # Fill remaining day budget with prioritized gap activities
+            gap_candidates = [g for g in top_gaps if g["skill_id"] not in completed_skills]
+            for gap in gap_candidates:
+                if avail_today < 25:
+                    break
+
+                skill_id = gap["skill_id"]
+                content_items = CURATED_CONTENT_CATALOG.get(skill_id, [])
+                if not content_items:
+                    continue
+
+                for item in content_items:
+                    dur = int(item.get("estimated_minutes", 30))
+                    if dur <= avail_today:
+                        act_id = f"act_{uuid.uuid4().hex[:10]}"
+                        scheduled_activities.append({
+                            "id": act_id,
+                            "activity_id": act_id,
+                            "roadmap_id": roadmap_id,
+                            "user_id": user_id,
+                            "day_number": day,
+                            "order_in_day": len([a for a in scheduled_activities if a.get("day_number") == day]) + 1,
+                            "skill_id": skill_id,
+                            "title": f"[{clean_company} Prep] {item['title']}",
+                            "description": f"Targeted preparation for {clean_company} {clean_role}: {item.get('learning_objective', '')}",
+                            "activity_type": item.get("activity_type", "LEARN"),
+                            "difficulty": item.get("difficulty", "Intermediate"),
+                            "estimated_minutes": dur,
+                            "learning_objective": item.get("learning_objective", ""),
+                            "completion_criteria": item.get("completion_criteria", ""),
+                            "priority": gap.get("priority_score", 80.0),
+                            "status": "pending",
+                            "is_pinned": 0,
+                            "company_relevance": gap.get("company_relevance", 0.70),
+                            "resource_payload": json.dumps(item.get("resource_payload", {}))
+                        })
+                        occupied_day_minutes[day] += dur
+                        avail_today -= dur
+
+        # 5. Save Roadmap and Activities
+        now_iso = datetime.now(timezone.utc).isoformat()
+        total_acts = len(scheduled_activities)
+        completed_acts = sum(1 for a in scheduled_activities if a.get("status") in ("completed", "COMPLETED"))
+        completion_pct = round((completed_acts / max(1, total_acts)) * 100)
+
+        roadmap_record = {
+            "id": roadmap_id,
+            "user_id": user_id,
+            "target_role": clean_role,
+            "current_version": next_version,
+            "status": "active",
+            "total_activities": total_acts,
+            "completed_activities": completed_acts,
+            "completion_percentage": completion_pct,
+            "updated_at": now_iso
+        }
+
+        if existing_rm:
+            supabase.table("roadmaps").update(roadmap_record).eq("id", roadmap_id).execute()
+        else:
+            roadmap_record["created_at"] = now_iso
+            supabase.table("roadmaps").insert(roadmap_record).execute()
+
+        # Update candidate profile target fields
+        try:
+            profile_update = {
+                "target_company": clean_company,
+                "target_role": clean_role,
+                "experience_level": clean_level,
+                "daily_minutes": daily_cap,
+                "target_date": target_date or (today + timedelta(days=total_days)).isoformat(),
+                "updated_at": now_iso
+            }
+            supabase.table("candidate_profiles").update(profile_update).eq("user_id", user_id).execute()
+        except Exception:
+            pass
+
+        # Clear pending and insert updated schedule
+        supabase.table("roadmap_activities").delete().eq("roadmap_id", roadmap_id).neq("status", "completed").neq("is_pinned", 1).execute()
+
+        preserved_ids = {a.get("id") for a in preserved_activities if a.get("id")}
+        for act in scheduled_activities:
+            if act.get("id") in preserved_ids:
+                continue
+            insert_row = {
+                "id": act["id"],
+                "roadmap_id": roadmap_id,
+                "user_id": user_id,
+                "skill_id": act["skill_id"],
+                "day_number": act["day_number"],
+                "order_in_day": act["order_in_day"],
+                "title": act["title"],
+                "description": act.get("description", ""),
+                "activity_type": act["activity_type"],
+                "difficulty": act["difficulty"],
+                "estimated_minutes": act["estimated_minutes"],
+                "learning_objective": act.get("learning_objective", ""),
+                "completion_criteria": act.get("completion_criteria", ""),
+                "priority": act.get("priority", 1.0),
+                "status": act.get("status", "pending"),
+                "is_pinned": int(act.get("is_pinned", 0)),
+                "resource_payload": act.get("resource_payload") if isinstance(act.get("resource_payload"), str) else json.dumps(act.get("resource_payload", {})),
+                "created_at": now_iso,
+                "updated_at": now_iso
+            }
+            try:
+                supabase.table("roadmap_activities").insert(insert_row).execute()
+            except Exception as e:
+                logger.warning(f"Error inserting activity {act['id']}: {e}")
+
+        # Format by-day schedule dictionary
+        by_day: Dict[int, List[Dict[str, Any]]] = {}
+        for a in scheduled_activities:
+            d = a.get("day_number", 1)
+            if d not in by_day:
+                by_day[d] = []
+            by_day[d].append({
+                **a,
+                "activity_id": a.get("activity_id") or a.get("id"),
+                "skill_name": (SkillTaxonomyService.get_skill(a.get("skill_id", "")) or {}).get("name", a.get("skill_id", "")),
+                "category": (SkillTaxonomyService.get_skill(a.get("skill_id", "")) or {}).get("category", "")
+            })
+
+        return {
+            "success": True,
+            "company_name": clean_company,
+            "target_role": clean_role,
+            "experience_level": clean_level,
+            "target_date": target_date or (today + timedelta(days=total_days)).isoformat(),
+            "daily_minutes": daily_cap,
+            "total_days": total_days,
+            "total_study_hours": round((total_days * daily_cap) / 60.0, 1),
+            "company_intelligence": company_profile,
+            "candidate_readiness": candidate_snapshot,
+            "gap_analysis": gap_result,
+            "roadmap": {
+                **roadmap_record,
+                "roadmap_id": roadmap_id,
+                "version": next_version,
+                "activities": scheduled_activities,
+                "schedule": by_day,
+                "total_activities": total_acts,
+                "completed_activities": completed_acts,
+                "completion_percentage": completion_pct
+            },
+            "tailored_question_bank": gap_result.get("tailored_question_bank", []),
+            "generated_at": now_iso
         }
