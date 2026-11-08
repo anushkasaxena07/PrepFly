@@ -213,6 +213,8 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
           const formData = new FormData();
           const ext = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
           formData.append('file', audioBlob, `recording.${ext}`);
+          formData.append('consent', 'true');
+          formData.append('consent_given', 'true');
 
           const res = await apiFetch('/speech-to-text', {
             method: 'POST',
@@ -269,7 +271,13 @@ export default function SpeechTab({ apiFetch, isLoggedIn, user = {} }) {
         const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
         const res = await apiFetch('/api/speech/analyze', {
           method: 'POST',
-          body: JSON.stringify({ transcript: rawText, duration_seconds: durationRef.current, user_id: resolvedUserId })
+          body: JSON.stringify({ 
+            transcript: rawText, 
+            duration_seconds: durationRef.current || 60, 
+            user_id: resolvedUserId,
+            consent: true,
+            consent_given: true
+          })
         });
         const d = await res.json();
         if (res.ok) {

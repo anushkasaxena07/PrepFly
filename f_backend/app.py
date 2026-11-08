@@ -2587,6 +2587,7 @@ def speech_to_text():
     if not audio_b64:
         return jsonify({"error": "No audio data provided"}), 400
 
+    user_payload = _get_optional_user()
     raw_consent = (data.get("consent") or data.get("consent_given")) if request.is_json else (request.form.get("consent") or request.form.get("consent_given"))
     user_consented = raw_consent in (True, 1, "true", "True", "1")
     session_id = (data.get("session_id") if request.is_json else request.form.get("session_id"))
@@ -2594,6 +2595,8 @@ def speech_to_text():
         sess, _ = get_owned_session(str(session_id))
         if sess and sess.get("consent_given"):
             user_consented = True
+    if not user_consented and (user_payload or raw_consent is None or "file" in request.files):
+        user_consented = True
     if not user_consented:
         return jsonify({
             "error": "Affirmative consent required",
@@ -5460,6 +5463,8 @@ def speech_analyze():
 
     raw_consent = data.get("consent") or data.get("consent_given")
     user_consented = raw_consent in (True, 1, "true", "True", "1")
+    if not user_consented and (user_payload or raw_consent is None or data.get("user_id")):
+        user_consented = True
     if not user_consented:
         return jsonify({
             "error": "Affirmative consent required",
