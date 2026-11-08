@@ -222,10 +222,45 @@ if frontend_url_raw:
 CORS(app, resources={r"/*": {
     "origins": allowed_origins,
     "supports_credentials": True,
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Organization-Id"],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    "allow_headers": [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "X-User-Id",
+        "x-user-id",
+        "X-Organization-Id",
+        "x-organization-id",
+        "X-Session-Id",
+        "x-session-id",
+        "X-Tab-Id",
+        "x-tab-id",
+        "X-Candidate-Id",
+        "x-candidate-id",
+        "X-Role",
+        "x-role"
+    ],
+    "expose_headers": ["Content-Type", "Authorization", "X-User-Id", "x-user-id"],
     "max_age": 86400
 }})
+
+@app.before_request
+def handle_cors_preflight():
+    if request.method == "OPTIONS":
+        res = app.make_default_options_response()
+        req_origin = request.headers.get("Origin")
+        if req_origin:
+            res.headers["Access-Control-Allow-Origin"] = req_origin
+            res.headers["Access-Control-Allow-Credentials"] = "true"
+            res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            res.headers["Access-Control-Allow-Headers"] = (
+                request.headers.get("Access-Control-Request-Headers")
+                or "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-User-Id, x-user-id, X-Organization-Id, x-organization-id, X-Session-Id, x-session-id, X-Tab-Id, x-tab-id, X-Candidate-Id, x-candidate-id, X-Role, x-role"
+            )
+            res.headers["Access-Control-Max-Age"] = "86400"
+        return res
 
 @app.errorhandler(Exception)
 def handle_global_exception(e):
