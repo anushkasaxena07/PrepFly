@@ -517,9 +517,21 @@ class RealBuilderWrapper:
                 # Intercept sessions table write queries to bypass missing Supabase columns
                 if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
                     import json
-                    metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color", "grade_label", "performance_level", "hiring_recommendation"]
+                    metadata_fields = [
+                        "category", "difficulty", "stage", "ats_score", "structured_resume",
+                        "final_score_100", "grade_color", "grade_label", "performance_level",
+                        "hiring_recommendation", "role", "interview_mode", "total_questions",
+                        "consent_given", "consent_timestamp", "privacy_policy_version",
+                        "job_description", "organization_id", "cached_hints", "interview_state",
+                        "personality", "knowledge_map", "idempotency_key", "turn_count"
+                    ]
                     
                     def process_dict(data):
+                        # Ensure array/object fields are serialized to valid JSON strings for TEXT columns
+                        for list_field in ("questions", "responses", "feedbacks", "scores"):
+                            if list_field in data and isinstance(data[list_field], (list, dict)):
+                                data[list_field] = json.dumps(data[list_field])
+
                         metadata = {}
                         for field in metadata_fields:
                             if field in data:
@@ -556,17 +568,34 @@ class RealBuilderWrapper:
             # Intercept sessions table read queries to restore custom metadata fields
             if self.table_name == "sessions" and hasattr(res, "data") and res.data:
                 import json
-                metadata_fields = ["category", "difficulty", "stage", "ats_score", "structured_resume", "final_score_100", "grade_color", "grade_label", "performance_level", "hiring_recommendation"]
+                metadata_fields = [
+                    "category", "difficulty", "stage", "ats_score", "structured_resume",
+                    "final_score_100", "grade_color", "grade_label", "performance_level",
+                    "hiring_recommendation", "role", "interview_mode", "total_questions",
+                    "consent_given", "consent_timestamp", "privacy_policy_version",
+                    "job_description", "organization_id", "cached_hints", "interview_state",
+                    "personality", "knowledge_map", "idempotency_key", "turn_count"
+                ]
                 for row in res.data:
-                    if isinstance(row, dict) and "storage_path" in row and row["storage_path"]:
-                        try:
-                            meta = json.loads(row["storage_path"])
-                            if isinstance(meta, dict):
-                                for field in metadata_fields:
-                                    if field in meta:
-                                        row[field] = meta[field]
-                        except Exception:
-                            pass
+                    if isinstance(row, dict):
+                        if "storage_path" in row and row["storage_path"]:
+                            try:
+                                meta = json.loads(row["storage_path"])
+                                if isinstance(meta, dict):
+                                    for field in metadata_fields:
+                                        if field in meta and (field not in row or row[field] is None):
+                                            row[field] = meta[field]
+                            except Exception:
+                                pass
+                        for list_field in ("questions", "responses", "feedbacks", "scores"):
+                            if list_field in row:
+                                if isinstance(row[list_field], str):
+                                    try:
+                                        row[list_field] = json.loads(row[list_field])
+                                    except Exception:
+                                        row[list_field] = []
+                                elif row[list_field] is None:
+                                    row[list_field] = []
 
             if not _is_production_mode() and self.local_builder is not None:
                 if hasattr(res, "data") and not res.data:
@@ -1291,8 +1320,28 @@ def get_owned_session(session_id):
         return None, (jsonify({"error": "Session not found"}), 404)
     res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
     s = res.data[0] if res and res.data else None
-    if not s or (str(s.get("user_id")) != str(p.get("sub")) and p.get("role") not in ("ADMIN", "SUPER_ADMIN")):
+    if not s:
         return None, (jsonify({"error": "Session not found"}), 404)
+
+    # Claim session if currently unowned or unassigned
+    if not s.get("user_id") or str(s.get("user_id")).strip().lower() in ("none", "", "null"):
+        s["user_id"] = str(p.get("sub"))
+        try:
+            supabase.table("sessions").update({"user_id": str(p.get("sub"))}).eq("session_id", session_id).execute()
+        except Exception as claim_err:
+            print("Session claim notice:", claim_err)
+    elif str(s.get("user_id")) != str(p.get("sub")) and p.get("role") not in ("ADMIN", "SUPER_ADMIN"):
+        return None, (jsonify({"error": "Session not found"}), 404)
+
+    # Ensure list fields are always deserialized lists
+    for field in ("questions", "responses", "feedbacks", "scores"):
+        if isinstance(s.get(field), str):
+            try:
+                s[field] = json.loads(s[field])
+            except Exception:
+                s[field] = []
+        elif not isinstance(s.get(field), list):
+            s[field] = []
 
     # Subscription expiration check on AI-powered sessions
     org_id = p.get("organization_id") or s.get("organization_id")
@@ -1959,7 +2008,14 @@ def upload_resume():
         try:
             supabase.table("sessions").insert(session_data).execute()
         except Exception as db_err:
-            print("Session DB insert notice:", db_err)
+            import logging, traceback
+            logging.error(f"Session DB insert failed: {db_err}\n{traceback.format_exc()}")
+            try:
+                from local_supabase import local_supabase
+                local_supabase.table("sessions").insert(session_data).execute()
+                logging.info(f"Session {session_id} saved to local fallback")
+            except Exception as loc_err:
+                logging.error(f"Local fallback session insert failed: {loc_err}")
 
         return jsonify({
             "message": "Resume uploaded successfully",
