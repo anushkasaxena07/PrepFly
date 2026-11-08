@@ -1,9 +1,23 @@
 import React from 'react';
 
 export default function AnalyticsChart({ type = "line", title, data = {} }) {
-  const labels = data.labels || ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-  const values1 = data.interviews || [45, 60, 75, 82, 88, 91, 94];
-  const values2 = data.coding || [50, 65, 78, 85, 90, 93, 96];
+  let labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
+  let values1 = [45, 60, 75, 82, 88, 91, 94];
+  let values2 = [50, 65, 78, 85, 90, 93, 96];
+  let label1 = null;
+  let label2 = null;
+
+  if (Array.isArray(data) && data.length > 0) {
+    labels = data.map(d => d.month || d.label || d.name || "");
+    values1 = data.map(d => Number(d.interviews ?? d.value1 ?? d.college ?? d.score ?? 0));
+    values2 = data.map(d => Number(d.coding ?? d.value2 ?? d.company ?? 0));
+  } else if (data && typeof data === 'object') {
+    if (Array.isArray(data.labels) && data.labels.length > 0) labels = data.labels;
+    if (Array.isArray(data.interviews) && data.interviews.length > 0) values1 = data.interviews.map(Number);
+    if (Array.isArray(data.coding) && data.coding.length > 0) values2 = data.coding.map(Number);
+    if (data.label1) label1 = data.label1;
+    if (data.label2) label2 = data.label2;
+  }
 
   const calculatedMax = Math.max(...values1, ...values2, 1);
   const maxVal = calculatedMax > 100 ? calculatedMax : 100;
@@ -38,8 +52,8 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>📈 {title || "Monthly Activity Trend"}</h3>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
-            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● AI Mock Practice</span>
-            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● Coding Readiness</span>
+            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● {label1 || "AI Mock Practice"}</span>
+            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● {label2 || "Coding Readiness"}</span>
           </div>
         </div>
 
@@ -84,8 +98,8 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>📊 {title || "Department Average Scores"}</h3>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
-            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● Interview Avg</span>
-            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● Coding Avg</span>
+            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● {label1 || "Interview Avg"}</span>
+            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● {label2 || "Coding Avg"}</span>
           </div>
         </div>
 

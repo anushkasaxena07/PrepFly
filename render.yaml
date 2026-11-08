@@ -42,6 +42,12 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+
+      # Google OAuth Client ID (for backend token verification)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
 
       # Google Gemini Generative AI
       - key: GEMINI_API_KEY
@@ -103,7 +109,7 @@ services:
         fromService:
           type: web
           name: prepfly-backend
-          property: host
+          property: hostURL
       - key: VITE_GOOGLE_CLIENT_ID
         sync: false
       - key: VITE_RAZORPAY_KEY_ID
