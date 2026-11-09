@@ -1376,8 +1376,7 @@ def get_owned_session(session_id):
     q_index = s.get("question_index", 0) or 0
     is_unstarted = (q_index == 0)
 
-    if (not current_owner or current_owner.lower() in ("none", "", "null", "undefined", "candidate", "anonymous", "guest", "unassigned")
-        or (is_unstarted and not valid_callers.intersection({current_owner}))):
+    if not current_owner or current_owner.lower() in ("none", "", "null", "undefined", "candidate", "anonymous", "guest", "unassigned"):
         claim_id = caller_sub or caller_id or caller_uid or "candidate"
         s["user_id"] = claim_id
         try:

@@ -37,14 +37,12 @@ def start_or_resume_conversation():
     return jsonify({"conversation": conv}), 200
 
 
-@mentor_bp.route("/api/mentor/conversations/<conv_id>/messages", methods=["GET"])
-def get_conversation_messages(conv_id):
-    messages = MentorService.get_conversation_messages(conv_id)
-    return jsonify({"messages": messages}), 200
+@mentor_bp.route("/api/mentor/conversations/<conv_id>/messages", methods=["GET", "POST"])
+def handle_conversation_messages(conv_id):
+    if request.method == "GET":
+        messages = MentorService.get_conversation_messages(conv_id)
+        return jsonify({"messages": messages}), 200
 
-
-@mentor_bp.route("/api/mentor/conversations/<conv_id>/messages", methods=["POST"])
-def send_mentor_message(conv_id):
     user_id = _extract_user_id()
     data = request.get_json(silent=True) or {}
     message_text = data.get("message", "").strip()
