@@ -12,6 +12,8 @@ BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BACKEND_DIR)
 
 # Set defaults for test runs if not already in environment
+os.environ["ENVIRONMENT"] = "test"
+os.environ["FLASK_ENV"] = "test"
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32-chars-long-for-testing-only-12345")
 os.environ.setdefault("SUPABASE_URL", "https://test-project.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key-for-unit-testing")

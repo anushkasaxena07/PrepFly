@@ -195,6 +195,12 @@ TECH_TO_CANONICAL_SKILL = {
     "docker": "cloud_devops",
     "kubernetes": "cloud_devops",
     "k8s": "cloud_devops",
+    "operating systems": "cs_os",
+    "operating system": "cs_os",
+    "memory management": "cs_os",
+    "concurrency": "cs_concurrency",
+    "oop": "cs_oop",
+    "object oriented": "cs_oop",
 
     # ── DSA (ONLY mapped when explicitly named) ──
     "dynamic programming": "dsa_dp",

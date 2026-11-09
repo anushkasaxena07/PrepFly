@@ -426,6 +426,69 @@ export const intelligenceAPI = {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
+  },
+
+  // 13. Job-Specific Readiness Assessment & Gap Engine
+  async createJobReadinessAssessment(payload) {
+    const uid = resolveUserId(payload.user_id);
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ...payload, user_id: uid })
+    });
+    return handleResponse(res);
+  },
+
+  async getJobReadinessReport(sessionId) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments/${sessionId}`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getJobAssessmentBlueprint(sessionId) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments/${sessionId}/blueprint`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async submitJobAssessmentAttempt(sessionId, payload) {
+    const uid = resolveUserId(payload.user_id);
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments/${sessionId}/attempts`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ...payload, user_id: uid })
+    });
+    return handleResponse(res);
+  },
+
+  async getJobRecommendations(sessionId) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments/${sessionId}/recommendations`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async transferJobReadinessToPrep(sessionId, payload = {}) {
+    const uid = resolveUserId(payload.user_id);
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/assessments/${sessionId}/transfer-to-prep`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ ...payload, user_id: uid })
+    });
+    return handleResponse(res);
+  },
+
+  async listJobAssessmentSessions() {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/job-prep/sessions`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
   }
 };
 

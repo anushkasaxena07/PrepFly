@@ -45,13 +45,19 @@ class SQLiteSupabaseMock:
             return conn
 
     def _init_db(self):
-        conn = self._get_conn()
-        cursor = conn.cursor()
         try:
+            conn = self._get_conn()
+            cursor = conn.cursor()
             if self.db_path != ":memory:":
                 cursor.execute("PRAGMA journal_mode=WAL")
-        except Exception:
-            pass
+            cursor.execute("SELECT 1")
+        except sqlite3.OperationalError:
+            self.db_path = ":memory:"
+            if not self._anchor_conn:
+                self._anchor_conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
+                self._anchor_conn.row_factory = sqlite3.Row
+            conn = self._get_conn()
+            cursor = conn.cursor()
         conn.commit()
         
         # 1. users
@@ -1127,6 +1133,178 @@ class SQLiteSupabaseMock:
                 overall_readiness REAL NOT NULL,
                 category_scores_json TEXT NOT NULL,
                 sample_counts_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 54. job_assessment_sessions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_assessment_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                job_id TEXT,
+                company TEXT NOT NULL,
+                role TEXT NOT NULL,
+                experience_level TEXT DEFAULT 'Fresher',
+                target_date TEXT,
+                raw_jd_text TEXT,
+                status TEXT DEFAULT 'IN_PROGRESS',
+                overall_readiness REAL,
+                assessment_coverage REAL DEFAULT 0.0,
+                evidence_confidence REAL DEFAULT 0.0,
+                readiness_status TEXT DEFAULT 'READINESS NOT YET ESTABLISHED',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 55. job_requirement_snapshots
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_requirement_snapshots (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                job_id TEXT,
+                canonical_skill_id TEXT NOT NULL,
+                original_source_text TEXT,
+                normalized_description TEXT NOT NULL,
+                requirement_type TEXT NOT NULL,
+                importance REAL DEFAULT 3.0,
+                role_relevance REAL DEFAULT 1.0,
+                evidence_source TEXT DEFAULT 'job_description',
+                extraction_confidence REAL DEFAULT 0.9,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 56. assessment_blueprints
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_blueprints (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                role_tier TEXT DEFAULT 'mid',
+                planned_components_json TEXT NOT NULL,
+                target_skills_json TEXT NOT NULL,
+                weights_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 57. assessment_attempts
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_attempts (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                component_type TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                canonical_skill_id TEXT NOT NULL,
+                candidate_response TEXT,
+                code_submission TEXT,
+                time_taken_seconds INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'COMPLETED',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 58. assessment_evaluations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_evaluations (
+                id TEXT PRIMARY KEY,
+                attempt_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                canonical_skill_id TEXT NOT NULL,
+                correctness_score REAL NOT NULL,
+                depth_score REAL NOT NULL,
+                communication_score REAL NOT NULL,
+                overall_score REAL NOT NULL,
+                rubric_breakdown_json TEXT NOT NULL,
+                feedback TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 59. readiness_snapshots
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS readiness_snapshots (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                overall_readiness REAL,
+                readiness_status TEXT NOT NULL,
+                assessment_coverage REAL NOT NULL,
+                evidence_confidence REAL NOT NULL,
+                mandatory_readiness REAL DEFAULT 0.0,
+                preferred_readiness REAL DEFAULT 0.0,
+                coding_readiness REAL DEFAULT 0.0,
+                interview_readiness REAL DEFAULT 0.0,
+                practical_readiness REAL DEFAULT 0.0,
+                resume_alignment REAL DEFAULT 0.0,
+                project_relevance REAL DEFAULT 0.0,
+                comm_behavioral REAL DEFAULT 0.0,
+                dimension_scores_json TEXT NOT NULL,
+                limitations_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 60. job_recommendations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_recommendations (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                canonical_skill_id TEXT NOT NULL,
+                skill_name TEXT NOT NULL,
+                problem_identified TEXT NOT NULL,
+                supporting_evidence TEXT NOT NULL,
+                target_competency TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                recommended_practice TEXT NOT NULL,
+                relevant_activity TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 61. topic_assignment_progress (Strict Assignment Question Coverage per Topic)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS topic_assignment_progress (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                topic_id TEXT NOT NULL,
+                total_required_questions INTEGER NOT NULL DEFAULT 5,
+                completed_question_ids_json TEXT NOT NULL DEFAULT '[]',
+                completed_count INTEGER NOT NULL DEFAULT 0,
+                coverage_percentage REAL NOT NULL DEFAULT 0.0,
+                is_fully_covered INTEGER NOT NULL DEFAULT 0,
+                average_assignment_score REAL NOT NULL DEFAULT 0.0,
+                last_attempted_at TEXT,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 62. candidate_intelligence_snapshots (Immutable Historical Snapshots)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_intelligence_snapshots (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                target_role TEXT NOT NULL,
+                target_company TEXT,
+                overall_readiness REAL,
+                readiness_status TEXT NOT NULL,
+                assessment_coverage REAL NOT NULL,
+                evidence_confidence TEXT NOT NULL,
+                resume_quality_score REAL NOT NULL,
+                jd_alignment_score REAL NOT NULL,
+                ava_interview_score REAL NOT NULL,
+                coding_score REAL NOT NULL,
+                project_experience_score REAL NOT NULL,
+                communication_score REAL NOT NULL,
+                consistency_score REAL NOT NULL,
+                major_strengths_json TEXT NOT NULL,
+                major_gaps_json TEXT NOT NULL,
+                improvement_deltas_json TEXT NOT NULL,
+                coaching_recommendations_json TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
         """)

@@ -38,3 +38,4 @@ local_db.sqlite
 
 *.db
 git_backups_immutable/
+.agents/

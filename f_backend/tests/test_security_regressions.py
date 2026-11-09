@@ -389,7 +389,7 @@ class TestSecurityRegressions(unittest.TestCase):
         import subprocess
         backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         res = subprocess.run(
-            [sys.executable, "-m", "ruff", "check", ".", "--select", "F821,E9,F811"],
+            [sys.executable, "-m", "ruff", "check", ".", "--no-cache", "--select", "F821,E9,F811"],
             cwd=backend_dir,
             capture_output=True,
             text=True
