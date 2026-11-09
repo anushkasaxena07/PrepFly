@@ -567,6 +567,49 @@ export const intelligenceAPI = {
       body: JSON.stringify(onboardingData)
     });
     return handleResponse(res);
+  },
+
+  // 12. Evidence-Based Readiness Engine & Provenance
+  async getReadinessProvenance() {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/readiness/provenance`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getReadinessSummary() {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/readiness/summary`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getVerifiedWeaknesses() {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/weaknesses/verified`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async probeProject(projectData) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/projects/probe`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(projectData)
+    });
+    return handleResponse(res);
+  },
+
+  async evaluateProjectDefense(defenseData) {
+    const res = await fetch(`${BACKEND_URL}/api/intelligence/projects/evaluate`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(defenseData)
+    });
+    return handleResponse(res);
   }
 };
 

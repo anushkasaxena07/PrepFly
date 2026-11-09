@@ -199,3 +199,4 @@ class ConversationalOnboardingService:
             "categorized_requirements": categorized_jd,
             "diagnostic_assessment": diagnostic_session
         }
+

@@ -216,3 +216,4 @@ export default function MentorChatDrawer({ isOpen, onClose, activeActivity, targ
     </div>
   );
 }
+

@@ -282,13 +282,18 @@ def submit_diagnostic_assessment(assessment_id: str):
         )
 
         # Generate or adapt preparation roadmap following baseline calibration
-        roadmap = RoadmapService.generate_roadmap(user_id=user_id, force_regenerate=True)
+        roadmap = None
+        try:
+            roadmap = RoadmapService.generate_roadmap(user_id=user_id, force_regenerate=True)
+        except Exception as rm_err:
+            import logging
+            logging.warning(f"Roadmap re-generation notice: {rm_err}")
 
         return jsonify({
             "status": "success",
             "evaluation": eval_result,
-            "roadmap_generated": True,
-            "roadmap_id": roadmap.get("roadmap_id")
+            "roadmap_generated": bool(roadmap),
+            "roadmap_id": roadmap.get("roadmap_id") if isinstance(roadmap, dict) else None
         }), 200
     except Exception as e:
         return jsonify({"error": f"Evaluation failed: {str(e)}"}), 500
@@ -599,4 +604,129 @@ def get_cross_feature_weaknesses():
     return jsonify({
         "status": "success",
         "weaknesses": weaknesses
+    }), 200
+
+
+# ============================================================================
+# 8. EVIDENCE-BASED READINESS & PROVENANCE ENGINE
+# ============================================================================
+
+@intelligence_bp.route("/api/intelligence/readiness/provenance", methods=["GET"])
+@intelligence_auth_required
+def get_readiness_provenance():
+    """Returns candidate readiness with mathematical provenance, formula breakdown, and subskill aggregation."""
+    from services.role_readiness_engine import RoleReadinessEngine
+    from services.evidence_scoring_engine import EvidenceScoringEngine
+    from services.evidence_registry_service import EvidenceRegistryService
+
+    user_id = _get_uid()
+    prof = CandidateProfileService.get_profile(user_id) or {}
+    target_role = prof.get("target_role", "Software Development Engineer (General)")
+
+    readiness = RoleReadinessEngine.calculate_readiness(user_id=user_id, target_role=target_role)
+
+    # 4 Competency Pillars aggregated from subskills
+    pillars = {
+        "dsa": EvidenceScoringEngine.evaluate_parent_domain(user_id, "data_structures_algorithms"),
+        "cs": EvidenceScoringEngine.evaluate_parent_domain(user_id, "core_cs"),
+        "system_design": EvidenceScoringEngine.evaluate_parent_domain(user_id, "system_design"),
+        "interview_skills": EvidenceScoringEngine.evaluate_parent_domain(user_id, "interview_skills")
+    }
+
+    # Full evidence provenance records
+    evidence_history = EvidenceRegistryService.get_evidence_for_candidate(user_id=user_id)
+
+    return jsonify({
+        "status": "success",
+        "readiness": readiness,
+        "pillars": pillars,
+        "evidence_history": evidence_history
+    }), 200
+
+
+@intelligence_bp.route("/api/intelligence/readiness/summary", methods=["GET"])
+@intelligence_auth_required
+def get_readiness_summary():
+    """Returns high-level summary of readiness, confidence, coverage, status, and verified weaknesses."""
+    from services.role_readiness_engine import RoleReadinessEngine
+    from services.weakness_detection_engine import WeaknessDetectionEngine
+
+    user_id = _get_uid()
+    prof = CandidateProfileService.get_profile(user_id) or {}
+    target_role = prof.get("target_role", "Software Development Engineer (General)")
+
+    readiness = RoleReadinessEngine.calculate_readiness(user_id=user_id, target_role=target_role)
+    weaknesses = WeaknessDetectionEngine.detect_weaknesses(user_id=user_id, target_role=target_role)
+
+    return jsonify({
+        "status": "success",
+        "readiness": readiness,
+        "verified_weaknesses": weaknesses
+    }), 200
+
+
+@intelligence_bp.route("/api/intelligence/weaknesses/verified", methods=["GET"])
+@intelligence_auth_required
+def get_verified_weaknesses():
+    """Returns strictly verified assessment failures with remedial actions."""
+    from services.weakness_detection_engine import WeaknessDetectionEngine
+
+    user_id = _get_uid()
+    prof = CandidateProfileService.get_profile(user_id) or {}
+    target_role = prof.get("target_role", "Software Development Engineer (General)")
+
+    weaknesses = WeaknessDetectionEngine.detect_weaknesses(user_id=user_id, target_role=target_role)
+    return jsonify({
+        "status": "success",
+        "weaknesses": weaknesses
+    }), 200
+
+
+@intelligence_bp.route("/api/intelligence/projects/probe", methods=["POST"])
+@intelligence_auth_required
+def probe_project():
+    """Generates 3 deep technical architectural probing questions for a project."""
+    from services.project_intelligence_service import ProjectIntelligenceService
+
+    data = request.get_json() or {}
+    title = data.get("title") or data.get("project_title", "Custom Project")
+    technologies = data.get("technologies") or []
+    description = data.get("description", "")
+
+    questions = ProjectIntelligenceService.generate_project_probing_questions(
+        project_title=title,
+        technologies=technologies,
+        description=description
+    )
+
+    return jsonify({
+        "status": "success",
+        "questions": questions
+    }), 200
+
+
+@intelligence_bp.route("/api/intelligence/projects/evaluate", methods=["POST"])
+@intelligence_auth_required
+def evaluate_project_defense():
+    """Evaluates candidate response to a project probing question and records verifiable evidence."""
+    from services.project_intelligence_service import ProjectIntelligenceService
+
+    user_id = _get_uid()
+    data = request.get_json() or {}
+    project_title = data.get("project_title", "Project")
+    skill_id = data.get("skill_id", "sys_ml_system_design")
+    question_text = data.get("question_text", "")
+    response_text = data.get("response", "")
+
+    eval_result = ProjectIntelligenceService.evaluate_project_defense(
+        user_id=user_id,
+        project_title=project_title,
+        skill_id=skill_id,
+        question_text=question_text,
+        candidate_response=response_text
+    )
+
+    return jsonify({
+        "status": "success",
+        "evaluation": eval_result
     }), 200

@@ -126,3 +126,4 @@ def complete_onboarding():
         onboarding_data=data
     )
     return jsonify(result), 200
+

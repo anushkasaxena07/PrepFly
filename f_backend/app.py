@@ -530,6 +530,10 @@ class RealBuilderWrapper:
                     ]
                     
                     def process_dict(data):
+                        # Ensure active is numeric 1 or 0 for Postgres integer columns
+                        if "active" in data:
+                            data["active"] = 1 if data["active"] in (True, 1, "1", "true", "True") else 0
+
                         # Ensure array/object fields are serialized to valid JSON strings for TEXT columns
                         for list_field in ("questions", "responses", "feedbacks", "scores"):
                             if list_field in data and isinstance(data[list_field], (list, dict)):
@@ -1363,12 +1367,17 @@ def get_owned_session(session_id):
     # Claim session if currently unowned or unassigned
     caller_sub = str(p.get("sub") or "").strip()
     caller_id = str(p.get("id") or "").strip()
-    caller_email = str(p.get("email") or "").strip()
+    caller_email = str(p.get("email") or p.get("user_metadata", {}).get("email") or p.get("preferred_username") or "").strip()
     caller_uid = str(p.get("user_id") or "").strip()
     valid_callers = {c for c in (caller_sub, caller_id, caller_email, caller_uid) if c}
     current_owner = str(s.get("user_id") or "").strip()
 
-    if not current_owner or current_owner.lower() in ("none", "", "null", "undefined", "candidate", "anonymous", "guest", "unassigned"):
+    # Determine if session is unstarted (0 questions completed)
+    q_index = s.get("question_index", 0) or 0
+    is_unstarted = (q_index == 0)
+
+    if (not current_owner or current_owner.lower() in ("none", "", "null", "undefined", "candidate", "anonymous", "guest", "unassigned")
+        or (is_unstarted and not valid_callers.intersection({current_owner}))):
         claim_id = caller_sub or caller_id or caller_uid or "candidate"
         s["user_id"] = claim_id
         try:

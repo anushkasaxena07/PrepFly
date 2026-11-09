@@ -1383,6 +1383,68 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 68. canonical_skills (Authoritative Hierarchical Skill Catalog)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS canonical_skills (
+                skill_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                parent_skill_id TEXT,
+                description TEXT,
+                prerequisites TEXT,
+                difficulty TEXT,
+                applicable_roles TEXT,
+                assessment_methods TEXT,
+                evaluation_rubric TEXT,
+                is_leaf INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 69. skill_evidence_registry (Immutable Provenance-Backed Evidence)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_evidence_registry (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                source_id TEXT,
+                raw_score REAL,
+                normalized_score REAL,
+                difficulty TEXT,
+                evidence_quality REAL,
+                validity_status TEXT NOT NULL,
+                evaluator_type TEXT NOT NULL,
+                evaluation_rubric TEXT,
+                provenance_hash TEXT NOT NULL,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 70. candidate_project_analyses (Analyzed Candidate Projects)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_project_analyses (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                project_title TEXT NOT NULL,
+                technologies TEXT,
+                description TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 71. project_technical_questions (Architectural Probing Questions)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project_technical_questions (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                focus_area TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                expected_aspects TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
         # Seed Default Achievements
         cursor.execute("SELECT COUNT(*) FROM achievement_definitions")
         if cursor.fetchone()[0] == 0:
