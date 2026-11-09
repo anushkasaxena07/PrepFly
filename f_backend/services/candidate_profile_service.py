@@ -47,7 +47,10 @@ class CandidateProfileService:
         # Style B: (user_id, data_dict)
         # Style C: (user_id=..., target_role=..., ...)
         if len(args) == 3:
-            supabase_client, user_id, data = args
+            if isinstance(args[0], str) and isinstance(args[1], dict):
+                user_id, data, supabase_client = args
+            else:
+                supabase_client, user_id, data = args
         elif len(args) == 2:
             if isinstance(args[0], str):
                 user_id, data = args
@@ -165,7 +168,10 @@ class CandidateProfileService:
     def get_profile(cls, *args, **kwargs) -> Optional[Dict[str, Any]]:
         """Fetches and parses a candidate profile."""
         if len(args) == 2:
-            supabase_client, user_id = args
+            if isinstance(args[0], str):
+                user_id, supabase_client = args
+            else:
+                supabase_client, user_id = args
         elif len(args) == 1:
             if isinstance(args[0], str):
                 user_id = args[0]

@@ -697,3 +697,4 @@ class AssessmentService:
         }
 
     evaluate_attempt = evaluate_and_submit_answers
+    start_diagnostic_session = start_diagnostic_assessment

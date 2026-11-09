@@ -1309,6 +1309,80 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 63. learning_content (Dedicated 7-Step Learning Workspaces)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS learning_content (
+                id TEXT PRIMARY KEY,
+                skill_id TEXT NOT NULL,
+                activity_id TEXT,
+                title TEXT NOT NULL,
+                step_why TEXT NOT NULL,
+                step_learn_json TEXT NOT NULL,
+                step_practice_json TEXT NOT NULL,
+                step_assignment_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 64. assignment_submissions (Candidate Code and Text Submissions)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assignment_submissions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                assignment_id TEXT NOT NULL,
+                activity_id TEXT,
+                skill_id TEXT NOT NULL,
+                code_submission TEXT,
+                text_submission TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 65. assignment_evaluations (Rubric-Graded Evaluations and Actionable Feedback)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assignment_evaluations (
+                id TEXT PRIMARY KEY,
+                submission_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                overall_score REAL NOT NULL,
+                rubric_scores_json TEXT NOT NULL,
+                correctness INTEGER NOT NULL DEFAULT 1,
+                missing_concepts_json TEXT NOT NULL,
+                technical_mistakes_json TEXT NOT NULL,
+                code_quality_json TEXT NOT NULL,
+                complexity_analysis_json TEXT NOT NULL,
+                improved_answer TEXT NOT NULL,
+                suggested_next_action TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 66. mentor_conversations (Persistent AI Interview Mentor Threads)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mentor_conversations (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                summary TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 67. mentor_messages (Contextual AI Mentor Messages)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mentor_messages (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                context_payload TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
         # Seed Default Achievements
         cursor.execute("SELECT COUNT(*) FROM achievement_definitions")
         if cursor.fetchone()[0] == 0:

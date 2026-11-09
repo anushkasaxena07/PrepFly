@@ -489,6 +489,84 @@ export const intelligenceAPI = {
       headers: getAuthHeaders()
     });
     return handleResponse(res);
+  },
+
+  // ─── AI MENTOR & 7-STEP LEARNING WORKSPACE ─────────────────────────────
+  async startMentorConversation(title) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/conversations`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title })
+    });
+    return handleResponse(res);
+  },
+
+  async getMentorMessages(conversationId) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/conversations/${conversationId}/messages`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async sendMentorMessage(conversationId, message, activeActivity = null) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        message,
+        active_activity: activeActivity
+      })
+    });
+    return handleResponse(res);
+  },
+
+  async getLearningWorkspace(activityId, { skillId, targetRole, targetCompany } = {}) {
+    const params = new URLSearchParams();
+    if (skillId) params.append("skill_id", skillId);
+    if (targetRole) params.append("target_role", targetRole);
+    if (targetCompany) params.append("target_company", targetCompany);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+
+    const res = await fetch(`${BACKEND_URL}/api/mentor/workspace/${activityId}${qs}`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async submitAssignment(activityId, { submissionText, codeSubmission }) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/workspace/${activityId}/submit`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        submission_text: submissionText,
+        code_submission: codeSubmission
+      })
+    });
+    return handleResponse(res);
+  },
+
+  async parseJobDescription(jobDescription, { targetRole, targetCompany } = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/parse-jd`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        job_description: jobDescription,
+        target_role: targetRole,
+        target_company: targetCompany
+      })
+    });
+    return handleResponse(res);
+  },
+
+  async completeOnboarding(onboardingData) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/onboarding/complete`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(onboardingData)
+    });
+    return handleResponse(res);
   }
 };
 

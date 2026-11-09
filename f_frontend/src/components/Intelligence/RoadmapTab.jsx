@@ -3,6 +3,8 @@ import { intelligenceAPI } from "../../services/intelligenceAPI";
 import PreparationOnboarding from "./PreparationOnboarding";
 import DiagnosticAssessmentModal from "./DiagnosticAssessmentModal";
 import RetrievalDrillModal from "./RetrievalDrillModal";
+import LearningWorkspaceModal from "./LearningWorkspaceModal";
+import MentorChatDrawer from "./MentorChatDrawer";
 import "./intelligence.css";
 
 export default function RoadmapTab({ onNavigateTab }) {
@@ -12,10 +14,12 @@ export default function RoadmapTab({ onNavigateTab }) {
   const [dueRevisions, setDueRevisions] = useState([]);
   const [error, setError] = useState("");
 
-  // Modals
+  // Modals & Drawers
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [activeDrillSkill, setActiveDrillSkill] = useState(null);
+  const [activeWorkspaceActivity, setActiveWorkspaceActivity] = useState(null);
+  const [showMentorChat, setShowMentorChat] = useState(false);
 
   // Recalculating state
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -190,6 +194,29 @@ export default function RoadmapTab({ onNavigateTab }) {
         />
       )}
 
+      {/* 7-Step Dedicated Learning Workspace Modal */}
+      {activeWorkspaceActivity && (
+        <LearningWorkspaceModal
+          activity={activeWorkspaceActivity}
+          targetRole={profile?.target_role}
+          targetCompany={profile?.target_company}
+          onClose={() => setActiveWorkspaceActivity(null)}
+          onCompleted={() => {
+            setActiveWorkspaceActivity(null);
+            loadAllData();
+          }}
+        />
+      )}
+
+      {/* Persistent Contextual Mentor Chat Drawer */}
+      <MentorChatDrawer
+        isOpen={showMentorChat}
+        onClose={() => setShowMentorChat(false)}
+        activeActivity={activeWorkspaceActivity}
+        targetRole={profile?.target_role}
+        targetCompany={profile?.target_company}
+      />
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800/80 to-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -216,6 +243,14 @@ export default function RoadmapTab({ onNavigateTab }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowMentorChat(true)}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-purple-600/25 flex items-center gap-1.5"
+            >
+              <span>💬 Ask AI Mentor</span>
+            </button>
+
             <button
               type="button"
               disabled={isRecalculating}
@@ -528,25 +563,34 @@ export default function RoadmapTab({ onNavigateTab }) {
 
                             {/* Actions Right Side */}
                             <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-                              {/* Direct Jump CTAs */}
-                              {act.activity_type === "CODING" && onNavigateTab && (
+                              {/* Direct Jump CTAs & Learning Workspace */}
+                              <div className="flex flex-wrap items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => onNavigateTab("coding")}
-                                  className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline"
+                                  onClick={() => setActiveWorkspaceActivity(act)}
+                                  className="text-xs font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/60 px-2.5 py-1 rounded-lg transition flex items-center gap-1"
                                 >
-                                  Solve in Sandbox &rarr;
+                                  <span>📖 Open 7-Step Workspace &rarr;</span>
                                 </button>
-                              )}
-                              {act.activity_type === "MOCK_INTERVIEW" && onNavigateTab && (
-                                <button
-                                  type="button"
-                                  onClick={() => onNavigateTab("ava")}
-                                  className="text-xs font-semibold text-purple-400 hover:text-purple-300 underline"
-                                >
-                                  Start Ava Interview &rarr;
-                                </button>
-                              )}
+                                {act.activity_type === "CODING" && onNavigateTab && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onNavigateTab("coding")}
+                                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline"
+                                  >
+                                    Solve in Sandbox &rarr;
+                                  </button>
+                                )}
+                                {act.activity_type === "MOCK_INTERVIEW" && onNavigateTab && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onNavigateTab("ava")}
+                                    className="text-xs font-semibold text-purple-400 hover:text-purple-300 underline"
+                                  >
+                                    Start Ava Interview &rarr;
+                                  </button>
+                                )}
+                              </div>
 
                               {/* Action Buttons */}
                               <div className="flex items-center space-x-1.5">

@@ -191,6 +191,9 @@ app.register_blueprint(interview_bp)
 from routes.career_intelligence import career_intelligence_bp
 app.register_blueprint(career_intelligence_bp)
 
+from routes.mentor import mentor_bp
+app.register_blueprint(mentor_bp)
+
 # Production strictly restricts origins to Vercel production domains and optional FRONTEND_URL.
 # Local development ports are only permitted in non-production environments.
 if is_production:
@@ -1320,15 +1323,28 @@ def get_owned_session(session_id):
     p = _get_optional_user()
     if not p:
         return None, (jsonify({"error": "Authentication required"}), 401)
-    if not session_id or not UUID_RE.match(str(session_id)):
+    
+    clean_session_id = str(session_id or "").strip()
+    if "_" in clean_session_id:
+        clean_session_id = clean_session_id.split("_")[0]
+
+    if not clean_session_id or not UUID_RE.match(clean_session_id):
         return None, (jsonify({"error": "Session not found"}), 404)
-    res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+        
+    res = supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
     s = res.data[0] if res and res.data else None
+    if not s and clean_session_id != str(session_id).strip():
+        try:
+            res = supabase.table("sessions").select("*").eq("session_id", str(session_id).strip()).execute()
+            s = res.data[0] if res and res.data else None
+        except Exception:
+            pass
+
     if not s:
         loc_client = getattr(supabase, "_local_client", None) or getattr(supabase, "local_client", None)
         if loc_client:
             try:
-                lres = loc_client.table("sessions").select("*").eq("session_id", session_id).execute()
+                lres = loc_client.table("sessions").select("*").eq("session_id", clean_session_id).execute()
                 if lres and lres.data:
                     s = lres.data[0]
             except Exception:
@@ -1336,7 +1352,7 @@ def get_owned_session(session_id):
         if not s:
             try:
                 from local_supabase import local_supabase
-                lres = local_supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+                lres = local_supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
                 if lres and lres.data:
                     s = lres.data[0]
             except Exception:
@@ -1352,15 +1368,26 @@ def get_owned_session(session_id):
     valid_callers = {c for c in (caller_sub, caller_id, caller_email, caller_uid) if c}
     current_owner = str(s.get("user_id") or "").strip()
 
-    if not current_owner or current_owner.lower() in ("none", "", "null", "undefined"):
+    if not current_owner or current_owner.lower() in ("none", "", "null", "undefined", "candidate", "anonymous", "guest", "unassigned"):
         claim_id = caller_sub or caller_id or caller_uid or "candidate"
         s["user_id"] = claim_id
         try:
-            supabase.table("sessions").update({"user_id": claim_id}).eq("session_id", session_id).execute()
+            supabase.table("sessions").update({"user_id": claim_id}).eq("session_id", clean_session_id).execute()
         except Exception as claim_err:
             print("Session claim notice:", claim_err)
     elif current_owner not in valid_callers and p.get("role") not in ("ADMIN", "SUPER_ADMIN", "Organization Admin", "ORG_ADMIN", "org_admin", "admin"):
-        return None, (jsonify({"error": "Session not found"}), 404)
+        matched = False
+        try:
+            if caller_email:
+                u_res = supabase.table("users").select("id").eq("email", caller_email).execute()
+                if u_res and u_res.data:
+                    db_uids = {str(row.get("id")) for row in u_res.data if row.get("id")}
+                    if current_owner in db_uids:
+                        matched = True
+        except Exception:
+            pass
+        if not matched:
+            return None, (jsonify({"error": "Session not found"}), 404)
 
     # Ensure list fields are always deserialized lists
     for field in ("questions", "responses", "feedbacks", "scores"):

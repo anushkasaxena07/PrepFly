@@ -384,3 +384,57 @@ class SkillProfilingService:
                     except Exception:
                         r[k] = []
         return rows
+
+    @classmethod
+    def get_candidate_proficiencies(cls, user_id: str, supabase_client: Any = None) -> Dict[str, float]:
+        """Returns flat mapping of skill_id -> proficiency (0.0 to 100.0)."""
+        profiles = cls.get_candidate_profile(user_id, supabase_client=supabase_client)
+        return {s_id: float(p.get("proficiency", 0.0)) for s_id, p in profiles.items()}
+
+    @classmethod
+    def get_skill_gaps(cls, user_id: str, target_role: str, supabase_client: Any = None) -> List[Dict[str, Any]]:
+        """Identifies skills where candidate proficiency is below the target role requirement."""
+        from services.skill_taxonomy_service import SkillTaxonomyService
+        role_reqs = SkillTaxonomyService.get_role_requirements(target_role)
+        proficiencies = cls.get_candidate_proficiencies(user_id, supabase_client)
+        gaps = []
+        for req in role_reqs:
+            s_id = req["skill_id"]
+            current_prof = proficiencies.get(s_id, 0.0)
+            target_prof = req.get("target_proficiency", 75.0)
+            if current_prof < target_prof:
+                gap_size = target_prof - current_prof
+                gaps.append({
+                    "skill_id": s_id,
+                    "skill_name": s_id.replace("_", " ").title(),
+                    "current_proficiency": current_prof,
+                    "target_proficiency": target_prof,
+                    "gap_size": gap_size,
+                    "importance_weight": req.get("importance_weight", 1.0)
+                })
+        gaps.sort(key=lambda g: g["gap_size"] * g["importance_weight"], reverse=True)
+        return gaps
+
+    @classmethod
+    def get_recurring_mistakes(cls, user_id: str, supabase_client: Any = None) -> List[str]:
+        """Gathers recurring misconceptions from candidate evidence history."""
+        client = supabase_client or get_supabase_client()
+        try:
+            res = client.table("skill_evidence").select("misconceptions").eq("user_id", user_id).limit(50).execute()
+            if not res or not res.data:
+                return []
+            counts = {}
+            for row in res.data:
+                m_list = row.get("misconceptions") or []
+                if isinstance(m_list, str):
+                    try:
+                        m_list = json.loads(m_list)
+                    except Exception:
+                        m_list = []
+                for m in m_list:
+                    if m and isinstance(m, str):
+                        counts[m] = counts.get(m, 0) + 1
+            sorted_m = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+            return [m for m, _ in sorted_m[:5]]
+        except Exception:
+            return []
