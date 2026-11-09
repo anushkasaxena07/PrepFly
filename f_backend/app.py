@@ -1348,15 +1348,18 @@ def get_owned_session(session_id):
     caller_sub = str(p.get("sub") or "").strip()
     caller_id = str(p.get("id") or "").strip()
     caller_email = str(p.get("email") or "").strip()
+    caller_uid = str(p.get("user_id") or "").strip()
+    valid_callers = {c for c in (caller_sub, caller_id, caller_email, caller_uid) if c}
     current_owner = str(s.get("user_id") or "").strip()
 
-    if not current_owner or current_owner.lower() in ("none", "", "null"):
-        s["user_id"] = caller_sub
+    if not current_owner or current_owner.lower() in ("none", "", "null", "undefined"):
+        claim_id = caller_sub or caller_id or caller_uid or "candidate"
+        s["user_id"] = claim_id
         try:
-            supabase.table("sessions").update({"user_id": caller_sub}).eq("session_id", session_id).execute()
+            supabase.table("sessions").update({"user_id": claim_id}).eq("session_id", session_id).execute()
         except Exception as claim_err:
             print("Session claim notice:", claim_err)
-    elif current_owner not in (caller_sub, caller_id, caller_email) and p.get("role") not in ("ADMIN", "SUPER_ADMIN", "Organization Admin", "ORG_ADMIN", "org_admin", "admin"):
+    elif current_owner not in valid_callers and p.get("role") not in ("ADMIN", "SUPER_ADMIN", "Organization Admin", "ORG_ADMIN", "org_admin", "admin"):
         return None, (jsonify({"error": "Session not found"}), 404)
 
     # Ensure list fields are always deserialized lists

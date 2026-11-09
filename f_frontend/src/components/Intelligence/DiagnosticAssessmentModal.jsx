@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { intelligenceAPI } from "../../services/intelligenceAPI";
 import "./intelligence.css";
 
-export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
+export default function DiagnosticAssessmentModal({ onClose, onCompleted, targetRole, experienceLevel }) {
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -19,7 +19,10 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
     setLoading(true);
     setError("");
     try {
-      const res = await intelligenceAPI.startDiagnosticAssessment();
+      const res = await intelligenceAPI.startDiagnosticAssessment({
+        target_role: targetRole,
+        experience_level: experienceLevel
+      });
       setAssessment(res.assessment);
       // Initialize answer map
       const initialAnswers = {};
@@ -44,6 +47,13 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
     });
   };
 
+  const handleFinish = () => {
+    if (onCompleted) {
+      onCompleted(evaluation);
+    }
+    onClose();
+  };
+
   const handleSubmit = async () => {
     if (!assessment) return;
     setSubmitting(true);
@@ -52,9 +62,6 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
       const assId = assessment.id || assessment.assessment_id;
       const res = await intelligenceAPI.submitAssessment(assId, answers);
       setEvaluation(res.evaluation);
-      if (onCompleted) {
-        onCompleted(res);
-      }
     } catch (err) {
       setError(err.message || "Failed to submit assessment.");
     } finally {
@@ -97,7 +104,7 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={evaluation ? handleFinish : onClose}
             className="text-slate-400 hover:text-white p-1 rounded-lg text-sm"
           >
             ✕
@@ -131,14 +138,23 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
                 Concept Performance Breakdown:
               </h4>
               <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                {(evaluation.results || []).map((r, i) => (
+                {(evaluation.results || evaluation.evaluated_questions || []).map((r, i) => (
                   <div
                     key={i}
                     className="p-3.5 bg-slate-800/60 border border-slate-700/60 rounded-xl space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sm text-white">
-                        {r.skill_id.replace("dsa_", "DSA: ").replace("cs_", "CS: ").replace("sys_", "System: ").replace("soft_", "Skills: ").replace(/_/g, " ").toUpperCase()}
+                        {(r.skill_id || "")
+                          .replace("ml_", "ML: ")
+                          .replace("dl_", "Deep Learning: ")
+                          .replace("genai_", "GenAI: ")
+                          .replace("dsa_", "DSA: ")
+                          .replace("cs_", "CS: ")
+                          .replace("sys_", "System: ")
+                          .replace("soft_", "Skills: ")
+                          .replace(/_/g, " ")
+                          .toUpperCase()}
                       </span>
                       <span
                         className={`text-xs font-bold px-2 py-0.5 rounded ${r.score >= 70
@@ -160,7 +176,7 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted }) {
             <div className="flex justify-end pt-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleFinish}
                 className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-md shadow-cyan-500/20"
               >
                 Go to Preparation Roadmap &rarr;

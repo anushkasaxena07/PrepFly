@@ -199,6 +199,81 @@ class TestPrepFlyIntelligence(unittest.TestCase):
         profiles = SkillProfilingService.get_candidate_profiles(self.user_id)
         self.assertGreater(len(profiles), 0)
 
+    def test_05b_aiml_diagnostic_selection_rotation_and_adaptive_roadmap(self):
+        """Verifies AI/ML diagnostic selects AI questions, rotates across retakes, and calibrates roadmap."""
+        # 1. AI/ML Diagnostic Assessment Generation
+        aiml_ass_1 = AssessmentService.generate_diagnostic_assessment(
+            user_id=self.user_id,
+            target_role="AI/ML Engineer",
+            experience_level="Mid-Level (2-5 years)"
+        )
+        self.assertEqual(len(aiml_ass_1["questions"]), 5)
+        # Verify AI/ML specific skills are present (e.g. ml_model_development, dl_transformers, etc.)
+        q_skills_1 = [q["skill_id"] for q in aiml_ass_1["questions"]]
+        for s in q_skills_1:
+            self.assertTrue(s.startswith("ml_") or s.startswith("dl_") or s.startswith("genai_") or s.startswith("sys_ml_") or s.startswith("math_"), f"Unexpected non-AI skill: {s}")
+
+        # 2. Retake Assessment — Verify adaptive rotation yields different questions
+        aiml_ass_2 = AssessmentService.generate_diagnostic_assessment(
+            user_id=self.user_id,
+            target_role="AI/ML Engineer",
+            experience_level="Mid-Level (2-5 years)"
+        )
+        q_skills_2 = [q["skill_id"] for q in aiml_ass_2["questions"]]
+        # Ensure questions shifted / rotated across attempts
+        self.assertNotEqual(q_skills_1, q_skills_2)
+
+        # 3. Submit Evaluation with Mixed Scores: Low on dl_transformers (30%), High on ml_model_development (90%)
+        answers = {q["id"]: "Comprehensive mathematical derivation with gradient formulation and regularization." for q in aiml_ass_1["questions"]}
+        eval_res = AssessmentService.evaluate_attempt(
+            user_id=self.user_id,
+            assessment_id=aiml_ass_1["id"],
+            answers=answers
+        )
+        self.assertIn("results", eval_res)
+        self.assertIn("overall_score", eval_res)
+
+        # 4. Generate preparation roadmap and verify adaptive activity types
+        # Update candidate profile to AI/ML Engineer with sufficient duration horizon
+        td = (datetime.now(timezone.utc) + timedelta(days=60)).strftime("%Y-%m-%d")
+        CandidateProfileService.create_or_update_profile(
+            user_id=self.user_id,
+            target_role="AI/ML Engineer",
+            target_date=td,
+            daily_minutes=60
+        )
+
+        # Explicitly record a critical gap (20%) and a mastered skill (95%)
+        supabase = get_supabase_client()
+        SkillProfilingService.record_evidence(
+            supabase_client=supabase,
+            user_id=self.user_id,
+            skill_id="ml_model_development",
+            source_type="diagnostic_assessment",
+            score=20.0,
+            notes="Diagnostic gap in bias-variance and loss formulation"
+        )
+        SkillProfilingService.record_evidence(
+            supabase_client=supabase,
+            user_id=self.user_id,
+            skill_id="dl_neural_networks",
+            source_type="diagnostic_assessment",
+            score=95.0,
+            notes="Diagnostic mastery in deep network backprop and skip connections"
+        )
+
+        roadmap = RoadmapService.generate_roadmap(user_id=self.user_id, force_regenerate=True)
+        activities = roadmap.get("activities", [])
+        self.assertGreater(len(activities), 0)
+
+        # The weak skill (ml_model_development) should have Remediation drills with Beginner difficulty
+        ml_acts = [a for a in activities if a.get("skill_id") == "ml_model_development"]
+        self.assertTrue(any("Remediation" in a.get("title", "") or a.get("difficulty") == "Beginner" for a in ml_acts))
+
+        # The mastered skill (dl_neural_networks) should have an Advanced Synthesis challenge
+        dl_acts = [a for a in activities if a.get("skill_id") == "dl_neural_networks"]
+        self.assertTrue(any("Advanced" in a.get("title", "") or a.get("difficulty") == "Advanced" for a in dl_acts))
+
     # ========================================================================
     # 5. PERSONALIZED ROADMAP GENERATION & ADAPTATION TESTS
     # ========================================================================

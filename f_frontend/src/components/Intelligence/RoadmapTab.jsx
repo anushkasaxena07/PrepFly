@@ -165,6 +165,8 @@ export default function RoadmapTab({ onNavigateTab }) {
 
       {showDiagnostic && (
         <DiagnosticAssessmentModal
+          targetRole={profile?.target_role}
+          experienceLevel={profile?.experience_level}
           onClose={() => {
             setShowDiagnostic(false);
             loadAllData();

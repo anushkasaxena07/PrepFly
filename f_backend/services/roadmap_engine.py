@@ -895,8 +895,8 @@ class RecommendationEngine:
                 tier=tier
             )
 
-            # Confidence Handling: low confidence triggers diagnostic probe
-            needs_diagnostic = (ev_count == 0 or confidence < 0.35)
+            # Diagnostic Probe: only unassessed skills with zero evidence require diagnostic calibration
+            needs_diagnostic = (ev_count == 0)
 
             # Build Traceable Rationale
             if is_from_jd:
@@ -909,7 +909,11 @@ class RecommendationEngine:
                     f"Proficiency {round(prof)}% leaves {round(100 - prof)}% room for mastery."
                 )
 
-            if needs_diagnostic:
+            if ev_count > 0 and prof < 50.0:
+                rationale += " [Critical Baseline Gap — Priority Remediation Scheduled in Days 1-3]"
+            elif ev_count > 0 and prof >= 80.0:
+                rationale += " [Mastered Baseline — Advanced Synthesis Challenge Scheduled]"
+            elif needs_diagnostic:
                 rationale += " [Unassessed Baseline - Diagnostic Assessment Recommended]"
 
             recommendations.append({
@@ -1011,11 +1015,11 @@ class SchedulingEngine:
         activity_queue: List[Dict[str, Any]] = []
         dag = SkillTaxonomyService.get_prerequisites_dag()
 
-        # Group recommendations by tier
-        tier1_recs = [r for r in recommendations if r.get("tier") == 1]
-        tier2_recs = [r for r in recommendations if r.get("tier") == 2]
-        tier3_recs = [r for r in recommendations if r.get("tier") == 3]
-        other_recs = [r for r in recommendations if r.get("tier") not in (1, 2, 3)]
+        # Group recommendations by tier and sort within tier by Priority Score descending
+        tier1_recs = sorted([r for r in recommendations if r.get("tier") == 1], key=lambda r: -r.get("priority_score", 0.0))
+        tier2_recs = sorted([r for r in recommendations if r.get("tier") == 2], key=lambda r: -r.get("priority_score", 0.0))
+        tier3_recs = sorted([r for r in recommendations if r.get("tier") == 3], key=lambda r: -r.get("priority_score", 0.0))
+        other_recs = sorted([r for r in recommendations if r.get("tier") not in (1, 2, 3)], key=lambda r: -r.get("priority_score", 0.0))
 
         # Collect foundation prerequisites needed by Tier 1 & 2 skills
         needed_prereqs = set()
@@ -1044,7 +1048,7 @@ class SchedulingEngine:
                 ordered_recs.append(r)
                 seen_sids.add(r["skill_id"])
 
-        # Step D: Remaining Tier 3 Role Foundations
+        # Step D: Remaining Tier 3 Role Foundations (Weakest skills first for early remediation)
         for r in tier3_recs:
             if r["skill_id"] not in seen_sids:
                 ordered_recs.append(r)
@@ -1056,16 +1060,18 @@ class SchedulingEngine:
                 ordered_recs.append(r)
                 seen_sids.add(r["skill_id"])
 
-        # Generate activities for each recommended skill
+        # Generate activities for each recommended skill calibrated to candidate diagnostic proficiency
         for rec in ordered_recs:
             sid = rec["skill_id"]
             prio = rec["priority_score"]
             reason = rec.get("rationale", "")
             req_id = rec.get("originating_requirement_id")
             jd_ev = rec.get("jd_evidence")
+            prof = float(rec.get("proficiency", 0.0))
+            ev_count = int(rec.get("evidence_count", 0))
 
             # If skill needs diagnostic assessment and has not been completed yet, queue assessment drill first
-            if rec.get("needs_diagnostic") and sid not in completed_skills:
+            if rec.get("needs_diagnostic") and prof < 80.0 and sid not in completed_skills:
                 activity_queue.append({
                     "skill_id": sid,
                     "skill_name": rec["name"],
@@ -1087,36 +1093,73 @@ class SchedulingEngine:
             curated_pool = CURATED_CONTENT_CATALOG.get(sid)
             if curated_pool:
                 for item in curated_pool:
+                    item_diff = item.get("difficulty", "Intermediate")
+                    item_title = item["title"]
+                    item_type = item["activity_type"]
+                    # Calibrate curated activity dynamically to candidate diagnostic performance
+                    if ev_count > 0 and prof < 50.0:
+                        item_diff = "Beginner"
+                        item_title = f"Remediation: {item['title']}"
+                    elif prof >= 80.0:
+                        item_diff = "Advanced"
+                        item_title = f"Advanced: {item['title']}"
+
                     activity_queue.append({
                         "skill_id": sid,
                         "skill_name": rec["name"],
                         "category": rec["category"],
-                        "title": item["title"],
+                        "title": item_title,
                         "description": item.get("learning_objective", ""),
-                        "activity_type": item["activity_type"],
-                        "difficulty": item.get("difficulty", "Intermediate"),
+                        "activity_type": item_type,
+                        "difficulty": item_diff,
                         "estimated_minutes": min(item.get("estimated_minutes", 30), daily_capacity_minutes),
                         "learning_objective": item["learning_objective"],
                         "completion_criteria": item["completion_criteria"],
-                        "priority": prio,
+                        "priority": (prio + 15.0) if (ev_count > 0 and prof < 50.0) else prio,
                         "recommendation_reason": reason,
                         "originating_requirement_id": req_id,
                         "jd_evidence": jd_ev,
                         "resource_payload": item.get("resource_payload", {})
                     })
             else:
+                # Dynamically calibrate title, difficulty, and type based on diagnostic score
+                if ev_count > 0 and prof < 50.0:
+                    act_title = f"Remediation & Core Foundations: {rec['name']}"
+                    act_desc = f"Targeted remediation drill addressing baseline gaps identified in diagnostic assessment for {rec['name']}."
+                    act_obj = f"Close foundational knowledge gaps in {rec['name']} identified during diagnostic assessment."
+                    act_crit = "Pass guided remediation exercises and review core conceptual invariants."
+                    act_diff = "Beginner"
+                    act_type = "CODING_CHALLENGE"
+                    act_prio = prio + 15.0  # Elevate priority so it lands in Days 1-3
+                elif prof >= 80.0:
+                    act_title = f"Advanced Production Synthesis: {rec['name']}"
+                    act_desc = f"High-complexity production optimization and architectural stress synthesis in {rec['name']}."
+                    act_obj = f"Solve non-trivial production failure modes, performance bottlenecks, and scale limits in {rec['name']}."
+                    act_crit = "Pass high-throughput stress tests and explain architectural trade-offs."
+                    act_diff = "Advanced"
+                    act_type = "SYSTEM_DESIGN" if rec.get("category") in ("System Design", "Machine Learning & AI") else "CODING_CHALLENGE"
+                    act_prio = max(5.0, prio - 10.0)  # Schedule in synthesis days
+                else:
+                    act_title = f"Applied Mastery Drill: {rec['name']}"
+                    act_desc = f"Master core patterns, invariants, and edge cases in {rec['name']}."
+                    act_obj = f"Solidify fundamental invariants in {rec['name']}."
+                    act_crit = "Pass all tests and explain complexity bounds."
+                    act_diff = "Intermediate"
+                    act_type = "CODING_CHALLENGE"
+                    act_prio = prio
+
                 activity_queue.append({
                     "skill_id": sid,
                     "skill_name": rec["name"],
                     "category": rec["category"],
-                    "title": f"Core Mastery Drill: {rec['name']}",
-                    "description": f"Master core patterns, invariants, and edge cases in {rec['name']}.",
-                    "activity_type": "CODING_CHALLENGE",
-                    "difficulty": "Intermediate",
+                    "title": act_title,
+                    "description": act_desc,
+                    "activity_type": act_type,
+                    "difficulty": act_diff,
                     "estimated_minutes": min(30, daily_capacity_minutes),
-                    "learning_objective": f"Solidify fundamental invariants in {rec['name']}.",
-                    "completion_criteria": "Pass all tests and explain complexity bounds.",
-                    "priority": prio,
+                    "learning_objective": act_obj,
+                    "completion_criteria": act_crit,
+                    "priority": act_prio,
                     "recommendation_reason": reason,
                     "originating_requirement_id": req_id,
                     "jd_evidence": jd_ev,
