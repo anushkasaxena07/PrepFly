@@ -597,7 +597,8 @@ class RealBuilderWrapper:
                                 elif row[list_field] is None:
                                     row[list_field] = []
 
-            if not _is_production_mode() and self.local_builder is not None:
+            allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (self.local_builder is not None)
+            if (not _is_production_mode() or allow_fallback) and self.local_builder is not None:
                 if hasattr(res, "data") and not res.data:
                     try:
                         loc_res = self.local_builder.execute()
@@ -647,7 +648,7 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 # ─── Upload Folder ─────────────────────────────────────────────────────────────
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
@@ -1320,13 +1321,23 @@ def get_owned_session(session_id):
         return None, (jsonify({"error": "Session not found"}), 404)
     res = supabase.table("sessions").select("*").eq("session_id", session_id).execute()
     s = res.data[0] if res and res.data else None
-    if not s and hasattr(supabase, "local_client") and supabase.local_client:
-        try:
-            lres = supabase.local_client.table("sessions").select("*").eq("session_id", session_id).execute()
-            if lres and lres.data:
-                s = lres.data[0]
-        except Exception:
-            pass
+    if not s:
+        loc_client = getattr(supabase, "_local_client", None) or getattr(supabase, "local_client", None)
+        if loc_client:
+            try:
+                lres = loc_client.table("sessions").select("*").eq("session_id", session_id).execute()
+                if lres and lres.data:
+                    s = lres.data[0]
+            except Exception:
+                pass
+        if not s:
+            try:
+                from local_supabase import local_supabase
+                lres = local_supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+                if lres and lres.data:
+                    s = lres.data[0]
+            except Exception:
+                pass
     if not s:
         return None, (jsonify({"error": "Session not found"}), 404)
 
@@ -2120,8 +2131,14 @@ def create_session_no_resume():
         supabase.table("sessions").insert(session_data).execute()
         return jsonify({"message": "Session created without resume", "session_id": session_id}), 200
     except Exception as e:
-        print(f"Create session no resume error: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"Create session no resume Supabase error: {e}")
+        try:
+            from local_supabase import local_supabase
+            local_supabase.table("sessions").insert(session_data).execute()
+            return jsonify({"message": "Session created without resume", "session_id": session_id}), 200
+        except Exception as loc_err:
+            print(f"Create session local fallback error: {loc_err}")
+            return jsonify({"error": str(e)}), 500
 
 
 def get_candidate_name_for_session(session):
@@ -2333,10 +2350,13 @@ def next_question():
 
         # Determine interview session question limit (default 10 for full 15-min interview, or 5 if bounded by session)
         total_q_raw = session.get("total_questions")
-        try:
-            total_q_bound = int(total_q_raw) if total_q_raw is not None else (len(questions) if (questions and len(questions) == 5) else 10)
-        except (ValueError, TypeError):
-            total_q_bound = len(questions) if (questions and len(questions) == 5) else 10
+        if questions and len(questions) == 5 and (total_q_raw in (None, 5, 10)) and len(responses) >= 4:
+            total_q_bound = 5
+        else:
+            try:
+                total_q_bound = int(total_q_raw) if total_q_raw is not None else 10
+            except (ValueError, TypeError):
+                total_q_bound = 10
 
         # Enforce maximum questions reached
         if len(responses) >= total_q_bound:
@@ -9965,7 +9985,11 @@ def support_file_upload():
     filename = secure_filename(file.filename)
     unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
     save_path = os.path.join(SUPPORT_UPLOAD_FOLDER, unique_filename)
-    file.save(save_path)
+    try:
+        file.save(save_path)
+    except (PermissionError, OSError) as e:
+        import logging
+        logging.warning(f"Could not persist support upload to {save_path}: {e}")
 
     file_url = f"/uploads/support/{unique_filename}"
     return jsonify({"url": file_url, "filename": filename}), 201
@@ -10384,7 +10408,11 @@ def feedback_screenshot_upload():
     filename = secure_filename(file.filename)
     unique_filename = f"{uuid.uuid4().hex[:8]}_{filename}"
     save_path = os.path.join(FEEDBACK_UPLOAD_FOLDER, unique_filename)
-    file.save(save_path)
+    try:
+        file.save(save_path)
+    except (PermissionError, OSError) as e:
+        import logging
+        logging.warning(f"Could not persist feedback upload to {save_path}: {e}")
 
     file_url = f"/uploads/feedback/{unique_filename}"
     return jsonify({"url": file_url, "filename": filename}), 201

@@ -697,3 +697,4 @@ class CompanyIntelligenceService:
         if any(w in l for w in ("senior", "5+", "lead", "staff", "principal", "l5", "l6", "sde-3")):
             return "senior"
         return "mid"
+
