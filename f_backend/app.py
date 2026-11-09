@@ -562,21 +562,19 @@ class RealBuilderWrapper:
         return orig_attr
         
     def execute(self):
-        try:
-            res = self.real_builder.execute()
-            
-            # Intercept sessions table read queries to restore custom metadata fields
-            if self.table_name == "sessions" and hasattr(res, "data") and res.data:
+        metadata_fields = [
+            "category", "difficulty", "stage", "ats_score", "structured_resume",
+            "final_score_100", "grade_color", "grade_label", "performance_level",
+            "hiring_recommendation", "role", "interview_mode", "total_questions",
+            "consent_given", "consent_timestamp", "privacy_policy_version",
+            "job_description", "organization_id", "cached_hints", "interview_state",
+            "personality", "knowledge_map", "idempotency_key", "turn_count"
+        ]
+
+        def _restore_meta(target_res):
+            if self.table_name == "sessions" and hasattr(target_res, "data") and target_res.data:
                 import json
-                metadata_fields = [
-                    "category", "difficulty", "stage", "ats_score", "structured_resume",
-                    "final_score_100", "grade_color", "grade_label", "performance_level",
-                    "hiring_recommendation", "role", "interview_mode", "total_questions",
-                    "consent_given", "consent_timestamp", "privacy_policy_version",
-                    "job_description", "organization_id", "cached_hints", "interview_state",
-                    "personality", "knowledge_map", "idempotency_key", "turn_count"
-                ]
-                for row in res.data:
+                for row in target_res.data:
                     if isinstance(row, dict):
                         if "storage_path" in row and row["storage_path"]:
                             try:
@@ -596,6 +594,11 @@ class RealBuilderWrapper:
                                         row[list_field] = []
                                 elif row[list_field] is None:
                                     row[list_field] = []
+            return target_res
+
+        try:
+            res = self.real_builder.execute()
+            _restore_meta(res)
 
             allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (self.local_builder is not None)
             if (not _is_production_mode() or allow_fallback) and self.local_builder is not None:
@@ -603,7 +606,7 @@ class RealBuilderWrapper:
                     try:
                         loc_res = self.local_builder.execute()
                         if hasattr(loc_res, "data") and loc_res.data:
-                            return loc_res
+                            return _restore_meta(loc_res)
                     except Exception:
                         pass
                 try:
@@ -632,7 +635,7 @@ class RealBuilderWrapper:
                 print(f"[NOTICE] Supabase execute fallback for '{self.table_name}': {e}")
             try:
                 if self.local_builder is not None:
-                    return self.local_builder.execute()
+                    return _restore_meta(self.local_builder.execute())
                 raise e
             except Exception:
                 raise e
@@ -1353,7 +1356,7 @@ def get_owned_session(session_id):
             supabase.table("sessions").update({"user_id": caller_sub}).eq("session_id", session_id).execute()
         except Exception as claim_err:
             print("Session claim notice:", claim_err)
-    elif current_owner not in (caller_sub, caller_id, caller_email) and p.get("role") not in ("ADMIN", "SUPER_ADMIN"):
+    elif current_owner not in (caller_sub, caller_id, caller_email) and p.get("role") not in ("ADMIN", "SUPER_ADMIN", "Organization Admin", "ORG_ADMIN", "org_admin", "admin"):
         return None, (jsonify({"error": "Session not found"}), 404)
 
     # Ensure list fields are always deserialized lists

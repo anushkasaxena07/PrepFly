@@ -1972,3 +1972,5 @@ def get_supabase_client():
     if _default_mock_client is None:
         _default_mock_client = SQLiteSupabaseMock()
     return _default_mock_client
+
+local_supabase = get_supabase_client()
