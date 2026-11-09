@@ -178,3 +178,4 @@ class RoleReadinessEngine:
             "unassessed_mandatory_skills": unassessed_mandatory,
             "skills_matrix": evaluated_skills
         }
+

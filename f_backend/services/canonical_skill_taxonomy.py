@@ -389,3 +389,4 @@ class CanonicalSkillTaxonomy:
     @classmethod
     def get_all_domains(cls) -> Dict[str, Dict[str, Any]]:
         return PARENT_DOMAINS
+

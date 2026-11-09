@@ -179,3 +179,4 @@ class EvidenceRegistryService:
                     except Exception:
                         r[field] = {}
         return rows
+

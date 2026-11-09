@@ -53,3 +53,4 @@ CREATE TABLE IF NOT EXISTS project_technical_questions (
     expected_aspects JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+

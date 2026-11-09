@@ -846,7 +846,9 @@ ROLE_REQUIREMENTS: Dict[str, Dict[str, float]] = {
 def normalize_role_id(role_name: str) -> str:
     """Maps human role names to normalized catalog keys."""
     r = (role_name or "").lower().strip()
-    if "devops" in r or "sre" in r or "site reliability" in r or "infrastructure" in r:
+    if any(k in r for k in ("ai", "ml", "aiml", "artificial intelligence", "machine learning", "deep learning", "nlp", "computer vision", "llm")):
+        return "ai_ml_engineer"
+    elif "devops" in r or "sre" in r or "site reliability" in r or "infrastructure" in r:
         return "devops_engineer"
     elif "data sci" in r:
         return "data_scientist"
@@ -858,8 +860,6 @@ def normalize_role_id(role_name: str) -> str:
         return "backend_developer"
     elif "full" in r or "stack" in r:
         return "full_stack_developer"
-    elif "ai" in r or "ml" in r or "machine learning" in r or "deep learning" in r or "nlp" in r:
-        return "ai_ml_engineer"
     elif "analyst" in r or "analytics" in r or "bi" in r:
         return "data_analyst"
     # Default to SDE

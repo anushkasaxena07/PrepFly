@@ -99,3 +99,4 @@ class WeaknessDetectionEngine:
         # Sort by severity (VERIFIED_GAP first) and lowest proficiency
         detected_weaknesses.sort(key=lambda w: (0 if w["severity"] == "VERIFIED_GAP" else 1, w["proficiency"]))
         return detected_weaknesses
+

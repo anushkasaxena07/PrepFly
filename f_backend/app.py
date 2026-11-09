@@ -521,7 +521,7 @@ class RealBuilderWrapper:
                 if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
                     import json
                     metadata_fields = [
-                        "category", "difficulty", "stage", "ats_score", "structured_resume",
+                        "active", "category", "difficulty", "stage", "ats_score", "structured_resume",
                         "final_score_100", "grade_color", "grade_label", "performance_level",
                         "hiring_recommendation", "role", "interview_mode", "total_questions",
                         "consent_given", "consent_timestamp", "privacy_policy_version",
@@ -530,10 +530,6 @@ class RealBuilderWrapper:
                     ]
                     
                     def process_dict(data):
-                        # Ensure active is numeric 1 or 0 for Postgres integer columns
-                        if "active" in data:
-                            data["active"] = 1 if data["active"] in (True, 1, "1", "true", "True") else 0
-
                         # Ensure array/object fields are serialized to valid JSON strings for TEXT columns
                         for list_field in ("questions", "responses", "feedbacks", "scores"):
                             if list_field in data and isinstance(data[list_field], (list, dict)):
@@ -570,7 +566,7 @@ class RealBuilderWrapper:
         
     def execute(self):
         metadata_fields = [
-            "category", "difficulty", "stage", "ats_score", "structured_resume",
+            "active", "category", "difficulty", "stage", "ats_score", "structured_resume",
             "final_score_100", "grade_color", "grade_label", "performance_level",
             "hiring_recommendation", "role", "interview_mode", "total_questions",
             "consent_given", "consent_timestamp", "privacy_policy_version",
@@ -590,8 +586,12 @@ class RealBuilderWrapper:
                                     for field in metadata_fields:
                                         if field in meta and (field not in row or row[field] is None):
                                             row[field] = meta[field]
+                                    if "active" in meta:
+                                        row["active"] = bool(meta["active"])
                             except Exception:
                                 pass
+                        if "active" not in row or row["active"] is None:
+                            row["active"] = True
                         for list_field in ("questions", "responses", "feedbacks", "scores"):
                             if list_field in row:
                                 if isinstance(row[list_field], str):

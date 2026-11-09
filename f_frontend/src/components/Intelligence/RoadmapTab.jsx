@@ -17,6 +17,8 @@ export default function RoadmapTab({ onNavigateTab }) {
   // Modals & Drawers
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDiagnostic, setShowDiagnostic] = useState(false);
+  const [activeDiagnosticRole, setActiveDiagnosticRole] = useState(null);
+  const [activeDiagnosticExp, setActiveDiagnosticExp] = useState(null);
   const [activeDrillSkill, setActiveDrillSkill] = useState(null);
   const [activeWorkspaceActivity, setActiveWorkspaceActivity] = useState(null);
   const [showMentorChat, setShowMentorChat] = useState(false);
@@ -160,6 +162,8 @@ export default function RoadmapTab({ onNavigateTab }) {
         <PreparationOnboarding
           onCompleted={(newProf) => {
             setProfile(newProf);
+            setActiveDiagnosticRole(newProf?.target_role || "AI/ML Engineer");
+            setActiveDiagnosticExp(newProf?.experience_level || "Fresher");
             setShowOnboarding(false);
             setShowDiagnostic(true);
           }}
@@ -169,8 +173,8 @@ export default function RoadmapTab({ onNavigateTab }) {
 
       {showDiagnostic && (
         <DiagnosticAssessmentModal
-          targetRole={profile?.target_role}
-          experienceLevel={profile?.experience_level}
+          targetRole={activeDiagnosticRole || profile?.target_role || "AI/ML Engineer"}
+          experienceLevel={activeDiagnosticExp || profile?.experience_level || "Fresher"}
           onClose={() => {
             setShowDiagnostic(false);
             loadAllData();

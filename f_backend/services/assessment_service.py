@@ -362,12 +362,18 @@ FRONTEND_DIAGNOSTIC_BANK = [
 # Role-to-Diagnostic-Bank Mapping
 ROLE_DIAGNOSTIC_MAP = {
     "ai_ml_engineer": AIML_DIAGNOSTIC_BANK,
+    "machine_learning_engineer": AIML_DIAGNOSTIC_BANK,
+    "ai_engineer": AIML_DIAGNOSTIC_BANK,
+    "ml_engineer": AIML_DIAGNOSTIC_BANK,
+    "deep_learning_engineer": AIML_DIAGNOSTIC_BANK,
+    "nlp_engineer": AIML_DIAGNOSTIC_BANK,
     "data_scientist": AIML_DIAGNOSTIC_BANK,
     "data_engineer": DATA_ENGINEER_DIAGNOSTIC_BANK,
     "frontend_developer": FRONTEND_DIAGNOSTIC_BANK,
     "frontend_engineer": FRONTEND_DIAGNOSTIC_BANK,
     "backend_developer": DIAGNOSTIC_BANK,
     "backend_engineer": DIAGNOSTIC_BANK,
+    "full_stack_developer": DIAGNOSTIC_BANK,
     "software_development_engineer": DIAGNOSTIC_BANK,
 }
 
@@ -655,6 +661,22 @@ class AssessmentService:
                 notes=f"Diagnostic assessment answer evaluation: {classification}",
                 rubric_version="v1"
             )
+
+            try:
+                from services.evidence_registry_service import EvidenceRegistryService, SOURCE_DIAGNOSTIC_ASSESSMENT
+                EvidenceRegistryService.record_evidence(
+                    user_id=user_id,
+                    skill_id=skill_id,
+                    source_type=SOURCE_DIAGNOSTIC_ASSESSMENT,
+                    raw_score=final_score,
+                    difficulty=q_data.get("difficulty", "Intermediate"),
+                    source_id=assessment_id,
+                    submission_content=answer,
+                    evaluation_rubric=rubric,
+                    supabase_client=supabase_client
+                )
+            except Exception:
+                pass
 
             total_score += final_score
             evaluated_count += 1

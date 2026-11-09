@@ -21,8 +21,11 @@ class SQLiteSupabaseMock:
             self._anchor_conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
             self._anchor_conn.row_factory = sqlite3.Row
         else:
-            dir_path = os.path.dirname(os.path.abspath(__file__))
-            self.db_path = os.path.join(dir_path, db_path) if not os.path.isabs(db_path) else db_path
+            if (os.getenv("RENDER") or (os.path.isdir("/tmp") and os.name != "nt")) and db_path == "local_db.sqlite":
+                self.db_path = "/tmp/prepfly_local.sqlite"
+            else:
+                dir_path = os.path.dirname(os.path.abspath(__file__))
+                self.db_path = os.path.join(dir_path, db_path) if not os.path.isabs(db_path) else db_path
             self._anchor_conn = None
         self.storage = MockStorage()
         self._init_db()

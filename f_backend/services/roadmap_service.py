@@ -107,7 +107,7 @@ class RoadmapService:
         if not user_id:
             return None
 
-        rm_res = supabase_client.table("roadmaps").select("*").eq("user_id", user_id).execute()
+        rm_res = supabase_client.table("roadmaps").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
         if not rm_res or not rm_res.data:
             return None
 

@@ -19,9 +19,20 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted, target
     setLoading(true);
     setError("");
     try {
+      let resolvedRole = targetRole;
+      let resolvedExp = experienceLevel;
+      if (!resolvedRole) {
+        try {
+          const profRes = await intelligenceAPI.getProfile();
+          if (profRes && profRes.profile) {
+            resolvedRole = profRes.profile.target_role;
+            resolvedExp = profRes.profile.experience_level;
+          }
+        } catch (_) {}
+      }
       const res = await intelligenceAPI.startDiagnosticAssessment({
-        target_role: targetRole,
-        experience_level: experienceLevel
+        target_role: resolvedRole || "AI/ML Engineer",
+        experience_level: resolvedExp || "Fresher"
       });
       setAssessment(res.assessment);
       // Initialize answer map
@@ -61,7 +72,8 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted, target
     try {
       const assId = assessment.id || assessment.assessment_id;
       const res = await intelligenceAPI.submitAssessment(assId, answers);
-      setEvaluation(res.evaluation);
+      const evalData = res?.evaluation || res?.data || res;
+      setEvaluation(evalData);
     } catch (err) {
       setError(err.message || "Failed to submit assessment.");
     } finally {
@@ -244,7 +256,7 @@ export default function DiagnosticAssessmentModal({ onClose, onCompleted, target
               {isLast ? (
                 <button
                   type="button"
-                  disabled={submitting || !currentAnswer.trim()}
+                  disabled={submitting}
                   onClick={handleSubmit}
                   className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-slate-950 font-bold px-6 py-2.5 rounded-lg text-sm transition-all shadow-md shadow-cyan-500/20"
                 >
