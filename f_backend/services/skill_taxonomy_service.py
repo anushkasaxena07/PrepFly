@@ -1029,6 +1029,81 @@ class SkillTaxonomyService:
         ]
 
     @staticmethod
+    def get_transitive_prerequisites(skill_id: str) -> List[str]:
+        """Returns all transitive ancestors of a skill in topological order."""
+        visited = set()
+        order = []
+
+        def dfs(curr: str):
+            for p in SkillTaxonomyService.get_prerequisites(curr):
+                if p not in visited:
+                    visited.add(p)
+                    dfs(p)
+                    order.append(p)
+
+        dfs(skill_id)
+        return order
+
+    @staticmethod
+    def detect_cycles() -> List[str]:
+        """
+        Validates that the prerequisite graph is a valid DAG.
+        Returns a list of skill IDs involved in a cycle, or empty list if valid.
+        """
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {s_id: WHITE for s_id in SKILL_CATALOG}
+        cycle_nodes = []
+
+        def dfs(u: str) -> bool:
+            color[u] = GRAY
+            for v in SkillTaxonomyService.get_prerequisites(u):
+                if color.get(v) == GRAY:
+                    cycle_nodes.append(u)
+                    cycle_nodes.append(v)
+                    return True
+                if color.get(v) == WHITE and dfs(v):
+                    cycle_nodes.append(u)
+                    return True
+            color[u] = BLACK
+            return False
+
+        for node in SKILL_CATALOG:
+            if color[node] == WHITE:
+                if dfs(node):
+                    return list(dict.fromkeys(cycle_nodes))
+        return []
+
+    @staticmethod
+    def seed_skill_catalogue(supabase_client=None) -> int:
+        """
+        Populates the persistent skill_catalogue table with all canonical skills.
+        Returns the count of seeded skills.
+        """
+        from local_supabase import get_supabase_client
+        client = supabase_client or get_supabase_client()
+        seeded = 0
+        from datetime import datetime, timezone
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        for s_id, s in SKILL_CATALOG.items():
+            record = {
+                "id": s_id,
+                "canonical_name": s.get("name", s_id),
+                "domain": s.get("category", "General"),
+                "category": s.get("category", "General"),
+                "difficulty_floor": s.get("difficulty", "Beginner"),
+                "difficulty_ceiling": "Advanced" if s.get("difficulty") == "Advanced" else "Intermediate",
+                "prerequisites": json.dumps(s.get("prerequisites", [])) if not hasattr(client, "_is_postgres") else s.get("prerequisites", []),
+                "created_at": now_iso
+            }
+            try:
+                client.table("skill_catalogue").insert(record).execute()
+                seeded += 1
+            except Exception:
+                pass
+        return seeded
+
+    @staticmethod
     def get_role_requirements(role_name: str) -> List[Dict[str, Any]]:
         weights = SkillTaxonomyService.get_role_weights(role_name)
         reqs = []

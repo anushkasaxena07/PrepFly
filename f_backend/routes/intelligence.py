@@ -19,6 +19,8 @@ from services.roadmap_adaptation_service import RoadmapAdaptationService
 from services.revision_scheduler import RevisionScheduler
 from services.progress_analytics_service import ProgressAnalyticsService
 from services.cross_feature_engine import CrossFeatureEngine
+from services.career_goal_service import CareerGoalService
+from services.adaptive_assessment_engine import AdaptiveAssessmentEngine
 
 intelligence_bp = Blueprint("intelligence_bp", __name__)
 
@@ -297,6 +299,163 @@ def submit_diagnostic_assessment(assessment_id: str):
         }), 200
     except Exception as e:
         return jsonify({"error": f"Evaluation failed: {str(e)}"}), 500
+
+
+# ============================================================================
+# 3B. ADAPTIVE DIAGNOSTIC ASSESSMENT & CAREER GOALS
+# ============================================================================
+
+@intelligence_bp.route("/api/career-goals", methods=["GET", "POST"])
+@intelligence_auth_required
+def career_goals_endpoint():
+    """Handles career goals retrieval and creation."""
+    user_id = _get_uid()
+    if request.method == "POST":
+        data = request.get_json() or {}
+        target_role = data.get("target_role")
+        custom_role = data.get("custom_role")
+        target_company = data.get("target_company")
+        job_description = data.get("job_description")
+        experience_level = data.get("experience_level", "Fresher")
+
+        if not target_role and not custom_role:
+            return jsonify({"error": "Either target_role or custom_role must be provided"}), 400
+
+        try:
+            goal = CareerGoalService.create_career_goal(
+                user_id=user_id,
+                target_role=target_role,
+                custom_role=custom_role,
+                target_company=target_company,
+                job_description=job_description,
+                experience_level=experience_level
+            )
+            return jsonify({
+                "status": "success",
+                "career_goal": goal
+            }), 201
+        except Exception as e:
+            return jsonify({"error": f"Failed to create career goal: {str(e)}"}), 500
+
+    goals = CareerGoalService.get_career_goals_for_user(user_id)
+    return jsonify({
+        "status": "success",
+        "career_goals": goals,
+        "supported_roles": CareerGoalService.list_supported_roles()
+    }), 200
+
+
+@intelligence_bp.route("/api/career-goals/supported-roles", methods=["GET"])
+def get_supported_roles():
+    """Returns canonical catalog of supported roles."""
+    return jsonify({
+        "status": "success",
+        "supported_roles": CareerGoalService.list_supported_roles()
+    }), 200
+
+
+@intelligence_bp.route("/api/assessment/adaptive/start", methods=["POST"])
+@intelligence_auth_required
+def start_adaptive_assessment():
+    """Initializes a turn-by-turn Computerized Adaptive Diagnostic Assessment."""
+    user_id = _get_uid()
+    data = request.get_json() or {}
+
+    role = data.get("target_role")
+    career_goal_id = data.get("career_goal_id")
+    jd = data.get("job_description")
+    company = data.get("company")
+    exp = data.get("experience_level")
+    budget = int(data.get("question_budget", 10))
+
+    if not role:
+        prof = CandidateProfileService.get_profile(user_id) or {}
+        role = prof.get("target_role", "Software Development Engineer (General)")
+        exp = exp or prof.get("experience_level", "Fresher")
+
+    try:
+        session = AdaptiveAssessmentEngine.start_session(
+            user_id=user_id,
+            target_role=role,
+            career_goal_id=career_goal_id,
+            job_description=jd,
+            company=company,
+            experience_level=exp or "Fresher",
+            question_budget=budget
+        )
+        return jsonify({
+            "status": "success",
+            "assessment": session
+        }), 201
+    except ValueError as ve:
+        code = 429 if "limit reached" in str(ve).lower() else 400
+        return jsonify({"error": str(ve)}), code
+    except Exception as e:
+        return jsonify({"error": f"Failed to start adaptive assessment: {str(e)}"}), 500
+
+
+@intelligence_bp.route("/api/assessment/adaptive/<assessment_id>/submit-turn", methods=["POST"])
+@intelligence_auth_required
+def submit_adaptive_turn(assessment_id: str):
+    """Submits candidate's answer for the current turn, evaluates against rubric, and adapts."""
+    user_id = _get_uid()
+    data = request.get_json() or {}
+
+    turn_index = data.get("turn_index")
+    answer = data.get("answer", "")
+    idempotency_key = data.get("idempotency_key")
+
+    if turn_index is None:
+        return jsonify({"error": "turn_index is required"}), 400
+
+    try:
+        result = AdaptiveAssessmentEngine.submit_turn(
+            assessment_id=assessment_id,
+            user_id=user_id,
+            turn_index=int(turn_index),
+            answer=answer,
+            idempotency_key=idempotency_key
+        )
+
+        # If completed, automatically generate or calibrate roadmap
+        roadmap = None
+        if result.get("status") == "COMPLETED":
+            try:
+                roadmap = RoadmapService.generate_roadmap(user_id=user_id, force_regenerate=True)
+            except Exception as rm_err:
+                import logging
+                logging.warning(f"Roadmap auto-calibration notice: {rm_err}")
+
+        return jsonify({
+            "status": "success",
+            "result": result,
+            "roadmap_generated": bool(roadmap),
+            "roadmap_id": roadmap.get("roadmap_id") if isinstance(roadmap, dict) else None
+        }), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to submit turn: {str(e)}"}), 500
+
+
+@intelligence_bp.route("/api/assessment/adaptive/<assessment_id>", methods=["GET"])
+@intelligence_auth_required
+def get_adaptive_assessment(assessment_id: str):
+    """Resumes an in-progress adaptive assessment following browser reload or disconnect."""
+    user_id = _get_uid()
+    try:
+        session = AdaptiveAssessmentEngine.resume_session(
+            assessment_id=assessment_id,
+            user_id=user_id
+        )
+        return jsonify({
+            "status": "success",
+            "assessment": session
+        }), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to resume assessment: {str(e)}"}), 500
 
 
 # ============================================================================

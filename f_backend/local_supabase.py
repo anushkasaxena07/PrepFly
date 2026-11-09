@@ -823,7 +823,10 @@ class SQLiteSupabaseMock:
                 skill_id TEXT NOT NULL,
                 source_type TEXT NOT NULL,
                 source_id TEXT,
-                score REAL NOT NULL,
+                score REAL DEFAULT 0.0,
+                raw_score REAL,
+                weighted_score REAL,
+                confidence REAL DEFAULT 1.0,
                 weight REAL DEFAULT 1.0,
                 demonstrated_concepts TEXT,
                 missed_concepts TEXT,
@@ -833,6 +836,11 @@ class SQLiteSupabaseMock:
                 created_at TEXT NOT NULL
             )
         """)
+        for se_col, se_type in [("raw_score", "REAL"), ("weighted_score", "REAL"), ("confidence", "REAL DEFAULT 1.0")]:
+            try:
+                cursor.execute(f"ALTER TABLE skill_evidence ADD COLUMN {_validate_ident(se_col)} {se_type}")
+            except Exception:
+                pass
 
         # 36. assessments
         cursor.execute("""
@@ -1445,6 +1453,112 @@ class SQLiteSupabaseMock:
                 question_text TEXT NOT NULL,
                 expected_aspects TEXT,
                 created_at TEXT NOT NULL
+            )
+        """)
+
+        # 72. career_goals (Student-Selected Career Goals)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS career_goals (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                role_id TEXT NOT NULL,
+                custom_role TEXT,
+                target_company TEXT,
+                job_description TEXT,
+                experience_level TEXT DEFAULT 'Fresher',
+                status TEXT DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 73. skill_catalogue (Canonical Skill Taxonomy)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_catalogue (
+                id TEXT PRIMARY KEY,
+                canonical_name TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                category TEXT NOT NULL,
+                difficulty_floor TEXT DEFAULT 'Beginner',
+                difficulty_ceiling TEXT DEFAULT 'Advanced',
+                prerequisites TEXT DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 73. job_skill_requirements (Extracted Requirements from JDs)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS job_skill_requirements (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                target_role TEXT NOT NULL,
+                company TEXT,
+                source_text_hash TEXT NOT NULL,
+                required_skills TEXT DEFAULT '[]',
+                weight_distribution TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 74. assessment_items (Dynamic Question Items with Variation Hashes)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_items (
+                id TEXT PRIMARY KEY,
+                assessment_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                question_type TEXT NOT NULL,
+                expected_concepts TEXT DEFAULT '[]',
+                rubric TEXT DEFAULT '{}',
+                variation_hash TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 75. evaluations (Per-question concept evaluations and rubric grading)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS evaluations (
+                id TEXT PRIMARY KEY,
+                assessment_item_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                raw_response TEXT,
+                matched_concepts TEXT DEFAULT '[]',
+                missed_concepts TEXT DEFAULT '[]',
+                rubric_breakdown TEXT DEFAULT '{}',
+                score REAL NOT NULL,
+                confidence REAL NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 76. candidate_skill_states (Current Evaluated Skill Mastery)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_skill_states (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                proficiency REAL NOT NULL DEFAULT 0.0,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                sample_count INTEGER NOT NULL DEFAULT 0,
+                last_assessed_at TEXT,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, skill_id)
+            )
+        """)
+
+        # 77. score_audit_log (Score Calculation Audit & Explainability Ledger)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS score_audit_log (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                target_role TEXT NOT NULL,
+                calculation_type TEXT NOT NULL,
+                score_inputs TEXT DEFAULT '{}',
+                calculated_score REAL NOT NULL,
+                generated_at TEXT NOT NULL
             )
         """)
 

@@ -29,6 +29,7 @@ from services.evidence_registry_service import (
 SOURCE_WEIGHTS = {
     SOURCE_PRACTICAL_ASSIGNMENT: 0.35,
     SOURCE_DIAGNOSTIC_ASSESSMENT: 0.25,
+    "adaptive_diagnostic": 0.25,
     SOURCE_CODING_SUBMISSION: 0.25,
     SOURCE_AI_INTERVIEW: 0.15,
     SOURCE_MOCK_INTERVIEW: 0.15
@@ -92,7 +93,7 @@ class EvidenceScoringEngine:
         # 1. Filter assessed evidence vs discovery exposure signals
         assessed_evidence = [
             e for e in evidence_list
-            if e.get("validity_status") in (STATUS_ASSESSED, STATUS_VERIFIED_CODE, STATUS_VERIFIED_EXPERIENCE)
+            if e.get("validity_status") in (STATUS_ASSESSED, STATUS_VERIFIED_CODE, STATUS_VERIFIED_EXPERIENCE, "VALID")
             and e.get("normalized_score") is not None
         ]
 

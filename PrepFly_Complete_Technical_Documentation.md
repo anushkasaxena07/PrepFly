@@ -2538,6 +2538,33 @@ A feature is never released to production until it passes through the four-tier 
 
 ---
 
+### 25.5 Master Production Audit Deliverables Registry
+
+The Senior Staff Software Engineering production-readiness audit has generated eight authoritative, standalone engineering specifications in the repository root:
+
+| Deliverable Document | Focus & Scope | Primary Invariants & Audited Artifacts |
+|---|---|---|
+| **[`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md)** | End-to-End Platform Topology | React 18 client state, Flask API Monolith, Gunicorn multi-worker concurrency, Supabase PostgreSQL, SQLite fallback, and Gemini AI. |
+| **[`DATABASE_DESIGN.md`](DATABASE_DESIGN.md)** | Relational Integrity & Schemas | 61 relational tables, Third Normal Form (3NF), foreign-key cascade rules, RLS policies, and Migrations 001–007. |
+| **[`API_DOCUMENTATION.md`](API_DOCUMENTATION.md)** | REST API Contracts & RFC 7807 | Complete route catalog across `app.py` and 4 Blueprints, input/output schemas, error codes, and rate limits. |
+| **[`SECURITY_AUDIT.md`](SECURITY_AUDIT.md)** | OWASP Top 10 & DPDP 2023 | BOLA/IDOR neutralization, AST code execution sandbox whitelist, JWT RBAC security, and secret leak verification. |
+| **[`TESTING_STRATEGY.md`](TESTING_STRATEGY.md)** | 4-Tier Testing Pyramid | 32 test suites, 335 automated tests (100% pass rate in 34.25s), regression gates, and mocked external boundaries. |
+| **[`ENGINEERING_DECISIONS.md`](ENGINEERING_DECISIONS.md)** | Architecture Decision Records (ADRs) | ADR-001 through ADR-006 detailing trade-offs on monoliths, dual persistence, AST sandboxing, and deterministic scoring. |
+| **[`TECHNICAL_DEBT.md`](TECHNICAL_DEBT.md)** | Refactoring & Debt Ledger | Prioritized debt items (TD-1 through TD-6) including `app.py` decomposition and dynamic question synthesis migration. |
+| **[`PRODUCTION_READINESS_REPORT.md`](PRODUCTION_READINESS_REPORT.md)** | Executive Readiness Assessment | Objective readiness scorecards across all architectural pillars, operational risk profiling, and staging release sign-off. |
+
+---
+
+### 25.6 Non-Negotiable Operational Principles for Engineering Changes
+
+Whenever maintaining, refactoring, or extending the PrepFly application:
+1. **Preserve Existing Product Functionality:** Never break, degrade, or overwrite working modules (Authentication, Subscriptions, Job Prep, Candidate Analytics, Coding Challenges, Ava AI Interviews, or Gamified Achievements).
+2. **Never Silently Change Business Rules:** Formula constants, evaluation thresholds, and pedagogical policies must remain transparent and documented in configuration registries.
+3. **Mandatory Approval for Destructive Database Changes:** No columns or tables may be dropped, renamed, or modified without an idempotent migration script and explicit stakeholder approval.
+4. **Evidence-Based Production Verification:** No change is accepted into the codebase without accompanying automated tests executed and passing with 100% success.
+
+---
+
 # Conclusion & Architect's Epilogue
 
 With the completion of this documentation, PrepFly stands fully specified across every architectural, domain, and operational dimension. From its resilient LLM cascading fallback and AST-hardened code execution sandbox to its Indian GST-compliant financial engine, topologically sorted adaptive roadmap intelligence, and Senior Staff Engineering operating charter, every line of code reflects deliberate, production-ready engineering.

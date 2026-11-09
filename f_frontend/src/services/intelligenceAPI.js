@@ -140,6 +140,59 @@ export const intelligenceAPI = {
     return handleResponse(res);
   },
 
+  // 3B. Evidence-Based Adaptive Diagnostic Engine
+  async startAdaptiveDiagnostic(payload = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/adaptive/start`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async submitAdaptiveTurn(assessmentId, payload = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/adaptive/${assessmentId}/submit-turn`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async resumeAdaptiveSession(assessmentId) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/adaptive/${assessmentId}`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  // Career Goals Management
+  async getCareerGoals() {
+    const res = await fetch(`${BACKEND_URL}/api/career-goals`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async createCareerGoal(payload = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/career-goals`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+
+  async getSupportedRoles() {
+    const res = await fetch(`${BACKEND_URL}/api/career-goals/supported-roles`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // 4. Personalized Roadmap & Adaptation
   async generateRoadmap(forceRegenerate = false) {
     const res = await fetch(`${BACKEND_URL}/api/roadmap/generate`, {

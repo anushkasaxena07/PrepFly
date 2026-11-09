@@ -14,6 +14,7 @@ from collections import Counter
 import re
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BACKEND_DIR)
 # Ensure default test environment variables if not present
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-32-chars-long-for-testing-only-12345")
 os.environ.setdefault("SUPABASE_URL", "https://test-project.supabase.co")
