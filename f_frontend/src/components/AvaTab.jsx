@@ -723,12 +723,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         activeSessionId = data.session_id;
       }
 
+      if (!activeSessionId) {
+        throw new Error("Interview session could not be established. Please retry uploading your resume.");
+      }
+
       setSessionId(activeSessionId);
 
       const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
       const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
 
-      const startRes = await apiFetch("/start-interview", {
+      let startRes = await apiFetch("/start-interview", {
         method: "POST",
         body: JSON.stringify({ 
           session_id: activeSessionId, 
@@ -739,6 +743,23 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           job_description: jobDescription || ""
         })
       });
+
+      if (!startRes.ok && startRes.status === 404) {
+        // Automatic retry once after 600ms in case of replica sync lag
+        await new Promise(r => setTimeout(r, 600));
+        startRes = await apiFetch("/start-interview", {
+          method: "POST",
+          body: JSON.stringify({ 
+            session_id: activeSessionId, 
+            category: chosenCategory, 
+            role: chosenRole,
+            difficulty: difficulty || "Medium",
+            personality: selectedPersonality || "professional",
+            job_description: jobDescription || ""
+          })
+        });
+      }
+
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || "Failed to start interview");
 

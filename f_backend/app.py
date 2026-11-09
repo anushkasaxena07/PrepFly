@@ -1335,12 +1335,25 @@ def get_owned_session(session_id):
     if not clean_session_id or not UUID_RE.match(clean_session_id):
         return None, (jsonify({"error": "Session not found"}), 404)
         
-    res = supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
-    s = res.data[0] if res and res.data else None
-    if not s and clean_session_id != str(session_id).strip():
-        try:
+    db_err = None
+    s = None
+    try:
+        res = supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
+        s = res.data[0] if res and res.data else None
+        if not s and clean_session_id != str(session_id).strip():
             res = supabase.table("sessions").select("*").eq("session_id", str(session_id).strip()).execute()
             s = res.data[0] if res and res.data else None
+    except Exception as exc:
+        db_err = exc
+
+    # Also check id column if primary key is named id
+    if not s and not db_err:
+        try:
+            res_id = supabase.table("sessions").select("*").eq("id", clean_session_id).execute()
+            if res_id and res_id.data:
+                s = res_id.data[0]
+                if "session_id" not in s or not s["session_id"]:
+                    s["session_id"] = s.get("id")
         except Exception:
             pass
 
@@ -1361,7 +1374,12 @@ def get_owned_session(session_id):
                     s = lres.data[0]
             except Exception:
                 pass
+
     if not s:
+        if db_err and not ("PGRST" in str(db_err) and "0 rows" in str(db_err)):
+            err_text = str(db_err)
+            if "timed out" in err_text.lower() or "connection" in err_text.lower():
+                return None, (jsonify({"error": "Database service unavailable. Please retry shortly.", "details": err_text}), 503)
         return None, (jsonify({"error": "Session not found"}), 404)
 
     # Claim session if currently unowned or unassigned
@@ -2069,17 +2087,26 @@ def upload_resume():
         if user_payload and user_payload.get("organization_id"):
             session_data["organization_id"] = user_payload.get("organization_id")
 
+        persisted = False
         try:
             supabase.table("sessions").insert(session_data).execute()
+            persisted = True
         except Exception as db_err:
             import logging, traceback
             logging.error(f"Session DB insert failed: {db_err}\n{traceback.format_exc()}")
             try:
                 from local_supabase import local_supabase
                 local_supabase.table("sessions").insert(session_data).execute()
+                persisted = True
                 logging.info(f"Session {session_id} saved to local fallback")
             except Exception as loc_err:
                 logging.error(f"Local fallback session insert failed: {loc_err}")
+
+        if not persisted:
+            return jsonify({
+                "error": "Failed to persist interview session",
+                "message": "Database write failed. Please retry your upload."
+            }), 500
 
         return jsonify({
             "message": "Resume uploaded successfully",
@@ -2220,7 +2247,7 @@ def start_interview():
             "message": "Interview session lacks valid affirmative consent."
         }), 403
 
-    if not session.get("active", True):
+    if session.get("active") in (False, 0, "0", "false", "False"):
         return jsonify({"error": "Session not found or already completed"}), 404
 
     try:
@@ -2542,6 +2569,7 @@ def next_question():
             "done": False,
             "feedback": feedback,
             "next_question": next_q,
+            "question": next_q,
             "question_number": question_index + 1,
             "stage": next_stage,
             "is_followup": is_followup,

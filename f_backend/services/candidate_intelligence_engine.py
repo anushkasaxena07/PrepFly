@@ -507,8 +507,12 @@ class CandidateIntelligenceEngine:
     @classmethod
     def _compile_coding_analytics(cls, user_id: str, supabase) -> Dict[str, Any]:
         """Aggregates Judge0 code execution submissions, correctness, and edge-case handling."""
-        sub_res = supabase.table("coding_submissions").select("*").eq("user_id", user_id).execute()
-        submissions = sub_res.data if (sub_res and sub_res.data) else []
+        submissions = []
+        try:
+            sub_res = supabase.table("coding_submissions").select("*").eq("user_id", user_id).execute()
+            submissions = sub_res.data if (sub_res and sub_res.data) else []
+        except Exception as e:
+            print(f"[NOTICE] Coding submissions lookup skipped or table empty: {e}")
 
         total_sub = len(submissions)
         accepted = [s for s in submissions if str(s.get("status", "")).upper() in ("ACCEPTED", "SUCCESS")]
