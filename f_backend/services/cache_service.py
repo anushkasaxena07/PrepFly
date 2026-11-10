@@ -129,13 +129,32 @@ class InMemoryLRUCache:
 # 2. Redis Distributed Cache Layer (with Resilient Health Checking)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class RedisCacheBackend:
-    """Distributed Redis cache backend with JSON serialization and connection pooling."""
+def normalize_redis_url(redis_url: Optional[str]) -> Optional[str]:
+    """Ensures Upstash endpoints use TLS (`rediss://`) while preserving local/other URLs."""
+    if not redis_url or not isinstance(redis_url, str):
+        return redis_url
+    trimmed = redis_url.strip()
+    if trimmed.startswith("redis://") and ".upstash.io" in trimmed.lower():
+        return "rediss://" + trimmed[len("redis://"):]
+    return trimmed
 
-    def __init__(self, redis_url: str):
-        self.redis_url = redis_url
+
+def _is_dns_resolution_error(err: Exception) -> bool:
+    s = str(err).lower()
+    return any(tok in s for tok in ("getaddrinfo", "nameresolutionerror", "name or service not known", "nodename nor servname", "error 11001"))
+
+
+class RedisCacheBackend:
+    """Distributed Redis cache backend with bounded retries, TLS support, and circuit-breaker L1 fallback."""
+
+    def __init__(self, redis_url: str, max_connect_retries: int = 2, cooldown_seconds: float = 60.0):
+        self.redis_url = normalize_redis_url(redis_url)
+        self.max_connect_retries = max(1, int(max_connect_retries))
+        self.cooldown_seconds = cooldown_seconds
         self.client = None
         self.is_connected = False
+        self._retry_after = 0.0
+        self._consecutive_failures = 0
         self.hits = 0
         self.misses = 0
         self.writes = 0
@@ -143,27 +162,60 @@ class RedisCacheBackend:
         self._init_connection()
 
     def _init_connection(self):
-        try:
-            import redis
-            self.client = redis.from_url(
-                self.redis_url,
-                socket_timeout=2.0,
-                socket_connect_timeout=2.0,
-                decode_responses=True,
-            )
-            self.client.ping()
-            self.is_connected = True
-            logger.info("[REDIS CACHE] Successfully connected to distributed cache.")
-        except Exception as e:
+        last_err = None
+        for attempt in range(self.max_connect_retries):
+            try:
+                import redis
+                self.client = redis.from_url(
+                    self.redis_url,
+                    socket_timeout=1.5,
+                    socket_connect_timeout=1.5,
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                    decode_responses=True,
+                )
+                self.client.ping()
+                self.is_connected = True
+                self._consecutive_failures = 0
+                self._retry_after = 0.0
+                logger.info("[REDIS CACHE] Successfully connected to distributed cache.")
+                return
+            except Exception as e:
+                last_err = e
+                self.is_connected = False
+                self.client = None
+                if _is_dns_resolution_error(e):
+                    break
+                if attempt < self.max_connect_retries - 1:
+                    time.sleep(0.15 * (2 ** attempt))
+
+        self._retry_after = time.monotonic() + self.cooldown_seconds
+        logger.warning(f"[REDIS CACHE] Connection failed or unreachable: {last_err}. Will fallback to L1 Memory.")
+
+    def _ensure_ready(self) -> bool:
+        if self.is_connected and self.client:
+            return True
+        if self.redis_url and time.monotonic() >= self._retry_after:
+            self._init_connection()
+            return self.is_connected and self.client is not None
+        return False
+
+    def _record_runtime_error(self, op: str, err: Exception) -> None:
+        self.errors += 1
+        self._consecutive_failures += 1
+        logger.debug(f"Redis {op} error: {err}")
+        if self._consecutive_failures >= 2 or _is_dns_resolution_error(err):
             self.is_connected = False
             self.client = None
-            logger.warning(f"[REDIS CACHE] Connection failed or unreachable: {e}. Will fallback to L1 Memory.")
+            self._retry_after = time.monotonic() + self.cooldown_seconds
+            logger.warning(f"[REDIS CACHE] Circuit open for {int(self.cooldown_seconds)}s after Redis {op} failure ({err}); serving from L1 Memory.")
 
     def get(self, key: str) -> Optional[Any]:
-        if not self.is_connected or not self.client:
+        if not self._ensure_ready():
             return None
         try:
             val_raw = self.client.get(key)
+            self._consecutive_failures = 0
             if val_raw is None:
                 self.misses += 1
                 return None
@@ -173,12 +225,11 @@ class RedisCacheBackend:
             except Exception:
                 return val_raw
         except Exception as e:
-            self.errors += 1
-            logger.debug(f"Redis get error: {e}")
+            self._record_runtime_error("get", e)
             return None
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
-        if not self.is_connected or not self.client:
+        if not self._ensure_ready():
             return False
         try:
             serialized = json.dumps(value) if not isinstance(value, str) else value
@@ -186,31 +237,35 @@ class RedisCacheBackend:
                 self.client.setex(key, ttl, serialized)
             else:
                 self.client.set(key, serialized)
+            self._consecutive_failures = 0
             self.writes += 1
             return True
         except Exception as e:
-            self.errors += 1
-            logger.debug(f"Redis set error: {e}")
+            self._record_runtime_error("set", e)
             return False
 
     def delete(self, key: str) -> bool:
-        if not self.is_connected or not self.client:
+        if not self._ensure_ready():
             return False
         try:
-            return bool(self.client.delete(key))
+            res = bool(self.client.delete(key))
+            self._consecutive_failures = 0
+            return res
         except Exception as e:
-            self.errors += 1
+            self._record_runtime_error("delete", e)
             return False
 
     def delete_prefix(self, prefix: str) -> int:
-        if not self.is_connected or not self.client:
+        if not self._ensure_ready():
             return 0
         try:
             keys = self.client.keys(f"{prefix}*")
+            self._consecutive_failures = 0
             if keys:
                 return self.client.delete(*keys)
             return 0
-        except Exception:
+        except Exception as e:
+            self._record_runtime_error("delete_prefix", e)
             return 0
 
     def clear(self) -> None:
@@ -486,7 +541,7 @@ def compute_prompt_hash(prompt: str, model_name: str, **kwargs) -> str:
     return hashlib.sha256(signature.encode("utf-8")).hexdigest()
 
 
-def get_cached_ai_response(prompt: str, model_name: str = "gemini-2.5-flash", **kwargs) -> Optional[Any]:
+def get_cached_ai_response(prompt: str, model_name: str = "gemini-3.8-flash", **kwargs) -> Optional[Any]:
     """Retrieves cached AI generation output (turns 2500ms Gemini latency into 0.2ms)."""
     p_hash = compute_prompt_hash(prompt, model_name, **kwargs)
     key = f"ai_resp:{model_name}:{p_hash}"
@@ -499,7 +554,7 @@ def get_cached_ai_response(prompt: str, model_name: str = "gemini-2.5-flash", **
 def save_cached_ai_response(
     prompt: str,
     response: Any,
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.8-flash",
     ttl: int = 86400,
     **kwargs
 ) -> None:

@@ -20,6 +20,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
   const [results, setResults] = useState(null);
   const [improveResults, setImproveResults] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [lastUploadedFile, setLastUploadedFile] = useState(null);
+  const [uploadRetryable, setUploadRetryable] = useState(false);
 
   const fillSampleJD = (type) => {
     setJdText(SAMPLE_JDS[type] || "");
@@ -29,35 +31,64 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
     else if (type === "frontend") setTargetRole("Senior Frontend Developer");
   };
 
-  const handleResumePDF = async (e) => {
-    const file = e.target.files[0];
+  const extractResumeFile = async (file) => {
     if (!file) return;
+    const ext = (file.name || "").split(".").pop()?.toLowerCase();
+    if (!["pdf", "docx"].includes(ext)) {
+      setStatusMsg("⚠️ Only PDF and DOCX resume files are supported.");
+      setStatusColor("var(--orange)");
+      setUploadRetryable(false);
+      return;
+    }
+    if (file.size === 0) {
+      setStatusMsg("⚠️ Uploaded file appears empty. Please select a valid resume.");
+      setStatusColor("var(--orange)");
+      setUploadRetryable(false);
+      return;
+    }
+    setLastUploadedFile(file);
+    setUploadRetryable(false);
     setStatusMsg("⏳ Uploading and extracting resume text...");
     setStatusColor("var(--text2)");
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('resume', file);
       formData.append('consent', 'true');
 
       const token = localStorage.getItem('access_token');
       const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-      const res = await fetch(`${BACKEND_URL}/upload`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-        body: formData
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.error || 'Upload failed');
+      const res = typeof apiFetch === "function"
+        ? await apiFetch('/api/resume/extract', { method: 'POST', body: formData })
+        : await fetch(`${BACKEND_URL}/api/resume/extract`, {
+            method: 'POST',
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+            body: formData
+          });
+      const rawText = await res.text();
+      let data = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = { error: `Server returned unexpected HTTP ${res.status}` };
+      }
+      if (!res.ok) throw new Error(data.message || data.detail || data.error || `Extraction failed (${res.status})`);
       
       setResumeText(data.resume_text || data.text || "");
       const pagesText = data.page_count ? ` (${data.page_count} pages)` : "";
       setStatusMsg(`✅ Resume text extracted${pagesText}. Review below and choose Score or Improve.`);
       setStatusColor("var(--cyan)");
     } catch(err) {
-      setStatusMsg("❌ Upload notice: " + err.message + " — you can paste resume text directly.");
+      setUploadRetryable(true);
+      setStatusMsg("❌ Upload notice: " + err.message + " — you can retry or paste resume text directly.");
       setStatusColor("var(--orange)");
     }
+  };
+
+  const handleResumePDF = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await extractResumeFile(file);
   };
 
   const scoreResume = async () => {
@@ -256,8 +287,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
             />
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px" }}>
               <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "10px", background: "#f5f3ff", border: "1px dashed #c4b5fd", borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: "#6d28d9" }}>
-                <span>Upload Resume PDF</span>
-                <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handleResumePDF} />
+                <span>Upload Resume PDF / DOCX</span>
+                <input type="file" accept=".pdf,.docx" style={{ display: "none" }} onChange={handleResumePDF} />
               </label>
               <button className="btn btn-ghost btn-sm" onClick={() => setResumeText("")} style={{ borderRadius: "10px" }}>Clear</button>
             </div>
@@ -325,6 +356,15 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
           {statusMsg && (
             <div id="resume-score-status" className="text-sm font-semibold" style={{ color: statusColor, marginTop: "8px" }}>
               {statusMsg}
+              {uploadRetryable && lastUploadedFile && (
+                <button
+                  type="button"
+                  onClick={() => extractResumeFile(lastUploadedFile)}
+                  style={{ marginLeft: "10px", padding: "4px 12px", borderRadius: "8px", background: "#6d28d9", color: "#fff", border: "none", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                >
+                  Retry Upload
+                </button>
+              )}
             </div>
           )}
         </div>

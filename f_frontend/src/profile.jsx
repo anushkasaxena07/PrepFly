@@ -11,20 +11,20 @@ const Icon = ({ d, size = 15 }) => (
     <path d={d} />
   </svg>
 );
-const BackIcon  = () => <Icon d="M19 12H5M12 5l-7 7 7 7" />;
-const UserIcon  = () => <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />;
-const MailIcon  = () => <Icon d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6" />;
+const BackIcon = () => <Icon d="M19 12H5M12 5l-7 7 7 7" />;
+const UserIcon = () => <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />;
+const MailIcon = () => <Icon d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6" />;
 const PhoneIcon = () => <Icon d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9a16 16 0 0 0 6.91 6.91l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />;
 const BriefIcon = () => <Icon d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />;
-const EditIcon  = () => <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />;
-const SaveIcon  = () => <Icon d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />;
-const CamIcon   = () => <Icon d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />;
+const EditIcon = () => <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />;
+const SaveIcon = () => <Icon d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8" />;
+const CamIcon = () => <Icon d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />;
 
 const fields = [
-  { key: "name",  label: "Full Name",    icon: <UserIcon />,  type: "text",  placeholder: "John Doe" },
-  { key: "email", label: "Email Address",icon: <MailIcon />,  type: "email", placeholder: "you@example.com" },
-  { key: "phone", label: "Phone Number", icon: <PhoneIcon />, type: "tel",   placeholder: "+91 00000 00000" },
-  { key: "role",  label: "Job Role",     icon: <BriefIcon />, type: "text",  placeholder: "Software Engineer" },
+  { key: "name", label: "Full Name", icon: <UserIcon />, type: "text", placeholder: "John Doe" },
+  { key: "email", label: "Email Address", icon: <MailIcon />, type: "email", placeholder: "you@example.com" },
+  { key: "phone", label: "Phone Number", icon: <PhoneIcon />, type: "tel", placeholder: "+91 00000 00000" },
+  { key: "role", label: "Job Role", icon: <BriefIcon />, type: "text", placeholder: "Software Engineer" },
 ];
 
 import SubscriptionPage from "./components/subscription/SubscriptionPage";
@@ -48,11 +48,11 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
       navigate("/dashboard");
     }
   };
-  const [user, setUser]         = useState({ name: "", email: "", phone: "", role: "", avatar: "" });
-  const [preview, setPreview]   = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [saved, setSaved]       = useState(false);
-  const [error, setError]       = useState(null);
+  const [user, setUser] = useState({ name: "", email: "", phone: "", role: "", avatar: "" });
+  const [preview, setPreview] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(true);
   const [dragOver, setDragOver] = useState(false);
 
@@ -138,15 +138,34 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
   const handleSave = async () => {
     setLoading(true); setError(null);
     try {
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-      const res = await axios.put(`${BACKEND_URL}/update-profile`, {
-        user_id: user._id, ...user,
-      });
+      const token =
+        localStorage.getItem("access_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("admin_access_token") ||
+        localStorage.getItem("superadmin_token");
+      if (typeof apiFetch === "function") {
+        const res = await apiFetch(`/update-profile`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: user._id, ...user }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to update profile");
+        }
+      } else {
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+        await axios.put(
+          `${BACKEND_URL}/update-profile`,
+          { user_id: user._id, ...user },
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+        );
+      }
       localStorage.setItem("user", JSON.stringify(user));
       setSaved(true);
       setIsEditing(false);
     } catch (err) {
-      setError(err.response?.data?.error || "Something went wrong. Please try again.");
+      setError(err.response?.data?.error || err.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -185,23 +204,23 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
 
         {/* Profile Sub Tabs */}
         <div style={{ display: "flex", gap: "10px", marginBottom: "24px", borderBottom: "1px solid #e5e8f2", paddingBottom: "12px", position: "relative", zIndex: 10 }}>
-          <button 
+          <button
             type="button"
-            className={`pf-filter-pill ${profileSubTab === "info" ? "active" : ""}`} 
+            className={`pf-filter-pill ${profileSubTab === "info" ? "active" : ""}`}
             onClick={() => setProfileSubTab("info")}
           >
             Personal Details
           </button>
-          <button 
+          <button
             type="button"
-            className={`pf-filter-pill ${profileSubTab === "subscription" ? "active" : ""}`} 
+            className={`pf-filter-pill ${profileSubTab === "subscription" ? "active" : ""}`}
             onClick={() => setProfileSubTab("subscription")}
           >
             Subscription
           </button>
-          <button 
+          <button
             type="button"
-            className={`pf-filter-pill ${profileSubTab === "feedback" ? "active" : ""}`} 
+            className={`pf-filter-pill ${profileSubTab === "feedback" ? "active" : ""}`}
             onClick={() => setProfileSubTab("feedback")}
           >
             Send Feedback
@@ -219,161 +238,161 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
         {(profileSubTab === "info" || (!["subscription", "feedback"].includes(profileSubTab))) && (
           <div className="pr-layout">
 
-          <div className="pr-side">
-            <div className="pr-glass-card pr-avatar-card">
-              <div
-                className={`pr-avatar-zone ${dragOver ? "pr-avatar-zone--over" : ""}`}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-              >
-                {preview ? (
-                  <img src={preview} alt="Avatar" className="pr-avatar-img" />
-                ) : (
-                  <div className="pr-avatar-placeholder">{initials}</div>
-                )}
+            <div className="pr-side">
+              <div className="pr-glass-card pr-avatar-card">
+                <div
+                  className={`pr-avatar-zone ${dragOver ? "pr-avatar-zone--over" : ""}`}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                >
+                  {preview ? (
+                    <img src={preview} alt="Avatar" className="pr-avatar-img" />
+                  ) : (
+                    <div className="pr-avatar-placeholder">{initials}</div>
+                  )}
+                  {isEditing && (
+                    <label className="pr-avatar-overlay" htmlFor="pr-file-input">
+                      <CamIcon />
+                      <span>Change photo</span>
+                      <input
+                        id="pr-file-input" type="file" accept="image/*"
+                        onChange={handleImageChange} style={{ display: "none" }}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 {isEditing && (
-                  <label className="pr-avatar-overlay" htmlFor="pr-file-input">
-                    <CamIcon />
-                    <span>Change photo</span>
-                    <input
-                      id="pr-file-input" type="file" accept="image/*"
-                      onChange={handleImageChange} style={{ display: "none" }}
-                    />
-                  </label>
+                  <p className="pr-avatar-hint">Drag & drop or click to upload</p>
+                )}
+
+                <div className="pr-avatar-meta">
+                  <div className="pr-avatar-name">{user.name || "Your Name"}</div>
+                  <div className="pr-avatar-role">{user.role || "Your Role"}</div>
+                </div>
+
+                <div className="pr-status-badge">
+                  <div className="pr-status-dot" />
+                  Active
+                </div>
+              </div>
+
+              <div className="pr-glass-card pr-stats-card">
+                <div className="pr-stat">
+                  <div className="pr-stat-value">{stats.interviews}</div>
+                  <div className="pr-stat-label">Interviews</div>
+                </div>
+                <div className="pr-stat-divider" />
+                <div className="pr-stat">
+                  <div className="pr-stat-value">{stats.avgScore}</div>
+                  <div className="pr-stat-label">Avg Score</div>
+                </div>
+                <div className="pr-stat-divider" />
+                <div className="pr-stat">
+                  <div className="pr-stat-value">{stats.sessions}</div>
+                  <div className="pr-stat-label">Sessions</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pr-main">
+              <div className="pr-glass-card">
+
+                <div className="pr-form-header">
+                  <div>
+                    <div className="pr-form-title">Personal Information</div>
+                    <div className="pr-form-sub">
+                      {isEditing ? "Update your details below and save." : "View your saved profile details."}
+                    </div>
+                  </div>
+                  {!isEditing && (
+                    <button className="pr-btn pr-btn--ghost pr-btn--sm" onClick={() => setIsEditing(true)}>
+                      <EditIcon /> Edit
+                    </button>
+                  )}
+                </div>
+
+                {/* Error */}
+                {error && (
+                  <div className="pr-message pr-message--error">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                    </svg>
+                    {error}
+                  </div>
+                )}
+
+                {/* Success */}
+                {saved && !isEditing && (
+                  <div className="pr-message pr-message--success">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Profile saved successfully!
+                  </div>
+                )}
+
+                {/* Fields */}
+                <div className="pr-fields">
+                  {fields.map(({ key, label, icon, type, placeholder }) => (
+                    <div className="pr-field-group" key={key}>
+                      <label className="pr-field-label">{label}</label>
+                      {isEditing ? (
+                        <div className="pr-field-wrap">
+                          <span className="pr-field-icon">{icon}</span>
+                          <input
+                            type={type}
+                            name={key}
+                            value={user[key] || ""}
+                            onChange={handleChange}
+                            placeholder={placeholder}
+                            className="pr-field-input"
+                            autoComplete={key === "email" ? "email" : "off"}
+                          />
+                        </div>
+                      ) : (
+                        <div className="pr-field-view">
+                          <span className="pr-field-icon pr-field-icon--view">{icon}</span>
+                          <span className="pr-field-value">{user[key] || <span className="pr-field-empty">Not set</span>}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                {isEditing && (
+                  <div className="pr-form-actions">
+                    <button className="pr-btn pr-btn--ghost" onClick={() => setIsEditing(false)} disabled={loading}>
+                      Cancel
+                    </button>
+                    <button className="pr-btn pr-btn--primary" onClick={handleSave} disabled={loading}>
+                      {loading ? (
+                        <span className="pr-spinner" />
+                      ) : (
+                        <><SaveIcon /> Save Changes</>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {isEditing && (
-                <p className="pr-avatar-hint">Drag & drop or click to upload</p>
-              )}
-
-              <div className="pr-avatar-meta">
-                <div className="pr-avatar-name">{user.name || "Your Name"}</div>
-                <div className="pr-avatar-role">{user.role || "Your Role"}</div>
-              </div>
-
-              <div className="pr-status-badge">
-                <div className="pr-status-dot" />
-                Active
-              </div>
-            </div>
-
-            <div className="pr-glass-card pr-stats-card">
-              <div className="pr-stat">
-                <div className="pr-stat-value">{stats.interviews}</div>
-                <div className="pr-stat-label">Interviews</div>
-              </div>
-              <div className="pr-stat-divider" />
-              <div className="pr-stat">
-                <div className="pr-stat-value">{stats.avgScore}</div>
-                <div className="pr-stat-label">Avg Score</div>
-              </div>
-              <div className="pr-stat-divider" />
-              <div className="pr-stat">
-                <div className="pr-stat-value">{stats.sessions}</div>
-                <div className="pr-stat-label">Sessions</div>
+              {/* Danger zone */}
+              <div className="pr-glass-card pr-danger-zone">
+                <div className="pr-danger-title">Danger Zone</div>
+                <div className="pr-danger-row">
+                  <div>
+                    <div className="pr-danger-label">Sign out of your account</div>
+                    <div className="pr-danger-sub">You will be redirected to the login page.</div>
+                  </div>
+                  <button className="pr-btn pr-btn--danger" onClick={() => { localStorage.clear(); navigate("/"); }}>
+                    Sign Out
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="pr-main">
-            <div className="pr-glass-card">
-
-              <div className="pr-form-header">
-                <div>
-                  <div className="pr-form-title">Personal Information</div>
-                  <div className="pr-form-sub">
-                    {isEditing ? "Update your details below and save." : "View your saved profile details."}
-                  </div>
-                </div>
-                {!isEditing && (
-                  <button className="pr-btn pr-btn--ghost pr-btn--sm" onClick={() => setIsEditing(true)}>
-                    <EditIcon /> Edit
-                  </button>
-                )}
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div className="pr-message pr-message--error">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                  </svg>
-                  {error}
-                </div>
-              )}
-
-              {/* Success */}
-              {saved && !isEditing && (
-                <div className="pr-message pr-message--success">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                  Profile saved successfully!
-                </div>
-              )}
-
-              {/* Fields */}
-              <div className="pr-fields">
-                {fields.map(({ key, label, icon, type, placeholder }) => (
-                  <div className="pr-field-group" key={key}>
-                    <label className="pr-field-label">{label}</label>
-                    {isEditing ? (
-                      <div className="pr-field-wrap">
-                        <span className="pr-field-icon">{icon}</span>
-                        <input
-                          type={type}
-                          name={key}
-                          value={user[key] || ""}
-                          onChange={handleChange}
-                          placeholder={placeholder}
-                          className="pr-field-input"
-                          autoComplete={key === "email" ? "email" : "off"}
-                        />
-                      </div>
-                    ) : (
-                      <div className="pr-field-view">
-                        <span className="pr-field-icon pr-field-icon--view">{icon}</span>
-                        <span className="pr-field-value">{user[key] || <span className="pr-field-empty">Not set</span>}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Actions */}
-              {isEditing && (
-                <div className="pr-form-actions">
-                  <button className="pr-btn pr-btn--ghost" onClick={() => setIsEditing(false)} disabled={loading}>
-                    Cancel
-                  </button>
-                  <button className="pr-btn pr-btn--primary" onClick={handleSave} disabled={loading}>
-                    {loading ? (
-                      <span className="pr-spinner" />
-                    ) : (
-                      <><SaveIcon /> Save Changes</>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Danger zone */}
-            <div className="pr-glass-card pr-danger-zone">
-              <div className="pr-danger-title">Danger Zone</div>
-              <div className="pr-danger-row">
-                <div>
-                  <div className="pr-danger-label">Sign out of your account</div>
-                  <div className="pr-danger-sub">You will be redirected to the login page.</div>
-                </div>
-                <button className="pr-btn pr-btn--danger" onClick={() => { localStorage.clear(); navigate("/"); }}>
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
         )}
       </div>
     </>

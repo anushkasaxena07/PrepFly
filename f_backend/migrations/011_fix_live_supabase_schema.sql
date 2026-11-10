@@ -40,17 +40,97 @@ BEGIN
     END IF;
 END $$;
 
--- 4. Create public.notifications table if missing
+-- 4. Create public.notifications table if missing and ensure all columns/indexes/RLS exist
 CREATE TABLE IF NOT EXISTS public.notifications (
     id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
     organization_id TEXT,
+    user_id TEXT,
     sender_type TEXT,
     sender_name TEXT,
-    title TEXT,
-    message TEXT,
-    read INTEGER DEFAULT 0,
+    target_group TEXT DEFAULT 'All',
+    title TEXT NOT NULL DEFAULT '',
+    message TEXT NOT NULL DEFAULT '',
+    target_dept TEXT DEFAULT 'All',
+    target_sem TEXT DEFAULT 'All',
+    read INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS organization_id TEXT;
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS user_id TEXT;
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS sender_type TEXT;
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS sender_name TEXT;
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS target_group TEXT DEFAULT 'All';
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS title TEXT DEFAULT '';
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS message TEXT DEFAULT '';
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS target_dept TEXT DEFAULT 'All';
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS target_sem TEXT DEFAULT 'All';
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS read INTEGER DEFAULT 0;
+        ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_notifications_read') THEN
+        ALTER TABLE public.notifications ADD CONSTRAINT chk_notifications_read CHECK (read IN (0, 1));
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_org_id ON public.notifications(organization_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_sender_type ON public.notifications(sender_type);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    DROP POLICY IF EXISTS "service_role_all_notifications" ON public.notifications;
+    CREATE POLICY "service_role_all_notifications" ON public.notifications
+        FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+    DROP POLICY IF EXISTS "authenticated_read_scoped_notifications" ON public.notifications;
+    CREATE POLICY "authenticated_read_scoped_notifications" ON public.notifications
+        FOR SELECT TO authenticated
+        USING (
+            (user_id IS NOT NULL AND user_id = auth.uid()::text)
+            OR (
+                user_id IS NULL AND (
+                    sender_type = 'SUPER_ADMIN'
+                    OR organization_id IS NULL
+                    OR organization_id = 'All'
+                    OR EXISTS (
+                        SELECT 1 FROM public.users u
+                        WHERE u.id = auth.uid()::text
+                          AND u.organization_id = notifications.organization_id
+                    )
+                )
+            )
+        );
+END $$;
+
+REVOKE INSERT, UPDATE, DELETE ON public.notifications FROM anon, authenticated;
+
+-- 5. Enforce RLS on payment/invoice tables if present
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'payment') THEN
+        ALTER TABLE public.payment ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "service_role_all_payment" ON public.payment;
+        CREATE POLICY "service_role_all_payment" ON public.payment
+            FOR ALL TO service_role USING (true) WITH CHECK (true);
+        REVOKE ALL ON public.payment FROM anon;
+        REVOKE INSERT, UPDATE, DELETE ON public.payment FROM authenticated;
+    END IF;
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'invoice') THEN
+        ALTER TABLE public.invoice ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "service_role_all_invoice" ON public.invoice;
+        CREATE POLICY "service_role_all_invoice" ON public.invoice
+            FOR ALL TO service_role USING (true) WITH CHECK (true);
+        REVOKE ALL ON public.invoice FROM anon;
+        REVOKE INSERT, UPDATE, DELETE ON public.invoice FROM authenticated;
+    END IF;
+END $$;
 
 -- Reload PostgREST schema cache immediately
 NOTIFY pgrst, 'reload schema';

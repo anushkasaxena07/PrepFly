@@ -316,25 +316,41 @@ is_production = (
     or bool(os.getenv("RENDER"))
 )
 
-candidate_redis = (
+from services.cache_service import normalize_redis_url
+
+candidate_redis = normalize_redis_url(
     os.getenv("REDIS_URL")
     or os.getenv("UPSTASH_REDIS_URL")
     or os.getenv("RATELIMIT_STORAGE_URI")
 )
 
-if candidate_redis:
+if candidate_redis and not candidate_redis.startswith("memory://"):
     if check_dns_resolves(candidate_redis):
         if is_production:
             import redis
-            try:
-                r_client = redis.from_url(candidate_redis, socket_timeout=3, socket_connect_timeout=3)
-                r_client.ping()
-                rate_limit_storage = candidate_redis
-                print(f"[RATE LIMITER] Successfully authenticated and connected to Redis: {candidate_redis.split('@')[-1] if '@' in candidate_redis else candidate_redis}")
-            except Exception as e_redis:
+            connected_redis = False
+            last_redis_err = None
+            for r_attempt in range(2):
+                try:
+                    r_client = redis.from_url(
+                        candidate_redis,
+                        socket_timeout=2,
+                        socket_connect_timeout=2,
+                        retry_on_timeout=True,
+                    )
+                    r_client.ping()
+                    rate_limit_storage = candidate_redis
+                    connected_redis = True
+                    print(f"[RATE LIMITER] Successfully authenticated and connected to Redis: {candidate_redis.split('@')[-1] if '@' in candidate_redis else candidate_redis}")
+                    break
+                except Exception as e_redis:
+                    last_redis_err = e_redis
+                    if r_attempt == 0:
+                        time.sleep(0.15)
+            if not connected_redis:
                 import logging
                 logging.critical(
-                    f"[RATE LIMITER] Redis ping/auth failed: {e_redis}. "
+                    f"[RATE LIMITER] Redis ping/auth failed after retries: {last_redis_err}. "
                     "Falling back to memory:// rate limiting."
                 )
                 rate_limit_storage = "memory://"
@@ -1976,6 +1992,71 @@ SUMMARY: [2-3 sentences]"""
 #  INTERVIEW ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
 
+MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024  # 10 MB limit
+
+
+def _extract_resume_upload(file_obj):
+    """Validates uploaded PDF/DOCX resume file and extracts plain text cleanly."""
+    filename = secure_filename(file_obj.filename or "")
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in ("pdf", "docx"):
+        return None, None, (jsonify({"error": "Only PDF and DOCX files are supported", "retryable": False}), 400)
+
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{uuid.uuid4()}_{filename}")
+    try:
+        file_obj.save(save_path)
+        if os.path.exists(save_path):
+            file_size = os.path.getsize(save_path)
+            if file_size == 0:
+                return None, None, (jsonify({"error": "Uploaded resume file is empty", "retryable": False}), 400)
+            if file_size > MAX_RESUME_FILE_BYTES:
+                return None, None, (jsonify({"error": "Resume file exceeds the 10 MB size limit", "retryable": False}), 413)
+        resume_text = extract_text_from_pdf(save_path) if ext == "pdf" else extract_text_from_docx(save_path)
+        if not resume_text or not resume_text.strip():
+            return None, None, (jsonify({"error": "Could not extract readable text from resume", "retryable": False}), 400)
+        return resume_text, filename, None
+    finally:
+        if os.path.exists(save_path):
+            os.remove(save_path)
+
+
+@app.route("/api/resume/extract", methods=["POST"])
+@app.route("/resume/extract", methods=["POST"])
+@limiter.limit("15 per minute")
+def extract_resume_text_only():
+    """Lightweight text-extraction endpoint for Resume AI without creating an interview session or requiring Gemini."""
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
+
+    file = request.files.get("resume") or request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "No resume file provided"}), 400
+
+    raw_consent = request.form.get("consent") or request.form.get("consent_given")
+    if raw_consent not in (True, 1, "true", "True", "1"):
+        return jsonify({
+            "error": "Affirmative consent required",
+            "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to process your resume."
+        }), 400
+
+    try:
+        resume_text, filename, err_resp = _extract_resume_upload(file)
+        if err_resp:
+            return err_resp
+        return jsonify({
+            "message": "Resume text extracted successfully",
+            "filename": filename,
+            "resume_text": resume_text,
+            "text_length": len(resume_text),
+            "extract_only": True,
+        }), 200
+    except Exception as e:
+        import logging
+        logging.error(f"Resume text extract error: {e}")
+        return jsonify({"error": "Failed to extract text from uploaded file", "retryable": True}), 500
+
+
 @app.route("/upload", methods=["POST"])
 @limiter.limit("10 per minute")
 def upload_resume():
@@ -2015,12 +2096,6 @@ def upload_resume():
             return jsonify({"error": "Authentication required to associate resume with a user account"}), 401
         user_id = None
 
-    filename = secure_filename(file.filename)
-    ext      = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
-    if ext not in ("pdf", "docx"):
-        return jsonify({"error": "Only PDF and DOCX files are supported"}), 400
-
     raw_consent = request.form.get("consent") or request.form.get("consent_given")
     user_consented = raw_consent in (True, 1, "true", "True", "1")
     if not user_consented:
@@ -2029,16 +2104,23 @@ def upload_resume():
             "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to upload, parse, and evaluate your resume with AI."
         }), 400
 
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{uuid.uuid4()}_{filename}")
-    file.save(save_path)
+    extract_only = str(request.form.get("extract_only", "")).lower() in ("1", "true", "yes")
 
     try:
         from services.resume_service import ResumeParseError
         from services.identity_service import resolve_candidate_display_name
 
-        resume_text = extract_text_from_pdf(save_path) if ext == "pdf" else extract_text_from_docx(save_path)
-        if not resume_text.strip():
-            return jsonify({"error": "Could not extract text from resume"}), 400
+        resume_text, _filename, err_resp = _extract_resume_upload(file)
+        if err_resp:
+            return err_resp
+
+        if extract_only:
+            return jsonify({
+                "message": "Resume text extracted successfully",
+                "resume_text": resume_text,
+                "text_length": len(resume_text),
+                "extract_only": True,
+            }), 200
 
         # Parse resume via Gemini (raises ResumeParseError on 503/504/failure — never falls back silently to HTTP 200)
         try:
@@ -2129,9 +2211,6 @@ def upload_resume():
         import logging
         logging.error(f"Upload resume error: {e}")
         return jsonify({"error": str(e), "retryable": True}), 500
-    finally:
-        if os.path.exists(save_path):
-            os.remove(save_path)
 
 
 @app.route("/create-session-no-resume", methods=["POST"])
@@ -5855,11 +5934,15 @@ def resume_score():
 
     narrative = {}
     try:
-        raw = chat_model.invoke([HumanMessage(content=narrative_prompt)]).content.strip()
-        if raw.startswith("```"):
-            lines = raw.split("\n")
-            raw = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
-        narrative = json.loads(raw)
+        from services.ai_service import safe_invoke_llm
+        raw = safe_invoke_llm(chat_model, narrative_prompt)
+        if raw:
+            if raw.startswith("```"):
+                lines = raw.split("\n")
+                raw = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
+            narrative = json.loads(raw)
+        else:
+            raise ValueError("LLM returned empty narrative")
     except Exception as e:
         print(f"Resume narrative notice: {e}")
         gap_str = f"Missing key skills: {', '.join(missing_skills[:4])}." if missing_skills else "Good keyword coverage."
@@ -5992,7 +6075,10 @@ Return ONLY a valid JSON object matching this schema:
 """
 
     try:
-        raw = chat_model.invoke([HumanMessage(content=improve_prompt)]).content.strip()
+        from services.ai_service import safe_invoke_llm
+        raw = safe_invoke_llm(chat_model, improve_prompt)
+        if not raw:
+            raise RuntimeError("AI resume rewrite unavailable across configured Gemini models")
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
@@ -6186,6 +6272,21 @@ def get_user_stats(user_id):
             target_id = token_user_id
         elif token_role in ("ADMIN", "SUPER_ADMIN"):
             target_id = user_id
+        elif token_role == "Organization Admin":
+            if str(user_id) == token_user_id:
+                target_id = token_user_id
+            else:
+                admin_org = user_payload.get("organization_id")
+                target_org = None
+                try:
+                    u_res = supabase.table("users").select("organization_id").eq("id", str(user_id)).execute()
+                    if u_res and getattr(u_res, "data", None):
+                        target_org = u_res.data[0].get("organization_id")
+                except Exception:
+                    target_org = None
+                if not admin_org or not target_org or str(target_org) != str(admin_org):
+                    return jsonify({"error": "Forbidden: Cannot access stats for users outside your organization"}), 403
+                target_id = user_id
         else:
             if str(user_id) != token_user_id:
                 return jsonify({"error": "Forbidden: Cannot access other users' stats"}), 403
@@ -7464,22 +7565,7 @@ def admin_coding_test_export_csv(test_id):
 
 
 
-# ── In-memory notification store ─────────────────────────────────────────────
-# Reliable fallback when the `notifications` Supabase table doesn't exist yet.
-# Survives for the lifetime of the process; cleared on restart.
-IN_MEMORY_NOTIFICATIONS = []
-
-def _push_notification(notif_dict):
-    """Insert into Supabase notifications table AND the in-memory fallback."""
-    global IN_MEMORY_NOTIFICATIONS
-    try:
-        supabase.table("notifications").insert(notif_dict).execute()
-    except Exception as e:
-        print(f"Supabase notifications insert notice (table may not exist): {e}")
-    # Always persist in memory regardless of DB status
-    IN_MEMORY_NOTIFICATIONS.insert(0, notif_dict)
-    if len(IN_MEMORY_NOTIFICATIONS) > 200:
-        IN_MEMORY_NOTIFICATIONS = IN_MEMORY_NOTIFICATIONS[:200]
+# Admin Question Bank & Announcements use the authoritative _push_notification store below.
 
 
 @app.route("/api/admin/question-bank", methods=["GET", "POST"])
@@ -8335,36 +8421,46 @@ def admin_announcements():
 
 
 IN_MEMORY_NOTIFICATIONS = []
+_NOTIFICATIONS_TABLE_MISSING_UNTIL = 0.0
+
 
 def _push_notification(notif):
     """Pushes notification to live memory and syncs to Supabase notifications table."""
-    if not isinstance(notif, dict): return
+    global _NOTIFICATIONS_TABLE_MISSING_UNTIL, IN_MEMORY_NOTIFICATIONS
+    if not isinstance(notif, dict):
+        return
     if "id" not in notif:
         notif["id"] = f"notif_{uuid.uuid4().hex[:8]}"
     if "created_at" not in notif:
         notif["created_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     IN_MEMORY_NOTIFICATIONS.insert(0, notif)
-    
+    if len(IN_MEMORY_NOTIFICATIONS) > 200:
+        IN_MEMORY_NOTIFICATIONS = IN_MEMORY_NOTIFICATIONS[:200]
+
+    if time.monotonic() < _NOTIFICATIONS_TABLE_MISSING_UNTIL:
+        return
+
     try:
         supabase.table("notifications").insert({
             "id": notif.get("id"),
             "sender_type": notif.get("sender_type") or ("SUPER_ADMIN" if notif.get("organization_id") is None else "ORG_ADMIN"),
             "sender_name": notif.get("sender_name") or notif.get("sender") or "Platform Admin",
             "organization_id": notif.get("organization_id"),
+            "user_id": notif.get("user_id"),
             "target_group": notif.get("target_group") or notif.get("target_dept") or "All",
             "title": notif.get("title") or "Platform Notification",
             "message": notif.get("message") or notif.get("desc") or "",
             "target_dept": notif.get("target_dept", "All"),
             "target_sem": notif.get("target_sem", "All"),
             "created_at": notif.get("created_at"),
-            "read": 0
+            "read": int(notif.get("read", 0) or 0)
         }).execute()
     except Exception as e:
+        err_s = str(e)
+        if "PGRST205" in err_s or "42P01" in err_s:
+            _NOTIFICATIONS_TABLE_MISSING_UNTIL = time.monotonic() + 300.0
         print("Push notification DB notice:", e)
-
-
-_NOTIFICATIONS_TABLE_MISSING_UNTIL = 0.0
 
 
 @app.route("/api/notifications", methods=["GET", "POST", "OPTIONS"])
@@ -8377,12 +8473,14 @@ def get_user_notifications():
     if user_payload:
         token_role = user_payload.get("role")
         token_org = user_payload.get("organization_id")
+        current_uid = str(user_payload.get("sub") or "")
         if token_role in ("SUPER_ADMIN", "Super Admin"):
             org_id = request.args.get("org_id") or request.args.get("organization_id") or "All"
         else:
             org_id = token_org
     else:
         org_id = None
+        current_uid = None
     
     notifications_list = []
     seen_ids = set()
@@ -8393,6 +8491,15 @@ def get_user_notifications():
             seen_ids.add(item_id)
             notifications_list.append(item)
 
+    def _matches_scope(n_row):
+        n_uid = n_row.get("user_id")
+        if n_uid:
+            return bool(current_uid and str(n_uid) == current_uid)
+        n_org = n_row.get("organization_id")
+        if n_row.get("sender_type") == "SUPER_ADMIN":
+            return True
+        return not n_org or n_org == "All" or (org_id and n_org == org_id) or (org_id == "All")
+
     notifications_table_available = time.monotonic() >= _NOTIFICATIONS_TABLE_MISSING_UNTIL
 
     # 1. Fetch Super Admin broadcasts
@@ -8401,6 +8508,8 @@ def get_user_notifications():
             sa_res = supabase.table("notifications").select("*").eq("sender_type", "SUPER_ADMIN").execute()
             if sa_res and sa_res.data:
                 for n in sa_res.data:
+                    if not _matches_scope(n):
+                        continue
                     add_item({
                         "id": n.get("id"),
                         "title": f"👑 Platform Alert: {n.get('title')}",
@@ -8416,19 +8525,18 @@ def get_user_notifications():
             if "PGRST205" in err_s or "42P01" in err_s:
                 _NOTIFICATIONS_TABLE_MISSING_UNTIL = time.monotonic() + 300.0
                 notifications_table_available = False
-                print("Notifications table missing in Supabase (PGRST205); suppressing notifications queries for 300s until migration 010 runs.")
+                print("Notifications table missing in Supabase (PGRST205); suppressing notifications queries for 300s until migration 010/011 runs.")
             else:
                 print("Fetch SA notifications notice:", e)
 
-    # 2. Fetch Org Admin notifications from Supabase
+    # 2. Fetch Org Admin & User notifications from Supabase
     if notifications_table_available:
         try:
             org_res = supabase.table("notifications").select("*").neq("sender_type", "FEEDBACK_SYSTEM").execute()
             if org_res and org_res.data:
                 import json
                 for n in org_res.data:
-                    n_org = n.get("organization_id")
-                    if not n_org or n_org == "All" or (org_id and n_org == org_id) or (org_id == "All") or n.get("sender_type") == "SUPER_ADMIN":
+                    if _matches_scope(n):
                         title = n.get("title") or ""
                         message_content = n.get("message") or ""
                         notif_type = "announcement"
@@ -8489,11 +8597,10 @@ def get_user_notifications():
     except Exception as e:
         print("Fetch announcements notice:", e)
 
-    # 4. Merge IN_MEMORY_NOTIFICATIONS (fallback and live memory store)
+    # 4. Merge IN_MEMORY_NOTIFICATIONS (process cache alongside Supabase)
     import json
     for n in IN_MEMORY_NOTIFICATIONS:
-        n_org = n.get("organization_id")
-        if n.get("sender_type") == "SUPER_ADMIN" or not n_org or n_org == "All" or (org_id and n_org == org_id) or (org_id == "All"):
+        if _matches_scope(n):
             title = n.get("title") or ""
             message_content = n.get("message") or ""
             notif_type = "announcement"

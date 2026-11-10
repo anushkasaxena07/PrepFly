@@ -2,12 +2,16 @@ import os
 import hashlib
 import json
 import random
+import threading
 import time
 import logging
 import docx
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+_IN_FLIGHT_LOCK = threading.Lock()
+_IN_FLIGHT_PARSES = {}
 
 RESUME_PARSE_PROMPT_ID = "resume_parse"
 RESUME_PARSE_PROMPT_VERSION = "v1.0"
@@ -191,6 +195,44 @@ def parse_resume_content(raw_text, chat_model):
             retryable=True,
             details="chat_model is None",
         )
+
+    # Single-flight deduplication across concurrent retries for the identical resume hash
+    is_leader = False
+    flight_entry = None
+    with _IN_FLIGHT_LOCK:
+        existing = _IN_FLIGHT_PARSES.get(text_hash)
+        if existing is not None:
+            flight_entry = existing
+        else:
+            flight_entry = {"event": threading.Event(), "result": None, "error": None}
+            _IN_FLIGHT_PARSES[text_hash] = flight_entry
+            is_leader = True
+
+    if not is_leader:
+        flight_entry["event"].wait(timeout=22.0)
+        if flight_entry["result"] is not None:
+            return dict(flight_entry["result"])
+        if flight_entry["error"] is not None:
+            raise flight_entry["error"]
+
+    try:
+        parsed_result = _execute_parse_resume_content(raw_text, text_hash, chat_model)
+        if is_leader:
+            flight_entry["result"] = parsed_result
+        return parsed_result
+    except Exception as exc:
+        if is_leader:
+            flight_entry["error"] = exc
+        raise
+    finally:
+        if is_leader:
+            flight_entry["event"].set()
+            with _IN_FLIGHT_LOCK:
+                if _IN_FLIGHT_PARSES.get(text_hash) is flight_entry:
+                    _IN_FLIGHT_PARSES.pop(text_hash, None)
+
+
+def _execute_parse_resume_content(raw_text, text_hash, chat_model):
 
     base_prompt = f"""Analyze the following resume text and extract structured candidate profile data.
 Return ONLY valid JSON with no markdown formatting or backticks.

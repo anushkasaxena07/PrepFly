@@ -84,18 +84,21 @@ def api_record_failed():
 @payment_bp.route("/payment/history", methods=["GET"])
 def api_payment_history():
     try:
-        from app import _get_optional_user
+        from app import _get_optional_user, get_admin_org_id
         p = _get_optional_user()
-        requested_org = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id") or "org_default"
-        
-        if p and p.get("role") != "SUPER_ADMIN":
-            token_org = p.get("organization_id")
-            if token_org and requested_org != "org_default" and str(requested_org) != str(token_org):
-                return jsonify({"error": "Forbidden: Cannot access payment history of another organization"}), 403
+        if not p:
+            return jsonify({"error": "Authentication required"}), 401
+        if p.get("role") not in ("Organization Admin", "ADMIN", "SUPER_ADMIN"):
+            return jsonify({"error": "Forbidden: Organization Admin access required"}), 403
 
-        org_id = requested_org if (p and p.get("role") == "SUPER_ADMIN") else ((p.get("organization_id") if p and p.get("organization_id") else requested_org) or "org_default")
+        requested_org = request.args.get("organization_id") or request.args.get("org_id") or request.args.get("user_id")
+        org_id = get_admin_org_id()
+        if requested_org and p.get("role") != "SUPER_ADMIN" and str(requested_org) != str(org_id):
+            return jsonify({"error": "Forbidden: Cannot access payment history of another organization"}), 403
+        target_org = requested_org if (requested_org and p.get("role") == "SUPER_ADMIN") else org_id
+
         supabase = get_supabase()
-        res = supabase.table("payment").select("*").eq("organization_id", org_id).execute()
+        res = supabase.table("payment").select("*").eq("organization_id", target_org).execute()
         rows = res.data if res and hasattr(res, "data") and res.data else []
 
         history = []

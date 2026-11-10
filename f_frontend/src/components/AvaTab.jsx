@@ -799,7 +799,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               headers: localStorage.getItem("access_token") ? { "Authorization": "Bearer " + localStorage.getItem("access_token") } : {},
               body: formData
             });
-        const data = await res.json();
+        const rawText = await res.text();
+        let data = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = { message: `Resume upload timed out or returned HTTP ${res.status}. Please retry or continue without a resume.` };
+        }
         if (!res.ok) {
           clearInterval(interval);
           setSetupError({
