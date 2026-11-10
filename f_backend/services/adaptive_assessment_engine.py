@@ -57,6 +57,17 @@ _SYNONYM_GROUPS = (
 )
 
 
+def _stem_token(tok: str) -> str:
+    if len(tok) <= 4:
+        return tok
+    for suf in ("ations", "ation", "ments", "ment", "ing", "ies", "es", "ed", "s"):
+        if tok.endswith(suf) and len(tok) - len(suf) >= 3:
+            if suf == "ies":
+                return tok[:-3] + "y"
+            return tok[:-len(suf)]
+    return tok
+
+
 def _extract_tech_tokens(text: str) -> Set[str]:
     """Extracts normalized technical tokens including short symbols (0, L1, L2, O(1), PR, SQL)."""
     low = (text or "").lower()
@@ -68,6 +79,9 @@ def _extract_tech_tokens(text: str) -> Set[str]:
     for tok in re.findall(r"[a-z0-9]+(?:[-_][a-z0-9]+)*", low):
         if len(tok) >= 2 or tok.isdigit():
             tokens.add(tok)
+            stemmed = _stem_token(tok)
+            if stemmed != tok:
+                tokens.add(stemmed)
     return tokens
 
 
@@ -662,19 +676,21 @@ class AdaptiveAssessmentEngine:
 
         rubric_score = PureScoringEngine.calculate_rubric_score(numeric_rubric_weights, criteria_achievements)
 
-        # Depth & reasoning adjustment so distinct thoroughness levels differentiate cleanly
+        # Calibrated scaling across demonstrated concepts, rubric match, and reasoning depth
         has_reasoning = any(
             kw in ans_lower
-            for kw in ("because", "therefore", "tradeoff", "trade-off", "whereas", "complexity", "o(", "prevents", "mitigate")
+            for kw in ("because", "therefore", "tradeoff", "trade-off", "whereas", "complexity", "o(", "prevents", "mitigate", "to prevent")
         )
-        reasoning_bonus = 6.0 if (has_reasoning and concept_ratio >= 0.35) else 0.0
+        effective_concept_score = min(100.0, (concept_ratio ** 0.72) * 100.0) if concept_ratio > 0 else 0.0
+        demonstrated_bonus = min(14.0, len(demonstrated) * 4.5) if len(demonstrated) >= 2 else 0.0
+        reasoning_bonus = 6.0 if (has_reasoning and concept_ratio >= 0.30) else 0.0
 
-        combined_score = (rubric_score * 0.55) + (concept_ratio * 100.0 * 0.35) + (cls_acc * 0.10) + reasoning_bonus
+        combined_score = (rubric_score * 0.40) + (effective_concept_score * 0.45) + (cls_acc * 0.15) + demonstrated_bonus + reasoning_bonus
 
-        # Enforce wrong/irrelevant upper bound if zero expected concepts were hit and classifier rejected
+        # Enforce wrong/irrelevant upper bound if expected concepts were missed and classifier rejected
         if concept_ratio < 0.15 and classification in (CLASS_INCORRECT, "Irrelevant or off-topic", "Unclear or insufficient response"):
             combined_score = min(combined_score, 25.0)
-        elif classification == CLASS_INCORRECT and concept_ratio < 0.3:
+        elif classification == CLASS_INCORRECT and concept_ratio < 0.25:
             combined_score = min(combined_score, 35.0)
 
         final_score = round(max(0.0, min(100.0, combined_score)), 1)
