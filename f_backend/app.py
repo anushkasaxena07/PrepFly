@@ -635,16 +635,15 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 chat_model = None
 
 GEMINI_MODEL_CANDIDATES = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
     "gemini-flash-latest",
-    "gemini-2.5-flash"
 ]
 
 for model_name in GEMINI_MODEL_CANDIDATES:
     try:
         chat_model = ChatGoogleGenerativeAI(
-            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=1, timeout=10
+            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=1, timeout=25
         )
         print(f"[GEMINI INIT] Successfully initialized model '{model_name}'")
         break
@@ -9972,25 +9971,25 @@ def superadmin_test_ai_provider():
         try:
             import google.generativeai as genai
             genai.configure(api_key=key_to_use)
-            t_model = genai.GenerativeModel('gemini-3.5-flash')
+            t_model = genai.GenerativeModel(model or 'gemini-2.5-flash')
             response = t_model.generate_content("Respond with 'OK' if connected.")
             latency_ms = int((time.time() - start_t) * 1000)
             return jsonify({
                 "status": "Success",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-3.5-flash",
+                "model": model or "gemini-2.5-flash",
                 "latency_ms": latency_ms,
                 "message": f"Connection Verified! Returned HTTP 200 OK ({latency_ms}ms latency). Response: '{response.text.strip()}'"
             }), 200
         except Exception as e:
             latency_ms = int((time.time() - start_t) * 1000)
             return jsonify({
-                "status": "Success (Simulated Test Mode)",
+                "status": "Failed",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-3.5-flash",
-                "latency_ms": max(145, latency_ms),
-                "message": f"Credentials formatted correctly. Endpoint reachable ({max(145, latency_ms)}ms latency). Gemini 3.5 Flash operational."
-            }), 200
+                "model": model or "gemini-2.5-flash",
+                "latency_ms": latency_ms,
+                "message": f"Gemini connectivity test failed: {e}"
+            }), 502
 
     elif provider == "openai":
         latency_ms = int((time.time() - start_t) * 1000) + 180

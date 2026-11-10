@@ -47,10 +47,10 @@ def safe_invoke_llm(chat_model, prompt_content):
             return None
         print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
         if api_key:
-            for alt_name in ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]:
+            for alt_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]:
                 try:
                     from langchain_google_genai import ChatGoogleGenerativeAI
-                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=1, timeout=10)
+                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=1, timeout=25)
                     res = alt_chat.invoke([HumanMessage(content=prompt_content)])
                     if res and hasattr(res, "content"):
                         txt = _extract_text(res.content)

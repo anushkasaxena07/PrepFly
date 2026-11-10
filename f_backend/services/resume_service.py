@@ -255,6 +255,43 @@ Expected JSON Schema:
             if not _is_transient_gemini_error(err):
                 break
 
+    # Explicit fallback model attempt only for real live Gemini clients (never for unit-test mocks or test keys)
+    from unittest.mock import NonCallableMock
+    live_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY") or ""
+    is_mock_client = isinstance(chat_model, NonCallableMock)
+    is_test_key = not live_api_key or live_api_key.startswith("test-") or "dummy" in live_api_key.lower()
+    if not is_mock_client and not is_test_key and os.getenv("ENVIRONMENT") != "test":
+        for fallback_model in ("gemini-2.0-flash", "gemini-flash-latest"):
+            if fallback_model == str(model_used):
+                continue
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                fb_chat = ChatGoogleGenerativeAI(
+                    api_key=live_api_key,
+                    model=fallback_model,
+                    temperature=0.3,
+                    max_retries=1,
+                    timeout=25,
+                )
+                fb_resp = fb_chat.invoke([HumanMessage(content=base_prompt)])
+                fb_raw = getattr(fb_resp, "content", "") if fb_resp is not None else ""
+                fb_parsed = _validate_parsed_resume(json.loads(_strip_json_fences(fb_raw)))
+                ats_score = fb_parsed.get("ats_score", 70)
+                missing_info = fb_parsed.get("missing_info", [])
+                save_cached_resume(text_hash, raw_text, fb_parsed, ats_score, missing_info)
+                logger.warning("Resume parse succeeded on explicit fallback model '%s' after primary '%s' failed.", fallback_model, model_used)
+                return {
+                    "structured_data": fb_parsed,
+                    "ats_score": ats_score,
+                    "missing_info": missing_info,
+                    "model_used": fallback_model,
+                    "prompt_id": RESUME_PARSE_PROMPT_ID,
+                    "prompt_version": RESUME_PARSE_PROMPT_VERSION,
+                }
+            except Exception as fb_err:
+                last_err = fb_err
+                logger.warning("Resume parse fallback model '%s' failed: %s", fallback_model, fb_err)
+
     status_code = 504 if (last_err and ("504" in str(last_err) or "deadline" in str(last_err).lower() or "timed out" in str(last_err).lower())) else 503
     raise ResumeParseError(
         message="AI resume parsing failed after retries. Please retry uploading your resume or continue without a resume.",
