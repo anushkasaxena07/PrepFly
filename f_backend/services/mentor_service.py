@@ -781,7 +781,7 @@ class MentorService:
             f"You are designing a low-latency real-time scoring service. Under continuous distribution shift "
             f"(adversarial spam attack with non-stationary positive class ratio), standard thresholding degrades recall by 40%.\n\n"
             f"**Deliverables:**\n"
-            f"1. Propose an online calibration algorithm that adapts decision boundaries in $O(1)$ amortized time per request.\n"
+            f"1. Propose an online calibration algorithm that adapts decision boundaries in `O(1)` amortized time per request.\n"
             f"2. Prove the space complexity bound for streaming threshold updates without storing raw prediction logits.\n"
             f"3. Explain what metric you monitor in production to trigger an automated rollback.\n\n"
             f"Submit your response with `Evaluate my answer: ...` when you are ready!"
@@ -895,10 +895,10 @@ class MentorService:
             q2 = (
                 f"Good explanation of class imbalance and PR-AUC. Now let's go deeper into production calibration.\n\n"
                 f"**Question 2 (Calibration & Cost Matrix Thresholding):**\n"
-                f"Suppose our model outputs probability scores $p \\in [0, 1]$. In production, falsely blocking a VIP user costs $50 in lost goodwill, "
+                f"Suppose our model outputs probability scores `p ∈ [0, 1]`. In production, falsely blocking a VIP user costs $50 in lost goodwill, "
                 f"while missing an actual fraud instance costs $1,000 in direct chargeback losses. "
                 f"How do you calibrate these raw probabilities (e.g., Platt scaling vs isotonic regression), "
-                f"and how do you mathematically derive the optimal decision threshold $\\tau^*$ from this cost matrix?"
+                f"and how do you mathematically derive the optimal decision threshold `τ*` from this cost matrix?"
             )
             mock_session["turn"] = 2
             mock_session["questions"].append(q2)
@@ -1104,20 +1104,32 @@ class MentorService:
         user_prompt = (
             f"Recent Dialogue:\n{dialogue_block}\n\n"
             f"Student Message: {user_message}\n\n"
-            "Provide your tailored coaching response:"
+            "Provide a cleanly formatted, concise coaching response using headings/bullet points and fenced code blocks where helpful:"
         )
 
+        chat_model = None
         try:
-            mentor_reply = safe_invoke_llm(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                temperature=0.4
-            )
+            import os
+            if os.getenv("ENVIRONMENT") != "test" and os.getenv("FLASK_ENV") != "test":
+                import app as app_module
+                chat_model = getattr(app_module, "chat_model", None)
         except Exception:
+            chat_model = None
+
+        mentor_reply = None
+        try:
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            mentor_reply = safe_invoke_llm(chat_model, full_prompt)
+        except Exception:
+            mentor_reply = None
+
+        if not mentor_reply:
             mentor_reply = (
-                f"Great question regarding your {int_ctx.get('target_role')} preparation for {int_ctx.get('target_company')}! "
-                f"Focus on the underlying invariant: state your data structures clearly, analyze your O(N) time and space complexity bounds, "
-                f"and ensure you handle boundary edge cases. Let me know if you would like a code walkthrough or a targeted practice challenge."
+                f"**Targeted Coaching for {int_ctx.get('target_role')} ({int_ctx.get('target_company')}):**\n\n"
+                f"• **Core Invariant:** State the exact data structure or mathematical invariant before optimizing.\n"
+                f"• **Complexity & Trade-offs:** Specify time/space bounds (`O(N)` vs `O(log N)`) and memory limits.\n"
+                f"• **Edge Cases:** Validate empty, zero, duplicate, and skewed boundary inputs.\n\n"
+                f"Ask me to break down a specific concept, share a real-world system example, or evaluate your draft answer."
             )
 
         suggested_pills = [

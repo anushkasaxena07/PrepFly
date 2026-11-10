@@ -12,6 +12,87 @@ const DEFAULT_PILLS = [
   "Start a mock interview"
 ];
 
+function renderInlineRichText(text) {
+  const cleaned = String(text || "").replace(/\$([^$]+)\$/g, "`$1`");
+  const parts = cleaned.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={idx} className="font-semibold text-white">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      return (
+        <code key={idx} className="px-1.5 py-0.5 mx-0.5 rounded bg-slate-950/80 border border-slate-700/70 text-cyan-300 font-mono text-[11px]">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return <React.Fragment key={idx}>{part}</React.Fragment>;
+  });
+}
+
+function FormattedMentorMessage({ content }) {
+  const raw = String(content || "").trim();
+  if (!raw) return null;
+
+  const segments = raw.split(/(```[\s\S]*?```)/g);
+
+  return (
+    <div className="space-y-2 leading-relaxed">
+      {segments.map((seg, sIdx) => {
+        if (seg.startsWith("```") && seg.endsWith("```")) {
+          const inner = seg.slice(3, -3).replace(/^[a-zA-Z0-9_+-]+\n/, "").trim();
+          return (
+            <pre key={sIdx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-700/80 overflow-x-auto font-mono text-[11px] text-emerald-300 leading-snug">
+              <code>{inner}</code>
+            </pre>
+          );
+        }
+
+        const lines = seg.split(/\r?\n/);
+        return (
+          <div key={sIdx} className="space-y-1.5">
+            {lines.map((line, lIdx) => {
+              const trimmed = line.trim();
+              if (!trimmed) return <div key={lIdx} className="h-1" />;
+
+              const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+              if (headingMatch) {
+                return (
+                  <div key={lIdx} className="font-bold text-cyan-300 text-xs pt-1">
+                    {renderInlineRichText(headingMatch[2])}
+                  </div>
+                );
+              }
+
+              const bulletMatch = trimmed.match(/^(?:•|-|\*)\s+(.+)$/);
+              if (bulletMatch) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 pl-1">
+                    <span className="text-cyan-400 font-bold leading-relaxed">•</span>
+                    <div className="flex-1">{renderInlineRichText(bulletMatch[1])}</div>
+                  </div>
+                );
+              }
+
+              const numMatch = trimmed.match(/^(\d+\.)\s+(.+)$/);
+              if (numMatch) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 pl-1">
+                    <span className="text-cyan-400 font-semibold min-w-[16px]">{numMatch[1]}</span>
+                    <div className="flex-1">{renderInlineRichText(numMatch[2])}</div>
+                  </div>
+                );
+              }
+
+              return <p key={lIdx} className="m-0">{renderInlineRichText(trimmed)}</p>;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function MentorChatDrawer({
   isOpen,
   onClose,
@@ -176,7 +257,7 @@ export default function MentorChatDrawer({
                       : "bg-slate-800/90 border border-slate-700/60 text-slate-200 rounded-bl-none shadow-md"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{m.content}</div>
+                  <FormattedMentorMessage content={m.content} />
 
                   {/* Machine Diff Alert Box */}
                   {parsedPayload?.diff && (

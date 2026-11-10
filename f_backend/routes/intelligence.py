@@ -374,6 +374,12 @@ def start_adaptive_assessment():
         exp = exp or prof.get("experience_level", "Fresher")
 
     try:
+        import app as app_module
+        live_chat_model = getattr(app_module, "chat_model", None)
+    except Exception:
+        live_chat_model = None
+
+    try:
         session = AdaptiveAssessmentEngine.start_session(
             user_id=user_id,
             target_role=role,
@@ -381,7 +387,8 @@ def start_adaptive_assessment():
             job_description=jd,
             company=company,
             experience_level=exp or "Fresher",
-            question_budget=budget
+            question_budget=budget,
+            chat_model=live_chat_model,
         )
         return jsonify({
             "status": "success",
@@ -409,12 +416,19 @@ def submit_adaptive_turn(assessment_id: str):
         return jsonify({"error": "turn_index is required"}), 400
 
     try:
+        import app as app_module
+        live_chat_model = getattr(app_module, "chat_model", None)
+    except Exception:
+        live_chat_model = None
+
+    try:
         result = AdaptiveAssessmentEngine.submit_turn(
             assessment_id=assessment_id,
             user_id=user_id,
             turn_index=int(turn_index),
             answer=answer,
-            idempotency_key=idempotency_key
+            idempotency_key=idempotency_key,
+            chat_model=live_chat_model,
         )
 
         # If completed, automatically generate or calibrate roadmap

@@ -140,7 +140,8 @@ class TestPhase3DynamicAdaptiveEngine(unittest.TestCase):
         self.assertEqual(turn2_res["status"], "COMPLETED")
         self.assertTrue(turn2_res["overall_score"] > 0)
         self.assertTrue(turn2_res["confidence"] > 0)
-        self.assertEqual(turn2_res["coverage_pct"], 100.0)
+        self.assertEqual(turn2_res["completion_pct"], 100.0)
+        self.assertTrue(0 < turn2_res["coverage_pct"] < 100.0)
 
         # Verify assessment record marked as completed in DB
         db_ass = self.client.table("assessments").select("*").eq("id", ass_id).execute().data[0]

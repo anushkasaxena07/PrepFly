@@ -382,10 +382,16 @@ export default function DiagnosticAssessmentModal({
               <div className="p-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 flex items-center justify-between animate-fadeIn">
                 <div className="flex items-center space-x-2">
                   <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                  <span>Previous question evaluated. Calibrated score recorded.</span>
+                  <span>
+                    {lastTurnFeedback.evaluation_status === "failed"
+                      ? "Previous response recorded (evaluation pending)."
+                      : "Previous question evaluated. Calibrated score recorded."}
+                  </span>
                 </div>
                 <span className="font-bold text-cyan-400">
-                  {lastTurnFeedback.score}%
+                  {lastTurnFeedback.evaluation_status === "failed" || lastTurnFeedback.score == null
+                    ? "Pending"
+                    : `${lastTurnFeedback.score}%`}
                 </span>
               </div>
             )}
@@ -447,35 +453,55 @@ export default function DiagnosticAssessmentModal({
             {/* Scorecard Hero Banner */}
             <div className="bg-gradient-to-r from-cyan-950/40 via-slate-800/60 to-slate-900 border border-cyan-800/40 rounded-xl p-5 text-center">
               <span className="text-xs font-semibold uppercase text-cyan-400 tracking-wider">
-                Adaptive Assessment Complete
+                Demonstrated Competency
               </span>
               <div className="text-4xl font-extrabold text-white mt-1">
-                {finalScorecard.overall_score || 0}%
+                {finalScorecard.overall_score !== null && finalScorecard.overall_score !== undefined
+                  ? `${finalScorecard.overall_score}%`
+                  : "Pending"}
               </div>
               <p className="text-xs text-slate-300 mt-2 max-w-lg mx-auto leading-relaxed">
-                {finalScorecard.summary || "Your initial baseline is calibrated across all 10 adaptive items."}
+                {finalScorecard.summary || "Your initial baseline is calibrated across all evaluated adaptive items."}
               </p>
             </div>
 
-            {/* Metas Row: Confidence & Coverage */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Metas Row: Confidence, Curriculum Coverage & Assessment Completion */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-3.5 bg-slate-800/40 border border-slate-700/60 rounded-xl text-center">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
                   Measurement Confidence
                 </span>
                 <span className="text-lg font-bold text-white mt-0.5 block">
-                  {Math.round((finalScorecard.confidence || 0) * 100)}%
+                  {Math.round((finalScorecard.confidence ?? 0) * 100)}%
                 </span>
-                <span className="text-[10px] text-slate-500">Based on multi-sample saturation</span>
+                <span className="text-[10px] text-slate-500">Evidence & topic diversity</span>
               </div>
               <div className="p-3.5 bg-slate-800/40 border border-slate-700/60 rounded-xl text-center">
                 <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
                   Curriculum Coverage
                 </span>
                 <span className="text-lg font-bold text-white mt-0.5 block">
-                  {finalScorecard.coverage_pct || 100}%
+                  {finalScorecard.coverage_pct ?? 0}%
                 </span>
-                <span className="text-[10px] text-slate-500">Items assessed across required taxonomy</span>
+                <span className="text-[10px] text-slate-500">
+                  {finalScorecard.distinct_skills_count ?? 0} distinct skills weighted
+                </span>
+              </div>
+              <div className="p-3.5 bg-slate-800/40 border border-slate-700/60 rounded-xl text-center">
+                <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
+                  Assessment Completion
+                </span>
+                <span className="text-lg font-bold text-white mt-0.5 block">
+                  {finalScorecard.completion_pct ??
+                    Math.round(
+                      ((finalScorecard.progress?.answered ?? 0) /
+                        Math.max(1, finalScorecard.progress?.total ?? 1)) *
+                        100
+                    )}%
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {finalScorecard.evaluated_count ?? finalScorecard.progress?.answered ?? 0}/{finalScorecard.progress?.total ?? totalQuestions} valid items
+                </span>
               </div>
             </div>
 
