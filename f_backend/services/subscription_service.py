@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 
 def get_supabase():
     try:
@@ -9,12 +10,45 @@ def get_supabase():
         from local_supabase import SQLiteSupabaseMock
         return SQLiteSupabaseMock()
 
+
+def utc_now() -> datetime:
+    """Returns a timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
+
+
+def parse_utc_datetime(value: Any) -> Optional[datetime]:
+    """
+    Normalizes ISO-8601 strings (with or without 'Z' or explicit offsets) and datetime objects
+    into timezone-aware UTC datetimes, preventing offset-naive vs offset-aware TypeErrors.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if raw.endswith("Z") or raw.endswith("z"):
+        raw = raw[:-1] + "+00:00"
+    dt = datetime.fromisoformat(raw)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _safe_org_write(supabase, op, payload, eq_id=None):
     """Execute organization insert/update and strip optional unmigrated columns on PGRST204."""
     clean = dict(payload)
     for _ in range(3):
         try:
-            q = supabase.table("organization").insert(clean) if op == "insert" else supabase.table("organization").update(clean).eq("id", eq_id)
+            q = (
+                supabase.table("organization").insert(clean)
+                if op == "insert"
+                else supabase.table("organization").update(clean).eq("id", eq_id)
+            )
             return q.execute()
         except Exception as exc:
             msg = str(exc)
@@ -26,19 +60,24 @@ def _safe_org_write(supabase, op, payload, eq_id=None):
                     break
             if not removed:
                 raise
-    q = supabase.table("organization").insert(clean) if op == "insert" else supabase.table("organization").update(clean).eq("id", eq_id)
+    q = (
+        supabase.table("organization").insert(clean)
+        if op == "insert"
+        else supabase.table("organization").update(clean).eq("id", eq_id)
+    )
     return q.execute()
 
 
 def get_org_subscription_status(org_id):
+    now = utc_now()
     if not org_id:
         return {
             "organization_id": "org_default",
             "subscription_status": "TRIAL",
             "current_plan": "Trial",
             "days_remaining": 10,
-            "trial_start": datetime.utcnow().isoformat(),
-            "trial_end": (datetime.utcnow() + timedelta(days=10)).isoformat(),
+            "trial_start": now.isoformat(),
+            "trial_end": (now + timedelta(days=10)).isoformat(),
             "subscription_start": None,
             "subscription_expiry": None,
             "is_blocked": False,
@@ -50,13 +89,11 @@ def get_org_subscription_status(org_id):
     rows = res.data if res and hasattr(res, "data") and res.data else []
     org = rows[0] if rows else None
 
-    now = datetime.utcnow()
-
     if not org:
         trial_start = now.isoformat()
         trial_end = (now + timedelta(days=10)).isoformat()
         org_name = f"Organization {org_id[:8]}" if len(org_id) >= 8 else f"Organization {org_id}"
-        
+
         try:
             _safe_org_write(supabase, "insert", {
                 "id": org_id,
@@ -103,15 +140,17 @@ def get_org_subscription_status(org_id):
 
         if sub_expiry_str:
             try:
-                s_exp = datetime.fromisoformat(sub_expiry_str.replace("Z", ""))
+                s_exp = parse_utc_datetime(sub_expiry_str)
+                if s_exp is None:
+                    raise ValueError("Empty subscription expiry timestamp")
                 days_remaining = max((s_exp.date() - now.date()).days, 0)
-                if now > s_exp:
+                if now >= s_exp:
                     sub_status = "EXPIRED"
                     current_plan = "Expired"
                     is_blocked = True
                     _safe_org_write(supabase, "update", {"subscription_status": "EXPIRED", "updated_at": now.isoformat()}, org_id)
                 else:
-                    if days_remaining <= 7 and days_remaining > 0:
+                    if 0 < days_remaining <= 7:
                         reminders.append(f"🔔 Subscription Notice: {days_remaining} days remaining before your plan expires.")
             except Exception as e:
                 print("Subscription expiry parse notice:", e)
@@ -136,9 +175,11 @@ def get_org_subscription_status(org_id):
     elif sub_status == "TRIAL":
         if trial_end_str:
             try:
-                t_end = datetime.fromisoformat(trial_end_str.replace("Z", ""))
+                t_end = parse_utc_datetime(trial_end_str)
+                if t_end is None:
+                    raise ValueError("Empty trial_end timestamp")
                 days_remaining = max((t_end.date() - now.date()).days, 0)
-                if now > t_end:
+                if now >= t_end:
                     sub_status = "EXPIRED"
                     current_plan = "Expired"
                     is_blocked = True
@@ -180,6 +221,7 @@ def get_org_subscription_status(org_id):
         "is_blocked": is_blocked,
         "reminders": reminders
     }
+
 
 def block_if_expired(org_id):
     status = get_org_subscription_status(org_id)

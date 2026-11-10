@@ -54,6 +54,11 @@ REQUIRED_SCHEMA: Dict[str, List[str]] = {
         "id", "session_id", "question_id", "skill_id", "rubric_json",
         "reference_answer", "created_at"
     ],
+    "notifications": [
+        "id", "organization_id", "user_id", "sender_type", "sender_name",
+        "target_group", "title", "message", "target_dept", "target_sem",
+        "read", "created_at"
+    ],
 }
 
 

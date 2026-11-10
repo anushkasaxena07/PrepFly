@@ -3,8 +3,9 @@ import hmac
 import hashlib
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from local_supabase import DB_FILE, SQLiteSupabaseMock
+from services.subscription_service import parse_utc_datetime, utc_now
 
 import secrets
 import threading
@@ -232,9 +233,21 @@ def verify_razorpay_payment(org_id, razorpay_order_id, razorpay_payment_id, razo
             }
 
         # 5. DATABASE UPDATE (Payment + Subscription Update + Invoice + Activity Log)
-        now = datetime.utcnow()
+        now = utc_now()
         duration_days = plan.get("duration_days", 365)
-        expiry = now + timedelta(days=duration_days)
+        # Preserve remaining active paid days on early renewal if existing expiry is still in the future
+        base_anchor = now
+        try:
+            org_cur = supabase.table("organization").select("subscription_expiry, subscription_status").eq("id", org_id).execute()
+            if org_cur and hasattr(org_cur, "data") and org_cur.data:
+                cur_row = org_cur.data[0]
+                if cur_row.get("subscription_status") == "ACTIVE" and cur_row.get("subscription_expiry"):
+                    cur_exp = parse_utc_datetime(cur_row["subscription_expiry"])
+                    if cur_exp and cur_exp > now:
+                        base_anchor = cur_exp
+        except Exception:
+            pass
+        expiry = base_anchor + timedelta(days=duration_days)
         pay_id = f"pay_{uuid.uuid4().hex[:8]}"
         invoice_number = f"INV-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
 
@@ -366,24 +379,8 @@ def record_failed_payment(org_id, razorpay_order_id, razorpay_payment_id=None, r
     return {"status": "FAILED_RECORDED", "reason": reason}
 
 def send_payment_confirmation_email(recipient_email, org_name, invoice_number, amount, payment_id, expiry_date, plan_name="Enterprise Plan"):
-    print(f"[EMAIL NOTIFICATION DISPATCHED] To: {recipient_email} | Org: {org_name} | Invoice: {invoice_number} | Amount: INR {amount} | Expiry: {expiry_date}")
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    sender_email = os.getenv("SENDER_EMAIL") or os.getenv("SMTP_EMAIL")
-    sender_pass = os.getenv("SENDER_PASSWORD") or os.getenv("SMTP_PASSWORD")
-
-    if not sender_email or not sender_pass:
-        return
-
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = recipient_email
-    msg['Subject'] = f"👑 Payment Receipt & Subscription Activation - {invoice_number}"
-
+    from services.email_service import enqueue_email
+    subject = f"👑 Payment Receipt & Subscription Activation - {invoice_number}"
     body = f"""
     Dear {org_name},
 
@@ -402,17 +399,4 @@ def send_payment_confirmation_email(recipient_email, org_name, invoice_number, a
     Regards,
     PrepFly Team
     """
-    msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        with smtplib.SMTP_SSL(smtp_server, 465, timeout=6) as server:
-            server.login(sender_email, sender_pass)
-            server.send_message(msg)
-    except Exception:
-        try:
-            with smtplib.SMTP(smtp_server, 587, timeout=6) as server:
-                server.starttls()
-                server.login(sender_email, sender_pass)
-                server.send_message(msg)
-        except Exception as e:
-            print(f"Receipt email notification notice: {e}")
+    enqueue_email(recipient_email, subject, body, is_html=False)

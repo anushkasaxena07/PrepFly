@@ -1,12 +1,26 @@
+import concurrent.futures
 import os
 import hashlib
 import json
 import random
+import re
 import threading
 import time
 import logging
+import uuid
 import docx
-from datetime import datetime
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
+
+_IN_FLIGHT_LOCK = threading.Lock()
+_IN_FLIGHT_PARSES = {}
+_GEMINI_PARSE_SEMAPHORE = threading.BoundedSemaphore(value=4)
+
+_RESUME_JOBS_LOCK = threading.Lock()
+_RESUME_JOBS = {}
+_RESUME_JOB_BY_HASH = {}
+_RESUME_JOB_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="prepfly-resume-job")
 
 logger = logging.getLogger(__name__)
 
@@ -270,11 +284,14 @@ Expected JSON Schema:
     # Up to 3 attempts with bounded exponential backoff + jitter on transient 503/504,
     # and validation-error feedback on invalid JSON.
     max_attempts = 3
+    retry_count = 0
     for attempt in range(max_attempts):
         if attempt > 0 and (time.monotonic() - started_at) >= total_budget_s:
             break
+        retry_count = attempt
         try:
-            response = chat_model.invoke([HumanMessage(content=prompt_to_send)])
+            with _GEMINI_PARSE_SEMAPHORE:
+                response = chat_model.invoke([HumanMessage(content=prompt_to_send)])
             raw_content = getattr(response, "content", "") if response is not None else ""
             cleaned = _strip_json_fences(raw_content)
             parsed = _validate_parsed_resume(json.loads(cleaned))
@@ -282,11 +299,18 @@ Expected JSON Schema:
             ats_score = parsed.get("ats_score", 70)
             missing_info = parsed.get("missing_info", [])
             save_cached_resume(text_hash, raw_text, parsed, ats_score, missing_info)
+            latency_ms = round((time.monotonic() - started_at) * 1000.0, 1)
+            logger.info(
+                "Resume parse success: model=%s latency_ms=%s retry_count=%d hash=%s",
+                model_used, latency_ms, retry_count, text_hash[:8],
+            )
             return {
                 "structured_data": parsed,
                 "ats_score": ats_score,
                 "missing_info": missing_info,
                 "model_used": str(model_used),
+                "latency_ms": latency_ms,
+                "retry_count": retry_count,
                 "prompt_id": RESUME_PARSE_PROMPT_ID,
                 "prompt_version": RESUME_PARSE_PROMPT_VERSION,
             }
@@ -321,6 +345,7 @@ Expected JSON Schema:
         for fallback_model in get_fallback_gemini_models(live_api_key, exclude_model=str(model_used), include_discovery=discover_live):
             if (time.monotonic() - started_at) >= total_budget_s + 2.0:
                 break
+            retry_count += 1
             try:
                 from langchain_google_genai import ChatGoogleGenerativeAI
                 fb_chat = ChatGoogleGenerativeAI(
@@ -330,18 +355,25 @@ Expected JSON Schema:
                     max_retries=0,
                     timeout=12,
                 )
-                fb_resp = fb_chat.invoke([HumanMessage(content=base_prompt)])
+                with _GEMINI_PARSE_SEMAPHORE:
+                    fb_resp = fb_chat.invoke([HumanMessage(content=base_prompt)])
                 fb_raw = getattr(fb_resp, "content", "") if fb_resp is not None else ""
                 fb_parsed = _validate_parsed_resume(json.loads(_strip_json_fences(fb_raw)))
                 ats_score = fb_parsed.get("ats_score", 70)
                 missing_info = fb_parsed.get("missing_info", [])
                 save_cached_resume(text_hash, raw_text, fb_parsed, ats_score, missing_info)
-                logger.warning("Resume parse succeeded on explicit fallback model '%s' after primary '%s' failed.", fallback_model, model_used)
+                latency_ms = round((time.monotonic() - started_at) * 1000.0, 1)
+                logger.warning(
+                    "Resume parse succeeded on fallback model='%s' after primary='%s' latency_ms=%s retry_count=%d",
+                    fallback_model, model_used, latency_ms, retry_count,
+                )
                 return {
                     "structured_data": fb_parsed,
                     "ats_score": ats_score,
                     "missing_info": missing_info,
                     "model_used": fallback_model,
+                    "latency_ms": latency_ms,
+                    "retry_count": retry_count,
                     "prompt_id": RESUME_PARSE_PROMPT_ID,
                     "prompt_version": RESUME_PARSE_PROMPT_VERSION,
                 }
@@ -351,10 +383,230 @@ Expected JSON Schema:
                     mark_gemini_model_unavailable(fallback_model)
                 logger.warning("Resume parse fallback model '%s' failed: %s", fallback_model, fb_err)
 
+    latency_ms = round((time.monotonic() - started_at) * 1000.0, 1)
+    failure_reason = type(last_err).__name__ if last_err else "unknown_error"
+    logger.error(
+        "Resume parse failed loudly: model=%s latency_ms=%s retry_count=%d failure_reason=%s hash=%s",
+        model_used, latency_ms, retry_count, failure_reason, text_hash[:8],
+    )
     status_code = 504 if (last_err and ("504" in str(last_err) or "deadline" in str(last_err).lower() or "timed out" in str(last_err).lower())) else 503
     raise ResumeParseError(
         message="AI resume parsing failed after retries. Please retry uploading your resume or continue without a resume.",
         status_code=status_code,
         retryable=True,
-        details=type(last_err).__name__ if last_err else "unknown_error",
+        details=failure_reason,
     )
+
+
+def deterministic_parse_resume(raw_text: str) -> dict:
+    """
+    Deterministic, zero-LLM resume extraction fallback grounded strictly in input text.
+    Never invents fake skills or synthetic names; explicitly tags `is_partial=True`.
+    """
+    text = (raw_text or "").strip()
+    if not text:
+        return {
+            "structured_data": {
+                "full_name": "",
+                "email": "",
+                "phone": "",
+                "skills": [],
+                "projects": [],
+                "experience": [],
+                "education": [],
+                "ats_score": 0,
+                "missing_info": ["Empty resume text"],
+            },
+            "ats_score": 0,
+            "missing_info": ["Empty resume text"],
+            "model_used": "deterministic_fallback",
+            "is_partial": True,
+            "prompt_id": RESUME_PARSE_PROMPT_ID,
+            "prompt_version": RESUME_PARSE_PROMPT_VERSION,
+        }
+
+    from services.ats_engine import extract_skills
+    skills = extract_skills(text)
+    email_m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+    phone_m = re.search(r"(?:\+?\d[\d\s\-().]{8,16}\d)", text)
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    first_line = lines[0][:80] if lines else ""
+    inferred_name = first_line if (first_line and "@" not in first_line and len(first_line.split()) <= 5) else ""
+
+    missing = []
+    if not skills:
+        missing.append("Recognized Technical Skills")
+    if not email_m:
+        missing.append("Email Address")
+
+    structured = {
+        "full_name": inferred_name,
+        "email": email_m.group(0) if email_m else "",
+        "phone": phone_m.group(0).strip() if phone_m else "",
+        "skills": skills,
+        "projects": [],
+        "experience": [],
+        "education": [],
+        "ats_score": None,
+        "missing_info": missing,
+    }
+    _validate_parsed_resume(structured)
+    return {
+        "structured_data": structured,
+        "ats_score": None,
+        "missing_info": missing,
+        "model_used": "deterministic_fallback",
+        "is_partial": True,
+        "prompt_id": RESUME_PARSE_PROMPT_ID,
+        "prompt_version": RESUME_PARSE_PROMPT_VERSION,
+    }
+
+
+def _run_resume_job(job_id: str, raw_text: str, user_id, org_id, chat_model, create_session: bool):
+    started = time.monotonic()
+    with _RESUME_JOBS_LOCK:
+        job = _RESUME_JOBS.get(job_id)
+        if not job:
+            return
+        job["status"] = "processing"
+        job["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        parse_result = parse_resume_content(raw_text, chat_model)
+        structured = parse_result.get("structured_data", {})
+        ats_score = parse_result.get("ats_score", 70)
+        session_id = None
+        display_name = None
+
+        if create_session:
+            from services.identity_service import resolve_candidate_display_name
+            supabase = get_supabase()
+            user_payload = {"sub": user_id, "organization_id": org_id} if user_id else None
+            display_name, display_name_source = resolve_candidate_display_name(
+                user_payload=user_payload,
+                user_id=user_id,
+                parsed_resume=structured,
+                supabase_client=supabase,
+            )
+            session_id = str(uuid.uuid4())
+            now_iso = datetime.now(timezone.utc).isoformat()
+            session_data = {
+                "session_id": session_id,
+                "resume_text": raw_text,
+                "resume_snapshot_json": json.dumps(structured),
+                "question_index": 0,
+                "questions": [],
+                "responses": [],
+                "feedbacks": [],
+                "active": True,
+                "status": "created",
+                "mode": "resume",
+                "role": "Resume Based",
+                "level": "Mid",
+                "interview_mode": "resume",
+                "total_questions": 10,
+                "ats_score": ats_score,
+                "structured_resume": json.dumps(structured),
+                "display_name": display_name,
+                "display_name_source": display_name_source,
+                "report_status": "pending",
+                "model_used": parse_result.get("model_used"),
+                "prompt_versions_json": json.dumps({"resume_parse": RESUME_PARSE_PROMPT_VERSION}),
+                "consent_given": 1,
+                "consent_timestamp": now_iso,
+                "privacy_policy_version": "DPDP-2023-v1.0",
+                "created_at": now_iso,
+                "updated_at": now_iso,
+            }
+            if user_id:
+                session_data["user_id"] = user_id
+            if org_id:
+                session_data["organization_id"] = org_id
+            supabase.table("sessions").insert(session_data).execute()
+
+        with _RESUME_JOBS_LOCK:
+            job = _RESUME_JOBS.get(job_id)
+            if job:
+                job["status"] = "completed"
+                job["session_id"] = session_id
+                job["display_name"] = display_name
+                job["ats_score"] = ats_score
+                job["structured_data"] = structured
+                job["missing_info"] = parse_result.get("missing_info", [])
+                job["model_used"] = parse_result.get("model_used")
+                job["latency_ms"] = round((time.monotonic() - started) * 1000.0, 1)
+                job["updated_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception as exc:
+        fb = deterministic_parse_resume(raw_text)
+        with _RESUME_JOBS_LOCK:
+            job = _RESUME_JOBS.get(job_id)
+            if job:
+                job["status"] = "failed"
+                job["error"] = str(getattr(exc, "message", None) or exc)
+                job["retryable"] = bool(getattr(exc, "retryable", True))
+                job["status_code"] = int(getattr(exc, "status_code", 503))
+                job["fallback_available"] = True
+                job["deterministic_fallback"] = fb["structured_data"]
+                job["latency_ms"] = round((time.monotonic() - started) * 1000.0, 1)
+                job["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def create_resume_parse_job(
+    raw_text: str,
+    chat_model,
+    user_id=None,
+    org_id=None,
+    create_session: bool = True,
+    run_async: bool = True,
+) -> dict:
+    """
+    Creates (or deduplicates by user_id + content hash) a background resume parsing job.
+    """
+    text_hash = compute_text_hash(raw_text)
+    dedupe_key = (str(user_id or "anon"), text_hash)
+
+    with _RESUME_JOBS_LOCK:
+        existing_id = _RESUME_JOB_BY_HASH.get(dedupe_key)
+        if existing_id and existing_id in _RESUME_JOBS:
+            existing_job = _RESUME_JOBS[existing_id]
+            if existing_job["status"] in ("queued", "processing", "completed"):
+                copy_job = dict(existing_job)
+                copy_job["deduplicated"] = True
+                return copy_job
+
+        job_id = f"rjob_{uuid.uuid4().hex[:12]}"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        job = {
+            "job_id": job_id,
+            "user_id": str(user_id) if user_id else None,
+            "organization_id": org_id,
+            "text_hash": text_hash,
+            "text_length": len(raw_text or ""),
+            "status": "queued",
+            "retryable": True,
+            "deduplicated": False,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+        _RESUME_JOBS[job_id] = job
+        _RESUME_JOB_BY_HASH[dedupe_key] = job_id
+
+    if run_async:
+        _RESUME_JOB_EXECUTOR.submit(_run_resume_job, job_id, raw_text, user_id, org_id, chat_model, create_session)
+    else:
+        _run_resume_job(job_id, raw_text, user_id, org_id, chat_model, create_session)
+
+    with _RESUME_JOBS_LOCK:
+        return dict(_RESUME_JOBS[job_id])
+
+
+def get_resume_parse_job(job_id: str):
+    with _RESUME_JOBS_LOCK:
+        job = _RESUME_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def clear_resume_jobs_for_tests():
+    with _RESUME_JOBS_LOCK:
+        _RESUME_JOBS.clear()
+        _RESUME_JOB_BY_HASH.clear()

@@ -139,6 +139,16 @@ def normalize_redis_url(redis_url: Optional[str]) -> Optional[str]:
     return trimmed
 
 
+def mask_redis_url(redis_url: Optional[str]) -> str:
+    """Returns host/port display string with credentials stripped."""
+    if not redis_url:
+        return "none"
+    if "@" in redis_url:
+        scheme = redis_url.split("://", 1)[0] if "://" in redis_url else "redis"
+        return f"{scheme}://{redis_url.split('@', 1)[1]}"
+    return str(redis_url)
+
+
 def _is_dns_resolution_error(err: Exception) -> bool:
     s = str(err).lower()
     return any(tok in s for tok in ("getaddrinfo", "nameresolutionerror", "name or service not known", "nodename nor servname", "error 11001"))
@@ -281,11 +291,44 @@ class RedisCacheBackend:
         return {
             "engine": "DistributedRedis",
             "connected": self.is_connected,
+            "is_distributed": self.is_connected,
+            "tls_enabled": bool(self.redis_url and str(self.redis_url).startswith("rediss://")),
+            "target": mask_redis_url(self.redis_url),
             "hits": self.hits,
             "misses": self.misses,
             "hit_ratio_percent": hit_ratio,
             "writes": self.writes,
             "errors": self.errors,
+        }
+
+    def health_check(self) -> Dict[str, Any]:
+        """Active connection ping check reporting latency and exact connectivity without exposing credentials."""
+        t0 = time.monotonic()
+        if not self.redis_url:
+            return {"connected": False, "is_distributed": False, "mode": "unconfigured", "target": "none"}
+        try:
+            if not self.client:
+                self._init_connection()
+            if self.client and self.is_connected:
+                self.client.ping()
+                latency_ms = round((time.monotonic() - t0) * 1000.0, 2)
+                return {
+                    "connected": True,
+                    "is_distributed": True,
+                    "mode": "distributed_redis",
+                    "tls_enabled": bool(str(self.redis_url).startswith("rediss://")),
+                    "target": mask_redis_url(self.redis_url),
+                    "latency_ms": latency_ms,
+                }
+        except Exception as exc:
+            self._record_runtime_error("health_check", exc)
+        return {
+            "connected": False,
+            "is_distributed": False,
+            "mode": "l1_local_memory_fallback",
+            "tls_enabled": bool(str(self.redis_url).startswith("rediss://")),
+            "target": mask_redis_url(self.redis_url),
+            "latency_ms": round((time.monotonic() - t0) * 1000.0, 2),
         }
 
 
@@ -398,7 +441,8 @@ class TieredCacheManager:
 
     def stats(self) -> Dict[str, Any]:
         l1_stats = self.l1.stats()
-        l2_stats = self.l2.stats() if self.l2 else {"engine": "Redis", "connected": False}
+        l2_stats = self.l2.stats() if self.l2 else {"engine": "Redis", "connected": False, "is_distributed": False}
+        is_distributed = bool(l2_stats.get("connected", False))
         total_hits = l1_stats["hits"] + (l2_stats.get("hits", 0))
         total_misses = l1_stats["misses"]
         total_req = total_hits + total_misses
@@ -406,12 +450,28 @@ class TieredCacheManager:
 
         return {
             "status": "healthy",
-            "architecture": "Two-Tier (L1 In-Memory + L2 Distributed Redis)",
+            "mode": "distributed_redis" if is_distributed else "l1_local_memory_fallback",
+            "is_distributed": is_distributed,
+            "architecture": (
+                "Two-Tier (L1 In-Memory + L2 Distributed Redis)"
+                if is_distributed
+                else "Single-Node L1 In-Memory Fallback (Non-Distributed)"
+            ),
             "overall_hit_ratio_percent": overall_ratio,
             "total_hits": total_hits,
             "total_misses": total_misses,
             "l1_memory": l1_stats,
             "l2_redis": l2_stats,
+        }
+
+    def health_check(self) -> Dict[str, Any]:
+        if self.l2:
+            return self.l2.health_check()
+        return {
+            "connected": False,
+            "is_distributed": False,
+            "mode": "l1_local_memory_fallback",
+            "target": "none",
         }
 
 

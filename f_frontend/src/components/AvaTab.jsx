@@ -792,20 +792,33 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         formData.append("consent", "true");
         if (resolvedUserId) formData.append("user_id", resolvedUserId);
 
-        const res = typeof apiFetch === "function"
-          ? await apiFetch("/upload", { method: "POST", body: formData })
-          : await fetch(`${BACKEND_URL}/upload`, {
-              method: "POST",
-              headers: localStorage.getItem("access_token") ? { "Authorization": "Bearer " + localStorage.getItem("access_token") } : {},
-              body: formData
-            });
-        const rawText = await res.text();
-        let data = {};
-        try {
-          data = rawText ? JSON.parse(rawText) : {};
-        } catch {
-          data = { message: `Resume upload timed out or returned HTTP ${res.status}. Please retry or continue without a resume.` };
+        const authHeaders = localStorage.getItem("access_token")
+          ? { "Authorization": "Bearer " + localStorage.getItem("access_token") }
+          : {};
+
+        const postResume = async (path) =>
+          typeof apiFetch === "function"
+            ? apiFetch(path, { method: "POST", body: formData })
+            : fetch(`${BACKEND_URL}${path}`, { method: "POST", headers: authHeaders, body: formData });
+
+        const parseResp = async (r) => {
+          const txt = await r.text();
+          try {
+            return txt ? JSON.parse(txt) : {};
+          } catch {
+            return { message: `Resume upload timed out or returned HTTP ${r.status}. Please retry or continue without a resume.` };
+          }
+        };
+
+        let res = await postResume("/api/resume/jobs");
+        let data = await parseResp(res);
+
+        // Fallback to sync /upload if async job endpoint unavailable (e.g. older test stub)
+        if (res.status === 404) {
+          res = await postResume("/upload");
+          data = await parseResp(res);
         }
+
         if (!res.ok) {
           clearInterval(interval);
           setSetupError({
@@ -816,6 +829,56 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           setStep("resume_upload");
           return;
         }
+
+        // Poll async resume parsing job until completion or failure
+        if (res.status === 202 && data.job_id) {
+          const jobId = data.job_id;
+          let jobDone = false;
+          for (let poll = 0; poll < 35; poll++) {
+            await new Promise((resolve) => setTimeout(resolve, 900));
+            const pollRes = typeof apiFetch === "function"
+              ? await apiFetch(`/api/resume/jobs/${jobId}`, { method: "GET" })
+              : await fetch(`${BACKEND_URL}/api/resume/jobs/${jobId}`, { headers: authHeaders });
+            const pollData = await parseResp(pollRes);
+
+            if (!pollRes.ok) {
+              clearInterval(interval);
+              setSetupError({
+                message: pollData.error || pollData.message || "Failed to check resume parsing status.",
+                retryable: true,
+                step: "resume_parse",
+              });
+              setStep("resume_upload");
+              return;
+            }
+            if (pollData.status === "completed") {
+              data = pollData;
+              jobDone = true;
+              break;
+            }
+            if (pollData.status === "failed") {
+              clearInterval(interval);
+              setSetupError({
+                message: pollData.error || "AI resume parsing failed after retries. You can retry or continue without a resume.",
+                retryable: pollData.retryable !== false,
+                step: "resume_parse",
+              });
+              setStep("resume_upload");
+              return;
+            }
+          }
+          if (!jobDone) {
+            clearInterval(interval);
+            setSetupError({
+              message: "Resume parsing is taking longer than expected. Please retry or continue without a resume.",
+              retryable: true,
+              step: "resume_parse",
+            });
+            setStep("resume_upload");
+            return;
+          }
+        }
+
         activeSessionId = data.session_id;
         if (data.ats_score) setAtsScore(data.ats_score);
       } else {

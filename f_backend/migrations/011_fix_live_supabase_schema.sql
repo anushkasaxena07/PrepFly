@@ -132,5 +132,70 @@ BEGIN
     END IF;
 END $$;
 
+-- 6. Ensure all Phase 1 / Migration 010 tables have complete idempotent columns
+--    in case partial tables pre-existed before CREATE TABLE IF NOT EXISTS ran.
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_speech_metrics') THEN
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS wpm REAL;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS filler_count INTEGER;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS filler_map_json JSONB DEFAULT '{}'::jsonb;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS pause_count INTEGER;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS longest_pause_s REAL;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS avg_pause_s REAL;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS speaking_time_s REAL;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS silence_ratio REAL;
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS computed_by TEXT DEFAULT 'deterministic_python';
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS formula_version TEXT DEFAULT 'v1';
+        ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS missing_reason TEXT;
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_evaluations') THEN
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS turn_id VARCHAR(255);
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS skill_id TEXT;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS rubric_scores_json JSONB;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS raw_score REAL;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS normalized_score REAL;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS quoted_evidence_json JSONB;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS missing_concepts_json JSONB;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS technical_mistakes_json JSONB;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS improved_answer TEXT;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS misconception_tags TEXT[] DEFAULT ARRAY[]::TEXT[];
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS evaluator_type TEXT DEFAULT 'gemini_rubric';
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS prompt_id TEXT;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS prompt_version TEXT;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS model_used TEXT;
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ok';
+        ALTER TABLE public.interview_evaluations ADD COLUMN IF NOT EXISTS error_code TEXT;
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_reports') THEN
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS candidate_id TEXT;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS report_status TEXT DEFAULT 'pending';
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS overall_score REAL;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS grade TEXT;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS recommendation TEXT;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS dimension_scores_json JSONB;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS strengths_json JSONB;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS weaknesses_json JSONB;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS coverage_json JSONB;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS data_sufficiency_json JSONB;
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS formula_version TEXT DEFAULT 'v1';
+        ALTER TABLE public.interview_reports ADD COLUMN IF NOT EXISTS generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_question_rubrics') THEN
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS question_id TEXT;
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS skill_id TEXT;
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS rubric_json JSONB;
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS reference_answer TEXT;
+        ALTER TABLE public.interview_question_rubrics ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+END $$;
+
 -- Reload PostgREST schema cache immediately
 NOTIFY pgrst, 'reload schema';

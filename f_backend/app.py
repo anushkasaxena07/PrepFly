@@ -13,7 +13,7 @@ import csv
 import io
 import re
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -371,6 +371,19 @@ else:
         logging.warning("[WARNING] No REDIS_URL or RATELIMIT_STORAGE_URI configured in production. Rate limits will not be shared across multi-worker instances.")
     rate_limit_storage = "memory://"
 
+if rate_limit_storage == "memory://" and is_production:
+    try:
+        worker_cnt = int(os.getenv("WEB_CONCURRENCY", "1"))
+        if worker_cnt > 1:
+            import logging
+            logging.critical(
+                "[RATE LIMITER] Running %d workers with memory:// storage! "
+                "Rate limits will be isolated per worker process until REDIS_URL/UPSTASH_REDIS_URL is active.",
+                worker_cnt,
+            )
+    except Exception:
+        pass
+
 limiter = Limiter(
     key_func=get_rate_limit_key,
     app=app,
@@ -701,85 +714,11 @@ def invoke_gemini_with_fallback(prompt_or_messages):
 #  EMAIL HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def send_email(to_email, subject, html_body):
-    # Strategy 0: Resend HTTPS API (Port 443 - 100% guaranteed delivery on Railway & Vercel without SMTP port blocking)
-    resend_api_key = RESEND_API_KEY
-    if resend_api_key and not resend_api_key.startswith("re_prepfly_rotated"):
-        import urllib.request
-        import json
-        
-        # 1. Try sending directly to recipient email
-        try:
-            req_data = json.dumps({
-                "from": "PrepFly <onboarding@resend.dev>",
-                "to": [to_email],
-                "subject": subject,
-                "html": html_body
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "https://api.resend.com/emails",
-                data=req_data,
-                headers={
-                    "Authorization": f"Bearer {resend_api_key}",
-                    "Content-Type": "application/json"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                if resp.status in (200, 201):
-                    print(f"Email sent via Resend HTTPS API directly to {to_email}!")
-                    return True
-        except Exception as e_direct:
-            pass
-
-    sender_email = SMTP_EMAIL
-    sender_password = SMTP_PASSWORD
-    smtp_server = SMTP_SERVER
-
-    if not sender_email or not sender_password:
-        print("SMTP credentials missing – skipping email")
-        return False
-
-    msg = MIMEMultipart('alternative')
-    msg['From']    = f"PrepFly <{sender_email}>"
-    msg['To']      = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(html_body, 'html'))
-
-    # Resolve IPv4 host to bypass Railway container IPv6 unreachable routing
-    target_hosts = [smtp_server]
-    try:
-        ipv4_addr = socket.gethostbyname(smtp_server)
-        if ipv4_addr and ipv4_addr not in target_hosts:
-            target_hosts.insert(0, ipv4_addr)
-    except Exception:
-        pass
-
-    # Strategy 1: SSL on Port 465
-    for host in target_hosts:
-        try:
-            with smtplib.SMTP_SSL(host, 465, timeout=8) as server:
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-            print("Email sent via SSL (port 465)!")
-            return True
-        except Exception as e:
-            print(f"SSL Error ({host}:465): {e}")
-
-    # Strategy 2: TLS on Port 587
-    for host in target_hosts:
-        try:
-            with smtplib.SMTP(host, 587, timeout=8) as server:
-                server.starttls()
-                server.login(sender_email, sender_password)
-                server.send_message(msg)
-            print("Email sent via TLS (port 587)!")
-            return True
-        except Exception as e:
-            print(f"TLS Error ({host}:587): {e}")
-
-    print("All SMTP attempts failed.")
-    return False
+def send_email(to_email, subject, html_body, sync: bool = False):
+    from services.email_service import enqueue_email, send_email_sync
+    if sync:
+        return send_email_sync(to_email, subject, html_body, is_html=True)
+    return enqueue_email(to_email, subject, html_body, is_html=True)
 
 
 def _otp_html(otp: str, title: str, subtitle: str) -> str:
@@ -956,14 +895,16 @@ def verify_otp_code(email: str, otp: str, purpose: str = "login") -> dict:
             .execute()
 
         if res and res.data:
+            from services.subscription_service import parse_utc_datetime, utc_now
             row = res.data[0]
-            exp_str = str(row.get("expires_at", "")).replace("Z", "").split("+")[0]
             try:
-                expires_at = datetime.fromisoformat(exp_str)
+                expires_at = parse_utc_datetime(row.get("expires_at"))
             except Exception:
-                expires_at = datetime.utcnow() + timedelta(minutes=15)
+                expires_at = None
+            if expires_at is None:
+                expires_at = utc_now() + timedelta(minutes=15)
 
-            if datetime.utcnow() > expires_at:
+            if utc_now() > expires_at:
                 locked = _record_fail()
                 return locked or {"valid": False, "error": "OTP has expired"}
 
@@ -1997,13 +1938,15 @@ MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024  # 10 MB limit
 
 def _extract_resume_upload(file_obj):
     """Validates uploaded PDF/DOCX resume file and extracts plain text cleanly."""
+    import tempfile
+
     filename = secure_filename(file_obj.filename or "")
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ("pdf", "docx"):
         return None, None, (jsonify({"error": "Only PDF and DOCX files are supported", "retryable": False}), 400)
 
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{uuid.uuid4()}_{filename}")
-    try:
+    with tempfile.TemporaryDirectory(prefix="prepfly_resume_") as tmp_dir:
+        save_path = os.path.join(tmp_dir, f"{uuid.uuid4()}_{filename}")
         file_obj.save(save_path)
         if os.path.exists(save_path):
             file_size = os.path.getsize(save_path)
@@ -2015,9 +1958,6 @@ def _extract_resume_upload(file_obj):
         if not resume_text or not resume_text.strip():
             return None, None, (jsonify({"error": "Could not extract readable text from resume", "retryable": False}), 400)
         return resume_text, filename, None
-    finally:
-        if os.path.exists(save_path):
-            os.remove(save_path)
 
 
 @app.route("/api/resume/extract", methods=["POST"])
@@ -2055,6 +1995,89 @@ def extract_resume_text_only():
         import logging
         logging.error(f"Resume text extract error: {e}")
         return jsonify({"error": "Failed to extract text from uploaded file", "retryable": True}), 500
+
+
+@app.route("/api/resume/jobs", methods=["POST"])
+@app.route("/resume/jobs", methods=["POST"])
+@limiter.limit("10 per minute")
+def create_resume_job_route():
+    """Creates an asynchronous background resume parsing job and returns job_id immediately (HTTP 202)."""
+    user_payload = _get_optional_user()
+    if user_payload:
+        request.current_user = user_payload
+        org_id = user_payload.get("organization_id")
+        if org_id and block_if_expired(org_id) and user_payload.get("role") not in ("ADMIN", "SUPER_ADMIN"):
+            return jsonify({
+                "error": "Subscription Expired",
+                "message": "Your organization's trial or subscription has expired.",
+                "is_blocked": True,
+                "subscription_status": "EXPIRED",
+            }), 403
+
+    file = request.files.get("resume") or request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "No resume file provided"}), 400
+
+    form_user_id = request.form.get("user_id")
+    if user_payload:
+        token_sub = str(user_payload.get("sub", ""))
+        token_role = user_payload.get("role", "")
+        if form_user_id and str(form_user_id) != token_sub and token_role not in ("ADMIN", "SUPER_ADMIN"):
+            return jsonify({"error": "Forbidden: Cannot upload resume for another user"}), 403
+        user_id = str(form_user_id) if (form_user_id and token_role in ("ADMIN", "SUPER_ADMIN")) else token_sub
+    else:
+        if form_user_id:
+            return jsonify({"error": "Authentication required to associate resume with a user account"}), 401
+        user_id = None
+
+    raw_consent = request.form.get("consent") or request.form.get("consent_given")
+    if raw_consent not in (True, 1, "true", "True", "1"):
+        return jsonify({"error": "Affirmative consent required"}), 400
+
+    resume_text, _filename, err_resp = _extract_resume_upload(file)
+    if err_resp:
+        return err_resp
+
+    from services.resume_service import create_resume_parse_job
+    org_id = user_payload.get("organization_id") if user_payload else None
+    job = create_resume_parse_job(
+        raw_text=resume_text,
+        chat_model=chat_model,
+        user_id=user_id,
+        org_id=org_id,
+        create_session=True,
+        run_async=True,
+    )
+    return jsonify({
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "deduplicated": job.get("deduplicated", False),
+        "poll_url": f"/api/resume/jobs/{job['job_id']}",
+        "text_length": len(resume_text),
+        "resume_text": resume_text,
+    }), 202
+
+
+@app.route("/api/resume/jobs/<job_id>", methods=["GET"])
+@app.route("/resume/jobs/<job_id>", methods=["GET"])
+def get_resume_job_route(job_id):
+    """Returns asynchronous resume parsing job status and validated result (auth/owner scoped)."""
+    from services.resume_service import get_resume_parse_job
+    job = get_resume_parse_job(job_id)
+    if not job:
+        return jsonify({"error": "Resume parsing job not found"}), 404
+
+    user_payload = _get_optional_user()
+    job_owner = job.get("user_id")
+    if job_owner:
+        if not user_payload:
+            return jsonify({"error": "Authentication required"}), 401
+        token_sub = str(user_payload.get("sub", ""))
+        token_role = user_payload.get("role", "")
+        if str(job_owner) != token_sub and token_role not in ("ADMIN", "SUPER_ADMIN"):
+            return jsonify({"error": "Forbidden: Cannot inspect another user's resume parsing job"}), 403
+
+    return jsonify(job), 200
 
 
 @app.route("/upload", methods=["POST"])
@@ -9363,13 +9386,16 @@ def superadmin_get_students():
             if uid:
                 user_sessions[uid].append(sess)
 
-        now = datetime.utcnow()
+        from services.subscription_service import parse_utc_datetime, utc_now
+        now = utc_now()
 
         def compute_status(last_session_date):
             if not last_session_date:
                 return "Never Logged In"
             try:
-                dt = datetime.fromisoformat(str(last_session_date).replace("Z", ""))
+                dt = parse_utc_datetime(last_session_date)
+                if dt is None:
+                    return "Active"
             except Exception:
                 return "Active"
             days = (now - dt).days
@@ -9406,8 +9432,8 @@ def superadmin_get_students():
             # Format last_active for display
             if last_active_dt:
                 try:
-                    dt = datetime.fromisoformat(str(last_active_dt).replace("Z", ""))
-                    days_ago = (now - dt).days
+                    dt = parse_utc_datetime(last_active_dt)
+                    days_ago = (now - dt).days if dt else 0
                     if days_ago == 0:
                         last_active_str = "Today 🟢"
                     elif days_ago == 1:
@@ -11733,13 +11759,26 @@ def root_endpoint():
         "status": "ok",
         "service": "prepfly-api",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
 
 
 @app.route("/health", methods=["GET", "HEAD"])
 def health():
-    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()}), 200
+    from services.cache_service import cache_manager
+    from services.email_service import get_email_queue_stats
+    cache_stats = cache_manager.stats()
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "cache": {
+            "mode": cache_stats.get("mode"),
+            "is_distributed": cache_stats.get("is_distributed", False),
+        },
+        "rate_limiter_storage": "redis" if str(rate_limit_storage).startswith(("redis://", "rediss://")) else "memory",
+        "email_queue": get_email_queue_stats(),
+        "schema_ok": bool((app.config.get("SCHEMA_CHECK") or {}).get("ok", True)),
+    }), 200
 
 
 @app.route("/api/cache/stats", methods=["GET"])
