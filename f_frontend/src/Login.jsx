@@ -455,9 +455,9 @@ export default function Login() {
         {/* Logo Badge */}
         <div className="logo-badge">
           <img 
-            src="/prepfly-logo.jpg" 
+            src="/prepfly-logo.png" 
             alt="PrepFly Logo" 
-            onError={(e) => { e.target.src = "/prepfly-logo.png"; }}
+            onError={(e) => { e.target.src = "/prepfly-logo.jpg"; }}
           />
         </div>
 

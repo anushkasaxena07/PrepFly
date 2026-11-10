@@ -17,8 +17,8 @@ export default function PaymentSuccess({ data = {}, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
-      <div style={{ background: "linear-gradient(145deg, #0c1220, #141d30)", border: "1px solid rgba(0, 240, 200, 0.4)", borderRadius: "24px", padding: "36px", maxWidth: "480px", width: "100%", textAlign: "center", color: "#fff", boxShadow: "0 24px 64px rgba(0, 240, 200, 0.2)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "24px", padding: "36px", maxWidth: "480px", width: "100%", textAlign: "center", color: "var(--text)", boxShadow: "0 24px 64px rgba(15,23,42,0.2)" }}>
         <div style={{ width: "72px", height: "72px", background: "rgba(109, 40, 217, 0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px", margin: "0 auto 20px auto", border: "1px solid rgba(109, 40, 217, 0.4)" }}>
           🎉
         </div>

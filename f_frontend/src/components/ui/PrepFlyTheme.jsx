@@ -3,65 +3,19 @@ import { usePrepFlyTheme } from "./ThemeContext";
 import heroMountainImg from "../../assets/hero-mountain.jpg";
 
 export function PrepFlyMark({ size = 34 }) {
-  const { isSunrise } = usePrepFlyTheme();
-
-  if (isSunrise) {
-    return (
-      <div
-        style={{
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: "10px",
-          background: "linear-gradient(135deg, #ea580c 0%, #f97316 58%, #fb923c 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          boxShadow: "0 4px 14px rgba(200, 80, 29, 0.25)",
-          transition: "background 0.45s ease, box-shadow 0.45s ease",
-        }}
-      >
-        <svg
-          width={Math.round(size * 0.6)}
-          height={Math.round(size * 0.6)}
-          viewBox="0 0 24 24"
-          fill="#ffffff"
-        >
-          <path d="M12 12.5C9.4 8.2 5.4 5.5 2.5 5.5c-.6 0-1 .5-.9 1.1.6 3.5 2.7 6.8 6.4 8.4-2.1 1.1-3.3 2.8-3.3 4.2 0 .6.6 1 1.2.8 2.4-.7 4.7-2.4 6.1-4.8 1.4 2.4 3.7 4.1 6.1 4.8.6.2 1.2-.2 1.2-.8 0-1.4-1.2-3.1-3.3-4.2 3.7-1.6 5.8-4.9 6.4-8.4.1-.6-.3-1.1-.9-1.1-2.9 0-6.9 2.7-9.5 7z" />
-        </svg>
-      </div>
-    );
-  }
-
   return (
-    <div
+    <img
+      src="/prepfly-logo.png"
+      alt="PrepFly"
       style={{
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: "10px",
-        background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #38bdf8 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        objectFit: "cover",
         flexShrink: 0,
-        boxShadow: "0 4px 16px rgba(109, 40, 217, 0.38)",
-        transition: "background 0.45s ease, box-shadow 0.45s ease",
+        boxShadow: "0 4px 14px rgba(15, 23, 42, 0.22)",
       }}
-    >
-      <svg
-        width={Math.round(size * 0.58)}
-        height={Math.round(size * 0.58)}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M22 2L11 13" />
-        <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-      </svg>
-    </div>
+    />
   );
 }
 
@@ -386,7 +340,7 @@ export function CosmicHero({
           <div className="pf-hero-right">
             {cornerNote && (
               <span className="pf-hero-note">
-                {cornerNote} <span style={{ fontSize: "13px" }}>✦</span>
+                {cornerNote}
               </span>
             )}
             {rightControls}

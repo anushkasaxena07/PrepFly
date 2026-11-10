@@ -977,10 +977,12 @@ def get_or_create_user(email, name=None, avatar=None, google_id=None):
 
 
         ins = supabase.table("users").insert({
+            "id": str(uuid.uuid4()),
             "email": email,
             "name":  name or email.split("@")[0],
             "avatar": avatar, "google_id": google_id,
-            "role": "candidate"
+            "role": "candidate",
+            "created_at": datetime.utcnow().isoformat(),
         }).execute()
         if ins and ins.data:
             return ins.data[0]
@@ -995,7 +997,7 @@ def log_authentication(email, method, success, ip_address=None):
     try:
         supabase.table("auth_logs").insert({
             "email": email, "auth_method": method,
-            "success": success, "ip_address": ip_address,
+            "success": 1 if success else 0, "ip_address": ip_address,
             "timestamp": datetime.utcnow().isoformat()
         }).execute()
     except Exception as e:
@@ -1493,8 +1495,10 @@ def verify_signup_otp():
 
         # Create real user with hashed password
         ins = supabase.table("users").insert({
+            "id": str(uuid.uuid4()),
             "name": p["name"], "email": email,
-            "password": p["password"], "role": "candidate"
+            "password": p["password"], "role": "candidate",
+            "created_at": datetime.utcnow().isoformat(),
         }).execute()
 
         if not ins or not ins.data:

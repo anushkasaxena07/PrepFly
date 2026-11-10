@@ -124,22 +124,22 @@ export default function StudentFeedbackForm({ role = "Student" }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "28px", maxWidth: "750px" }}>
       
       {/* SUBMISSION FORM CARD */}
-      <div className="pr-glass-card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "28px" }}>
-        <h3 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", marginBottom: "6px" }}>
-          💬 Share Your Feedback & Bug Reports
+      <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "28px" }}>
+        <h3 style={{ fontSize: "20px", fontWeight: 900, color: "var(--text)", marginBottom: "6px" }}>
+          💬 Share Your Feedback &amp; Bug Reports
         </h3>
-        <p style={{ fontSize: "13px", color: "var(--text2, #94a3b8)", marginBottom: "20px" }}>
+        <p style={{ fontSize: "13px", color: "var(--text2)", marginBottom: "20px" }}>
           Your feedback goes directly to our platform administrators to help improve your interview preparation experience.
         </p>
 
         {feedbackSuccessMsg && (
-          <div style={{ padding: "14px 18px", borderRadius: "10px", background: "rgba(0,196,167,0.15)", border: "1px solid #00c4a7", color: "#fff", fontWeight: 700, marginBottom: "20px", fontSize: "13px" }}>
+          <div style={{ padding: "14px 18px", borderRadius: "10px", background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", fontWeight: 700, marginBottom: "20px", fontSize: "13px" }}>
             🎉 {feedbackSuccessMsg}
           </div>
         )}
 
         {errorMsg && (
-          <div style={{ padding: "14px 18px", borderRadius: "10px", background: "rgba(239,68,68,0.15)", border: "1px solid #ef4444", color: "#f87171", fontWeight: 700, marginBottom: "20px", fontSize: "13px" }}>
+          <div style={{ padding: "14px 18px", borderRadius: "10px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontWeight: 700, marginBottom: "20px", fontSize: "13px" }}>
             ⚠️ {errorMsg}
           </div>
         )}

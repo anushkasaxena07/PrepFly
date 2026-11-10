@@ -768,7 +768,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       });
       return;
     }
-    const activeMode = overrideSetupMode || setupMode;
+    const activeMode = (typeof overrideSetupMode === "string" ? overrideSetupMode : null) || setupMode;
     setSetupError(null);
     setStep("loading");
     setLoadingStepIndex(0);
@@ -791,13 +791,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         formData.append("resume", resumeFile);
         formData.append("consent", "true");
         if (resolvedUserId) formData.append("user_id", resolvedUserId);
-        const token = localStorage.getItem("access_token");
 
-        const res = await fetch(`${BACKEND_URL}/upload`, {
-          method: "POST",
-          headers: token ? { "Authorization": "Bearer " + token } : {},
-          body: formData
-        });
+        const res = typeof apiFetch === "function"
+          ? await apiFetch("/upload", { method: "POST", body: formData })
+          : await fetch(`${BACKEND_URL}/upload`, {
+              method: "POST",
+              headers: localStorage.getItem("access_token") ? { "Authorization": "Bearer " + localStorage.getItem("access_token") } : {},
+              body: formData
+            });
         const data = await res.json();
         if (!res.ok) {
           clearInterval(interval);
@@ -1742,12 +1743,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             </div>
 
             {setupError && (
-              <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "16px", padding: "14px 18px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                <div style={{ fontSize: "13px", color: "#fca5a5" }}>
-                  <strong style={{ color: "#fff" }}>Session Error:</strong> {setupError.message}
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "16px", padding: "14px 18px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "13px", color: "#991b1b" }}>
+                  <strong style={{ color: "#7f1d1d" }}>Session Error:</strong> {setupError.message}
                 </div>
                 {setupError.retryable && (
-                  <button type="button" onClick={() => triggerStartInterview()} style={{ padding: "8px 16px", borderRadius: "10px", background: "#00c4a7", color: "#050811", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
+                  <button type="button" onClick={() => triggerStartInterview()} style={{ padding: "8px 16px", borderRadius: "10px", background: "var(--violet)", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
                     Retry Start Interview
                   </button>
                 )}
@@ -1969,7 +1970,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             <div style={{ textAlign: "center", marginTop: "16px" }}>
               <button
                 type="button"
-                onClick={triggerStartInterview}
+                onClick={() => triggerStartInterview()}
                 disabled={!consentGiven}
                 style={{
                   padding: "14px 44px",

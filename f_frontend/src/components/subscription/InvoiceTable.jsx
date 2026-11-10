@@ -6,7 +6,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 export default function InvoiceTable({ payments = [] }) {
   if (!payments || payments.length === 0) {
     return (
-      <div style={{ padding: "24px", textAlign: "center", color: "var(--text2)", background: "rgba(12, 18, 32, 0.6)", borderRadius: "12px", border: "1px solid #e5e8f2" }}>
+      <div style={{ padding: "24px", textAlign: "center", color: "var(--text2)", background: "var(--bg3)", borderRadius: "12px", border: "1px solid var(--border)" }}>
         No payment invoices generated yet.
       </div>
     );

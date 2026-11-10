@@ -2,8 +2,8 @@ import React from 'react';
 
 export default function PaymentFailed({ errorMsg, onRetry, onClose }) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
-      <div style={{ background: "linear-gradient(145deg, #0c1220, #1a1020)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "24px", padding: "36px", maxWidth: "440px", width: "100%", textAlign: "center", color: "#fff", boxShadow: "0 24px 64px rgba(239, 68, 68, 0.2)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #fecaca", borderRadius: "24px", padding: "36px", maxWidth: "440px", width: "100%", textAlign: "center", color: "var(--text)", boxShadow: "0 24px 64px rgba(220, 38, 38, 0.14)" }}>
         <div style={{ width: "72px", height: "72px", background: "rgba(239, 68, 68, 0.15)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px", margin: "0 auto 20px auto", border: "1px solid rgba(239, 68, 68, 0.4)" }}>
           ❌
         </div>

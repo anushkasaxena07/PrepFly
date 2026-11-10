@@ -193,14 +193,14 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
         onClick={() => setShowMethodsModal(true)}
         disabled={isProcessing}
         style={{
-          background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+          background: "linear-gradient(135deg, var(--violet), var(--violet2))",
           border: "none",
-          color: "#0f172a",
+          color: "#ffffff",
           fontWeight: 800,
           fontSize: "13px",
           padding: "12px 24px",
           borderRadius: "12px",
-          boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)",
+          boxShadow: "0 8px 24px rgba(109, 40, 217, 0.25)",
           cursor: isProcessing ? "not-allowed" : "pointer",
           display: "inline-flex",
           alignItems: "center",
@@ -229,17 +229,17 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
 
       {/* SUPPORTED PAYMENT METHODS MODAL */}
       {showMethodsModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
-          <div style={{ background: "linear-gradient(145deg, #0c1220, #141d30)", border: "1px solid rgba(124, 58, 237, 0.4)", borderRadius: "24px", padding: "32px", maxWidth: "520px", width: "100%", color: "#fff", boxShadow: "0 24px 64px rgba(124, 58, 237, 0.3)" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
+          <div style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "24px", padding: "32px", maxWidth: "520px", width: "100%", color: "var(--text)", boxShadow: "0 24px 64px rgba(15,23,42,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ width: "42px", height: "42px", background: "rgba(124, 58, 237, 0.2)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>💳</div>
+                <div style={{ width: "42px", height: "42px", background: "var(--cyan-dim)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>💳</div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>Select Payment Method</h3>
-                  <p style={{ fontSize: "12px", color: "var(--cyan)", margin: 0, fontWeight: 700 }}>1-Year Enterprise Plan (₹500 INR)</p>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "var(--text)" }}>Select Payment Method</h3>
+                  <p style={{ fontSize: "12px", color: "var(--violet2)", margin: 0, fontWeight: 700 }}>1-Year Enterprise Plan (₹500 INR)</p>
                 </div>
               </div>
-              <button onClick={() => setShowMethodsModal(false)} style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontWeight: 700 }}>✕</button>
+              <button onClick={() => setShowMethodsModal(false)} style={{ background: "var(--bg3)", border: "1px solid var(--border)", color: "var(--text2)", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontWeight: 700 }}>✕</button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>

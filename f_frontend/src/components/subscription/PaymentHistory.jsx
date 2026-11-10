@@ -3,7 +3,7 @@ import InvoiceTable from './InvoiceTable';
 
 export default function PaymentHistory({ payments = [] }) {
   return (
-    <div className="card" style={{ background: "rgba(12, 18, 32, 0.95)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px", marginTop: "24px" }}>
+    <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "24px", marginTop: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <div>
           <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>

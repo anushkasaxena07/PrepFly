@@ -67,21 +67,18 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
       }}>
         {!isCollapsed && (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "10px",
-              background: isSunrise ? "linear-gradient(135deg, #ea580c, #fb923c)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "15px",
-              fontWeight: 800,
-              color: "#fff",
-              boxShadow: isSunrise ? "0 4px 14px rgba(200,80,29,0.28)" : "0 4px 14px rgba(109,40,217,0.35)"
-            }}>
-              🏛
-            </div>
+            <img
+              src="/prepfly-logo.png"
+              alt="PrepFly Logo"
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "10px",
+                objectFit: "cover",
+                flexShrink: 0,
+                boxShadow: "0 4px 14px rgba(15,23,42,0.22)"
+              }}
+            />
             <div>
               <div style={{ fontWeight: 800, fontSize: "14px", color: isSunrise ? "#1f1916" : "#fff", lineHeight: "1.2", maxWidth: "145px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {organization?.name || "PrepFly Admin"}

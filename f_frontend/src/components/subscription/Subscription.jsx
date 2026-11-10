@@ -124,11 +124,11 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
           position: "fixed",
           top: "24px",
           right: "24px",
-          background: "linear-gradient(135deg, #6d28d9, #1e293b)",
-          color: "#0f172a",
+          background: "linear-gradient(135deg, var(--violet2), var(--violet))",
+          color: "#ffffff",
           padding: "16px 24px",
           borderRadius: "14px",
-          boxShadow: "0 12px 32px rgba(109,40,217,0.3)",
+          boxShadow: "0 12px 32px rgba(109,40,217,0.28)",
           zIndex: 9999,
           fontWeight: 700,
           display: "flex",
@@ -174,8 +174,8 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       {/* EXPIRY REMINDER ALERTS */}
       {reminders.map((rem, i) => (
         <div key={i} style={{
-          background: rem.level === 'EXPIRED' ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-          border: `1px solid ${rem.level === 'EXPIRED' ? "#ef4444" : "#f59e0b"}`,
+          background: rem.level === 'EXPIRED' ? "#fef2f2" : "#fffbeb",
+          border: `1px solid ${rem.level === 'EXPIRED' ? "#fecaca" : "#fde68a"}`,
           borderRadius: "14px",
           padding: "16px 20px",
           marginBottom: "24px",
@@ -186,7 +186,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span style={{ fontSize: "20px" }}>{rem.level === 'EXPIRED' ? "🚨" : "⚠️"}</span>
-            <span style={{ color: rem.level === 'EXPIRED' ? "#fca5a5" : "#fcd34d", fontWeight: 700, fontSize: "14px" }}>
+            <span style={{ color: rem.level === 'EXPIRED' ? "#991b1b" : "#92400e", fontWeight: 700, fontSize: "14px" }}>
               {rem.message}
             </span>
           </div>
@@ -195,12 +195,12 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       ))}
 
       {/* SUBSCRIPTION STATUS CARD */}
-      <div style={{
-        background: "linear-gradient(135deg, rgba(12, 18, 32, 0.9) 0%, rgba(20, 28, 48, 0.8) 100%)",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+      <div className="pf-card" style={{
+        background: "#ffffff",
+        border: "1px solid var(--border)",
         borderRadius: "20px",
         padding: "28px",
-        boxShadow: "0 16px 40px rgba(0, 0, 0, 0.4)",
+        boxShadow: "0 4px 18px rgba(15, 23, 42, 0.04)",
         position: "relative",
         overflow: "hidden"
       }}>
@@ -212,8 +212,8 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
           
           <div>
             <div style={{ fontSize: "12px", color: "var(--text2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>CURRENT PLAN</div>
-            <div style={{ fontSize: "24px", fontWeight: 900, color: "#0f172a", marginTop: "6px" }}>{planName} Plan</div>
-            <div style={{ fontSize: "14px", color: "var(--cyan)", fontWeight: 800, marginTop: "4px" }}>₹500 / 365 Days (1 Year)</div>
+            <div style={{ fontSize: "24px", fontWeight: 900, color: "var(--text)", marginTop: "6px" }}>{planName} Plan</div>
+            <div style={{ fontSize: "14px", color: "var(--violet2)", fontWeight: 800, marginTop: "4px" }}>₹500 / 365 Days (1 Year)</div>
           </div>
 
           <div>
@@ -221,7 +221,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
             <div style={{
               fontSize: "24px",
               fontWeight: 900,
-              color: isBlocked ? "#ef4444" : daysRemaining <= 3 ? "#f59e0b" : "#6d28d9",
+              color: isBlocked ? "#dc2626" : daysRemaining <= 3 ? "#d97706" : "var(--violet2)",
               marginTop: "6px"
             }}>
               {isBlocked ? "Expired Access" : `${daysRemaining} Days Left`}
@@ -233,7 +233,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
 
           <div>
             <div style={{ fontSize: "12px", color: "var(--text2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>DATES</div>
-            <div style={{ fontSize: "13px", color: "#0f172a", marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ fontSize: "13px", color: "var(--text)", marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
               <div><strong>Started:</strong> {statusData?.trial_start ? statusData.trial_start.split("T")[0] : "2026-07-20"}</div>
               <div><strong>Expires:</strong> {statusData?.trial_end ? statusData.trial_end.split("T")[0] : "2026-07-30"}</div>
             </div>
@@ -244,7 +244,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
         <div style={{
           marginTop: "24px",
           paddingTop: "20px",
-          borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+          borderTop: "1px solid var(--border)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -259,40 +259,40 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       </div>
 
       {/* PLAN BENEFITS SUMMARY */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginTop: "24px" }}>
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", marginTop: "24px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>👥</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>All Students Included</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>All Students Included</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Students belonging to your organization automatically receive premium features.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>🤖</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Unlimited AI Mock Interviews</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>Unlimited AI Mock Interviews</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Live speech-to-text feedback, transcript analytics, and STAR method evaluations.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>💻</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Coding Test Environment</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>Coding Test Environment</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Automated code execution, complexity review, and collaborative WebRTC rooms.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>📄</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Instant PDF Invoices</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>Instant PDF Invoices</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>GST-compliant PDF invoices generated automatically after every payment.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>📊</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Institutional Analytics</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>Institutional Analytics</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Cohort breakdown, skill weakness tracking, and downloadable CSV candidate digests.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+        <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>⚡</div>
-          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>24/7 Priority Support & SLA</div>
+          <div style={{ fontWeight: 800, color: "var(--text)", fontSize: "14px" }}>24/7 Priority Support & SLA</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Dedicated account manager, custom API integrations, and guaranteed 99.9% uptime.</div>
         </div>
       </div>
@@ -302,10 +302,10 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
 
       {/* COVERED ORGANIZATION STUDENTS ROSTER (ADMIN ONLY) */}
       {isAdmin && (
-        <div style={{ marginTop: "32px", background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "24px" }}>
+        <div className="pf-card" style={{ marginTop: "32px", background: "#ffffff", border: "1px solid var(--border)", borderRadius: "20px", padding: "24px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <h3 style={{ color: "#0f172a", fontSize: "16px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <h3 style={{ color: "var(--text)", fontSize: "16px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>👥</span> Covered Organization Students ({students.length})
               </h3>
               <p style={{ color: "var(--text2)", fontSize: "12px", margin: "4px 0 0 0" }}>
@@ -319,15 +319,15 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
                   onClick={handleBulkRenew}
                   disabled={bulkRenewing}
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                    color: "#0f172a",
+                    background: "linear-gradient(135deg, var(--violet), var(--violet2))",
+                    color: "#ffffff",
                     border: "none",
                     borderRadius: "12px",
                     padding: "8px 16px",
                     fontSize: "12px",
                     fontWeight: 800,
                     cursor: "pointer",
-                    boxShadow: "0 4px 16px rgba(124, 79, 224, 0.4)",
+                    boxShadow: "0 4px 16px rgba(109, 40, 217, 0.25)",
                     display: "flex",
                     alignItems: "center",
                     gap: "6px"
@@ -336,7 +336,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
                   <span>⚡</span> {bulkRenewing ? "Renewing..." : `Bulk Renew Access (${selectedIds.length} Selected)`}
                 </button>
               )}
-              <div style={{ background: "rgba(109, 40, 217, 0.15)", color: "#6d28d9", border: "1px solid rgba(109,40,217,0.3)", padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 700 }}>
+              <div style={{ background: "var(--cyan-dim)", color: "var(--violet2)", border: "1px solid var(--border2)", padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 700 }}>
                 Active Subscription Coverage
               </div>
             </div>

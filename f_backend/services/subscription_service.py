@@ -9,6 +9,27 @@ def get_supabase():
         from local_supabase import SQLiteSupabaseMock
         return SQLiteSupabaseMock()
 
+def _safe_org_write(supabase, op, payload, eq_id=None):
+    """Execute organization insert/update and strip optional unmigrated columns on PGRST204."""
+    clean = dict(payload)
+    for _ in range(3):
+        try:
+            q = supabase.table("organization").insert(clean) if op == "insert" else supabase.table("organization").update(clean).eq("id", eq_id)
+            return q.execute()
+        except Exception as exc:
+            msg = str(exc)
+            removed = False
+            for opt_col in ("updated_at", "status", "created_at"):
+                if opt_col in clean and ("PGRST204" in msg or opt_col in msg):
+                    clean.pop(opt_col, None)
+                    removed = True
+                    break
+            if not removed:
+                raise
+    q = supabase.table("organization").insert(clean) if op == "insert" else supabase.table("organization").update(clean).eq("id", eq_id)
+    return q.execute()
+
+
 def get_org_subscription_status(org_id):
     if not org_id:
         return {
@@ -37,7 +58,7 @@ def get_org_subscription_status(org_id):
         org_name = f"Organization {org_id[:8]}" if len(org_id) >= 8 else f"Organization {org_id}"
         
         try:
-            supabase.table("organization").insert({
+            _safe_org_write(supabase, "insert", {
                 "id": org_id,
                 "name": org_name,
                 "type": "College",
@@ -48,7 +69,7 @@ def get_org_subscription_status(org_id):
                 "status": "Active",
                 "created_at": now.isoformat(),
                 "updated_at": now.isoformat()
-            }).execute()
+            })
 
             res_new = supabase.table("organization").select("*").eq("id", org_id).execute()
             if res_new and hasattr(res_new, "data") and res_new.data:
@@ -88,7 +109,7 @@ def get_org_subscription_status(org_id):
                     sub_status = "EXPIRED"
                     current_plan = "Expired"
                     is_blocked = True
-                    supabase.table("organization").update({"subscription_status": "EXPIRED", "updated_at": now.isoformat()}).eq("id", org_id).execute()
+                    _safe_org_write(supabase, "update", {"subscription_status": "EXPIRED", "updated_at": now.isoformat()}, org_id)
                 else:
                     if days_remaining <= 7 and days_remaining > 0:
                         reminders.append(f"🔔 Subscription Notice: {days_remaining} days remaining before your plan expires.")
@@ -102,13 +123,13 @@ def get_org_subscription_status(org_id):
             sub_start_str = s_start.isoformat()
             days_remaining = 365
             try:
-                supabase.table("organization").update({
+                _safe_org_write(supabase, "update", {
                     "subscription_start": sub_start_str,
                     "subscription_expiry": sub_expiry_str,
                     "subscription_status": "ACTIVE",
                     "current_plan": current_plan,
                     "updated_at": now.isoformat()
-                }).eq("id", org_id).execute()
+                }, org_id)
             except Exception as e:
                 print("Update default active subscription notice:", e)
 
@@ -121,7 +142,7 @@ def get_org_subscription_status(org_id):
                     sub_status = "EXPIRED"
                     current_plan = "Expired"
                     is_blocked = True
-                    supabase.table("organization").update({"subscription_status": "EXPIRED", "updated_at": now.isoformat()}).eq("id", org_id).execute()
+                    _safe_org_write(supabase, "update", {"subscription_status": "EXPIRED", "updated_at": now.isoformat()}, org_id)
                 else:
                     if days_remaining <= 3:
                         reminders.append(f"⏰ Free Trial expires in {days_remaining} day(s). Renew now to maintain uninterrupted access.")
@@ -131,13 +152,13 @@ def get_org_subscription_status(org_id):
         else:
             t_start = now
             t_end = t_start + timedelta(days=14)
-            supabase.table("organization").update({
+            _safe_org_write(supabase, "update", {
                 "trial_start": t_start.isoformat(),
                 "trial_end": t_end.isoformat(),
                 "subscription_status": "TRIAL",
                 "current_plan": "Trial",
                 "updated_at": now.isoformat()
-            }).eq("id", org_id).execute()
+            }, org_id)
             trial_start_str = t_start.isoformat()
             trial_end_str = t_end.isoformat()
             days_remaining = 14

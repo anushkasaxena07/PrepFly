@@ -438,5 +438,46 @@ class TestSubscriptionService(unittest.TestCase):
         cached_val = sess_data.get("cached_hints")
         self.assertTrue(cached_val in [{}, "{}", None, ""] or len(cached_val or {}) == 0)
 
+    def test_get_or_create_user_assigns_non_null_id_and_auth_log_integer(self):
+        """New users created by Google/email login must receive a non-null UUID id, and auth_logs.success must be 0/1."""
+        import uuid
+        from app import get_or_create_user, log_authentication
+        from services.subscription_service import get_supabase
+
+        sb = get_supabase()
+        unique_email = f"google_{uuid.uuid4().hex[:8]}@example.com"
+        created = get_or_create_user(unique_email, name="Anushka Google", google_id="107605240944621582348")
+        self.assertIsNotNone(created)
+        self.assertTrue(bool(created.get("id")))
+
+        log_authentication(unique_email, "google", False, "127.0.0.1")
+        logs = sb.table("auth_logs").select("*").eq("email", unique_email).execute().data
+        self.assertTrue(len(logs) >= 1)
+        self.assertIn(logs[-1]["success"], (0, 1))
+        self.assertEqual(logs[-1]["success"], 0)
+
+    def test_safe_org_write_strips_missing_updated_at_on_pgrst204(self):
+        """Organization status creation must retry without updated_at when PostgREST reports PGRST204."""
+        from services.subscription_service import _safe_org_write
+
+        mock_sb = MagicMock()
+        seen_payloads = []
+
+        def insert_side_effect(payload):
+            seen_payloads.append(dict(payload))
+            leaf = MagicMock()
+            if "updated_at" in payload:
+                leaf.execute.side_effect = RuntimeError("PGRST204: Could not find the 'updated_at' column of 'organization'")
+            else:
+                leaf.execute.return_value = MagicMock(data=[payload])
+            return leaf
+
+        mock_sb.table.return_value.insert.side_effect = insert_side_effect
+        res = _safe_org_write(mock_sb, "insert", {"id": "org_1", "name": "Test Org", "updated_at": "2026-11-10T00:00:00"})
+        self.assertEqual(len(seen_payloads), 2)
+        self.assertIn("updated_at", seen_payloads[0])
+        self.assertNotIn("updated_at", seen_payloads[1])
+        self.assertEqual(res.data[0]["id"], "org_1")
+
 if __name__ == "__main__":
     unittest.main()

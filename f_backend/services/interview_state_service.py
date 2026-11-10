@@ -125,6 +125,11 @@ class InterviewStateService:
             return False
 
     @staticmethod
+    def _scoped_idem_id(session_id: str, request_id: str) -> str:
+        prefix = f"{session_id}::"
+        return request_id if request_id.startswith(prefix) else f"{prefix}{request_id}"
+
+    @staticmethod
     def check_idempotency(supabase_client, session_id: str, request_id: Optional[str]) -> Optional[Dict[str, Any]]:
         """
         Checks if request_id has already been executed for this session.
@@ -133,8 +138,11 @@ class InterviewStateService:
         if not request_id:
             return None
 
+        scoped_id = InterviewStateService._scoped_idem_id(session_id, request_id)
         try:
-            res = supabase_client.table("interview_turns").select("*").eq("session_id", session_id).eq("id", request_id).execute()
+            res = supabase_client.table("interview_turns").select("*").eq("session_id", session_id).eq("id", scoped_id).execute()
+            if not (res and hasattr(res, "data") and res.data):
+                res = supabase_client.table("interview_turns").select("*").eq("session_id", session_id).eq("id", request_id).execute()
             if res and hasattr(res, "data") and res.data:
                 row = res.data[0]
                 eval_data = row.get("evaluation_json")
@@ -171,7 +179,11 @@ class InterviewStateService:
         request_id: Optional[str] = None
     ) -> bool:
         """Records an immutable relational turn audit record."""
-        turn_id = request_id or f"turn_{session_id}_{turn_number}_{int(datetime.now(timezone.utc).timestamp())}"
+        turn_id = (
+            InterviewStateService._scoped_idem_id(session_id, request_id)
+            if request_id
+            else f"turn_{session_id}_{turn_number}_{int(datetime.now(timezone.utc).timestamp())}"
+        )
         turn_record = {
             "id": turn_id,
             "session_id": session_id,

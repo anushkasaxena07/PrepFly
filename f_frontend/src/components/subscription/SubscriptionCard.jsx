@@ -11,15 +11,13 @@ export default function SubscriptionCard({ subscription, onUpgrade }) {
   };
 
   return (
-    <div className="card" style={{ background: "linear-gradient(135deg, rgba(12,18,32,0.9), rgba(20,29,48,0.9))", border: "1px solid rgba(155,109,255,0.25)", borderRadius: "16px", padding: "24px", position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px", background: "radial-gradient(circle, rgba(155,109,255,0.15) 0%, transparent 70%)", borderRadius: "50%", pointerEvents: "none" }} />
-
+    <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "24px", position: "relative", overflow: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
         <div>
-          <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--cyan)", letterSpacing: "1px", marginBottom: "4px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "var(--violet2)", letterSpacing: "1px", marginBottom: "4px" }}>
             Current Subscription Plan
           </div>
-          <h2 style={{ fontSize: "24px", fontWeight: 900, margin: 0, color: "#0f172a", display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "24px", fontWeight: 900, margin: 0, color: "var(--text)", display: "flex", alignItems: "center", gap: "10px" }}>
             <span>{isPremium ? "💎 PREMIUM PLAN" : "🌱 FREE TIER"}</span>
             {getStatusBadge(status)}
           </h2>
@@ -28,7 +26,7 @@ export default function SubscriptionCard({ subscription, onUpgrade }) {
         {!isPremium && (
           <button 
             className="btn btn-primary" 
-            style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", boxShadow: "0 8px 24px rgba(124,79,224,0.35)", padding: "10px 20px", fontWeight: 800 }}
+            style={{ background: "linear-gradient(135deg, var(--violet), var(--violet2))", color: "#ffffff", border: "none", boxShadow: "0 8px 24px rgba(109,40,217,0.25)", padding: "10px 20px", fontWeight: 800 }}
             onClick={onUpgrade}
           >
             👑 Upgrade to Premium
@@ -36,7 +34,7 @@ export default function SubscriptionCard({ subscription, onUpgrade }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px", background: "rgba(0,0,0,0.25)", padding: "16px", borderRadius: "12px", border: "1px solid #e5e8f2" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "16px", background: "var(--bg3)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)" }}>
         <div>
           <div style={{ fontSize: "11px", color: "var(--text2)", marginBottom: "4px" }}>Start Date</div>
           <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{subscription?.start_date || "2026-07-01"}</div>
