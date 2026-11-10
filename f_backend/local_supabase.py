@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import threading
 import uuid
 import re
 from datetime import datetime, timedelta
@@ -27,6 +28,7 @@ class SQLiteSupabaseMock:
                 dir_path = os.path.dirname(os.path.abspath(__file__))
                 self.db_path = os.path.join(dir_path, db_path) if not os.path.isabs(db_path) else db_path
             self._anchor_conn = None
+        self._db_lock = threading.RLock()
         self.storage = MockStorage()
         self._init_db()
 
@@ -167,7 +169,27 @@ class SQLiteSupabaseMock:
             ("consent_timestamp", "TEXT"),
             ("privacy_policy_version", "TEXT"),
             ("job_description", "TEXT"),
-            ("organization_id", "TEXT")
+            ("organization_id", "TEXT"),
+            ("report_json", "TEXT"),
+            ("final_score_100", "REAL"),
+            ("grade_color", "TEXT"),
+            ("grade_label", "TEXT"),
+            ("performance_level", "TEXT"),
+            ("hiring_recommendation", "TEXT"),
+            ("job_target_id", "TEXT"),
+            ("level", "TEXT DEFAULT 'Mid'"),
+            ("mode", "TEXT DEFAULT 'resume'"),
+            ("status", "TEXT DEFAULT 'created'"),
+            ("started_at", "TEXT"),
+            ("ended_at", "TEXT"),
+            ("resume_snapshot_json", "TEXT"),
+            ("display_name", "TEXT DEFAULT 'Candidate'"),
+            ("display_name_source", "TEXT DEFAULT 'fallback'"),
+            ("blueprint_json", "TEXT"),
+            ("adaptive_state_json", "TEXT"),
+            ("report_status", "TEXT DEFAULT 'pending'"),
+            ("model_used", "TEXT"),
+            ("prompt_versions_json", "TEXT")
         ]
         for col_name, col_type in session_cols:
             try:
@@ -640,6 +662,19 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 27b. parsed_resumes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS parsed_resumes (
+                id TEXT PRIMARY KEY,
+                hash TEXT UNIQUE,
+                raw_text TEXT,
+                structured_data TEXT,
+                ats_score INTEGER DEFAULT 70,
+                missing_info TEXT,
+                created_at TEXT
+            )
+        """)
+
         # 28. support_tickets
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS support_tickets (
@@ -836,11 +871,19 @@ class SQLiteSupabaseMock:
                 created_at TEXT NOT NULL
             )
         """)
-        for se_col, se_type in [("raw_score", "REAL"), ("weighted_score", "REAL"), ("confidence", "REAL DEFAULT 1.0")]:
+        for se_col, se_type in [
+            ("raw_score", "REAL"),
+            ("weighted_score", "REAL"),
+            ("confidence", "REAL DEFAULT 1.0"),
+            ("difficulty", "TEXT DEFAULT 'Medium'"),
+            ("evaluator_version", "TEXT DEFAULT 'v1'"),
+            ("dedupe_key", "TEXT"),
+        ]:
             try:
                 cursor.execute(f"ALTER TABLE skill_evidence ADD COLUMN {_validate_ident(se_col)} {se_type}")
             except Exception:
                 pass
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_skill_evidence_dedupe_key ON skill_evidence(dedupe_key) WHERE dedupe_key IS NOT NULL")
 
         # 36. assessments
         cursor.execute("""
@@ -1000,21 +1043,143 @@ class SQLiteSupabaseMock:
             except Exception:
                 pass
 
-        # 44. interview_turns
+        # 44. interview_turns (extended for Phase 1 normalized turn ledger)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS interview_turns (
                 id TEXT PRIMARY KEY,
                 session_id TEXT NOT NULL,
-                turn_number INTEGER NOT NULL,
-                question_text TEXT NOT NULL,
+                turn_number INTEGER,
+                turn_index INTEGER,
+                speaker TEXT,
+                question_id TEXT,
+                skill_id TEXT,
+                question_text TEXT,
+                text TEXT,
                 question_type TEXT,
                 stage TEXT,
                 candidate_response TEXT,
+                input_mode TEXT,
+                stt_engine TEXT,
+                stt_confidence REAL,
+                audio_ref TEXT,
+                audio_duration_s REAL,
+                started_at TEXT,
+                ended_at TEXT,
+                word_count INTEGER,
+                turn_status TEXT DEFAULT 'answered',
                 intent TEXT DEFAULT 'ANSWER',
                 decision TEXT DEFAULT 'NEXT_QUESTION',
-                score REAL DEFAULT 0.0,
-                accuracy_score INTEGER DEFAULT 0,
+                score REAL,
+                accuracy_score INTEGER,
                 evaluation_json TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        for col_name, col_type in [
+            ("turn_index", "INTEGER"),
+            ("speaker", "TEXT"),
+            ("question_id", "TEXT"),
+            ("skill_id", "TEXT"),
+            ("text", "TEXT"),
+            ("input_mode", "TEXT"),
+            ("stt_engine", "TEXT"),
+            ("stt_confidence", "REAL"),
+            ("audio_ref", "TEXT"),
+            ("audio_duration_s", "REAL"),
+            ("started_at", "TEXT"),
+            ("ended_at", "TEXT"),
+            ("word_count", "INTEGER"),
+            ("turn_status", "TEXT DEFAULT 'answered'")
+        ]:
+            try:
+                cursor.execute(f"ALTER TABLE interview_turns ADD COLUMN {_validate_ident(col_name)} {col_type}")
+            except Exception:
+                pass
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_interview_turns_session_idx ON interview_turns(session_id, turn_index)")
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_interview_turns_session_idx_speaker
+            ON interview_turns(session_id, turn_index, speaker)
+            WHERE turn_index IS NOT NULL AND speaker IS NOT NULL
+        """)
+
+        # 44b. interview_speech_metrics
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_speech_metrics (
+                turn_id TEXT PRIMARY KEY,
+                session_id TEXT,
+                wpm REAL,
+                filler_count INTEGER,
+                filler_map_json TEXT DEFAULT '{}',
+                pause_count INTEGER,
+                longest_pause_s REAL,
+                avg_pause_s REAL,
+                speaking_time_s REAL,
+                silence_ratio REAL,
+                computed_by TEXT NOT NULL DEFAULT 'deterministic_python',
+                formula_version TEXT NOT NULL DEFAULT 'v1',
+                missing_reason TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_speech_metrics_session ON interview_speech_metrics(session_id)")
+
+        # 44c. interview_evaluations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_evaluations (
+                id TEXT PRIMARY KEY,
+                turn_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                skill_id TEXT,
+                rubric_scores_json TEXT,
+                raw_score REAL,
+                normalized_score REAL,
+                quoted_evidence_json TEXT,
+                missing_concepts_json TEXT,
+                technical_mistakes_json TEXT,
+                improved_answer TEXT,
+                misconception_tags TEXT DEFAULT '[]',
+                evaluator_type TEXT NOT NULL DEFAULT 'gemini_rubric',
+                prompt_id TEXT,
+                prompt_version TEXT,
+                model_used TEXT,
+                status TEXT NOT NULL DEFAULT 'ok',
+                error_code TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_interview_evals_turn ON interview_evaluations(turn_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_interview_evals_session ON interview_evaluations(session_id)")
+
+        # 44d. interview_reports
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_reports (
+                id TEXT PRIMARY KEY,
+                session_id TEXT UNIQUE NOT NULL,
+                candidate_id TEXT NOT NULL,
+                report_status TEXT NOT NULL,
+                overall_score REAL,
+                grade TEXT,
+                recommendation TEXT,
+                dimension_scores_json TEXT,
+                strengths_json TEXT,
+                weaknesses_json TEXT,
+                coverage_json TEXT,
+                data_sufficiency_json TEXT,
+                formula_version TEXT NOT NULL DEFAULT 'v1',
+                generated_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_interview_reports_candidate ON interview_reports(candidate_id)")
+
+        # 44e. interview_question_rubrics (service-role-only rubric store)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_question_rubrics (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                question_id TEXT,
+                skill_id TEXT,
+                rubric_json TEXT NOT NULL,
+                reference_answer TEXT,
                 created_at TEXT NOT NULL
             )
         """)
@@ -1345,6 +1510,7 @@ class SQLiteSupabaseMock:
                 skill_id TEXT NOT NULL,
                 code_submission TEXT,
                 text_submission TEXT,
+                answer_hash TEXT,
                 created_at TEXT NOT NULL
             )
         """)
@@ -1376,6 +1542,9 @@ class SQLiteSupabaseMock:
                 user_id TEXT NOT NULL,
                 title TEXT NOT NULL,
                 summary TEXT,
+                context_summary TEXT,
+                status TEXT DEFAULT 'active',
+                metadata TEXT DEFAULT '{}',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -1389,10 +1558,29 @@ class SQLiteSupabaseMock:
                 user_id TEXT NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                intent TEXT DEFAULT 'general_chat',
                 context_payload TEXT,
+                tokens_used INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL
             )
         """)
+
+        # Ensure additional columns exist in mentor_conversations and mentor_messages
+        cursor.execute("PRAGMA table_info(mentor_conversations)")
+        mc_cols = [c[1] for c in cursor.fetchall()]
+        if "context_summary" not in mc_cols:
+            cursor.execute("ALTER TABLE mentor_conversations ADD COLUMN context_summary TEXT")
+        if "status" not in mc_cols:
+            cursor.execute("ALTER TABLE mentor_conversations ADD COLUMN status TEXT DEFAULT 'active'")
+        if "metadata" not in mc_cols:
+            cursor.execute("ALTER TABLE mentor_conversations ADD COLUMN metadata TEXT DEFAULT '{}'")
+
+        cursor.execute("PRAGMA table_info(mentor_messages)")
+        mm_cols = [c[1] for c in cursor.fetchall()]
+        if "intent" not in mm_cols:
+            cursor.execute("ALTER TABLE mentor_messages ADD COLUMN intent TEXT DEFAULT 'general_chat'")
+        if "tokens_used" not in mm_cols:
+            cursor.execute("ALTER TABLE mentor_messages ADD COLUMN tokens_used INTEGER DEFAULT 0")
 
         # 68. canonical_skills (Authoritative Hierarchical Skill Catalog)
         cursor.execute("""
@@ -1543,11 +1731,18 @@ class SQLiteSupabaseMock:
                 proficiency REAL NOT NULL DEFAULT 0.0,
                 confidence REAL NOT NULL DEFAULT 0.0,
                 sample_count INTEGER NOT NULL DEFAULT 0,
+                status TEXT DEFAULT 'NOT_ASSESSED',
                 last_assessed_at TEXT,
                 updated_at TEXT NOT NULL,
                 UNIQUE(user_id, skill_id)
             )
         """)
+
+        # Ensure status column exists in candidate_skill_states if table was created previously
+        cursor.execute("PRAGMA table_info(candidate_skill_states)")
+        css_cols = [c[1] for c in cursor.fetchall()]
+        if "status" not in css_cols:
+            cursor.execute("ALTER TABLE candidate_skill_states ADD COLUMN status TEXT DEFAULT 'NOT_ASSESSED'")
 
         # 77. score_audit_log (Score Calculation Audit & Explainability Ledger)
         cursor.execute("""
@@ -1559,6 +1754,42 @@ class SQLiteSupabaseMock:
                 score_inputs TEXT DEFAULT '{}',
                 calculated_score REAL NOT NULL,
                 generated_at TEXT NOT NULL
+            )
+        """)
+
+        # 78. interview_goals (Prompt 2: Adaptive AI Interview Mentor Goals)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_goals (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                target_company TEXT,
+                target_role TEXT NOT NULL,
+                job_description_text TEXT,
+                required_experience_years REAL DEFAULT 0.0,
+                candidate_actual_experience_years REAL DEFAULT 0.0,
+                resume_text TEXT,
+                target_interview_date TEXT,
+                days_horizon INTEGER DEFAULT 30,
+                daily_minutes INTEGER DEFAULT 60,
+                self_reported_skills TEXT DEFAULT '[]',
+                previous_attempts INTEGER DEFAULT 0,
+                learning_preference TEXT DEFAULT 'hands-on',
+                status TEXT DEFAULT 'active',
+                version INTEGER DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 79. activity_hint_logs (3-Tier Hint Tracking & Evidence Penalty Ledger)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS activity_hint_logs (
+                id TEXT PRIMARY KEY,
+                activity_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                hint_level INTEGER NOT NULL,
+                penalty_percentage REAL NOT NULL,
+                accessed_at TEXT NOT NULL
             )
         """)
 
@@ -1806,6 +2037,116 @@ class SQLiteSupabaseMock:
     def table(self, name):
         return QueryBuilder(self, _validate_ident(name))
 
+    def for_client_role(self, uid: str, role: str = "authenticated"):
+        """Returns a client-role proxy enforcing Migration 010 RLS and privilege rules."""
+        return ClientRoleProxy(self, uid=str(uid), role=role)
+
+
+class ClientRoleProxy:
+    """Enforces PostgreSQL Migration 010 RLS & column privileges on SQLiteSupabaseMock for tests."""
+    BACKEND_WRITE_ONLY_TABLES = {
+        "interview_speech_metrics",
+        "interview_evaluations",
+        "interview_reports",
+        "interview_question_rubrics",
+    }
+    PRIVATE_RUBRIC_TABLES = {"interview_question_rubrics"}
+
+    def __init__(self, mock_client: SQLiteSupabaseMock, uid: str, role: str = "authenticated"):
+        self._client = mock_client
+        self.uid = uid
+        self.role = role
+
+    def table(self, name: str):
+        return _ClientRoleQueryBuilder(self._client, _validate_ident(name), self.uid, self.role)
+
+
+class _ClientRoleQueryBuilder:
+    def __init__(self, mock_client: SQLiteSupabaseMock, table_name: str, uid: str, role: str):
+        self._client = mock_client
+        self._qb = QueryBuilder(mock_client, table_name)
+        self.table_name = table_name
+        self.uid = uid
+        self.role = role
+        self._op = None
+        self._cols = "*"
+
+    def select(self, columns="*", count=None):
+        self._op = "select"
+        self._cols = columns
+        self._qb.select(columns, count=count)
+        return self
+
+    def insert(self, data):
+        self._op = "insert"
+        self._qb.insert(data)
+        return self
+
+    def update(self, data):
+        self._op = "update"
+        self._qb.update(data)
+        return self
+
+    def upsert(self, data, on_conflict=None):
+        self._op = "upsert"
+        self._qb.upsert(data, on_conflict=on_conflict)
+        return self
+
+    def delete(self):
+        self._op = "delete"
+        self._qb.delete()
+        return self
+
+    def eq(self, column, value):
+        self._qb.eq(column, value)
+        return self
+
+    def execute(self):
+        if self.table_name in ClientRoleProxy.PRIVATE_RUBRIC_TABLES:
+            raise PermissionError(f"RLS/privilege denied for role '{self.role}' on private table '{self.table_name}'")
+
+        if self._op in ("insert", "update", "upsert", "delete"):
+            if self.table_name in ClientRoleProxy.BACKEND_WRITE_ONLY_TABLES:
+                raise PermissionError(
+                    f"RLS/privilege denied: role '{self.role}' cannot {self._op} on '{self.table_name}' (service_role only)"
+                )
+
+        if self._op == "select" and self.table_name == "interview_evaluations":
+            if self._cols == "*" or "rubric_scores_json" in [c.strip() for c in str(self._cols).split(",")]:
+                raise PermissionError(
+                    f"Privilege denied: role '{self.role}' cannot select rubric column on 'interview_evaluations'"
+                )
+
+        # Evaluate RLS ownership over full rows (matching PostgreSQL USING clause before projection)
+        if self._op == "select":
+            full_qb = QueryBuilder(self._client, self.table_name)
+            full_qb.select("*")
+            full_qb.filters = list(self._qb.filters)
+            full_qb.order_by = self._qb.order_by
+            full_qb.limit_val = self._qb.limit_val
+            full_res = full_qb.execute()
+            raw_rows = list(full_res.data or []) if full_res else []
+
+            owned_sessions = {
+                row.get("session_id")
+                for row in (self._client.table("sessions").select("session_id").eq("user_id", self.uid).execute().data or [])
+            }
+            if self.table_name == "sessions":
+                filtered = [r for r in raw_rows if str(r.get("user_id")) == self.uid]
+            elif self.table_name == "interview_reports":
+                filtered = [r for r in raw_rows if str(r.get("candidate_id")) == self.uid]
+            elif self.table_name in ("interview_turns", "interview_speech_metrics", "interview_evaluations"):
+                filtered = [r for r in raw_rows if r.get("session_id") in owned_sessions]
+            else:
+                filtered = raw_rows
+
+            if self._cols != "*":
+                wanted = [c.strip() for c in str(self._cols).split(",")]
+                filtered = [{k: row.get(k) for k in wanted if k in row} for row in filtered]
+            return DummyResult(filtered)
+
+        return self._qb.execute()
+
 
 class MockStorageBucket:
     def __init__(self, bucket_name):
@@ -1925,14 +2266,15 @@ class QueryBuilder:
 
 
     def execute(self):
-        conn = self.client._get_conn()
-        try:
-            return self._execute_internal(conn)
-        finally:
+        with self.client._db_lock:
+            conn = self.client._get_conn()
             try:
-                conn.close()
-            except Exception:
-                pass
+                return self._execute_internal(conn)
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def _execute_internal(self, conn):
         cursor = conn.cursor()

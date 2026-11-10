@@ -1,8 +1,27 @@
 import os
 import hashlib
 import json
+import random
+import time
+import logging
 import docx
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+RESUME_PARSE_PROMPT_ID = "resume_parse"
+RESUME_PARSE_PROMPT_VERSION = "v1.0"
+
+
+class ResumeParseError(Exception):
+    """Raised when AI resume parsing fails after retries (must never return HTTP 200)."""
+    def __init__(self, message: str, status_code: int = 503, retryable: bool = True, details: str = ""):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.retryable = retryable
+        self.details = details
+
 
 def get_supabase():
     try:
@@ -21,10 +40,10 @@ def extract_text_from_pdf(filepath):
                 extracted = page.extract_text()
                 if extracted:
                     text += extracted + "\n"
-    except Exception as e:
+    except Exception:
         try:
-            import fitz
-            doc = fitz.open(filepath)
+            import pymupdf
+            doc = pymupdf.open(filepath)
             for page in doc:
                 text += page.get_text() + "\n"
         except Exception as e2:
@@ -79,6 +98,14 @@ def get_cached_resume(text_hash):
                 "ats_score": row.get("ats_score", 70),
                 "missing_info": m_info or []
             }
+            # Reject previously poisoned fallback cache entries
+            if (
+                isinstance(result["structured_data"], dict)
+                and result["structured_data"].get("full_name") == "Candidate"
+                and result["structured_data"].get("skills") == ["Software Engineering", "Algorithms"]
+                and result["ats_score"] == 70
+            ):
+                return None
             try:
                 from services.cache_service import cache_manager
                 cache_manager.set(f"resume:{text_hash}", result, ttl=86400)
@@ -116,7 +143,32 @@ def save_cached_resume(text_hash, raw_text, structured_data, ats_score, missing_
         except Exception:
             pass
     except Exception as e:
-        print("Save resume cache error:", e)
+        logger.warning("Save resume cache notice: %s", e)
+
+
+def _strip_json_fences(content: str) -> str:
+    txt = (content or "").strip()
+    if txt.startswith("```"):
+        lines = txt.split("\n")
+        if len(lines) >= 3:
+            txt = "\n".join(lines[1:-1]).strip()
+        else:
+            txt = txt.strip("`").strip()
+    return txt
+
+
+def _validate_parsed_resume(parsed: object) -> dict:
+    if not isinstance(parsed, dict):
+        raise ValueError("Parsed output must be a JSON object")
+    if "skills" not in parsed or not isinstance(parsed.get("skills"), list):
+        raise ValueError("Missing or non-list 'skills' field in parsed resume JSON")
+    return parsed
+
+
+def _is_transient_gemini_error(err: Exception) -> bool:
+    s = str(err).lower()
+    return any(tok in s for tok in ("503", "504", "429", "unavailable", "deadline", "timed out", "timeout", "resource exhausted"))
+
 
 def parse_resume_content(raw_text, chat_model):
     if not raw_text or not raw_text.strip():
@@ -129,10 +181,18 @@ def parse_resume_content(raw_text, chat_model):
     text_hash = compute_text_hash(raw_text)
     cached = get_cached_resume(text_hash)
     if cached:
-        print(f"[RESUME CACHE HIT] Reusing cached resume parsing for hash {text_hash[:8]}")
+        logger.info("[RESUME CACHE HIT] Reusing cached resume parsing for hash %s", text_hash[:8])
         return cached
 
-    prompt = f"""Analyze the following resume text and extract structured candidate profile data.
+    if chat_model is None:
+        raise ResumeParseError(
+            message="AI resume parser is currently unavailable. Please retry.",
+            status_code=503,
+            retryable=True,
+            details="chat_model is None",
+        )
+
+    base_prompt = f"""Analyze the following resume text and extract structured candidate profile data.
 Return ONLY valid JSON with no markdown formatting or backticks.
 
 Resume Content:
@@ -151,34 +211,54 @@ Expected JSON Schema:
   "missing_info": ["string"]
 }}"""
 
-    try:
-        from langchain_core.messages import HumanMessage
-        response = chat_model.invoke([HumanMessage(content=prompt)])
-        content = response.content.strip()
-        if content.startswith("```"):
-            lines = content.split("\n")
-            content = "\n".join(lines[1:-1]).strip()
+    from langchain_core.messages import HumanMessage
 
-        parsed = json.loads(content)
-        ats_score = parsed.get("ats_score", 70)
-        missing_info = parsed.get("missing_info", [])
-        save_cached_resume(text_hash, raw_text, parsed, ats_score, missing_info)
-        return {
-            "structured_data": parsed,
-            "ats_score": ats_score,
-            "missing_info": missing_info
-        }
-    except Exception as e:
-        print("Parse resume AI error:", e)
-        fallback_data = {
-            "full_name": "Candidate",
-            "skills": ["Software Engineering", "Algorithms"],
-            "ats_score": 70,
-            "missing_info": ["Detailed project metrics"]
-        }
-        save_cached_resume(text_hash, raw_text, fallback_data, 70, fallback_data["missing_info"])
-        return {
-            "structured_data": fallback_data,
-            "ats_score": 70,
-            "missing_info": fallback_data["missing_info"]
-        }
+    model_used = getattr(chat_model, "model", None) or getattr(chat_model, "model_name", None) or "gemini"
+    last_err = None
+    prompt_to_send = base_prompt
+
+    # Up to 3 attempts with exponential backoff + jitter on transient 503/504,
+    # and validation-error feedback on invalid JSON.
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            response = chat_model.invoke([HumanMessage(content=prompt_to_send)])
+            raw_content = getattr(response, "content", "") if response is not None else ""
+            cleaned = _strip_json_fences(raw_content)
+            parsed = _validate_parsed_resume(json.loads(cleaned))
+
+            ats_score = parsed.get("ats_score", 70)
+            missing_info = parsed.get("missing_info", [])
+            save_cached_resume(text_hash, raw_text, parsed, ats_score, missing_info)
+            return {
+                "structured_data": parsed,
+                "ats_score": ats_score,
+                "missing_info": missing_info,
+                "model_used": str(model_used),
+                "prompt_id": RESUME_PARSE_PROMPT_ID,
+                "prompt_version": RESUME_PARSE_PROMPT_VERSION,
+            }
+        except (json.JSONDecodeError, ValueError) as val_err:
+            last_err = val_err
+            logger.warning("Resume parse JSON validation failed (attempt %d/%d): %s", attempt + 1, max_attempts, val_err)
+            prompt_to_send = (
+                f"{base_prompt}\n\nPREVIOUS OUTPUT WAS INVALID JSON ({val_err}). "
+                "Respond with ONLY a valid JSON object matching the schema."
+            )
+        except Exception as err:
+            last_err = err
+            logger.warning("Resume parse Gemini call failed (attempt %d/%d): %s", attempt + 1, max_attempts, err)
+            if _is_transient_gemini_error(err) and attempt < max_attempts - 1:
+                sleep_s = (0.4 * (2 ** attempt)) + random.uniform(0.0, 0.25)
+                time.sleep(sleep_s)
+                continue
+            if not _is_transient_gemini_error(err):
+                break
+
+    status_code = 504 if (last_err and ("504" in str(last_err) or "deadline" in str(last_err).lower() or "timed out" in str(last_err).lower())) else 503
+    raise ResumeParseError(
+        message="AI resume parsing failed after retries. Please retry uploading your resume or continue without a resume.",
+        status_code=status_code,
+        retryable=True,
+        details=type(last_err).__name__ if last_err else "unknown_error",
+    )

@@ -16,7 +16,7 @@ export default function UsageCard({ usage }) {
       limit: usage?.ai_interviews_limit ?? "Unlimited",
       unit: "interviews",
       icon: "🎤",
-      color: "#00c4a7"
+      color: "#6d28d9"
     },
     {
       label: "Coding Tests",
@@ -24,7 +24,7 @@ export default function UsageCard({ usage }) {
       limit: usage?.coding_tests_limit ?? "Unlimited",
       unit: "tests",
       icon: "💻",
-      color: "#7c4fe0"
+      color: "#7c3aed"
     },
     {
       label: "Resume Analysis",
@@ -54,8 +54,8 @@ export default function UsageCard({ usage }) {
   ];
 
   return (
-    <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-      <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+    <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+      <div style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
         <span>📊</span> Usage Statistics & Consumption
       </div>
 
@@ -63,7 +63,7 @@ export default function UsageCard({ usage }) {
         {usageItems.map((item, idx) => {
           const pct = item.pct !== undefined ? item.pct : calcPercent(item.used, item.limit);
           return (
-            <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "16px" }}>
+            <div key={idx} style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text1)", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span>{item.icon}</span> {item.label}
@@ -73,7 +73,7 @@ export default function UsageCard({ usage }) {
                 </span>
               </div>
 
-              <div style={{ fontSize: "16px", fontWeight: 900, color: "#fff", marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
                 {item.used} <span style={{ fontSize: "12px", color: "var(--text2)", fontWeight: 600 }}>/ {item.limit}</span>
               </div>
 

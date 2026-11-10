@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getSupportUnreadCount } from '../../services/supportAPI';
+import { usePrepFlyTheme } from '../ui/ThemeContext';
 
 export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, organization = {}, isExpired = false }) {
+  const { isSunrise } = usePrepFlyTheme();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -38,50 +40,54 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
   };
 
   return (
-    <aside style={{
-      width: isCollapsed ? "72px" : "260px",
+    <aside className="pf-portal-sidebar" style={{
+      width: isCollapsed ? "74px" : "248px",
       minHeight: "100vh",
-      background: "#070b14",
-      borderRight: "1px solid rgba(255,255,255,0.08)",
+      background: isSunrise
+        ? "linear-gradient(180deg, #fdf9f6 0%, #faf4ee 100%)"
+        : "linear-gradient(180deg, #0b0e1a 0%, #0e1222 100%)",
+      borderRight: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.07)",
       display: "flex",
       flexDirection: "column",
       transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
       position: "sticky",
       top: 0,
       zIndex: 100,
-      userSelect: "none"
+      userSelect: "none",
+      color: isSunrise ? "#3d322c" : "#e2e8f0"
     }}>
       {/* BRAND & TOGGLE HEADER */}
       <div style={{
-        height: "64px",
+        height: "68px",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: isCollapsed ? "center" : "space-between",
-        borderBottom: "1px solid rgba(255,255,255,0.06)"
+        borderBottom: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.06)"
       }}>
         {!isCollapsed && (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{
               width: "32px",
               height: "32px",
-              borderRadius: "8px",
-              background: "linear-gradient(135deg, #7c4fe0, #00c4a7)",
+              borderRadius: "10px",
+              background: isSunrise ? "linear-gradient(135deg, #ea580c, #fb923c)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "16px",
-              fontWeight: 900,
-              color: "#fff"
+              fontSize: "15px",
+              fontWeight: 800,
+              color: "#fff",
+              boxShadow: isSunrise ? "0 4px 14px rgba(200,80,29,0.28)" : "0 4px 14px rgba(109,40,217,0.35)"
             }}>
               🏛
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: "14px", color: "#fff", lineHeight: "1.2", maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {organization?.name || "Organization Admin"}
+              <div style={{ fontWeight: 800, fontSize: "14px", color: isSunrise ? "#1f1916" : "#fff", lineHeight: "1.2", maxWidth: "145px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {organization?.name || "PrepFly Admin"}
               </div>
-              <div style={{ fontSize: "10px", color: isExpired ? "#f87171" : "var(--cyan)", fontWeight: 700, textTransform: "uppercase" }}>
-                {isExpired ? "🔴 TRIAL EXPIRED" : `${organization?.type || "College"} Admin`}
+              <div style={{ fontSize: "10px", color: isExpired ? "#dc2626" : (isSunrise ? "#c8501d" : "#a78bfa"), fontWeight: 700, textTransform: "uppercase" }}>
+                {isExpired ? "TRIAL EXPIRED" : `${organization?.type || "College"} Portal`}
               </div>
             </div>
           </div>
@@ -90,10 +96,10 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           style={{
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: isSunrise ? "#ffffff" : "rgba(255,255,255,0.05)",
+            border: isSunrise ? "1px solid #e4d2c4" : "1px solid rgba(255,255,255,0.1)",
             borderRadius: "6px",
-            color: "var(--text2)",
+            color: isSunrise ? "#5d4e45" : "var(--text2)",
             padding: "4px 8px",
             cursor: "pointer",
             fontSize: "12px"
@@ -123,15 +129,23 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                 padding: isCollapsed ? "10px 0" : "10px 14px",
                 justifyContent: isCollapsed ? "center" : "flex-start",
                 borderRadius: "10px",
-                background: isActive ? "linear-gradient(135deg, rgba(124,79,224,0.25), rgba(0,196,167,0.15))" : "transparent",
-                border: isActive ? "1px solid rgba(0,240,200,0.3)" : "1px solid transparent",
-                color: isDisabled ? "rgba(255,255,255,0.2)" : isActive ? "#fff" : "var(--text2)",
-                fontWeight: isActive ? 800 : 600,
+                background: isActive
+                  ? (isSunrise ? "#fce3d4" : "linear-gradient(90deg, rgba(109,40,217,0.44) 0%, rgba(79,70,229,0.20) 100%)")
+                  : "transparent",
+                border: isActive
+                  ? (isSunrise ? "1px solid #f5cbb2" : "1px solid rgba(167,139,250,0.34)")
+                  : "1px solid transparent",
+                color: isDisabled
+                  ? (isSunrise ? "#c4b5a9" : "rgba(255,255,255,0.25)")
+                  : isActive
+                    ? (isSunrise ? "#b84718" : "#ffffff")
+                    : (isSunrise ? "#4c3f37" : "#94a3b8"),
+                fontWeight: isActive ? 700 : 600,
                 fontSize: "13px",
                 cursor: isDisabled ? "not-allowed" : "pointer",
                 transition: "all 0.15s ease",
                 textAlign: "left",
-                opacity: isDisabled ? 0.4 : 1
+                opacity: isDisabled ? 0.45 : 1
               }}
               title={isDisabled ? "Subscription Expired - Locked" : isCollapsed ? item.label : ""}
             >

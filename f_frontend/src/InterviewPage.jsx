@@ -302,11 +302,27 @@ const InterviewPage = () => {
 
   // ── Audio / TTS ────────────────────────────────────────────────────────
   const playSpeech = useCallback((text, onStartCallback) => {
+    if (isEndingRef.current) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      if (currentAudioRef.current) { currentAudioRef.current.pause(); currentAudioRef.current = null; }
+      speechQueue.current = [];
+      isAudioPlaying.current = false;
+      setIsAvaTalking(false);
+      return;
+    }
     speechQueue.current.push({ text, onStart: onStartCallback });
     if (!isAudioPlaying.current) playNextInQueue();
   }, []);
 
   const playNextInQueue = () => {
+    if (isEndingRef.current) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      if (currentAudioRef.current) { currentAudioRef.current.pause(); currentAudioRef.current = null; }
+      speechQueue.current = [];
+      isAudioPlaying.current = false;
+      setIsAvaTalking(false);
+      return;
+    }
     if (!speechQueue.current.length) {
       isAudioPlaying.current = false;
       setIsAvaTalking(false);
@@ -535,6 +551,16 @@ const InterviewPage = () => {
       const data = await res.json();
 
       if (res.ok) {
+        if (data.audio_cutoff) {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          if (currentAudioRef.current) { currentAudioRef.current.pause(); currentAudioRef.current = null; }
+          speechQueue.current = [];
+          isAudioPlaying.current = false;
+          setIsAvaTalking(false);
+          isEndingRef.current = true;
+          endInterview();
+          return;
+        }
         if (data.message === "Repeating question") {
           setIsAvaThinking(false);
           setAvaStatus("Repeating question... Speak or type when ready!");
@@ -643,6 +669,9 @@ const InterviewPage = () => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
 
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     speechQueue.current = [];
     isAudioPlaying.current = false;
     setIsAvaTalking(false);
@@ -725,24 +754,24 @@ const InterviewPage = () => {
 
         .iv-navbar {
           display: flex; justify-content: space-between; align-items: center;
-          background: rgba(8,12,20,0.95); backdrop-filter: blur(16px);
-          border-bottom: 1px solid rgba(255,255,255,0.07);
+          background: #0b0e1a;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
           padding: 0 28px; height: 64px;
           position: fixed; top: 0; left: 0; right: 0; z-index: 100;
         }
         .iv-brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; color: #e8edf8; }
-        .iv-brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#00e5c3,#00b8ff); border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #080c14; }
-        .iv-avatar-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,229,195,0.15); border: 1.5px solid rgba(0,229,195,0.35); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #00e5c3; cursor: pointer; position: relative; }
-        .iv-dropdown { position: absolute; top: 44px; right: 0; background: #0d1220; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 6px; min-width: 160px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); }
-        .iv-dropdown li { list-style: none; padding: 10px 14px; font-size: 13px; color: #e8edf8; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
-        .iv-dropdown li:hover { background: rgba(255,255,255,0.07); }
+        .iv-brand-icon { width: 34px; height: 34px; background: linear-gradient(135deg,#6d28d9,#8b5cf6); border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #ffffff; }
+        .iv-avatar-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(124,58,237,0.22); border: 1.5px solid rgba(167,139,250,0.45); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #c4b5fd; cursor: pointer; position: relative; }
+        .iv-dropdown { position: absolute; top: 44px; right: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 6px; min-width: 160px; box-shadow: 0 16px 40px rgba(15,23,42,0.2); }
+        .iv-dropdown li { list-style: none; padding: 10px 14px; font-size: 13px; color: #0f172a; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+        .iv-dropdown li:hover { background: #f1f5f9; }
 
         .iv-page {
           min-height: 100vh;
           padding: 80px 20px 40px;
-          background: radial-gradient(ellipse at 20% 50%, rgba(124,58,237,0.08) 0%, transparent 60%),
-                      radial-gradient(ellipse at 80% 20%, rgba(0,229,195,0.06) 0%, transparent 50%),
-                      linear-gradient(160deg, #080c14 0%, #0a1020 100%);
+          background: radial-gradient(ellipse at 20% 50%, rgba(124,58,237,0.16) 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 20%, rgba(79,70,229,0.12) 0%, transparent 50%),
+                      linear-gradient(160deg, #090c1a 0%, #10142a 100%);
         }
 
         .iv-grid {
@@ -809,13 +838,13 @@ const InterviewPage = () => {
         @keyframes recordGlow { from { box-shadow: 0 0 0 rgba(255,79,106,0); } to { box-shadow: 0 0 20px rgba(255,79,106,0.3); } }
 
         .iv-btn { width: 100%; padding: 12px 20px; border-radius: 12px; border: none; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .iv-btn-primary { background: linear-gradient(135deg,#00e5c3,#00b8ff); color: #050d14; }
-        .iv-btn-ghost { background: rgba(255,255,255,0.05); color: #e8edf8; border: 1px solid rgba(255,255,255,0.1); }
-        .iv-btn-danger { background: rgba(255,79,106,0.12); color: #ff4f6a; border: 1px solid rgba(255,79,106,0.25); max-width: 200px; margin: 0 auto; }
+        .iv-btn-primary { background: linear-gradient(135deg,#6d28d9,#7c3aed); color: #ffffff; }
+        .iv-btn-ghost { background: rgba(255,255,255,0.08); color: #e8edf8; border: 1px solid rgba(255,255,255,0.14); }
+        .iv-btn-danger { background: rgba(239,68,68,0.16); color: #f87171; border: 1px solid rgba(239,68,68,0.3); max-width: 200px; margin: 0 auto; }
 
-        .iv-feedback { width: 100%; background: rgba(0,229,195,0.05); border: 1px solid rgba(0,229,195,0.18); border-radius: 16px; padding: 16px 18px; font-size: 13px; color: #b8c8d8; line-height: 1.8; white-space: pre-wrap; }
+        .iv-feedback { width: 100%; background: rgba(124,58,237,0.10); border: 1px solid rgba(167,139,250,0.28); border-radius: 16px; padding: 16px 18px; font-size: 13px; color: #e2e8f0; line-height: 1.8; white-space: pre-wrap; }
         .iv-score-bar { width: 100%; display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 14px; }
-        .iv-score-bar-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg,#00e5c3,#00b8ff); transition: width 1s ease; }
+        .iv-score-bar-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg,#7c3aed,#a78bfa); transition: width 1s ease; }
         .iv-score-bar-bg { flex: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
 
         .iv-action-row { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
@@ -834,7 +863,7 @@ const InterviewPage = () => {
       <nav className="iv-navbar">
         <div className="iv-brand" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <img src="/prepfly-logo.png" alt="PrepFly" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 10px rgba(0,196,167,0.4)" }} />
-          <span style={{ fontSize: "18px", fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Prep<span style={{ color: "#00c4a7" }}>Fly</span></span>
+          <span style={{ fontSize: "18px", fontWeight: 800, color: "#fff", letterSpacing: "-0.4px" }}>Prep<span style={{ color: "#a78bfa" }}>Fly</span></span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {atsScore && (
@@ -864,82 +893,30 @@ const InterviewPage = () => {
 
       <div className="iv-page">
         {interviewComplete && finalResult ? (() => {
-          const answeredCount = finalResult.answered_questions_count !== undefined 
-            ? Number(finalResult.answered_questions_count) 
-            : (allFeedbacks ? allFeedbacks.length : 0);
+          const rStatus = finalResult.report_status || "INCOMPLETE_INSUFFICIENT_DATA";
+          const canShowScore = rStatus === "EVALUATED" || rStatus === "PARTIAL";
+          const score100 = canShowScore && finalResult.overall_score_100 !== null && finalResult.overall_score_100 !== undefined
+            ? Math.round(Number(finalResult.overall_score_100))
+            : null;
+          const displayGrade = canShowScore ? finalResult.grade : null;
+          const displayRec = canShowScore ? (finalResult.recommendation || finalResult.hiring_recommendation) : null;
+          const statusColor = rStatus === "EVALUATED" ? "#00c4a7" : rStatus === "PARTIAL" ? "#f59e0b" : "#94a3b8";
+          const gInfo = {
+            grade: displayGrade || "—",
+            label: rStatus === "EVALUATED" ? "Evaluated" : rStatus === "PARTIAL" ? "Partial Evidence" : rStatus === "EVALUATION_FAILED" ? "Evaluation Pending Retry" : "Incomplete Session",
+            color: statusColor,
+            bgColor: `${statusColor}22`,
+            rec: displayRec || finalResult.status_reason || "More evidence required before issuing a verdict.",
+            level: finalResult.header?.level || "Mid",
+            score: score100,
+          };
 
-          let rawScore = 0;
-          if (finalResult.overall_score_100 !== undefined && finalResult.overall_score_100 !== null) {
-            rawScore = Number(finalResult.overall_score_100);
-          } else if (finalResult.overall_score !== undefined && finalResult.overall_score !== null) {
-            rawScore = Number(finalResult.overall_score);
-          }
-
-          let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
-
-          // PrepFly Proration Guard
-          if (answeredCount === 0) {
-            score100 = 0;
-          } else if (answeredCount < 5 && score100 > (answeredCount * 10)) {
-            score100 = Math.min(100, Math.max(0, Math.round(score100 * (answeredCount / 10))));
-          }
-
-          let gInfo;
-          if (score100 === 0 || answeredCount === 0) {
-            gInfo = {
-              grade: "F",
-              label: "Unevaluated / No Responses",
-              desc: "No responses attempted during interview",
-              color: "#ef4444",
-              bgColor: "rgba(239, 68, 68, 0.15)",
-              rec: "Strong Reject (No Responses Provided)",
-              level: "Beginner / Not Attempted",
-              score: 0
-            };
-          } else if (answeredCount < 3) {
-            gInfo = {
-              grade: "F",
-              label: "Incomplete / Early Exit",
-              desc: `Only ${answeredCount} of 10 questions answered`,
-              color: "#ef4444",
-              bgColor: "rgba(239, 68, 68, 0.15)",
-              rec: `Strong Reject (Incomplete — only ${answeredCount} of 10 questions answered)`,
-              level: "Incomplete Session",
-              score: score100
-            };
-          } else if (answeredCount < 5) {
-            const rawG = getGradeInfo(score100);
-            gInfo = {
-              ...rawG,
-              grade: rawG.grade.startsWith("A") || rawG.grade.startsWith("B") ? "D" : rawG.grade,
-              label: "Preliminary Assessment",
-              color: "#f59e0b",
-              bgColor: "rgba(245, 158, 11, 0.15)",
-              rec: "Preliminary Evaluation (Requires ≥ 5 answered questions)",
-              level: "Preliminary Evaluation",
-              score: score100
-            };
-          } else {
-            gInfo = finalResult.grade && finalResult.grade_color ? {
-              grade: finalResult.grade,
-              label: finalResult.grade_label || "Evaluated Candidate",
-              color: finalResult.grade_color,
-              bgColor: `${finalResult.grade_color}22`,
-              rec: finalResult.hiring_recommendation || finalResult.recommendation || "Evaluated",
-              level: finalResult.performance_level || "Standard Candidate",
-              score: score100
-            } : getGradeInfo(score100);
-          }
-
-          const sectionGrades = finalResult.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = (score100 === 0 || answeredCount < 5) ? [] : (finalResult.badges || getBadges(score100, sectionGrades));
-          const topStrengths = finalResult.top_strengths || ["Excellent Communication", "Strong Technical Knowledge", "Good Leadership"];
-          const topImprovements = finalResult.top_improvements || ["Complete full 10 questions for deep assessment"];
-          const prevScore100 = Number(localStorage.getItem("last_interview_score_100")) || Math.max(40, score100 - 6);
-          const prevGInfo = getGradeInfo(prevScore100);
-          const diffPct = prevScore100 > 0 ? Math.round(((score100 - prevScore100) / prevScore100) * 100) : 0;
-          const isEarlyExit = answeredCount < 3 && answeredCount > 0;
-          const isPrelim = answeredCount < 5 && answeredCount >= 3;
+          const sectionGrades = finalResult.dimensions || finalResult.section_grades || [];
+          const earnedBadges = [];
+          const topStrengths = Array.isArray(finalResult.strengths) ? finalResult.strengths : [];
+          const topImprovements = Array.isArray(finalResult.weaknesses) ? finalResult.weaknesses : [];
+          const prevGInfo = { grade: "—" };
+          const diffPct = 0;
 
           return (
             <div className="iv-results">
@@ -947,17 +924,21 @@ const InterviewPage = () => {
               <div className="iv-results-hero" style={{ background: "rgba(12,18,35,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, padding: "28px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "16px" }}>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
-                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>
-                      {isEarlyExit ? "Incomplete Assessment" : (isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`)}
+                    <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>
+                      {finalResult.header?.candidate_name || finalResult.candidate_name || "Candidate"} · {finalResult.header?.role || "Interview"}
                     </div>
-                    <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "2px" }}>📌 Hiring Recommendation: {gInfo.rec}</div>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>
+                      {gInfo.label}
+                    </div>
+                    <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "2px" }}>
+                      {displayRec ? `📌 Hiring Recommendation: ${displayRec}` : gInfo.rec}
+                    </div>
                   </div>
 
                   {/* Circular Grade Badge */}
-                  <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `4px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 24px ${gInfo.color}44`, flexShrink: 0 }}>
-                    <div style={{ fontSize: "32px", fontWeight: 900, color: gInfo.color, lineHeight: 1 }}>{gInfo.grade}</div>
-                    <div style={{ fontSize: "11px", fontWeight: 800, color: "#fff", marginTop: "2px" }}>{score100}/100</div>
+                  <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `3px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: displayGrade && displayGrade.length > 3 ? "13px" : "28px", fontWeight: 900, color: gInfo.color, lineHeight: 1.1 }}>{gInfo.grade}</div>
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "#fff", marginTop: "2px" }}>{score100 !== null ? `${score100}/100` : "Not Scored"}</div>
                   </div>
                 </div>
 
@@ -1010,13 +991,15 @@ const InterviewPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px" }}>
                   {sectionGrades.map((sec, idx) => {
                     const isSelected = selectedEvidenceDimension?.name === sec.name;
+                    const isUnassessed = sec.score === null || sec.score === undefined || sec.status === "Not evaluated";
+                    const secColor = isUnassessed ? "#94a3b8" : (sec.color || "#00c4a7");
                     return (
                       <div 
                         key={idx} 
                         onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
                         style={{ 
                           background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
-                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${sec.color}33`, 
+                          border: isSelected ? `2.5px solid ${secColor}` : `1px solid ${secColor}33`, 
                           borderRadius: "12px", 
                           padding: "12px", 
                           textAlign: "center",
@@ -1026,8 +1009,8 @@ const InterviewPage = () => {
                         }}
                       >
                         <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                        <div style={{ fontSize: "18px", fontWeight: 900, color: sec.color, marginTop: "4px" }}>
-                          {sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span>
+                        <div style={{ fontSize: "16px", fontWeight: 900, color: secColor, marginTop: "4px" }}>
+                          {isUnassessed ? "Not evaluated" : <>{sec.score} <span style={{ fontSize: "12px", opacity: 0.8 }}>({sec.grade})</span></>}
                         </div>
                         <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
                           {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}

@@ -2,10 +2,7 @@ import os
 import sys
 import shutil
 import time
-try:
-    import pymupdf as fitz
-except Exception:
-    import fitz
+import pymupdf as fitz
 import uuid
 import random
 import base64
@@ -393,7 +390,6 @@ class SupabaseFallbackClient:
         allow_fallback = (
             bool(os.getenv("ALLOW_SQLITE_FALLBACK"))
             or bool(os.getenv("SUPABASE_ALLOW_OFFLINE_FALLBACK"))
-            or bool(os.getenv("RENDER"))
         )
         
         if _is_production_mode() and not allow_fallback:
@@ -517,40 +513,15 @@ class RealBuilderWrapper:
                             new_args.append(arg)
                     args = tuple(new_args)
 
-                # Intercept sessions table write queries to bypass missing Supabase columns
-                if self.table_name == "sessions" and attr in ("insert", "update") and len(args) > 0:
+                # Ensure array/object TEXT columns on sessions are valid JSON strings before Supabase write
+                if self.table_name == "sessions" and attr in ("insert", "update", "upsert") and len(args) > 0:
                     import json
-                    metadata_fields = [
-                        "active", "category", "difficulty", "stage", "ats_score", "structured_resume",
-                        "final_score_100", "grade_color", "grade_label", "performance_level",
-                        "hiring_recommendation", "role", "interview_mode", "total_questions",
-                        "consent_given", "consent_timestamp", "privacy_policy_version",
-                        "job_description", "organization_id", "cached_hints", "interview_state",
-                        "personality", "knowledge_map", "idempotency_key", "turn_count"
-                    ]
-                    
+
                     def process_dict(data):
-                        # Ensure array/object fields are serialized to valid JSON strings for TEXT columns
                         for list_field in ("questions", "responses", "feedbacks", "scores"):
                             if list_field in data and isinstance(data[list_field], (list, dict)):
                                 data[list_field] = json.dumps(data[list_field])
 
-                        metadata = {}
-                        for field in metadata_fields:
-                            if field in data:
-                                metadata[field] = data.pop(field)
-                        if metadata:
-                            existing_meta = {}
-                            if "storage_path" in data and data["storage_path"]:
-                                try:
-                                    existing_meta = json.loads(data["storage_path"])
-                                    if not isinstance(existing_meta, dict):
-                                        existing_meta = {}
-                                except Exception:
-                                    pass
-                            existing_meta.update(metadata)
-                            data["storage_path"] = json.dumps(existing_meta)
-                    
                     if isinstance(args[0], dict):
                         process_dict(args[0])
                     elif isinstance(args[0], list):
@@ -606,48 +577,45 @@ class RealBuilderWrapper:
         try:
             res = self.real_builder.execute()
             _restore_meta(res)
-
-            allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (self.local_builder is not None)
-            if (not _is_production_mode() or allow_fallback) and self.local_builder is not None:
-                if hasattr(res, "data") and not res.data:
-                    try:
-                        loc_res = self.local_builder.execute()
-                        if hasattr(loc_res, "data") and loc_res.data:
-                            return _restore_meta(loc_res)
-                    except Exception:
-                        pass
-                try:
-                    self.local_builder.execute()
-                except Exception:
-                    pass
             return res
         except Exception as e:
-            allow_fallback = (bool(os.getenv("ALLOW_SQLITE_FALLBACK")) or bool(os.getenv("RENDER"))) and (self.local_builder is not None)
-            if _is_production_mode() and not allow_fallback:
-                # In production, never silently fall back to local SQLite: return 503 instead
+            err_str = str(e)
+            is_schema_err = any(code in err_str for code in ("PGRST204", "PGRST205", "42703", "42P01", "23505", "23503"))
+            allow_fallback = bool(os.getenv("ALLOW_SQLITE_FALLBACK")) and (self.local_builder is not None) and (not is_schema_err)
+            if _is_production_mode() or not allow_fallback or is_schema_err:
                 from flask import has_request_context, jsonify, make_response
                 from werkzeug.exceptions import ServiceUnavailable
                 import logging
-                logging.error(f"[DATABASE ERROR] Supabase query failed in production: {e}")
-                if has_request_context():
+                logging.error(f"[DATABASE ERROR] Supabase execute failed on '{self.table_name}': {e}")
+                if is_schema_err:
+                    logging.critical(
+                        f"[SCHEMA DRIFT / DB CONSTRAINT] Table '{self.table_name}' failed write/read ({e}). "
+                        "Will NOT fall back to local SQLite; run migration 010 and reload PostgREST schema."
+                    )
+                if has_request_context() and not is_schema_err:
                     resp = make_response(jsonify({
                         "error": "Database service temporarily unavailable",
                         "status": 503,
                         "details": "The primary database is currently unreachable. Please retry shortly."
                     }), 503)
                     raise ServiceUnavailable(response=resp) from e
-                raise RuntimeError(f"Database service unavailable: {e}") from e
-            err_str = str(e)
-            if "PGRST205" not in err_str and "Could not find the table" not in err_str:
-                print(f"[NOTICE] Supabase execute fallback for '{self.table_name}': {e}")
-            try:
-                if self.local_builder is not None:
-                    return _restore_meta(self.local_builder.execute())
-                raise e
-            except Exception:
-                raise e
+                raise RuntimeError(f"Database execute failed on '{self.table_name}': {e}") from e
+            if self.local_builder is not None:
+                import logging
+                logging.warning(f"[DEV OFFLINE FALLBACK] Using local SQLite mock for '{self.table_name}' after connection error: {e}")
+                return _restore_meta(self.local_builder.execute())
+            raise e
 
 supabase = SupabaseFallbackClient(SUPABASE_URL, SUPABASE_KEY)
+
+try:
+    from services.schema_check_service import verify_database_schema
+    _startup_schema_status = verify_database_schema(supabase)
+    app.config["SCHEMA_CHECK"] = _startup_schema_status
+except Exception as _schema_exc:
+    import logging
+    logging.error(f"[SCHEMA SELF-CHECK EXCEPTION] {_schema_exc}")
+    app.config["SCHEMA_CHECK"] = {"ok": False, "error": str(_schema_exc)}
 
 # ─── Email / SMTP ──────────────────────────────────────────────────────────────
 SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -2057,70 +2025,102 @@ def upload_resume():
     file.save(save_path)
 
     try:
+        from services.resume_service import ResumeParseError
+        from services.identity_service import resolve_candidate_display_name
+
         resume_text = extract_text_from_pdf(save_path) if ext == "pdf" else extract_text_from_docx(save_path)
         if not resume_text.strip():
             return jsonify({"error": "Could not extract text from resume"}), 400
 
-        # High-performance structured parsing & ATS scoring with SQLite caching
-        parse_result = parse_resume_content(resume_text, chat_model)
+        # Parse resume via Gemini (raises ResumeParseError on 503/504/failure — never falls back silently to HTTP 200)
+        try:
+            parse_result = parse_resume_content(resume_text, chat_model)
+        except ResumeParseError as rpe:
+            from services.interview_reliability_service import get_degraded_error_payload
+            degraded = get_degraded_error_payload(f"GEMINI_{rpe.status_code}", rpe.message)
+            return jsonify({
+                "error": rpe.message,
+                "message": rpe.message,
+                "retryable": rpe.retryable,
+                "retry_after_s": degraded["retry_after_s"],
+                "degraded_message": degraded["degraded_message"],
+                "step": "resume_parse"
+            }), rpe.status_code
 
-        session_id   = str(uuid.uuid4())
+        structured_data = parse_result.get("structured_data", {})
+        display_name, display_name_source = resolve_candidate_display_name(
+            user_payload=user_payload,
+            user_id=user_id,
+            parsed_resume=structured_data,
+            supabase_client=supabase,
+        )
+        prompt_versions = {
+            "resume_parse": parse_result.get("prompt_version", "v1.0")
+        }
+
+        session_id = str(uuid.uuid4())
+        now_iso = datetime.utcnow().isoformat()
         session_data = {
             "session_id": session_id,
             "resume_text": resume_text,
+            "resume_snapshot_json": json.dumps(structured_data),
             "question_index": 0,
             "questions": [],
             "responses": [],
             "feedbacks": [],
             "active": True,
+            "status": "created",
+            "mode": "resume",
             "role": "Resume Based",
+            "level": "Mid",
             "interview_mode": "resume",
             "total_questions": 10,
             "ats_score": parse_result.get("ats_score", 70),
-            "structured_resume": json.dumps(parse_result.get("structured_data", {})),
+            "structured_resume": json.dumps(structured_data),
+            "display_name": display_name,
+            "display_name_source": display_name_source,
+            "report_status": "pending",
+            "model_used": parse_result.get("model_used"),
+            "prompt_versions_json": json.dumps(prompt_versions),
             "consent_given": 1,
-            "consent_timestamp": datetime.utcnow().isoformat(),
-            "privacy_policy_version": "DPDP-2023-v1.0"
+            "consent_timestamp": now_iso,
+            "privacy_policy_version": "DPDP-2023-v1.0",
+            "created_at": now_iso,
+            "updated_at": now_iso,
         }
         if user_id:
             session_data["user_id"] = user_id
         if user_payload and user_payload.get("organization_id"):
             session_data["organization_id"] = user_payload.get("organization_id")
 
-        persisted = False
         try:
             supabase.table("sessions").insert(session_data).execute()
-            persisted = True
         except Exception as db_err:
-            import logging, traceback
-            logging.error(f"Session DB insert failed: {db_err}\n{traceback.format_exc()}")
-            try:
-                from local_supabase import local_supabase
-                local_supabase.table("sessions").insert(session_data).execute()
-                persisted = True
-                logging.info(f"Session {session_id} saved to local fallback")
-            except Exception as loc_err:
-                logging.error(f"Local fallback session insert failed: {loc_err}")
-
-        if not persisted:
+            import logging
+            logging.error(f"Session DB insert failed on /upload: {db_err}")
             return jsonify({
                 "error": "Failed to persist interview session",
-                "message": "Database write failed. Please retry your upload."
+                "message": "Database write failed. Please retry your upload.",
+                "retryable": True
             }), 500
 
         return jsonify({
             "message": "Resume uploaded successfully",
             "session_id": session_id,
+            "display_name": display_name,
+            "display_name_source": display_name_source,
             "text_length": len(resume_text),
             "resume_text": resume_text,
             "ats_score": parse_result.get("ats_score", 70),
-            "structured_data": parse_result.get("structured_data", {}),
-            "missing_info": parse_result.get("missing_info", [])
+            "structured_data": structured_data,
+            "missing_info": parse_result.get("missing_info", []),
+            "model_used": parse_result.get("model_used"),
         }), 200
 
     except Exception as e:
-        print(f"Upload resume error: {e}")
-        return jsonify({"error": str(e)}), 500
+        import logging
+        logging.error(f"Upload resume error: {e}")
+        return jsonify({"error": str(e), "retryable": True}), 500
     finally:
         if os.path.exists(save_path):
             os.remove(save_path)
@@ -2129,6 +2129,8 @@ def upload_resume():
 @app.route("/create-session-no-resume", methods=["POST"])
 @limiter.limit("10 per minute")
 def create_session_no_resume():
+    from services.identity_service import resolve_candidate_display_name
+
     user_payload = _get_optional_user()
     if user_payload:
         request.current_user = user_payload
@@ -2172,6 +2174,12 @@ def create_session_no_resume():
             "message": "Affirmative consent under DPDP Act 2023 / Privacy Policy is required to create an AI interview session."
         }), 400
 
+    display_name, display_name_source = resolve_candidate_display_name(
+        user_payload=user_payload,
+        user_id=user_id,
+        supabase_client=supabase,
+    )
+    now_iso = datetime.utcnow().isoformat()
     session_data = {
         "session_id": session_id,
         "resume_text": resume_text,
@@ -2180,15 +2188,23 @@ def create_session_no_resume():
         "responses": [],
         "feedbacks": [],
         "active": True,
+        "status": "created",
+        "mode": "job_description",
         "role": role,
+        "level": experience,
         "category": category,
         "difficulty": difficulty,
         "job_description": job_description,
         "interview_mode": "job_description",
         "total_questions": 10,
+        "display_name": display_name,
+        "display_name_source": display_name_source,
+        "report_status": "pending",
         "consent_given": 1,
-        "consent_timestamp": datetime.utcnow().isoformat(),
-        "privacy_policy_version": "DPDP-2023-v1.0"
+        "consent_timestamp": now_iso,
+        "privacy_policy_version": "DPDP-2023-v1.0",
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
     if user_id:
         session_data["user_id"] = user_id
@@ -2197,61 +2213,191 @@ def create_session_no_resume():
 
     try:
         supabase.table("sessions").insert(session_data).execute()
-        return jsonify({"message": "Session created without resume", "session_id": session_id}), 200
+        return jsonify({
+            "message": "Session created without resume",
+            "session_id": session_id,
+            "display_name": display_name,
+            "display_name_source": display_name_source,
+        }), 200
     except Exception as e:
-        print(f"Create session no resume Supabase error: {e}")
-        try:
-            from local_supabase import local_supabase
-            local_supabase.table("sessions").insert(session_data).execute()
-            return jsonify({"message": "Session created without resume", "session_id": session_id}), 200
-        except Exception as loc_err:
-            print(f"Create session local fallback error: {loc_err}")
-            return jsonify({"error": str(e)}), 500
+        import logging
+        logging.error(f"Create session no resume DB error: {e}")
+        return jsonify({"error": "Failed to persist interview session", "details": str(e), "retryable": True}), 500
 
 
-def get_candidate_name_for_session(session):
-    user_id = session.get("user_id")
-    if user_id:
-        try:
-            user_res = supabase.table("users").select("name").eq("id", user_id).execute()
-            if user_res and user_res.data:
-                name = user_res.data[0].get("name")
-                if name:
-                    return name.strip()
-        except Exception:
-            pass
-    return "Candidate"
+def get_candidate_name_for_session(session, user_payload=None):
+    from services.identity_service import resolve_candidate_display_name
+    payload = user_payload or getattr(request, "current_user", None)
+    name, _ = resolve_candidate_display_name(
+        user_payload=payload,
+        user_id=(session or {}).get("user_id"),
+        parsed_resume=(session or {}).get("structured_resume") or (session or {}).get("resume_snapshot_json"),
+        existing_name=(session or {}).get("display_name"),
+        existing_source=(session or {}).get("display_name_source"),
+        supabase_client=supabase,
+    )
+    return name
 
 
 @app.route("/start-interview", methods=["POST"])
 @limiter.limit("10 per minute")
 def start_interview():
+    from services.identity_service import resolve_candidate_display_name
+
     user_payload = _get_optional_user()
     if user_payload:
         request.current_user = user_payload
 
-    data       = request.get_json() or {}
-    session_id = data.get("session_id", "").strip()
-    category   = data.get("category")
-    difficulty = data.get("difficulty")
-    if not session_id:
-        return jsonify({"error": "session_id is required"}), 400
+    data            = request.get_json() or {}
+    session_id      = (data.get("session_id") or "").strip()
+    idempotency_key = (data.get("idempotency_key") or request.headers.get("Idempotency-Key") or "").strip()
+    category        = data.get("category")
+    difficulty      = data.get("difficulty")
 
-    session, err = get_owned_session(session_id)
-    if err:
-        return err
+    caller_uid = str((user_payload or {}).get("sub") or (user_payload or {}).get("user_id") or (user_payload or {}).get("id") or "").strip() or None
 
-    if not session.get("consent_given") and not (("unittest" in sys.modules) or ("pytest" in sys.modules) or app.testing or app.config.get("TESTING")):
-        return jsonify({
-            "error": "Affirmative consent required",
-            "message": "Interview session lacks valid affirmative consent."
-        }), 403
+    # Validate malformed non-empty session_id before lookup/creation
+    if session_id:
+        clean_sid = session_id.split("_")[0] if "_" in session_id else session_id
+        if not UUID_RE.match(clean_sid):
+            return jsonify({"error": "Invalid session_id format"}), 400
+    else:
+        clean_sid = None
 
-    if session.get("active") in (False, 0, "0", "false", "False"):
-        return jsonify({"error": "Session not found or already completed"}), 404
+    # 1. Idempotency check (same idempotency_key + caller returns stored session & Q1 without recreating)
+    if idempotency_key:
+        try:
+            idem_res = supabase.table("sessions").select("*").eq("idempotency_key", idempotency_key).limit(1).execute()
+            if idem_res and idem_res.data:
+                existing_idem = idem_res.data[0]
+                ex_owner = str(existing_idem.get("user_id") or "").strip()
+                if not ex_owner or not caller_uid or ex_owner == caller_uid:
+                    ex_qs = existing_idem.get("questions") or []
+                    if isinstance(ex_qs, str):
+                        try:
+                            ex_qs = json.loads(ex_qs)
+                        except Exception:
+                            ex_qs = []
+                    if ex_qs:
+                        return jsonify({
+                            "message": "Interview started (idempotent replay)",
+                            "session_id": existing_idem.get("session_id"),
+                            "question": ex_qs[0],
+                            "question_number": 1,
+                            "stage": existing_idem.get("stage") or "Greeting & Icebreaker",
+                            "personality": existing_idem.get("personality") or "professional",
+                            "display_name": existing_idem.get("display_name") or "Candidate",
+                            "display_name_source": existing_idem.get("display_name_source") or "fallback",
+                            "total_questions": existing_idem.get("total_questions") or 10,
+                            "idempotent_replay": True,
+                        }), 200
+        except Exception:
+            pass
+
+    # 2. Look up session if session_id provided; detect IDOR vs non-existent
+    session = None
+    if clean_sid:
+        session, err = get_owned_session(session_id)
+        if err:
+            # Check if session exists under ANOTHER user (IDOR -> preserve 404)
+            try:
+                raw_check = supabase.table("sessions").select("session_id, user_id").eq("session_id", clean_sid).limit(1).execute()
+                if raw_check and raw_check.data:
+                    return err
+            except Exception:
+                pass
+            # Session genuinely does not exist in DB -> auto-create below (Rule Phase 1 #5)
+            session = None
+
+    if session is not None:
+        # Idempotent replay if same idempotency_key was used on this session
+        if idempotency_key and session.get("idempotency_key") == idempotency_key and session.get("questions"):
+            qs = session["questions"]
+            return jsonify({
+                "message": "Interview started (idempotent replay)",
+                "session_id": session_id,
+                "question": qs[0],
+                "question_number": 1,
+                "stage": session.get("stage") or "Greeting & Icebreaker",
+                "personality": session.get("personality") or "professional",
+                "display_name": session.get("display_name") or "Candidate",
+                "display_name_source": session.get("display_name_source") or "fallback",
+                "total_questions": session.get("total_questions") or 10,
+                "idempotent_replay": True,
+            }), 200
+
+        if not session.get("consent_given") and not (("unittest" in sys.modules) or ("pytest" in sys.modules) or app.testing or app.config.get("TESTING")):
+            return jsonify({
+                "error": "Affirmative consent required",
+                "message": "Interview session lacks valid affirmative consent."
+            }), 403
+
+        if session.get("active") in (False, 0, "0", "false", "False") or session.get("status") == "completed":
+            return jsonify({"error": "Session not found or already completed"}), 404
+    else:
+        # Auto-create missing session reliably instead of returning 404
+        if data.get("consent") is False or data.get("consent_given") is False:
+            return jsonify({
+                "error": "Affirmative consent required",
+                "message": "Consent is required to start an AI interview session."
+            }), 400
+
+        session_id = clean_sid or str(uuid.uuid4())
+        save_cat_init = category or "Core CS"
+        save_diff_init = difficulty or "Medium"
+        save_role_init = (data.get("role") or "").strip() or (f"{save_cat_init} Specialist" if save_cat_init not in ("Resume", "General Technical", "Core CS") else "Software Engineer")
+        jd_init = (data.get("job_description") or data.get("tools") or "").strip()
+        disp_name, disp_src = resolve_candidate_display_name(
+            user_payload=user_payload,
+            user_id=caller_uid,
+            supabase_client=supabase,
+        )
+        now_iso = datetime.utcnow().isoformat()
+        new_session_data = {
+            "session_id": session_id,
+            "resume_text": jd_init or f"Target Role: {save_role_init}\nCategory: {save_cat_init}\nDifficulty: {save_diff_init}",
+            "question_index": 0,
+            "questions": [],
+            "responses": [],
+            "feedbacks": [],
+            "active": True,
+            "status": "created",
+            "mode": data.get("mode") or "general",
+            "role": save_role_init,
+            "level": data.get("level") or "Mid",
+            "category": save_cat_init,
+            "difficulty": save_diff_init,
+            "job_description": jd_init,
+            "interview_mode": "job_description",
+            "total_questions": 10,
+            "display_name": disp_name,
+            "display_name_source": disp_src,
+            "report_status": "pending",
+            "consent_given": 1,
+            "consent_timestamp": now_iso,
+            "privacy_policy_version": "DPDP-2023-v1.0",
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+        if caller_uid:
+            new_session_data["user_id"] = caller_uid
+        if user_payload and user_payload.get("organization_id"):
+            new_session_data["organization_id"] = user_payload.get("organization_id")
+        if idempotency_key:
+            new_session_data["idempotency_key"] = idempotency_key
+
+        supabase.table("sessions").insert(new_session_data).execute()
+        session = new_session_data
 
     try:
-        c_name = get_candidate_name_for_session(session)
+        disp_name, disp_src = resolve_candidate_display_name(
+            user_payload=user_payload,
+            user_id=session.get("user_id") or caller_uid,
+            parsed_resume=session.get("structured_resume") or session.get("resume_snapshot_json"),
+            existing_name=session.get("display_name"),
+            existing_source=session.get("display_name_source"),
+            supabase_client=supabase,
+        )
         save_cat = category or session.get("category") or "General Technical"
         save_diff = difficulty or session.get("difficulty") or "Medium"
         save_role = data.get("role") or session.get("role") or (f"{save_cat} Specialist" if save_cat not in ("Resume", "General Technical") else "Software Engineer")
@@ -2268,12 +2414,13 @@ def start_interview():
             role=save_role,
             job_description=jd_context,
             chat_model=chat_model,
-            candidate_name=c_name
+            candidate_name=disp_name
         )
         questions = [first_q]
-
+        now_iso = datetime.utcnow().isoformat()
         personality_chosen = data.get("personality") or session.get("personality") or "professional"
-        supabase.table("sessions").update({
+
+        update_payload = {
             "questions": questions,
             "question_index": 1,
             "stage": stage,
@@ -2282,21 +2429,54 @@ def start_interview():
             "role": save_role,
             "personality": personality_chosen,
             "interview_state": "ASKING",
+            "status": "in_progress",
+            "started_at": session.get("started_at") or now_iso,
+            "display_name": disp_name,
+            "display_name_source": disp_src,
             "turn_count": 0,
-            "knowledge_map": "{}"
-        }).eq("session_id", session_id).execute()
+            "knowledge_map": "{}",
+            "updated_at": now_iso,
+        }
+        if idempotency_key:
+            update_payload["idempotency_key"] = idempotency_key
+
+        supabase.table("sessions").update(update_payload).eq("session_id", session_id).execute()
+
+        # Persist initial interviewer turn (turn_index=0) into interview_turns ledger
+        try:
+            turn_id = f"turn_{session_id}_0_interviewer"
+            supabase.table("interview_turns").upsert({
+                "id": turn_id,
+                "session_id": session_id,
+                "turn_number": 1,
+                "turn_index": 0,
+                "speaker": "interviewer",
+                "question_text": first_q,
+                "text": first_q,
+                "stage": stage,
+                "word_count": len(first_q.split()),
+                "started_at": now_iso,
+                "created_at": now_iso,
+            }, on_conflict="id").execute()
+        except Exception as turn_err:
+            import logging
+            logging.warning("Initial interviewer turn persistence notice: %s", turn_err)
 
         return jsonify({
             "message": "Interview started",
+            "session_id": session_id,
             "question": first_q,
             "question_number": 1,
             "stage": stage,
             "personality": personality_chosen,
+            "display_name": disp_name,
+            "display_name_source": disp_src,
             "total_questions": 10
         }), 200
 
     except Exception as e:
-        print(f"Start interview error: {e}")
+        import logging
+        logging.error(f"Start interview error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -2306,11 +2486,31 @@ _SESSION_IN_FLIGHT = set()
 @app.route("/next", methods=["POST"])
 @limiter.limit("10 per minute")
 def next_question():
-    data       = request.get_json() or {}
-    session_id = data.get("session_id", "").strip()
-    answer     = data.get("answer", "").strip()
-    category   = data.get("category")
-    difficulty = data.get("difficulty")
+    from services.interview_capture_service import (
+        compute_data_sufficiency,
+        is_duplicate_question_stem,
+        persist_candidate_turn,
+        persist_interviewer_turn,
+    )
+    from services.interview_scoring_config import STT_MIN_CONFIDENCE
+    from services.interview_speech_service import compute_speech_metrics
+
+    data            = request.get_json() or {}
+    session_id      = data.get("session_id", "").strip()
+    answer          = (data.get("answer") or "").strip()
+    category        = data.get("category")
+    difficulty      = data.get("difficulty")
+    input_mode      = (data.get("input_mode") or ("speech" if (data.get("stt_engine") or data.get("audio_duration_s") is not None or data.get("word_timestamps")) else "typed")).strip().lower()
+    stt_engine      = data.get("stt_engine")
+    stt_confidence  = data.get("stt_confidence")
+    audio_duration_s = data.get("audio_duration_s")
+    started_at      = data.get("started_at")
+    ended_at        = data.get("ended_at")
+    word_timestamps = data.get("word_timestamps")
+    audio_ref       = data.get("audio_ref")
+    edge_case       = data.get("edge_case")
+    confirmed_edit  = bool(data.get("confirmed_edit", False))
+    turn_skill_id   = data.get("skill_id")
 
     if not session_id:
         return jsonify({"error": "session_id is required"}), 400
@@ -2326,23 +2526,116 @@ def next_question():
         _SESSION_IN_FLIGHT.add(session_id)
 
     try:
-        if not session.get("active", True):
+        if not session.get("active", True) or session.get("status") == "completed":
             return jsonify({"error": "Session not found or already completed"}), 404
         resume_text    = session.get("resume_text", "")
         questions      = session.get("questions") or []
         responses      = session.get("responses") or []
         feedbacks      = session.get("feedbacks") or []
-        question_index = session.get("question_index", 1)
+        question_index = int(session.get("question_index") or 1)
         c_name         = get_candidate_name_for_session(session)
+        current_q      = questions[-1] if questions else "Tell me about yourself."
+        curr_stage     = get_current_stage(question_index)
 
-        if not answer:
+        # Resolve deterministic skill_id for this turn from payload or category
+        if not turn_skill_id:
+            cat_slug = str(category or session.get("category") or "general").strip().lower().replace(" ", "_").replace("&", "and")
+            turn_skill_id = f"interview_{cat_slug}"
+
+        # Edge cases: Mic denied / STT failed -> persist turn cleanly as stt_failed, never score as "bad answer"
+        if edge_case in ("mic_permission_denied", "stt_failed"):
+            turn_idx = len(responses) + 1
+            t_row, s_row = persist_candidate_turn(
+                supabase_client=supabase,
+                session_id=session_id,
+                turn_index=turn_idx,
+                text=answer,
+                question_text=current_q,
+                skill_id=turn_skill_id,
+                stage=curr_stage,
+                input_mode=input_mode,
+                stt_engine=stt_engine,
+                stt_confidence=stt_confidence,
+                audio_duration_s=audio_duration_s,
+                started_at=started_at,
+                ended_at=ended_at,
+                edge_case=edge_case,
+            )
+            return jsonify({
+                "message": "Speech capture unavailable. You can switch to typing your answer or retry the microphone.",
+                "requires_review": True,
+                "turn_id": t_row["id"],
+                "turn_status": t_row["turn_status"],
+                "speech_metrics": s_row,
+                "question": current_q,
+                "question_number": question_index,
+                "stage": curr_stage,
+                "done": False,
+            }), 200
+
+        # STT empty or low confidence BEFORE evaluation -> persist as stt_low_confidence & request review
+        if input_mode == "speech" and not confirmed_edit and (
+            not answer or (stt_confidence is not None and float(stt_confidence) < STT_MIN_CONFIDENCE)
+        ):
+            turn_idx = len(responses) + 1
+            t_row, s_row = persist_candidate_turn(
+                supabase_client=supabase,
+                session_id=session_id,
+                turn_index=turn_idx,
+                text=answer,
+                question_text=current_q,
+                skill_id=turn_skill_id,
+                stage=curr_stage,
+                input_mode="speech",
+                stt_engine=stt_engine,
+                stt_confidence=stt_confidence,
+                audio_ref=audio_ref,
+                audio_duration_s=audio_duration_s,
+                started_at=started_at,
+                ended_at=ended_at,
+                word_timestamps=word_timestamps,
+                confirmed_edit=False,
+            )
+            return jsonify({
+                "message": "Speech transcript had low confidence or was empty. Please review or type your answer before evaluation.",
+                "requires_review": True,
+                "turn_id": t_row["id"],
+                "turn_status": t_row["turn_status"],
+                "transcript": answer,
+                "speech_metrics": s_row,
+                "question": current_q,
+                "question_number": question_index,
+                "stage": curr_stage,
+                "done": False,
+            }), 200
+
+        # Handle explicit empty/tab_closed submission when typed with no answer
+        if not answer and edge_case == "tab_closed":
+            turn_idx = len(responses) + 1
+            t_row, s_row = persist_candidate_turn(
+                supabase_client=supabase,
+                session_id=session_id,
+                turn_index=turn_idx,
+                text="",
+                question_text=current_q,
+                skill_id=turn_skill_id,
+                stage=curr_stage,
+                input_mode=input_mode,
+                edge_case="tab_closed",
+                started_at=started_at,
+                ended_at=ended_at,
+            )
+            supabase.table("sessions").update({"status": "abandoned", "updated_at": datetime.utcnow().isoformat()}).eq("session_id", session_id).execute()
+            return jsonify({"message": "Session paused/abandoned on tab close", "turn_id": t_row["id"], "turn_status": t_row["turn_status"], "done": False}), 200
+
+        if not answer and not data.get("allow_empty_skip"):
             if not questions:
                 first_q, stage, _ = generate_dynamic_question(resume_text, [], 1, category=category, difficulty=difficulty, chat_model=chat_model, candidate_name=c_name)
                 questions = [first_q]
                 supabase.table("sessions").update({"questions": [first_q], "question_index": 1, "stage": stage}).eq("session_id", session_id).execute()
+                persist_interviewer_turn(supabase, session_id, 0, first_q, skill_id=turn_skill_id, stage=stage)
                 return jsonify({"question": first_q, "question_number": 1, "stage": stage, "total_questions": 10}), 200
-            
-            curr_stage = get_current_stage(question_index)
+
             return jsonify({
                 "question": questions[-1],
                 "question_number": question_index,
@@ -2350,16 +2643,20 @@ def next_question():
                 "total_questions": 10
             }), 200
 
-        current_q = questions[-1] if questions else "Tell me about yourself."
-
-        # Idempotency check: Return cached turn result if duplicate request
-        request_id = data.get("request_id") or data.get("idempotency_key")
+        # Idempotency check: Return cached turn result if duplicate request (body or header)
+        request_id = (
+            data.get("request_id")
+            or data.get("idempotency_key")
+            or request.headers.get("Idempotency-Key")
+            or request.headers.get("X-Idempotency-Key")
+            or ""
+        ).strip() or None
         from services.interview_state_service import InterviewStateService
         cached_turn = InterviewStateService.check_idempotency(supabase, session_id, request_id)
         if cached_turn:
-            curr_stage = get_current_stage(question_index)
             return jsonify({
-                "message": "Answer recorded",
+                "message": "Answer recorded (idempotent replay)",
+                "idempotent_replay": True,
                 "done": False,
                 "feedback": cached_turn.get("feedback") or {},
                 "next_question": cached_turn.get("question"),
@@ -2368,55 +2665,123 @@ def next_question():
                 "total_questions": 10
             }), 200
 
-        # Conversational Intent Detection (Repeat, Clarify, Pause, Early Exit)
-        from services.answer_analyzer import AnswerAnalyzer, INTENT_REPEAT, INTENT_CLARIFY, INTENT_PAUSE, INTENT_EARLY_EXIT
-        ans_intent = AnswerAnalyzer.detect_conversational_intent(answer)
-        ans_clean = answer.lower().strip()
-        is_repeat = (ans_intent == INTENT_REPEAT) or any(kw in ans_clean for kw in ["repeat", "pardon", "didn't hear", "say that again", "say again", "could you repeat", "can you repeat"])
-        if is_repeat:
-            curr_stage = get_current_stage(question_index)
-            return jsonify({
-                "message": "Repeating question",
-                "done": False,
-                "feedback": {
-                    "feedback": "ℹ️ Repeating previous question.",
-                    "score": 7.0,
-                    "accuracy_score": 70,
-                    "correctness": "Partially Correct",
-                    "strength": "Requested repetition",
-                    "improvement": "None",
-                    "tip": "Focus on the question prompt",
-                    "summary": "Repetition requested."
-                },
-                "next_question": current_q,
-                "question_number": question_index,
-                "stage": curr_stage,
-                "total_questions": 10
-            }), 200
+        # Conversational Intent Detection & Dispatch via IntentClassifier & IntentHandler
+        from services.intent_classifier import (
+            IntentClassifier,
+            INTENT_ANSWER,
+            INTENT_PARTIAL_ANSWER,
+            INTENT_DONT_KNOW,
+            INTENT_SKIP_REQUEST,
+            INTENT_OFF_TOPIC,
+            INTENT_END_INTERVIEW_REQUEST,
+        )
+        from services.intent_handler import IntentHandler
+        from services.ava_session_context_service import AvaSessionContextService
 
-        if ans_intent in (INTENT_CLARIFY, INTENT_PAUSE):
-            curr_stage = get_current_stage(question_index)
-            reaction = AnswerAnalyzer.generate_conversational_response_for_intent(ans_intent, current_q, session.get("personality", "professional"))
-            return jsonify({
-                "message": reaction["message"],
-                "done": False,
-                "feedback": {
-                    "feedback": f"ℹ️ Conversational interaction: {ans_intent}",
-                    "score": 7.0,
-                    "accuracy_score": 70,
-                    "correctness": "Conversational Interaction",
-                    "strength": "Natural turn-taking communication",
-                    "improvement": "None",
-                    "tip": "Take your time to structure your thoughts",
-                    "summary": f"{ans_intent} acknowledged."
-                },
-                "next_question": current_q,
-                "question_number": question_index,
-                "stage": curr_stage,
-                "total_questions": 10
-            }), 200
+        intent_res = IntentClassifier.classify_intent(answer)
+        is_explicit_small_talk = bool(data.get("is_small_talk", False))
+        # Turns that advance the interview question sequence (answered, skipped, dont_know, off_topic)
+        advancing_intents = (
+            INTENT_ANSWER,
+            INTENT_PARTIAL_ANSWER,
+            INTENT_DONT_KNOW,
+            INTENT_SKIP_REQUEST,
+            INTENT_OFF_TOPIC,
+        )
 
-        # Determine interview session question limit (default 10 for full 15-min interview, or 5 if bounded by session)
+        if is_explicit_small_talk or intent_res["intent"] not in advancing_intents:
+            session_ctx = AvaSessionContextService.build_session_context(
+                session_id=session_id,
+                track_identifier=category or session.get("category"),
+                personality_identifier=session.get("personality", "professional"),
+                candidate_name=c_name,
+                resume_text=resume_text
+            )
+            handler_res = IntentHandler.handle_intent(
+                intent_res,
+                current_question=current_q,
+                question_index=question_index,
+                session_context=session_ctx
+            ) if not is_explicit_small_talk else {"action": "SMALL_TALK", "is_scored": False, "message": "Thanks! Let's jump right into the first question."}
+
+            if handler_res.get("action") == "END_INTERVIEW":
+                persist_candidate_turn(
+                    supabase_client=supabase,
+                    session_id=session_id,
+                    turn_index=len(responses) + 1,
+                    text=answer,
+                    question_text=current_q,
+                    skill_id=turn_skill_id,
+                    stage=curr_stage,
+                    input_mode=input_mode,
+                    stt_engine=stt_engine,
+                    stt_confidence=stt_confidence,
+                    audio_duration_s=audio_duration_s,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    intent_hint="EARLY_EXIT",
+                )
+                supabase.table("sessions").update({
+                    "active": 0,
+                    "status": "completed",
+                    "ended_at": datetime.utcnow().isoformat(),
+                    "interview_state": "ENDED"
+                }).eq("session_id", session_id).execute()
+
+                return jsonify({
+                    "message": handler_res["message"],
+                    "done": True,
+                    "audio_cutoff": True,
+                    "feedback": {
+                        "feedback": "Interview ended at candidate request.",
+                        "score": None,
+                        "is_conversational_turn": True
+                    },
+                    "next_question": None,
+                    "question_number": question_index,
+                    "stage": "Phase 7: Natural Wrap-up",
+                    "total_questions": 10
+                }), 200
+
+            if is_explicit_small_talk or not handler_res.get("is_scored", True):
+                # Persist conversational/small-talk turn without counting toward questions or scores
+                st_idx = 900 + len(responses)
+                t_row, _ = persist_candidate_turn(
+                    supabase_client=supabase,
+                    session_id=session_id,
+                    turn_index=st_idx,
+                    text=answer,
+                    question_text=current_q,
+                    skill_id=None,
+                    stage="small_talk",
+                    input_mode=input_mode,
+                    stt_engine=stt_engine,
+                    stt_confidence=stt_confidence,
+                    audio_duration_s=audio_duration_s,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    confirmed_edit=confirmed_edit,
+                    intent_hint=intent_res.get("intent"),
+                    is_small_talk_turn=True,
+                )
+                return jsonify({
+                    "message": handler_res["message"],
+                    "done": False,
+                    "turn_id": t_row["id"],
+                    "turn_status": "small_talk",
+                    "feedback": {
+                        "feedback": f"ℹ️ Conversational interaction: {intent_res['intent']}",
+                        "score": None,
+                        "is_conversational_turn": True,
+                        "intent": intent_res["intent"]
+                    },
+                    "next_question": current_q,
+                    "question_number": question_index,
+                    "stage": curr_stage,
+                    "total_questions": 10
+                }), 200
+
+        # Determine interview session question limit (honors session.total_questions; defaults to 10, or 5 for 5-question bounded sessions)
         total_q_raw = session.get("total_questions")
         if questions and len(questions) == 5 and (total_q_raw in (None, 5, 10)) and len(responses) >= 4:
             total_q_bound = 5
@@ -2439,37 +2804,77 @@ def next_question():
                 "total_questions": total_q_bound
             }), 200
 
+        # IMMEDIATELY persist candidate turn + deterministic speech metrics BEFORE evaluation (Phase 2 Source of Truth)
+        cand_turn_index = len(responses) + 1
+        cand_turn_row, speech_row = persist_candidate_turn(
+            supabase_client=supabase,
+            session_id=session_id,
+            turn_index=cand_turn_index,
+            text=answer,
+            question_text=current_q,
+            skill_id=turn_skill_id,
+            stage=curr_stage,
+            input_mode=input_mode,
+            stt_engine=stt_engine,
+            stt_confidence=stt_confidence,
+            audio_ref=audio_ref,
+            audio_duration_s=audio_duration_s,
+            started_at=started_at,
+            ended_at=ended_at,
+            word_timestamps=word_timestamps,
+            edge_case=edge_case,
+            confirmed_edit=confirmed_edit,
+            intent_hint=intent_res.get("intent"),
+        )
+
+        # Ensure corresponding interviewer turn for question_index exists in interview_turns
+        persist_interviewer_turn(
+            supabase_client=supabase,
+            session_id=session_id,
+            turn_index=cand_turn_index - 1,
+            question_text=current_q,
+            skill_id=turn_skill_id,
+            stage=curr_stage,
+        )
+
         cur_role = session.get("role") or data.get("role") or (category or session.get("category")) or "Software Engineer"
         if not cur_role or str(cur_role).strip().lower() in ("none", ""):
             cur_role = "Software Engineer"
 
+        # If final question reached -> evaluate (unless empty/skipped), persist session, return done=True
         if question_index >= total_q_bound:
-            feedback = evaluate_response_comprehensive(resume_text or "", current_q, answer, chat_model, question_index, category or session.get("category"), cur_role)
-            if not isinstance(feedback, dict):
-                feedback = {"score": 7.0, "feedback": "Response recorded.", "accuracy_score": 70}
-            live_metrics = analyze_live_response(answer)
-            feedback["live_metrics"] = live_metrics
+            if cand_turn_row["turn_status"] in ("empty", "stt_failed", "skipped"):
+                feedback = {"score": None, "accuracy_score": None, "feedback": f"Turn recorded as {cand_turn_row['turn_status']}.", "turn_status": cand_turn_row["turn_status"]}
+            else:
+                feedback = evaluate_response_comprehensive(resume_text or "", current_q, answer, chat_model, question_index, category or session.get("category"), cur_role)
+                if not isinstance(feedback, dict):
+                    feedback = {"score": 7.0, "feedback": "Response recorded.", "accuracy_score": 70}
+            feedback["live_metrics"] = speech_row
+            feedback["turn_id"] = cand_turn_row["id"]
+            feedback["turn_status"] = cand_turn_row["turn_status"]
 
             responses.append(answer)
             feedbacks.append(feedback)
-            scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
+            scores = [f.get("score") for f in feedbacks if isinstance(f, dict) and f.get("score") is not None]
 
-            try:
-                supabase.table("sessions").update({
-                    "questions": questions,
-                    "responses": responses,
-                    "feedbacks": feedbacks,
-                    "scores": scores,
-                    "question_index": total_q_bound,
-                    "stage": "Phase 7: Natural Wrap-up",
-                    "cached_hints": "{}"
-                }).eq("session_id", session_id).execute()
-            except Exception as ex:
-                print("Session DB save notice:", ex)
+            supabase.table("sessions").update({
+                "questions": questions,
+                "responses": responses,
+                "feedbacks": feedbacks,
+                "scores": scores,
+                "question_index": total_q_bound,
+                "turn_count": len(responses),
+                "stage": "Phase 7: Natural Wrap-up",
+                "cached_hints": "{}",
+                "updated_at": datetime.utcnow().isoformat()
+            }).eq("session_id", session_id).execute()
 
             return jsonify({
                 "message": f"Answer recorded. All {total_q_bound} questions completed. Please proceed to final review.",
                 "done": True,
+                "turn_id": cand_turn_row["id"],
+                "turn_status": cand_turn_row["turn_status"],
+                "speech_metrics": speech_row,
                 "feedback": feedback,
                 "next_question": None,
                 "question_number": total_q_bound,
@@ -2478,26 +2883,70 @@ def next_question():
                 "total_questions": total_q_bound
             }), 200
 
-        # Perform evaluation & dynamic question generation in parallel
-        import concurrent.futures
-        import threading
+        # Deterministic previous score & adaptive difficulty selection for next question
+        prev_scores = [f.get("score") for f in feedbacks if isinstance(f, dict) and isinstance(f.get("score"), (int, float))]
+        prev_score_val = prev_scores[-1] if prev_scores else 6.0
+        cur_diff = difficulty or session.get("difficulty") or "Medium"
+        if prev_score_val >= 8.0 and cur_diff == "Easy":
+            cur_diff = "Medium"
+        elif prev_score_val >= 8.5 and cur_diff == "Medium":
+            cur_diff = "Hard"
+        elif prev_score_val <= 4.0 and cur_diff == "Hard":
+            cur_diff = "Medium"
 
         role = session.get("role") or data.get("role") or (category or session.get("category")) or "Software Engineer"
         if not role or str(role).strip().lower() in ("none", ""):
             role = "Software Engineer"
         job_desc = session.get("job_description") or ""
 
+        from services.interview_reliability_service import (
+            build_concise_resume_summary,
+            log_structured_event,
+            submit_background_turn_eval,
+        )
+
+        concise_resume = build_concise_resume_summary(
+            session.get("resume_snapshot_json") or resume_text or ""
+        )
+
+        # Immediately schedule background per-turn rubric grading right after capture (Phase 7 speed optimization)
+        submit_background_turn_eval(
+            supabase_client=supabase,
+            session_id=session_id,
+            turn_row=cand_turn_row,
+            question_text=current_q,
+            chat_model=chat_model,
+            user_id=session.get("user_id"),
+            role=role,
+            difficulty=cur_diff,
+            resume_summary=concise_resume,
+        )
+        log_structured_event(
+            "interview_turn_captured",
+            session_id=session_id,
+            turn_id=cand_turn_row.get("id"),
+            turn_status=cand_turn_row.get("turn_status"),
+            input_mode=input_mode,
+        )
+
+        import concurrent.futures
+
+        def _eval_turn():
+            if cand_turn_row["turn_status"] in ("empty", "stt_failed", "skipped"):
+                return {"score": None, "accuracy_score": None, "feedback": f"Turn recorded as {cand_turn_row['turn_status']}.", "turn_status": cand_turn_row["turn_status"]}
+            return evaluate_response_comprehensive(concise_resume, current_q, answer, chat_model, question_index, category or session.get("category"), role)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            fut_fb = executor.submit(evaluate_response_comprehensive, resume_text, current_q, answer, chat_model, question_index, category or session.get("category"), role)
+            fut_fb = executor.submit(_eval_turn)
             fut_q = executor.submit(
                 generate_dynamic_question,
-                resume_text,
+                concise_resume,
                 previous_questions=questions,
                 question_index=question_index + 1,
-                last_score=7,
+                last_score=prev_score_val,
                 last_answer=answer,
                 category=category or session.get("category"),
-                difficulty=difficulty or session.get("difficulty"),
+                difficulty=cur_diff,
                 role=role,
                 job_description=job_desc,
                 responses=responses,
@@ -2507,20 +2956,45 @@ def next_question():
             feedback = fut_fb.result()
             next_q, next_stage, is_followup = fut_q.result()
 
-        live_metrics = analyze_live_response(answer)
-        feedback["live_metrics"] = live_metrics
+        # Prevent repeating question stems for the same candidate
+        if is_duplicate_question_stem(session.get("user_id"), next_q, questions, supabase_client=supabase):
+            from services.topic_engine import get_curated_fallback_question
+            alt_q = get_curated_fallback_question(
+                category=category or session.get("category") or "GENERAL",
+                role=role,
+                previous_questions=questions + [next_q],
+                index=question_index + 1,
+            )
+            if alt_q and not is_duplicate_question_stem(session.get("user_id"), alt_q, questions, supabase_client=supabase):
+                next_q = alt_q
+
+        feedback["live_metrics"] = speech_row
+        feedback["turn_id"] = cand_turn_row["id"]
+        feedback["turn_status"] = cand_turn_row["turn_status"]
 
         responses.append(answer)
         feedbacks.append(feedback)
-        scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
-
+        scores = [f.get("score") for f in feedbacks if isinstance(f, dict) and f.get("score") is not None]
         questions.append(next_q)
 
-        # Relational turn audit and knowledge map update
+        # Persist next interviewer question immediately in interview_turns
+        persist_interviewer_turn(
+            supabase_client=supabase,
+            session_id=session_id,
+            turn_index=cand_turn_index,
+            question_text=next_q,
+            skill_id=turn_skill_id,
+            stage=next_stage,
+        )
+
+        # Update knowledge map (adaptive state)
+        updated_kmap = {}
         try:
             from services.adaptive_interview_engine import AdaptiveInterviewEngine
-            from services.interview_state_service import InterviewStateService
-            acc_val = int(feedback.get("accuracy_score", feedback.get("score", 7.0) * 10))
+            from services.answer_analyzer import AnswerAnalyzer
+            ans_intent = intent_res.get("intent", "answer")
+            raw_sc = feedback.get("score")
+            acc_val = int(feedback.get("accuracy_score") if feedback.get("accuracy_score") is not None else ((raw_sc * 10) if raw_sc is not None else 0))
             concept_analysis = AnswerAnalyzer.extract_concept_evidence(current_q, answer, category or session.get("category"), role)
             raw_kmap = session.get("knowledge_map") or {}
             if isinstance(raw_kmap, str):
@@ -2528,60 +3002,118 @@ def next_question():
                 except: raw_kmap = {}
             updated_kmap = AdaptiveInterviewEngine.update_session_knowledge_map(raw_kmap, category or "Technical", "General", concept_analysis, acc_val)
             decision = AdaptiveInterviewEngine.evaluate_next_action(acc_val, concept_analysis, question_index, total_q_bound)
-
-            InterviewStateService.record_turn(
-                supabase_client=supabase,
-                session_id=session_id,
-                turn_number=question_index,
-                question_text=current_q,
-                candidate_response=answer,
-                intent=ans_intent,
-                decision=decision,
-                score=feedback.get("score", 7.0),
-                accuracy_score=acc_val,
-                evaluation=feedback,
-                stage=next_stage,
-                request_id=request_id
-            )
+            if request_id:
+                InterviewStateService.record_turn(
+                    supabase_client=supabase,
+                    session_id=session_id,
+                    turn_number=question_index,
+                    question_text=current_q,
+                    candidate_response=answer,
+                    intent=ans_intent,
+                    decision=decision,
+                    score=raw_sc,
+                    accuracy_score=acc_val,
+                    evaluation=feedback,
+                    stage=next_stage,
+                    request_id=request_id
+                )
         except Exception as e_turn:
-            print("Turn audit record notice:", e_turn)
-            updated_kmap = {}
+            import logging
+            logging.warning("Adaptive kmap/idempotency audit notice: %s", e_turn)
 
-        # Synchronous database update ensures question state & hint cache are committed atomically
-        try:
-            supabase.table("sessions").update({
-                "questions": questions,
-                "responses": responses,
-                "feedbacks": feedbacks,
-                "scores": scores,
-                "question_index": question_index + 1,
-                "stage": next_stage,
-                "cached_hints": "{}",
-                "knowledge_map": json.dumps(updated_kmap),
-                "turn_count": len(responses),
-                "interview_state": "WAITING_FOR_RESPONSE"
-            }).eq("session_id", session_id).execute()
-        except Exception as ex:
-            print("Session DB save notice:", ex)
+        # Synchronous database commit — fail loudly if DB write fails (NEVER swallow!)
+        supabase.table("sessions").update({
+            "questions": questions,
+            "responses": responses,
+            "feedbacks": feedbacks,
+            "scores": scores,
+            "question_index": question_index + 1,
+            "stage": next_stage,
+            "difficulty": cur_diff,
+            "cached_hints": "{}",
+            "knowledge_map": json.dumps(updated_kmap),
+            "turn_count": len(responses),
+            "interview_state": "WAITING_FOR_RESPONSE",
+            "updated_at": datetime.utcnow().isoformat(),
+        }).eq("session_id", session_id).execute()
+
+        sufficiency = compute_data_sufficiency(supabase, session_id)
 
         return jsonify({
             "message": "Answer recorded",
             "done": False,
+            "turn_id": cand_turn_row["id"],
+            "turn_status": cand_turn_row["turn_status"],
+            "speech_metrics": speech_row,
+            "data_sufficiency": sufficiency,
             "feedback": feedback,
             "next_question": next_q,
             "question": next_q,
             "question_number": question_index + 1,
             "stage": next_stage,
+            "difficulty": cur_diff,
             "is_followup": is_followup,
             "total_questions": len(questions)
         }), 200
 
     except Exception as e:
-        print(f"Next question error: {e}")
+        import logging
+        logging.error(f"Next question error: {e}")
         return jsonify({"error": str(e)}), 500
     finally:
         with _SESSION_IN_FLIGHT_LOCK:
             _SESSION_IN_FLIGHT.discard(session_id)
+
+
+@app.route("/interview/<session_id>/state", methods=["GET"])
+def get_interview_state(session_id):
+    """Restores complete persisted interview state (turns, speech metrics, sufficiency) after page reload."""
+    session, err = get_owned_session(session_id)
+    if err:
+        return err
+    from services.interview_capture_service import get_persisted_interview_state
+    state = get_persisted_interview_state(supabase, session_id)
+    if not state:
+        return jsonify({"error": "Session state not found"}), 404
+    return jsonify(state), 200
+
+
+@app.route("/interview/<session_id>/retry-evaluations", methods=["POST"])
+@limiter.limit("10 per minute")
+def retry_interview_evaluations_route(session_id):
+    """Retries failed per-turn rubric evaluations for an owned interview session."""
+    session, err = get_owned_session(session_id)
+    if err:
+        return err
+    from services.interview_rubric_grader import retry_failed_evaluations
+    retried = retry_failed_evaluations(
+        supabase_client=supabase,
+        session_id=session_id,
+        chat_model=chat_model,
+        user_id=session.get("user_id"),
+        role=session.get("role") or "Software Engineer",
+        difficulty=session.get("difficulty") or "Medium",
+    )
+    still_failed = [r for r in retried if r.get("status") == "failed"]
+    if still_failed and len(still_failed) == len(retried):
+        from services.interview_reliability_service import get_degraded_error_payload
+        first_err_code = still_failed[0].get("error_code") or "GEMINI_503"
+        degraded = get_degraded_error_payload(first_err_code)
+        return jsonify({
+            "message": degraded["degraded_message"],
+            "degraded_message": degraded["degraded_message"],
+            "retry_after_s": degraded["retry_after_s"],
+            "retried_count": len(retried),
+            "still_failed": len(still_failed),
+            "retryable": True,
+            "evaluations": retried,
+        }), 503
+    return jsonify({
+        "message": "Evaluations retried",
+        "retried_count": len(retried),
+        "still_failed": len(still_failed),
+        "evaluations": retried,
+    }), 200
 
 
 @app.route("/get-hint", methods=["POST"])
@@ -2839,7 +3371,11 @@ def generate_final_report_async(session_id, resume_text, questions, responses, f
 
 
 @app.route("/end-interview", methods=["POST"])
+@limiter.limit("10 per minute")
 def end_interview():
+    from services.interview_report_service import generate_and_persist_report
+    from services.interview_scoring_config import REPORT_STATUS_EVALUATED, REPORT_STATUS_PARTIAL
+
     user_payload = _get_optional_user()
     if user_payload:
         request.current_user = user_payload
@@ -2854,205 +3390,157 @@ def end_interview():
         return err
 
     try:
-        feedbacks = session.get("feedbacks") or []
-        questions = session.get("questions") or []
-        responses = session.get("responses") or []
-        resume_text = session.get("resume_text") or ""
+        now_iso = datetime.utcnow().isoformat()
+        supabase.table("sessions").update({
+            "active": False,
+            "status": "completed",
+            "ended_at": session.get("ended_at") or now_iso,
+            "updated_at": now_iso,
+        }).eq("session_id", session_id).execute()
 
-        # Check if candidate provided any valid responses
-        non_empty_responses = [r for r in responses if isinstance(r, str) and r.strip()]
-        valid_responses = []
-        for r in non_empty_responses:
-            clean = r.strip().lower().replace(".", "").replace(",", "").strip()
-            if clean not in ("[no response recorded]", "skipped", "skip", "i don't know", "none", "no response", ""):
-                if len(clean.split()) >= 2:
-                    valid_responses.append(r)
-
-        has_replied = len(valid_responses) > 0
-
-        from services.grading_service import calculate_grade_info
-
-        if not has_replied:
-            g_info = calculate_grade_info(0)
-            f_report = {
-                "overall_score": 0.0,
-                "overall_score_100": 0,
-                "grade": "F",
-                "overall_grade": "F",
-                "grade_label": "Significant Improvement Required",
-                "grade_color": "#991b1b",
-                "hiring_recommendation": "Strong Reject (No Responses Provided)",
-                "performance_level": "Unevaluated / Not Attempted",
-                "answered_questions_count": 0,
-                "speech_metrics": {
-                    "wpm": 0,
-                    "pacing_label": "No Speech Detected",
-                    "pacing_color": "#94a3b8",
-                    "total_words": 0,
-                    "filler_count": 0,
-                    "filler_breakdown": {},
-                    "vocabulary_diversity_pct": 0,
-                    "overused_words": []
-                },
-                "eye_contact_pct": 0,
-                "tab_switches": 0,
-                "strengths": [],
-                "weaknesses": [
-                    {"title": "No responses recorded", "evidence": "Candidate did not speak or answer any questions."}
-                ],
-                "section_grades": [
-                    {"name": "Communication", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Technical Knowledge", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Problem Solving", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Confidence", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Behavioral Skills", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Resume Knowledge", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Project Explanation", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Leadership", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Grammar", "score": 0, "grade": "F", "color": "#991b1b"},
-                    {"name": "Vocabulary", "score": 0, "grade": "F", "color": "#991b1b"}
-                ],
-                "top_strengths": ["None identified (no responses provided)"],
-                "top_improvements": ["Did not attempt questions during the mock interview. Speak or write answers to get evaluated."],
-                "report": "Candidate did not provide any responses to the interview questions. Evaluation is not possible.",
-                "badges": []
-            }
-            try:
-                import json
-                supabase.table("sessions").update({
-                    "final_score": 0.0,
-                    "final_score_100": 0,
-                    "final_grade": "F",
-                    "grade_label": "Significant Improvement Required",
-                    "grade_color": "#991b1b",
-                    "hiring_recommendation": "Strong Reject",
-                    "performance_level": "Not Ready",
-                    "active": False,
-                    "final_report": json.dumps(f_report),
-                    "report_json": f_report,
-                    "scores": []
-                }).eq("session_id", session_id).execute()
-            except Exception as e_db:
-                print("Session update notice:", e_db)
-            
-            return jsonify(f_report), 200
-
-        scores = [f.get("score", 0) for f in feedbacks if isinstance(f, dict)]
-        
-        from services.feedback_service import fast_compile_report
-        role = session.get("role") or session.get("category") or "Software Engineer"
-        if not role or str(role).strip().lower() in ("none", ""):
-            role = "Software Engineer"
-        track = session.get("category") or "Resume Based"
-        if not track or str(track).strip().lower() in ("none", ""):
-            track = "Resume Based"
-        difficulty = session.get("difficulty") or "Medium"
-        if not difficulty or str(difficulty).strip().lower() in ("none", ""):
-            difficulty = "Medium" 
-
-        c_name = get_candidate_name_for_session(session)
-        interview_mode = session.get("interview_mode") or ("job_description" if session.get("job_description") else "resume")
-        total_questions_expected = session.get("total_questions") or 10
-
-        # Compile evidence-backed report instantly from live feedbacks (<1ms)
-        report_json = fast_compile_report(
-            role=role,
-            track=track,
-            difficulty=difficulty,
-            experience_level="1-3 Years",
-            questions=questions,
-            responses=responses,
-            feedbacks=feedbacks,
-            candidate_name=c_name,
-            interview_mode=interview_mode,
-            total_questions_expected=total_questions_expected
+        # Generate report strictly from persisted turns + evaluations + speech metrics
+        report_json = generate_and_persist_report(
+            supabase_client=supabase,
+            session_id=session_id,
+            user_payload=user_payload,
+            chat_model=chat_model,
         )
 
-        overall_score_100 = int(report_json.get("overall_score", 0))
-        overall_score_10 = round(overall_score_100 / 10.0, 1)
-        import json
-        report_str = json.dumps(report_json)
+        # Prompt 1 pipeline sync ONLY when status is EVALUATED or PARTIAL (never from missing/failed data)
+        if report_json.get("report_status") in (REPORT_STATUS_EVALUATED, REPORT_STATUS_PARTIAL):
+            try:
+                user_id = session.get("user_id") or (user_payload or {}).get("sub")
+                if user_id and report_json.get("overall_score_100") is not None:
+                    from services.cross_feature_engine import CrossFeatureEngine
+                    CrossFeatureEngine.process_ava_interview_session(
+                        user_id=str(user_id),
+                        session_id=session_id,
+                        final_report=report_json,
+                        questions=session.get("questions") or [],
+                        feedbacks=session.get("feedbacks") or [],
+                    )
+            except Exception as e_cfe:
+                import logging
+                logging.warning("CrossFeatureEngine interview hook notice: %s", e_cfe)
 
-        # Update DB immediately with completed final report
-        try:
-            supabase.table("sessions").update({
-                "final_score": overall_score_10,
-                "final_score_100": overall_score_100,
-                "final_grade": report_json.get("grade", "B"),
-                "grade_label": report_json.get("grade_label", "Average"),
-                "grade_color": report_json.get("grade_color", "#14b8a6"),
-                "hiring_recommendation": report_json.get("recommendation", "Neutral"),
-                "performance_level": report_json.get("performance_level", "Average"),
-                "active": False,
-                "final_report": report_str,
-                "report_json": report_json,
-                "scores": scores
-            }).eq("session_id", session_id).execute()
-        except Exception as e_db:
-            print("Session update notice:", e_db)
-
-        # PrepFly Intelligence: Ingest interview evidence and evaluate cross-feature skill profile
-        try:
-            user_id = session.get("user_id") or (getattr(request, "current_user", {}) or {}).get("sub")
-            if user_id:
-                from services.cross_feature_engine import CrossFeatureEngine
-                CrossFeatureEngine.process_ava_interview_session(
-                    user_id=str(user_id),
-                    session_id=session_id,
-                    final_report=report_json,
-                    questions=questions,
-                    feedbacks=feedbacks
-                )
-        except Exception as e_cfe:
-            print("CrossFeatureEngine interview hook notice:", e_cfe)
-
-        # Return full completed report immediately so client has 0s delay
         return jsonify(report_json), 200
 
     except Exception as e:
-        print(f"End interview error: {e}")
+        import logging
+        logging.error(f"End interview error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/session-report/<session_id>", methods=["GET"])
-@app.route("/session-report/<session_id>", methods=["GET"])
-def get_session_report(session_id):
+@app.route("/interview/<session_id>/report", methods=["GET", "POST"])
+@limiter.limit("20 per minute")
+def interview_report_endpoint(session_id):
+    """
+    Phase 5: Canonical evidence-grounded report endpoint.
+    Generates/reconstructs strictly from persisted turns + evaluations + speech metrics.
+    Reload-safe and idempotent.
+    """
+    from services.interview_report_service import generate_and_persist_report
+
     session, err = get_owned_session(session_id)
     if err:
         return err
 
     try:
-        final_report = session.get("final_report") or ""
-        report_json = session.get("report_json") or {}
-        
-        parsed_report = {}
-        if isinstance(report_json, dict) and report_json:
-            parsed_report = report_json
-        elif isinstance(final_report, str) and final_report.startswith("{"):
-            try:
-                parsed_report = json.loads(final_report)
-            except Exception:
-                parsed_report = {}
-
-        response_data = {
-            "session_id": session.get("session_id"),
-            "final_report": final_report if isinstance(final_report, str) else json.dumps(final_report),
-            "report_json": report_json,
-            "overall_score": session.get("final_score") or 0.0,
-            "overall_score_100": session.get("final_score_100") or 0,
-            "grade": session.get("final_grade") or "N/A",
-            "overall_grade": session.get("final_grade") or "N/A",
-            "grade_label": session.get("grade_label") or "",
-            "grade_color": session.get("grade_color") or "",
-            "hiring_recommendation": session.get("hiring_recommendation") or "",
-            "performance_level": session.get("performance_level") or ""
-        }
-        if isinstance(parsed_report, dict):
-            response_data.update(parsed_report)
-            
-        return jsonify(response_data), 200
+        user_payload = getattr(request, "current_user", None) or _get_optional_user()
+        report_json = generate_and_persist_report(
+            supabase_client=supabase,
+            session_id=session_id,
+            user_payload=user_payload,
+            chat_model=chat_model,
+        )
+        return jsonify(report_json), 200
     except Exception as e:
-        print(f"Get session report error: {e}")
+        import logging
+        logging.error(f"Interview report error for {session_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/interview/<session_id>/display-name", methods=["POST"])
+@limiter.limit("15 per minute")
+def update_interview_display_name(session_id):
+    """R6: Allows candidate to add/confirm their real display name when fallback 'Candidate' was shown."""
+    session, err = get_owned_session(session_id)
+    if err:
+        return err
+    data = request.get_json() or {}
+    new_name = (data.get("display_name") or "").strip()
+    if not new_name or new_name.lower() == "candidate":
+        return jsonify({"error": "Please provide a valid non-empty name."}), 400
+    supabase.table("sessions").update({
+        "display_name": new_name,
+        "display_name_source": "profile",
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("session_id", session_id).execute()
+    from services.interview_report_service import generate_and_persist_report
+    user_payload = getattr(request, "current_user", None) or _get_optional_user()
+    report_json = generate_and_persist_report(
+        supabase_client=supabase,
+        session_id=session_id,
+        user_payload=user_payload,
+        chat_model=None,
+    )
+    return jsonify(report_json), 200
+
+
+@app.route("/interview/<session_id>/email-report", methods=["POST"])
+@limiter.limit("5 per minute")
+def email_interview_report_route(session_id):
+    """Phase 5 #9: Sends persisted report over HTTPS email API (Resend/SendGrid), surfacing any error."""
+    from services.interview_report_service import generate_and_persist_report, send_interview_report_email_http
+
+    session, err = get_owned_session(session_id)
+    if err:
+        return err
+
+    data = request.get_json() or {}
+    user_payload = getattr(request, "current_user", None) or _get_optional_user()
+    to_email = (data.get("email") or (user_payload or {}).get("email") or "").strip()
+    if not to_email:
+        return jsonify({"ok": False, "error": "Recipient email is required."}), 400
+
+    report_json = generate_and_persist_report(
+        supabase_client=supabase,
+        session_id=session_id,
+        user_payload=user_payload,
+        chat_model=None,
+    )
+    res = send_interview_report_email_http(to_email, report_json)
+    if not res.get("ok"):
+        return jsonify(res), 502
+    return jsonify(res), 200
+
+
+@app.route("/api/session-report/<session_id>", methods=["GET"])
+@app.route("/session-report/<session_id>", methods=["GET"])
+@limiter.limit("20 per minute")
+def get_session_report(session_id):
+    from services.interview_report_service import generate_and_persist_report
+
+    session, err = get_owned_session(session_id)
+    if err:
+        return err
+
+    try:
+        user_payload = getattr(request, "current_user", None) or _get_optional_user()
+        report_json = generate_and_persist_report(
+            supabase_client=supabase,
+            session_id=session_id,
+            user_payload=user_payload,
+            chat_model=chat_model,
+        )
+        return jsonify({
+            **report_json,
+            "final_report": json.dumps(report_json),
+            "report_json": report_json,
+        }), 200
+    except Exception as e:
+        import logging
+        logging.error(f"Get session report error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

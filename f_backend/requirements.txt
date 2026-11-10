@@ -14,3 +14,4 @@ openpyxl
 razorpay
 google-generativeai>=0.8.0
 Flask-Limiter
+redis>=5.0.0

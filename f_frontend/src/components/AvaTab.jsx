@@ -1,6 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AI_INTERVIEWER, { INTERVIEWER_PERSONALITIES, getInterviewerPersonality } from '../config/aiInterviewerConfig';
-import { getGradeInfo, computeSectionGrades, getBadges } from '../utils/gradingSystem';
+
+const STATUS_META = {
+  EVALUATED: {
+    badge: "Evaluated",
+    color: "#059669",
+    bg: "#ecfdf5",
+    border: "#a7f3d0",
+  },
+  PARTIAL: {
+    badge: "Partial Evidence",
+    color: "#d97706",
+    bg: "#fffbeb",
+    border: "#fde68a",
+  },
+  INCOMPLETE_INSUFFICIENT_DATA: {
+    badge: "Incomplete · Insufficient Data",
+    color: "#475569",
+    bg: "#f1f5f9",
+    border: "#cbd5e1",
+  },
+  EVALUATION_FAILED: {
+    badge: "Evaluation Pending Retry",
+    color: "#4f46e5",
+    bg: "#eef2ff",
+    border: "#c7d2fe",
+  },
+};
+
+const formatDurationDisplay = (seconds) => {
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+    return "Not measurable";
+  }
+  const s = Math.max(0, Math.round(Number(seconds)));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return m > 0 ? `${m}m ${rem}s` : `${rem}s`;
+};
 
 // ── futur21 Concentric Circle Waves Avatar for Ava ──────────────────────────
 const CircleWavesAvatar = ({ isTalking, isThinking }) => {
@@ -75,15 +111,15 @@ const renderEvidenceCard = (item, isStrength, idx) => {
 
   return (
     <div key={idx} style={{
-      background: isStrength ? "rgba(0,196,167,0.06)" : "rgba(245,158,11,0.06)",
-      border: isStrength ? "1px solid rgba(0,196,167,0.22)" : "1px solid rgba(245,158,11,0.22)",
+      background: isStrength ? "#ecfdf5" : "#fffbeb",
+      border: isStrength ? "1px solid #a7f3d0" : "1px solid #fde68a",
       borderRadius: "14px",
       padding: "14px",
       marginBottom: "12px",
       textAlign: "left"
     }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", marginBottom: "6px" }}>
-        <strong style={{ color: "#fff", fontSize: "12.5px", lineHeight: "1.4", display: "flex", alignItems: "center", gap: "6px" }}>
+        <strong style={{ color: "#0f172a", fontSize: "12.5px", lineHeight: "1.4", display: "flex", alignItems: "center", gap: "6px" }}>
           <span>{isStrength ? "✅" : "⚠️"}</span>
           <span>{cleanTitle}</span>
         </strong>
@@ -95,9 +131,9 @@ const renderEvidenceCard = (item, isStrength, idx) => {
             letterSpacing: "0.5px",
             padding: "2px 8px",
             borderRadius: "10px",
-            background: isStrength ? "rgba(0,229,195,0.15)" : "rgba(245,158,11,0.15)",
-            color: isStrength ? "#00e5c3" : "#f59e0b",
-            border: isStrength ? "1px solid rgba(0,229,195,0.3)" : "1px solid rgba(245,158,11,0.3)",
+            background: isStrength ? "#d1fae5" : "#fef3c7",
+            color: isStrength ? "#065f46" : "#92400e",
+            border: isStrength ? "1px solid #6ee7b7" : "1px solid #fcd34d",
             whiteSpace: "nowrap"
           }}>
             {turnBadge}
@@ -106,7 +142,7 @@ const renderEvidenceCard = (item, isStrength, idx) => {
       </div>
 
       {observation && observation.toLowerCase() !== cleanTitle.toLowerCase() && (
-        <div style={{ fontSize: "11.5px", color: "#94a3b8", marginBottom: quote ? "8px" : "0", lineHeight: "1.5" }}>
+        <div style={{ fontSize: "11.5px", color: "#475569", marginBottom: quote ? "8px" : "0", lineHeight: "1.5" }}>
           {observation}
         </div>
       )}
@@ -251,6 +287,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [isSpeakingAnswer, setIsSpeakingAnswer] = useState(false);
   const recognitionRef = useRef(null);
   const isListeningDesiredRef = useRef(false);
+  const isEndingRef = useRef(false);
   const finalTranscriptRef = useRef("");
   const [audioLevel, setAudioLevel] = useState(0);
   const [hintText, setHintText] = useState("");
@@ -389,6 +426,29 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   // Active accordion tab for turn-by-turn benchmark review
   const [expandedTurn, setExpandedTurn] = useState(null);
 
+  // Phase 6: Capture telemetry, error/retry states, transcript preview & evidence drawer
+  const [inputMode, setInputMode] = useState("speech"); // "speech" | "typed"
+  const [sttConfidence, setSttConfidence] = useState(null);
+  const [confirmedEdit, setConfirmedEdit] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState("");
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [setupError, setSetupError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
+  const [evaluatingTurns, setEvaluatingTurns] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState(null);
+  const [retryEvalState, setRetryEvalState] = useState({ loading: false, error: null });
+  const [emailState, setEmailState] = useState({ sending: false, sent: false, error: null });
+  const [customNameDraft, setCustomNameDraft] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
+  const [evidenceDrawer, setEvidenceDrawer] = useState(null);
+
+  const turnStartIsoRef = useRef(null);
+  const speechStartMsRef = useRef(null);
+  const speechConfsRef = useRef([]);
+  const turnInputModeRef = useRef("speech");
+  const turnIdemKeyRef = useRef(null);
+
   useEffect(() => {
     isHandsFreeRef.current = isHandsFree;
   }, [isHandsFree]);
@@ -512,18 +572,50 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     alert(`Selected Capture Devices:\n\n📷 Camera: ${videoLabel}\n🎙️ Microphone: ${audioLabel}\n\nUsing system-default selection.`);
   };
 
-  // Restore active interview step or report from localStorage / sessionStorage on reload
+  // Restore active interview step or report from localStorage / sessionStorage & backend persistence on reload
   useEffect(() => {
     try {
       const saved = localStorage.getItem("prepfly_avatab_session") || sessionStorage.getItem("prepfly_avatab_session");
       if (saved) {
         const p = JSON.parse(saved);
-        if (p && p.step === "report" && p.reportData) {
+        if (p && p.sessionId && p.step === "report") {
+          setSessionId(p.sessionId);
           setStep("report");
-          setReportData(p.reportData);
+          if (p.reportData) setReportData(p.reportData);
           if (p.allFeedbacks) setAllFeedbacks(p.allFeedbacks);
-          if (p.sessionId) setSessionId(p.sessionId);
           if (p.atsScore) setAtsScore(p.atsScore);
+          // Rehydrate latest persisted report from DB
+          setReportLoading(true);
+          apiFetch(`/interview/${p.sessionId}/report`)
+            .then(async (r) => {
+              const d = await r.json();
+              if (r.ok) {
+                setReportData(d);
+                setReportError(null);
+              } else {
+                setReportError(d.error || "Could not load saved report.");
+              }
+            })
+            .catch((err) => setReportError(err.message || "Network error loading report."))
+            .finally(() => setReportLoading(false));
+        } else if (p && p.sessionId && p.step === "live_call") {
+          setSessionId(p.sessionId);
+          setStep("live_call");
+          if (p.question) setQuestion(p.question);
+          if (p.questionNumber) setQuestionNumber(p.questionNumber);
+          apiFetch(`/interview/${p.sessionId}/state`)
+            .then(async (r) => {
+              if (!r.ok) return;
+              const st = await r.json();
+              if (st.current_question) setQuestion(st.current_question);
+              const candTurns = (st.turns || []).filter((t) => t.speaker === "candidate");
+              if (candTurns.length > 0) {
+                setAllFeedbacks(candTurns);
+                setQuestionNumber(candTurns.length + 1);
+              }
+              turnStartIsoRef.current = new Date().toISOString();
+            })
+            .catch(() => {});
         }
       }
     } catch (e) {
@@ -667,11 +759,17 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   };
 
   // Step 3 -> 4: Start Interview & Loading Flow
-  const triggerStartInterview = async () => {
+  const triggerStartInterview = async (overrideSetupMode = null) => {
     if (!consentGiven) {
-      alert("Affirmative consent is required to process your voice and resume data with AI under DPDP Act 2023. Please check the consent box before starting.");
+      setSetupError({
+        message: "Affirmative privacy consent is required before starting your AI interview.",
+        retryable: false,
+        step: "consent",
+      });
       return;
     }
+    const activeMode = overrideSetupMode || setupMode;
+    setSetupError(null);
     setStep("loading");
     setLoadingStepIndex(0);
 
@@ -688,7 +786,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
       const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-      if (setupMode === "resume" && resumeFile) {
+      if (activeMode === "resume" && resumeFile) {
         const formData = new FormData();
         formData.append("resume", resumeFile);
         formData.append("consent", "true");
@@ -701,7 +799,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           body: formData
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to upload resume");
+        if (!res.ok) {
+          clearInterval(interval);
+          setSetupError({
+            message: data.message || data.error || "Resume parsing failed temporarily.",
+            retryable: data.retryable !== false,
+            step: data.step || "resume_parse",
+          });
+          setStep("resume_upload");
+          return;
+        }
         activeSessionId = data.session_id;
         if (data.ats_score) setAtsScore(data.ats_score);
       } else {
@@ -719,68 +826,88 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to create non-resume session");
+        if (!res.ok) {
+          clearInterval(interval);
+          setSetupError({
+            message: data.message || data.error || "Failed to initialize interview session.",
+            retryable: true,
+            step: "session_create",
+          });
+          setStep("device_check");
+          return;
+        }
         activeSessionId = data.session_id;
       }
 
       if (!activeSessionId) {
-        throw new Error("Interview session could not be established. Please retry uploading your resume.");
+        throw new Error("Interview session could not be established. Please retry.");
       }
 
       setSessionId(activeSessionId);
 
-      const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
-      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
+      const chosenCategory = (activeMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
+      const chosenRole = (activeMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
 
       let startRes = await apiFetch("/start-interview", {
         method: "POST",
-        body: JSON.stringify({ 
-          session_id: activeSessionId, 
-          category: chosenCategory, 
+        body: JSON.stringify({
+          session_id: activeSessionId,
+          category: chosenCategory,
           role: chosenRole,
           difficulty: difficulty || "Medium",
           personality: selectedPersonality || "professional",
-          job_description: jobDescription || ""
+          job_description: jobDescription || "",
+          idempotency_key: `start_${activeSessionId}`
         })
       });
 
-      if (!startRes.ok && startRes.status === 404) {
-        // Automatic retry once after 600ms in case of replica sync lag
-        await new Promise(r => setTimeout(r, 600));
-        startRes = await apiFetch("/start-interview", {
-          method: "POST",
-          body: JSON.stringify({ 
-            session_id: activeSessionId, 
-            category: chosenCategory, 
-            role: chosenRole,
-            difficulty: difficulty || "Medium",
-            personality: selectedPersonality || "professional",
-            job_description: jobDescription || ""
-          })
+      const startData = await startRes.json();
+      if (!startRes.ok) {
+        clearInterval(interval);
+        setSetupError({
+          message: startData.message || startData.error || "Failed to start interview.",
+          retryable: true,
+          step: "start_interview",
         });
+        setStep("device_check");
+        return;
       }
 
-      const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.error || "Failed to start interview");
-
+      clearInterval(interval);
+      isEndingRef.current = false;
       setQuestion(startData.question);
       setQuestionNumber(startData.question_number || 1);
       if (startData.stage) setCurrentStage(startData.stage);
+      turnStartIsoRef.current = new Date().toISOString();
+      speechStartMsRef.current = null;
+      speechConfsRef.current = [];
+      setConfirmedEdit(false);
+      setReviewNotice("");
 
       setTimeout(() => {
         setStep("live_call");
         setupCamera(true);
         playAvaSpeech(startData.question);
-      }, 1200);
+      }, 900);
 
     } catch (err) {
-      alert("Error starting interview: " + err.message);
+      clearInterval(interval);
+      setSetupError({
+        message: err.message || "Unexpected error starting interview.",
+        retryable: true,
+        step: "start_interview",
+      });
       setStep("device_check");
     }
   };
 
   // Play Ava speech
   const playAvaSpeech = (text) => {
+    if (isEndingRef.current) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      setIsAvaTalking(false);
+      return;
+    }
     setIsAvaTalking(true);
 
     // Strip markdown formatting symbols for natural vocal speech and accurate captions
@@ -819,8 +946,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     };
 
     const speakWithWebSpeech = () => {
+      if (isEndingRef.current) {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        setIsAvaTalking(false);
+        return;
+      }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+        if (isEndingRef.current) return;
         const utterance = new SpeechSynthesisUtterance(cleanedText || text);
         const bestVoice = getNaturalVoice();
         if (bestVoice) {
@@ -833,7 +966,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         const onSpeechFinish = () => {
           if (speechSafetyTimer) clearTimeout(speechSafetyTimer);
           setIsAvaTalking(false);
-          startVoiceRecognition();
+          if (!isEndingRef.current) {
+            startVoiceRecognition();
+          }
         };
 
         const wordCount = (cleanedText || text).split(/\s+/).length;
@@ -848,7 +983,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         window.speechSynthesis.speak(utterance);
       } else {
         setIsAvaTalking(false);
-        startVoiceRecognition();
+        if (!isEndingRef.current) {
+          startVoiceRecognition();
+        }
       }
     };
 
@@ -883,10 +1020,18 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       });
   };
 
-  // Voice Speech Recognition (Speaking Answer) with continuous recovery & PrepFly VAD
+  // Voice Speech Recognition (Speaking Answer) with continuous recovery, telemetry & PrepFly VAD
   const startVoiceRecognition = () => {
     isListeningDesiredRef.current = true;
     setIsSpeakingAnswer(true);
+    setInputMode("speech");
+    turnInputModeRef.current = "speech";
+    if (!turnStartIsoRef.current) {
+      turnStartIsoRef.current = new Date().toISOString();
+    }
+    if (!speechStartMsRef.current) {
+      speechStartMsRef.current = Date.now();
+    }
 
     if (mediaStreamRef.current) {
       startAudioMeter(mediaStreamRef.current);
@@ -894,7 +1039,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
-      console.warn("Web Speech API not available in this browser. Please type your response directly.");
+      setMicErrorMsg("Speech-to-text is unavailable in this browser. Switched to Typed Response mode (all content dimensions are still evaluated).");
+      setIsSpeakingAnswer(false);
+      setInputMode("typed");
+      turnInputModeRef.current = "typed";
       return;
     }
 
@@ -917,16 +1065,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
       rec.onresult = (e) => {
         let interim = "";
+        let latestChunk = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const chunk = e.results[i][0].transcript;
+          const alt = e.results[i][0];
+          const chunk = alt.transcript;
+          latestChunk = chunk;
           if (e.results[i].isFinal) {
             finalTranscriptRef.current += (finalTranscriptRef.current ? " " : "") + chunk.trim();
+            if (typeof alt.confidence === "number" && alt.confidence > 0) {
+              speechConfsRef.current.push(alt.confidence);
+              const avgConf = speechConfsRef.current.reduce((a, b) => a + b, 0) / speechConfsRef.current.length;
+              setSttConfidence(Number(avgConf.toFixed(3)));
+            }
           } else {
             interim += chunk;
           }
         }
         // Barge-in Interruption: When candidate speaks while Ava is talking, interrupt playback
-        if (isAvaTalkingRef.current && (interim || chunk)) {
+        if (isAvaTalkingRef.current && (interim || latestChunk)) {
           if ('speechSynthesis' in window) window.speechSynthesis.cancel();
           if (currentAudioRef.current) {
             try { currentAudioRef.current.pause(); } catch {}
@@ -947,7 +1103,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
         // PrepFly VAD: When candidate speaks meaningful words (>= 3 words) and pauses
         const words = currentTotal.split(/\s+/).filter(Boolean);
-        if (isHandsFreeRef.current && words.length >= 3 && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
+        if (isHandsFreeRef.current && words.length >= 3 && !isAvaTalkingRef.current && !isAvaThinkingRef.current && !reviewNotice) {
           setAutoSubmitCountdown(2);
           silenceTimerRef.current = setTimeout(() => {
             if (isListeningDesiredRef.current && !isAvaTalkingRef.current && !isAvaThinkingRef.current) {
@@ -979,12 +1135,15 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           return;
         }
         if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-          setMicErrorMsg("Microphone access was denied. Please allow microphone permissions in your browser.");
+          setMicErrorMsg("Microphone permission was denied. Switched to Typed Response mode so you can continue cleanly.");
           setIsSpeakingAnswer(false);
+          setInputMode("typed");
+          turnInputModeRef.current = "typed";
+          isListeningDesiredRef.current = false;
           return;
         }
         if (e.error === "network" || e.error === "audio-capture") {
-          console.warn("Speech recognition network/audio notice. Listener will auto-reconnect.");
+          setMicErrorMsg("Microphone audio/STT had a brief interruption. You can type or edit your answer directly below.");
         }
       };
 
@@ -993,6 +1152,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       setMicErrorMsg("");
     } catch (e) {
       console.warn("Voice speech rec start error:", e);
+      setInputMode("typed");
+      turnInputModeRef.current = "typed";
     }
   };
 
@@ -1040,42 +1201,69 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   };
 
-  // Submit Answer & Fetch Next Question (hands-free auto submit compatible)
+  // Submit Answer & Fetch Next Question (hands-free auto submit compatible + capture telemetry)
   const submitAnswerAndNext = async (overrideAnswer = null) => {
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
     setAutoSubmitCountdown(null);
+    setSubmitError(null);
 
     const textToSubmit = (typeof overrideAnswer === "string" ? overrideAnswer : (answer || finalTranscriptRef.current || "")).trim();
     if (!textToSubmit) {
       if (!overrideAnswer) {
-        alert("Please speak or type your answer first.");
+        setSubmitError("Please speak or type your answer before submitting.");
       }
       return;
     }
 
     stopVoiceRecognition();
     setIsAvaThinking(true);
-    setCaptionText("Evaluating your response and preparing next question...");
+    setCaptionText("Saving your response and preparing next question...");
     setHintText("");
+
+    const endedIso = new Date().toISOString();
+    const startedIso = turnStartIsoRef.current || endedIso;
+    const isSpeechMode = turnInputModeRef.current === "speech";
+    const measuredDurationSec = isSpeechMode && speechStartMsRef.current
+      ? Math.max(0.5, Number(((Date.now() - speechStartMsRef.current) / 1000).toFixed(2)))
+      : null;
 
     try {
       const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
       const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
+      if (!turnIdemKeyRef.current) {
+        turnIdemKeyRef.current = `turn_${sessionId}_${questionNumber}_${Date.now()}`;
+      }
       const res = await apiFetch("/next", {
         method: "POST",
+        headers: { "X-Idempotency-Key": turnIdemKeyRef.current },
         body: JSON.stringify({
           session_id: sessionId,
+          idempotency_key: turnIdemKeyRef.current,
           answer: textToSubmit,
           category: chosenCategory,
           role: chosenRole,
-          difficulty: difficulty || "Medium"
+          difficulty: difficulty || "Medium",
+          input_mode: isSpeechMode ? "speech" : "typed",
+          stt_engine: isSpeechMode ? "web_speech_api" : null,
+          stt_confidence: isSpeechMode ? sttConfidence : null,
+          audio_duration_s: measuredDurationSec,
+          started_at: startedIso,
+          ended_at: endedIso,
+          confirmed_edit: Boolean(confirmedEdit),
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to process answer");
+      if (!res.ok) throw new Error(data.degraded_message || data.error || "Failed to process answer");
+
+      if (data.requires_review) {
+        setIsAvaThinking(false);
+        setReviewNotice(data.message || "Low speech confidence detected. Review or edit your transcript below before submitting.");
+        setConfirmedEdit(true);
+        return;
+      }
 
       if (data.message === "Repeating question") {
         setIsAvaThinking(false);
@@ -1084,15 +1272,34 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         return;
       }
 
-      if (data.feedback) {
-        setAllFeedbacks(prev => [...prev, data.feedback]);
+      if (data.feedback || data.turn_id) {
+        setAllFeedbacks(prev => [...prev, {
+          ...(data.feedback || {}),
+          turn_id: data.turn_id,
+          question,
+          response: textToSubmit,
+          status: data.turn_status || "ok",
+        }]);
       }
       finalTranscriptRef.current = "";
+      speechStartMsRef.current = null;
+      speechConfsRef.current = [];
+      turnIdemKeyRef.current = null;
+      turnStartIsoRef.current = new Date().toISOString();
+      setSttConfidence(null);
+      setConfirmedEdit(false);
+      setReviewNotice("");
       setAnswer("");
       setIsAvaThinking(false);
 
-      if (data.done) {
-        endInterviewSession();
+      if (data.audio_cutoff || data.done) {
+        isEndingRef.current = true;
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+        setIsAvaTalking(false);
+        endInterviewSession(true);
+        return;
       } else if (data.next_question) {
         setQuestion(data.next_question);
         setQuestionNumber(data.question_number || questionNumber + 1);
@@ -1100,107 +1307,202 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         playAvaSpeech(data.next_question);
       }
     } catch (err) {
-      alert("Error: " + err.message);
+      setSubmitError(err.message || "Could not submit your response. Your draft is preserved below.");
       setIsAvaThinking(false);
-      startVoiceRecognition();
     }
   };
 
-    // End Interview & Generate Report
-  const endInterviewSession = async () => {
+  // End Interview & Generate Report (with confirmation warning if < 3 substantive answers)
+  const handleRequestEndInterview = () => {
+    const answeredSoFar = allFeedbacks.length;
+    if (answeredSoFar < 3) {
+      setShowEndConfirm(true);
+      return;
+    }
+    endInterviewSession(true);
+  };
+
+  const endInterviewSession = async (confirmedEarly = false) => {
+    setShowEndConfirm(false);
+    isEndingRef.current = true;
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsAvaTalking(false);
     stopVoiceRecognition();
     setIsAvaThinking(true);
-    setCaptionText("Compiling your comprehensive executive evaluation report...");
+    setReportLoading(true);
+    setReportError(null);
+
+    // Initialize visible per-turn evaluation progress list
+    const initialTurnProgress = (allFeedbacks || []).map((f, idx) => ({
+      turn: idx + 1,
+      label: f.question ? f.question.slice(0, 48) : `Response ${idx + 1}`,
+      status: "retrying",
+    }));
+    setEvaluatingTurns(initialTurnProgress);
+    setCaptionText("Evaluating your answers against structured rubrics...");
 
     try {
       const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
       const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
       const res = await apiFetch("/end-interview", {
         method: "POST",
-        body: JSON.stringify({ 
-          session_id: sessionId, 
+        body: JSON.stringify({
+          session_id: sessionId,
           role: chosenRole,
           category: chosenCategory,
           difficulty: difficulty || "Medium",
-          eye_contact_pct: eyeContactPct, 
-          tab_switches: tabSwitches 
+          eye_contact_pct: eyeContactPct,
+          tab_switches: tabSwitches,
+          confirmed_early: Boolean(confirmedEarly),
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "End interview failed");
 
+      const revStatus = (data.question_reviews || []).map((q, idx) => ({
+        turn: idx + 1,
+        label: q.question ? q.question.slice(0, 48) : `Response ${idx + 1}`,
+        status: q.evaluation_status === "ok" ? "ok" : (q.evaluation_status === "failed" ? "failed" : "ok"),
+      }));
+      if (revStatus.length > 0) setEvaluatingTurns(revStatus);
+
       setReportData(data);
       setStep("report");
       setIsAvaThinking(false);
-
-      // Poll background report if initial response is "Generating..."
-      if (data.report && data.report.includes("Generating")) {
-        let attempts = 0;
-        const poll = setInterval(async () => {
-          attempts++;
-          try {
-            const r = await apiFetch(`/session-report/${sessionId}`);
-            const rd = await r.json();
-            if (rd.final_report && !rd.final_report.includes("Generating")) {
-              try {
-                const parsed = JSON.parse(rd.final_report);
-                setReportData(prev => ({
-                  ...prev,
-                  ...parsed,
-                  report: rd.final_report
-                }));
-              } catch (e) {
-                setReportData(prev => ({ ...prev, report: rd.final_report }));
-              }
-              clearInterval(poll);
-            }
-          } catch {}
-          if (attempts >= 12) clearInterval(poll);
-        }, 4000);
-      }
+      setReportLoading(false);
     } catch (err) {
-      alert("Error generating report: " + err.message);
+      setReportError(err.message || "Error generating report.");
       setIsAvaThinking(false);
+      setReportLoading(false);
     }
   };
 
+  const retryFailedEvaluations = async () => {
+    if (!sessionId || retryEvalState.loading) return;
+    setRetryEvalState({ loading: true, error: null });
+    try {
+      const res = await apiFetch(`/interview/${sessionId}/retry-evaluations`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setRetryEvalState({ loading: false, error: data.message || data.error || "Evaluation service temporarily unavailable." });
+      } else {
+        setRetryEvalState({ loading: false, error: null });
+      }
+      const repRes = await apiFetch(`/interview/${sessionId}/report`);
+      if (repRes.ok) {
+        const repJson = await repRes.json();
+        setReportData(repJson);
+      }
+    } catch (err) {
+      setRetryEvalState({ loading: false, error: err.message || "Retry request failed." });
+    }
+  };
+
+  const sendReportByEmail = async () => {
+    if (!sessionId || emailState.sending) return;
+    setEmailState({ sending: true, sent: false, error: null });
+    try {
+      const res = await apiFetch(`/interview/${sessionId}/email-report`, {
+        method: "POST",
+        body: JSON.stringify({ email: safeUser?.email || "" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        setEmailState({ sending: false, sent: false, error: data.error || "Failed to send email." });
+        return;
+      }
+      setEmailState({ sending: false, sent: true, error: null });
+    } catch (err) {
+      setEmailState({ sending: false, sent: false, error: err.message || "Network error sending email." });
+    }
+  };
+
+  const saveCustomDisplayName = async () => {
+    const trimmed = customNameDraft.trim();
+    if (!trimmed || !sessionId || nameSaving) return;
+    setNameSaving(true);
+    try {
+      const res = await apiFetch(`/interview/${sessionId}/display-name`, {
+        method: "POST",
+        body: JSON.stringify({ display_name: trimmed }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReportData(data);
+        setCustomNameDraft("");
+      }
+    } catch {}
+    setNameSaving(false);
+  };
 
   const downloadPDFReport = () => {
-    const gc = reportData?.grade === "S" ? "#ffd700" : reportData?.grade === "A" ? "#00e5c3" : reportData?.grade === "B" ? "#00b8ff" : "#f59e0b";
+    if (!reportData) return;
+    const hdr = reportData.header || {};
+    const status = reportData.report_status || "INCOMPLETE_INSUFFICIENT_DATA";
+    const statusInfo = STATUS_META[status] || STATUS_META.INCOMPLETE_INSUFFICIENT_DATA;
+    const candidateDisplay = hdr.candidate_name || reportData.candidate_name || safeUser?.name || "Candidate";
+    const canShowScore = status === "EVALUATED" || status === "PARTIAL";
+    const scoreStr = canShowScore && reportData.overall_score_100 !== null && reportData.overall_score_100 !== undefined
+      ? `${reportData.overall_score_100} / 100`
+      : "Not Scored";
+    const gradeStr = canShowScore && reportData.grade ? reportData.grade : "—";
+    const recStr = canShowScore && (reportData.recommendation || reportData.hiring_recommendation)
+      ? (reportData.recommendation || reportData.hiring_recommendation)
+      : reportData.status_reason || statusInfo.badge;
+    const dimsHtml = (reportData.dimensions || reportData.section_grades || []).map((d) => {
+      const val = d.score !== null && d.score !== undefined ? `${d.score}/100 (${d.grade || ""})` : "Not Evaluated";
+      return `<div class="dim-row"><span>${d.name}</span><span>${val}</span></div>`;
+    }).join("");
+    const reviewsHtml = (reportData.question_reviews || []).map((q, i) =>
+      `<div class="qa-card">
+        <div style="color:#a78bfa;font-weight:800;margin-bottom:4px">Q${q.question_number || i + 1}: ${q.question || ""}${q.is_small_talk ? " (Small Talk · Excluded from scoring)" : ""}</div>
+        <div style="color:#00c4a7;font-weight:700">${q.score_100 !== null && q.score_100 !== undefined ? `Score: ${q.score_100}/100` : `Status: ${q.evaluation_status || q.turn_status}`}</div>
+        <div style="margin-top:8px;font-style:italic">"${q.candidate_answer || ""}"</div>
+        ${q.improved_answer ? `<div style="margin-top:8px;color:#cbd5e1"><strong>Model Benchmark:</strong> ${q.improved_answer}</div>` : ""}
+      </div>`
+    ).join("");
+
     const html = `<!DOCTYPE html><html><head>
-    <meta charset="UTF-8"/><title>PrepFly Executive Report - Ava</title>
+    <meta charset="UTF-8"/><title>PrepFly Interview Report - ${candidateDisplay}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap');
       *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Plus Jakarta Sans',sans-serif;background:#070b14;color:#f0f4fd;padding:40px;line-height:1.6}
       .hdr{display:flex;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:28px}
       .brand{font-size:24px;font-weight:900;background:linear-gradient(135deg,#00c4a7,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-      .hero{background:linear-gradient(145deg,rgba(12,18,32,0.9),rgba(24,18,40,0.9));border:1px solid rgba(124,58,237,0.3);border-radius:20px;padding:28px;margin-bottom:28px;display:flex;gap:24px;align-items:center}
-      .grade-circle{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;border:4px solid ${gc};background:${gc}18;color:${gc};box-shadow:0 0 24px ${gc}33}
-      .score-val{font-size:32px;font-weight:900;color:#00c4a7;margin-top:2px}
-      .sec-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#00c4a7;margin:28px 0 16px;border-left:3px solid #00c4a7;padding-left:10px}
+      .hero{background:rgba(12,18,32,0.9);border:1px solid ${statusInfo.border};border-radius:20px;padding:28px;margin-bottom:28px;display:flex;gap:24px;align-items:center}
+      .grade-circle{min-width:84px;height:84px;padding:0 14px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;border:2px solid ${statusInfo.color};background:${statusInfo.bg};color:${statusInfo.color}}
+      .score-val{font-size:28px;font-weight:900;color:#00c4a7;margin-top:2px}
+      .sec-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#00c4a7;margin:24px 0 12px;border-left:3px solid #00c4a7;padding-left:10px}
+      .dim-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px}
       .qa-card{background:rgba(12,18,32,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:16px}
       .rpt-box{background:rgba(12,18,32,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px;font-size:14px;color:#e2e8f0;white-space:pre-wrap;line-height:1.7}
       .ftr{margin-top:40px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);font-size:11px;color:#64748b;text-align:center}
     </style></head><body>
-    <div class="hdr"><div class="brand">🚀 PrepFly Executive Evaluation (Ava)</div><div>Candidate: ${(safeUser?.name)||"Candidate"}<br/>Generated: ${new Date().toLocaleString()}</div></div>
+    <div class="hdr"><div class="brand">PrepFly Interview Report</div><div>Candidate: ${candidateDisplay}<br/>Role: ${hdr.role || "Software Engineer"} (${hdr.level || "Mid"})<br/>Status: ${statusInfo.badge}<br/>Generated: ${new Date().toLocaleString()}</div></div>
     <div class="hero">
-      <div class="grade-circle">${reportData?.grade || "F"}</div>
+      <div class="grade-circle">${gradeStr}</div>
       <div>
-        <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;font-weight:700">Overall Rating</div>
-        <div class="score-val">${reportData?.overall_score_100 ?? reportData?.overall_score ?? 0} / 100</div>
-        <div style="font-size:12px;color:#cbd5e1;margin-top:4px">${reportData?.grade_label || "Candidate Evaluation"}</div>
+        <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;font-weight:700">${statusInfo.badge}</div>
+        <div class="score-val">${scoreStr}</div>
+        <div style="font-size:12px;color:#cbd5e1;margin-top:4px">${recStr}</div>
       </div>
     </div>
-    <div class="sec-title">Final Recruiter Evaluation Summary & Strengths</div>
-    <div class="rpt-box">${reportData?.report || "Full technical evaluation completed successfully."}</div>
-    <div class="sec-title">Question-by-Question Deep Dive</div>
-    ${allFeedbacks.map((f, i) => `<div class="qa-card"><div style="color:#a78bfa;font-weight:800;margin-bottom:4px">Question ${i+1}: ${f.question||""}</div><div style="color:#00c4a7;font-weight:700">Score: ${f.score||7}/10</div><div style="margin-top:8px;font-style:italic">"${f.response||""}"</div><div style="margin-top:8px">${f.feedback||""}</div></div>`).join("")}
-    <div class="ftr">Official Evaluation Conducted by Ava (Senior AI Technical Interviewer)</div>
+    <div class="sec-title">Summary</div>
+    <div class="rpt-box">${(reportData.narrative && reportData.narrative.text) || reportData.report || reportData.status_reason || ""}</div>
+    <div class="sec-title">10 Dimensions</div>
+    ${dimsHtml}
+    <div class="sec-title">Question-by-Question Review</div>
+    ${reviewsHtml}
+    <div class="ftr">Evidence-Grounded Report generated from persisted interview turns (Formula ${reportData.formula_version || "v1"})</div>
     </body></html>`;
     const win = window.open("", "_blank");
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 600);
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 600);
+    }
   };
 
   const interviewTypes = [
@@ -1214,30 +1516,56 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     { id: "HR", name: "HR & Behavioral", duration: "20 min", desc: "Culture fit, leadership, conflict resolution, and structured STAR-method storytelling." }
   ];
 
+  const isLiveRoomStep = step === "loading" || step === "live_call";
+
   return (
-    <div style={{ backgroundColor: "#050811", color: "#ffffff", minHeight: "100vh", padding: "28px" }}>
+    <div style={{
+      backgroundColor: isLiveRoomStep ? "#090c1a" : "transparent",
+      color: isLiveRoomStep ? "#ffffff" : "#0f172a",
+      minHeight: isLiveRoomStep ? "calc(100vh - 120px)" : "auto",
+      borderRadius: isLiveRoomStep ? "20px" : "0",
+      padding: isLiveRoomStep ? "24px" : "4px 0 28px"
+    }}>
       <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
 
         {/* ── STEP 1: RESUME OR NON-RESUME INTERVIEW SETUP ── */}
         {step === "resume_upload" && (
-          <div style={{ maxWidth: "860px", margin: "30px auto", background: "rgba(12,18,32,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "36px", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+          <div style={{ maxWidth: "860px", margin: "8px auto", background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "22px", padding: "36px", boxShadow: "0 4px 20px rgba(15,23,42,0.04)" }}>
             <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "6px" }}>PREPFLY ADVANCED VOICE AI</div>
-              <h2 style={{ fontSize: "28px", fontWeight: 900, marginBottom: "8px", color: "#fff" }}>Configure Your AI Interview</h2>
-              <p style={{ fontSize: "14px", color: "var(--text2)", maxWidth: "560px", margin: "0 auto" }}>Choose your preferred interview setup mode below:</p>
+              <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: "6px" }}>PREPFLY ADVANCED VOICE AI</div>
+              <h2 style={{ fontSize: "26px", fontWeight: 800, marginBottom: "8px", color: "#0f172a" }}>Configure Your AI Interview</h2>
+              <p style={{ fontSize: "14px", color: "#64748b", maxWidth: "560px", margin: "0 auto" }}>Choose your preferred interview setup mode below:</p>
             </div>
 
+            {setupError && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "14px", padding: "14px 18px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "13px", color: "#991b1b", textAlign: "left" }}>
+                  <strong style={{ color: "#dc2626" }}>Upload / Parse Interrupted:</strong> {setupError.message}
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {setupError.retryable && resumeFile && (
+                    <button type="button" onClick={() => triggerStartInterview("resume")} style={{ padding: "8px 14px", borderRadius: "10px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
+                      Retry Resume Parse
+                    </button>
+                  )}
+                  <button type="button" onClick={() => { setSetupError(null); setSetupMode("non_resume"); setResumeFile(null); }} style={{ padding: "8px 14px", borderRadius: "10px", background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}>
+                    Continue Without Resume
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 2 Distinct Setup Mode Option Tabs */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(255,255,255,0.03)", borderRadius: "16px", padding: "6px", marginBottom: "28px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#eaedf6", borderRadius: "14px", padding: "6px", marginBottom: "26px" }}>
               <button 
                 type="button"
                 onClick={() => setSetupMode("resume")} 
                 style={{ 
-                  padding: "14px", 
-                  borderRadius: "12px", 
-                  border: setupMode === "resume" ? "1.5px solid #00c4a7" : "1px solid transparent", 
-                  background: setupMode === "resume" ? "linear-gradient(135deg, rgba(0,196,167,0.18), rgba(124,58,237,0.18))" : "transparent", 
-                  color: setupMode === "resume" ? "#00c4a7" : "#94a3b8", 
+                  padding: "13px", 
+                  borderRadius: "10px", 
+                  border: setupMode === "resume" ? "1px solid #6d28d9" : "1px solid transparent", 
+                  background: setupMode === "resume" ? "#ffffff" : "transparent", 
+                  color: setupMode === "resume" ? "#6d28d9" : "#475569", 
                   fontWeight: 800, 
                   cursor: "pointer", 
                   fontSize: "13px",
@@ -1245,10 +1573,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
+                  boxShadow: setupMode === "resume" ? "0 2px 8px rgba(109,40,217,0.12)" : "none",
                   transition: "all 0.2s"
                 }}
               >
-                <span style={{ fontSize: "18px" }}>📄</span>
                 <span>Option 1: With Resume <strong>[Upload Resume]</strong></span>
               </button>
 
@@ -1256,11 +1584,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 type="button"
                 onClick={() => setSetupMode("non_resume")} 
                 style={{ 
-                  padding: "14px", 
-                  borderRadius: "12px", 
-                  border: setupMode === "non_resume" ? "1.5px solid #00c4a7" : "1px solid transparent", 
-                  background: setupMode === "non_resume" ? "linear-gradient(135deg, rgba(0,196,167,0.18), rgba(124,58,237,0.18))" : "transparent", 
-                  color: setupMode === "non_resume" ? "#00c4a7" : "#94a3b8", 
+                  padding: "13px", 
+                  borderRadius: "10px", 
+                  border: setupMode === "non_resume" ? "1px solid #6d28d9" : "1px solid transparent", 
+                  background: setupMode === "non_resume" ? "#ffffff" : "transparent", 
+                  color: setupMode === "non_resume" ? "#6d28d9" : "#475569", 
                   fontWeight: 800, 
                   cursor: "pointer", 
                   fontSize: "13px",
@@ -1268,10 +1596,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
+                  boxShadow: setupMode === "non_resume" ? "0 2px 8px rgba(109,40,217,0.12)" : "none",
                   transition: "all 0.2s"
                 }}
               >
-                <span style={{ fontSize: "18px" }}>📋</span>
                 <span>Option 2: Without Resume <strong>[With Job Description]</strong></span>
               </button>
             </div>
@@ -1280,27 +1608,27 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             {setupMode === "resume" ? (
               <div style={{ textAlign: "center" }}>
                 {resumeFile ? (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "18px 22px", marginBottom: "28px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f5f3ff", border: "1px solid #c4b5fd", borderRadius: "16px", padding: "18px 22px", marginBottom: "28px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                      <span style={{ fontSize: "28px" }}>📄</span>
+                      <span style={{ fontSize: "26px" }}>📄</span>
                       <div style={{ textAlign: "left" }}>
-                        <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff" }}>{resumeFile?.name || 'Resume'}</div>
-                        <div style={{ fontSize: "12px", color: "#00c4a7" }}>{(resumeFile.size / 1024).toFixed(1)} KB · Ava will personalize questions to your projects & experience</div>
+                        <div style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>{resumeFile?.name || 'Resume'}</div>
+                        <div style={{ fontSize: "12px", color: "#6d28d9" }}>{(resumeFile.size / 1024).toFixed(1)} KB · Ava will personalize questions to your projects & experience</div>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: "10px" }}>
                       {previewResumeUrl && (
-                        <button type="button" onClick={() => window.open(previewResumeUrl, '_blank')} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "8px", width: "36px", height: "36px", color: "#fff", cursor: "pointer", fontSize: "16px" }} title="Preview Resume">👁️</button>
+                        <button type="button" onClick={() => window.open(previewResumeUrl, '_blank')} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", width: "36px", height: "36px", color: "#0f172a", cursor: "pointer", fontSize: "16px" }} title="Preview Resume">👁️</button>
                       )}
-                      <button type="button" onClick={clearResume} style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", width: "36px", height: "36px", color: "#ef4444", cursor: "pointer", fontSize: "16px" }} title="Clear Resume">✕</button>
+                      <button type="button" onClick={clearResume} style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", width: "36px", height: "36px", color: "#dc2626", cursor: "pointer", fontSize: "16px" }} title="Clear Resume">✕</button>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ border: "2px dashed rgba(0,196,167,0.35)", borderRadius: "20px", padding: "40px 24px", marginBottom: "28px", position: "relative", cursor: "pointer", background: "rgba(0,196,167,0.02)" }}>
+                  <div style={{ border: "2px dashed #c4b5fd", borderRadius: "18px", padding: "40px 24px", marginBottom: "28px", position: "relative", cursor: "pointer", background: "#faf8ff" }}>
                     <input type="file" accept=".pdf,.docx" onChange={handleFileUpload} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
-                    <div style={{ fontSize: "44px", marginBottom: "14px" }}>☁️</div>
-                    <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff" }}>Click or Drag & Drop your resume (PDF or DOCX)</div>
-                    <div style={{ fontSize: "13px", color: "var(--text2)", marginTop: "6px" }}>Option 1: Ava tailors every behavioral and technical question directly to your resume projects</div>
+                    <div style={{ fontSize: "38px", marginBottom: "12px" }}>☁️</div>
+                    <div style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>Click or Drag &amp; Drop your resume (PDF or DOCX)</div>
+                    <div style={{ fontSize: "13px", color: "#64748b", marginTop: "6px" }}>Option 1: Ava tailors every behavioral and technical question directly to your resume projects</div>
                   </div>
                 )}
               </div>
@@ -1308,39 +1636,39 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               /* OPTION 2 CONTENT: WITHOUT RESUME (WITH JOB DESCRIPTION) */
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px", textAlign: "left" }}>
                 <div>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Role Title</label>
+                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Role Title</label>
                   <input 
                     type="text" 
                     value={roleTitle} 
                     onChange={e => setRoleTitle(e.target.value)} 
                     placeholder="e.g. Senior Full Stack Engineer (React, Python, Microservices)" 
-                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }} 
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px" }} 
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
-                    Job Description (JD) & Key Requirements
+                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
+                    Job Description (JD) &amp; Key Requirements
                   </label>
                   <textarea 
                     value={jobDescription} 
                     onChange={e => setJobDescription(e.target.value)} 
                     placeholder="Paste the Job Description here (Responsibilities, Required Skills, Tech Stack, Qualifications)... Ava will tailor her questions to match this exact role!" 
                     rows={5}
-                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px", resize: "vertical", fontFamily: "inherit" }} 
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px", resize: "vertical", fontFamily: "inherit" }} 
                   />
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
-                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Core Focus Category</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Core Focus Category</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px" }}>
                       {["Full Stack / Generalist", "HR & Behavioral", "DSA & Algorithms", "System Design & Architecture", "OOPS & Clean Code", "DBMS & SQL", "OS & Networking", "Core CS"].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Difficulty Level</label>
-                    <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "13px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Difficulty Level</label>
+                    <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={{ width: "100%", padding: "11px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px" }}>
                       <option value="Easy">Junior / Associate (Easy)</option>
                       <option value="Medium">Mid-Level / Standard (Medium)</option>
                       <option value="Hard">Senior / Lead (Hard)</option>
@@ -1372,7 +1700,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   }
                   setStep("type_selection");
                 }} 
-                style={{ padding: "14px 32px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 8px 24px rgba(0,196,167,0.4)" }} 
+                style={{ padding: "13px 32px", borderRadius: "12px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 6px 20px rgba(109,40,217,0.28)" }} 
                 title="Continue to Track Selection"
               >
                 Continue to Track Selection ➔
@@ -1383,20 +1711,20 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* ── STEP 2: INTERVIEW TYPE SELECTION CARDS ── */}
         {step === "type_selection" && (
-          <div style={{ marginTop: "24px" }}>
-            <div style={{ textAlign: "center", marginBottom: "32px" }}>
-              <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>Choose Interview Track</h2>
-              <p style={{ fontSize: "13px", color: "var(--text2)", marginTop: "4px" }}>Select the topic and format for your 1-on-1 AI Recruiter interview with Ava</p>
+          <div style={{ marginTop: "12px" }}>
+            <div style={{ textAlign: "center", marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a" }}>Choose Interview Track</h2>
+              <p style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>Select the topic and format for your 1-on-1 AI Recruiter interview with Ava</p>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "18px" }}>
               {interviewTypes.map(t => (
-                <div key={t.id} style={{ background: selectedType?.id === t.id ? "linear-gradient(145deg, rgba(12,18,32,0.95), rgba(24,18,45,0.95))" : "rgba(12,18,32,0.7)", border: selectedType?.id === t.id ? "2px solid #00c4a7" : "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "240px", transition: "all 0.2s ease" }}>
+                <div key={t.id} style={{ background: "#ffffff", border: selectedType?.id === t.id ? "2px solid #6d28d9" : "1px solid #e5e8f2", borderRadius: "18px", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "220px", boxShadow: "0 2px 12px rgba(15,23,42,0.04)", transition: "all 0.2s ease" }}>
                   <div>
-                    <h3 style={{ fontSize: "18px", fontWeight: 900, color: "#fff", marginBottom: "10px" }}>{t.name}</h3>
-                    <p style={{ fontSize: "12px", color: "var(--text2)", lineHeight: "1.6" }}>{t.desc}</p>
+                    <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a", marginBottom: "10px" }}>{t.name}</h3>
+                    <p style={{ fontSize: "13px", color: "#475569", lineHeight: "1.6" }}>{t.desc}</p>
                   </div>
-                  <button onClick={() => { setSelectedType(t); setStep("device_check"); }} style={{ width: "100%", padding: "12px", borderRadius: "12px", background: selectedType?.id === t.id ? "linear-gradient(135deg,#00c4a7,#7c3aed)" : "rgba(255,255,255,0.08)", border: "none", color: "#fff", fontWeight: 800, fontSize: "13px", cursor: "pointer", marginTop: "16px" }}>
+                  <button onClick={() => { setSelectedType(t); setStep("device_check"); }} style={{ width: "100%", padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#6d28d9,#7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "13px", cursor: "pointer", marginTop: "16px" }}>
                     Start {t.name} →
                   </button>
                 </div>
@@ -1407,11 +1735,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* ── STEP 3: PRE-INTERVIEW DEVICE CHECK SCREEN ── */}
         {step === "device_check" && (
-          <div style={{ maxWidth: "960px", margin: "20px auto" }}>
-            <div style={{ textAlign: "center", marginBottom: "28px" }}>
-              <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>{selectedType?.name || (setupMode === "non_resume" ? roleTitle : "AI Mock")} Interview</h2>
-              <p style={{ fontSize: "13px", color: "var(--text2)", marginTop: "4px" }}>Enable and test your camera and microphone before joining.</p>
+          <div style={{ maxWidth: "960px", margin: "10px auto", background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "22px", padding: "30px" }}>
+            <div style={{ textAlign: "center", marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a" }}>{selectedType?.name || (setupMode === "non_resume" ? roleTitle : "AI Mock")} Interview</h2>
+              <p style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>Enable and test your camera and microphone before joining.</p>
             </div>
+
+            {setupError && (
+              <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "16px", padding: "14px 18px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "13px", color: "#fca5a5" }}>
+                  <strong style={{ color: "#fff" }}>Session Error:</strong> {setupError.message}
+                </div>
+                {setupError.retryable && (
+                  <button type="button" onClick={() => triggerStartInterview()} style={{ padding: "8px 16px", borderRadius: "10px", background: "#00c4a7", color: "#050811", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
+                    Retry Start Interview
+                  </button>
+                )}
+              </div>
+            )}
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px", marginBottom: "32px" }}>
               {/* Left: Camera Preview */}
@@ -1517,46 +1858,46 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
 
               {/* Right: Checklist */}
-              <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff" }}>Things to know before starting</h3>
+              <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "20px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>Things to know before starting</h3>
 
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px" }}>🕒</span>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Expect to spend ~20 minutes</div>
-                    <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Very short interviews may not be considered complete. Please answer thoughtfully.</div>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>Expect to spend ~20 minutes</div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Very short interviews may not be considered complete. Please answer thoughtfully.</div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px" }}>✋</span>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Need assistance? Just ask</div>
-                    <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Tell the AI if you need a question repeated or more time.</div>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>Need assistance? Just ask</div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Tell the AI if you need a question repeated or more time.</div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px" }}>🔒</span>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Your data is in your control</div>
-                    <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Your responses are used only to assess your candidacy and are never used to train AI models.</div>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>Your data is in your control</div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Your responses are used only to assess your candidacy and are never used to train AI models.</div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px" }}>🌐</span>
                   <div>
-                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Supported browsers</div>
-                    <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "2px" }}>Chrome and Safari are preferred for the best experience.</div>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>Supported browsers</div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Chrome and Safari are preferred for the best experience.</div>
                   </div>
                 </div>
 
                 {/* Interviewer Personality Selection */}
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "16px", textAlign: "left" }}>
+                <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "16px", textAlign: "left" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.5px" }}>🎭 Interviewer Personality</div>
-                    <span style={{ fontSize: "11px", color: "#00c4a7", fontWeight: 700 }}>Rubric score remains objective</span>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.5px" }}>Interviewer Personality</div>
+                    <span style={{ fontSize: "11px", color: "#6d28d9", fontWeight: 700 }}>Rubric score remains objective</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "8px" }}>
                     {INTERVIEWER_PERSONALITIES.map(p => (
@@ -1567,9 +1908,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         style={{
                           padding: "8px 6px",
                           borderRadius: "10px",
-                          border: selectedPersonality === p.id ? "1.5px solid #00c4a7" : "1px solid rgba(255,255,255,0.08)",
-                          background: selectedPersonality === p.id ? "rgba(0,196,167,0.15)" : "rgba(255,255,255,0.02)",
-                          color: selectedPersonality === p.id ? "#00c4a7" : "#cbd5e1",
+                          border: selectedPersonality === p.id ? "1.5px solid #6d28d9" : "1px solid #e2e8f0",
+                          background: selectedPersonality === p.id ? "#f5f3ff" : "#f8fafc",
+                          color: selectedPersonality === p.id ? "#6d28d9" : "#475569",
                           cursor: "pointer",
                           display: "flex",
                           flexDirection: "column",
@@ -1579,19 +1920,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         }}
                       >
                         <span style={{ fontSize: "11px", fontWeight: 800 }}>{p.name.replace(" Ava", "")}</span>
-                        <span style={{ fontSize: "9px", color: "#94a3b8" }}>{p.badge}</span>
+                        <span style={{ fontSize: "9px", color: "#64748b" }}>{p.badge}</span>
                       </button>
                     ))}
                   </div>
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "8px" }}>
+                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "8px" }}>
                     {getInterviewerPersonality(selectedPersonality).description}
                   </div>
+                  {getInterviewerPersonality(selectedPersonality).sampleLine && (
+                    <div style={{ fontSize: "11px", color: "#5b21b6", marginTop: "6px", fontStyle: "italic", background: "#f5f3ff", padding: "6px 10px", borderRadius: "8px", borderLeft: "2px solid #7c3aed" }}>
+                      Spoken Tone Preview: "{getInterviewerPersonality(selectedPersonality).sampleLine}"
+                    </div>
+                  )}
                 </div>
 
                 {/* Explicit Affirmative Consent Card (DPDP Act 2023 / Privacy Compliance) */}
                 <div style={{
-                  background: "rgba(0,196,167,0.08)",
-                  border: "1px solid rgba(0,196,167,0.3)",
+                  background: "#f5f3ff",
+                  border: "1px solid #ddd6fe",
                   borderRadius: "14px",
                   padding: "14px 16px",
                   marginTop: "6px",
@@ -1609,12 +1955,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       marginTop: "3px",
                       width: "18px",
                       height: "18px",
-                      accentColor: "#00c4a7",
+                      accentColor: "#6d28d9",
                       cursor: "pointer"
                     }}
                   />
-                  <label htmlFor="affirmative-consent-checkbox" style={{ fontSize: "11px", color: "#e2e8f0", lineHeight: "1.5", cursor: "pointer" }}>
-                    <strong style={{ color: "#fff" }}>Affirmative Privacy & AI Consent (DPDP Act 2023):</strong> I explicitly consent to the recording and real-time processing of my voice, interview responses, and resume by PrepFly's AI interviewer (Ava) solely for candidate evaluation and scoring. I understand my data is confidential, is never used to train foundation models, and can be deleted upon request via my profile dashboard.
+                  <label htmlFor="affirmative-consent-checkbox" style={{ fontSize: "11px", color: "#334155", lineHeight: "1.5", cursor: "pointer" }}>
+                    <strong style={{ color: "#0f172a" }}>Affirmative Privacy &amp; AI Consent (DPDP Act 2023):</strong> I explicitly consent to the recording and real-time processing of my voice, interview responses, and resume by PrepFly's AI interviewer (Ava) solely for candidate evaluation and scoring. I understand my data is confidential, is never used to train foundation models, and can be deleted upon request via my profile dashboard.
                   </label>
                 </div>
               </div>
@@ -1629,14 +1975,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   padding: "14px 44px",
                   borderRadius: "30px",
                   background: consentGiven
-                    ? "linear-gradient(135deg,#00c4a7,#7c3aed)"
-                    : "rgba(255,255,255,0.12)",
+                    ? "linear-gradient(135deg,#6d28d9,#7c3aed)"
+                    : "#e2e8f0",
                   border: "none",
-                  color: consentGiven ? "#fff" : "rgba(255,255,255,0.4)",
-                  fontWeight: 900,
-                  fontSize: "16px",
+                  color: consentGiven ? "#ffffff" : "#94a3b8",
+                  fontWeight: 800,
+                  fontSize: "15px",
                   cursor: consentGiven ? "pointer" : "not-allowed",
-                  boxShadow: consentGiven ? "0 8px 24px rgba(0,196,167,0.4)" : "none",
+                  boxShadow: consentGiven ? "0 8px 24px rgba(109,40,217,0.3)" : "none",
                   transition: "all 0.2s"
                 }}
               >
@@ -1685,9 +2031,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-
-
-                <button onClick={endInterviewSession} style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444", borderRadius: "24px", padding: "8px 20px", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
+                <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700 }}>
+                  Answered: {allFeedbacks.length}
+                </span>
+                <button onClick={handleRequestEndInterview} style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444", borderRadius: "24px", padding: "8px 20px", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
                   🚪 End Interview & Evaluate
                 </button>
               </div>
@@ -1894,8 +2241,66 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   )}
                 </div>
 
-                {/* Spoken Answer & Response Area */}
+                {/* Spoken Answer & Transcript Preview Area */}
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                  {/* Live Transcript Preview Header + Mode Switch */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Transcript Preview (Editable Before Submit)
+                      </span>
+                      <span style={{ background: inputMode === "speech" ? "rgba(0,196,167,0.14)" : "rgba(148,163,184,0.15)", color: inputMode === "speech" ? "#00c4a7" : "#cbd5e1", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
+                        {inputMode === "speech" ? "Voice Capture" : "Typed Mode"}
+                      </span>
+                      {sttConfidence !== null && inputMode === "speech" && (
+                        <span style={{ color: sttConfidence < 0.55 ? "#f59e0b" : "#94a3b8", fontWeight: 700 }}>
+                          STT {Math.round(sttConfidence * 100)}%
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ color: "#94a3b8" }}>{answer.trim() ? answer.trim().split(/\s+/).length : 0} words</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (inputMode === "speech") {
+                            stopVoiceRecognition();
+                            setInputMode("typed");
+                            turnInputModeRef.current = "typed";
+                          } else {
+                            setInputMode("speech");
+                            turnInputModeRef.current = "speech";
+                            startVoiceRecognition();
+                          }
+                        }}
+                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#cbd5e1", borderRadius: "8px", padding: "2px 8px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer" }}
+                      >
+                        {inputMode === "speech" ? "Switch to Typing" : "Use Voice"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {micErrorMsg && (
+                    <div style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "10px", padding: "8px 12px", fontSize: "11.5px", color: "#fde68a", textAlign: "left" }}>
+                      {micErrorMsg}
+                    </div>
+                  )}
+
+                  {reviewNotice && (
+                    <div style={{ background: "rgba(124,58,237,0.16)", border: "1px solid rgba(124,58,237,0.45)", borderRadius: "10px", padding: "8px 12px", fontSize: "12px", color: "#e9d5ff", textAlign: "left", fontWeight: 700 }}>
+                      {reviewNotice}
+                    </div>
+                  )}
+
+                  {submitError && (
+                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "10px", padding: "8px 12px", fontSize: "11.5px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{submitError}</span>
+                      <button type="button" onClick={() => submitAnswerAndNext(answer)} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", padding: "3px 10px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                        Retry Submit
+                      </button>
+                    </div>
+                  )}
+
                   {autoSubmitCountdown !== null && (
                     <div style={{
                       display: "flex",
@@ -1912,7 +2317,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3" }}></span>
-                        <span>🎙️ Answer captured · Ava answering in 2s (pause)...</span>
+                        <span>🎙️ Answer captured · Review transcript or click Send Now...</span>
                       </div>
                       <button
                         type="button"
@@ -1934,18 +2339,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   )}
                   <textarea
                     rows={3}
-                    placeholder="Speak your answer naturally (transcription appears here in real-time). You can also edit or type directly..."
+                    placeholder={inputMode === "typed" ? "Type your technical or behavioral response directly here..." : "Speak your answer naturally — live transcript appears here so you can review or edit before submitting..."}
                     value={answer}
                     onChange={e => {
                       setAnswer(e.target.value);
                       finalTranscriptRef.current = e.target.value;
+                      if (!isSpeakingAnswer) {
+                        setInputMode("typed");
+                        turnInputModeRef.current = "typed";
+                      } else {
+                        setConfirmedEdit(true);
+                      }
                     }}
                     style={{
                       width: "100%",
                       padding: "10px 14px",
                       borderRadius: "14px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: reviewNotice ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.04)",
+                      border: reviewNotice ? "1.5px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)",
                       color: "#fff",
                       fontSize: "13px",
                       fontFamily: "inherit",
@@ -2010,7 +2421,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     
                     <button
                       type="button"
-                      onClick={submitAnswerAndNext}
+                      onClick={() => submitAnswerAndNext()}
                       disabled={isAvaThinking}
                       style={{
                         padding: "11px 22px",
@@ -2025,506 +2436,524 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         transition: "all 0.2s"
                       }}
                     >
-                      {isAvaThinking ? "Evaluating..." : "Submit Answer →"}
+                      {isAvaThinking ? "Saving..." : (reviewNotice ? "Confirm & Submit Transcript →" : "Submit Answer →")}
                     </button>
                   </div>
                 </div>
 
               </div>
               </div>
+
+            {/* Early Exit Confirmation Modal */}
+            {showEndConfirm && (
+              <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,17,0.84)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }}>
+                <div style={{ maxWidth: "460px", width: "92%", background: "#0c1220", border: "1px solid rgba(245,158,11,0.4)", borderRadius: "20px", padding: "28px", textAlign: "left", boxShadow: "0 20px 60px rgba(0,0,0,0.75)" }}>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: "#f59e0b", textTransform: "uppercase", marginBottom: "6px" }}>
+                    Early Exit Notice
+                  </div>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, color: "#fff", marginBottom: "10px" }}>
+                    End interview before minimum coverage?
+                  </h3>
+                  <p style={{ fontSize: "13px", color: "#cbd5e1", lineHeight: "1.6", marginBottom: "18px" }}>
+                    You have submitted <strong>{allFeedbacks.length}</strong> response(s) so far (at least <strong>3 substantive answers</strong> are needed for a full grade &amp; recommendation). If you end now, your saved answers are preserved and the report will be marked <strong>Incomplete · Insufficient Data</strong> until you continue.
+                  </p>
+                  <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                    <button type="button" onClick={() => setShowEndConfirm(false)} style={{ padding: "10px 18px", borderRadius: "12px", background: "linear-gradient(135deg,#00c4a7,#00e5c3)", border: "none", color: "#050811", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
+                      Keep Answering
+                    </button>
+                    <button type="button" onClick={() => endInterviewSession(true)} style={{ padding: "10px 18px", borderRadius: "12px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
+                      End &amp; Save Progress
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Evaluating Answers Progress Overlay */}
+            {reportLoading && (
+              <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,17,0.92)", backdropFilter: "blur(14px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1150 }}>
+                <div style={{ maxWidth: "480px", width: "92%", background: "#0c1220", border: "1px solid rgba(0,196,167,0.35)", borderRadius: "22px", padding: "30px", textAlign: "left" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", marginBottom: "6px" }}>Rubric Evaluation Engine</div>
+                  <h3 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", marginBottom: "14px" }}>Evaluating your answers...</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "14px" }}>
+                    {evaluatingTurns.length > 0 ? evaluatingTurns.map((et, idx) => (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: "10px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", fontSize: "12px" }}>
+                        <span style={{ color: "#e2e8f0" }}>Turn {et.turn}: {et.label}</span>
+                        <span style={{ fontWeight: 800, color: et.status === "ok" ? "#00c4a7" : et.status === "failed" ? "#f87171" : "#f59e0b", textTransform: "uppercase", fontSize: "10.5px" }}>
+                          {et.status}
+                        </span>
+                      </div>
+                    )) : (
+                      <div style={{ fontSize: "13px", color: "#94a3b8" }}>Reconstructing evidence from persisted turns...</div>
+                    )}
+                  </div>
+                  {reportError && (
+                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "12px", padding: "10px 14px", fontSize: "12px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{reportError}</span>
+                      <button type="button" onClick={() => endInterviewSession(true)} style={{ background: "#00c4a7", color: "#050811", border: "none", borderRadius: "8px", padding: "5px 12px", fontWeight: 800, cursor: "pointer" }}>
+                        Retry
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── REPORT PANEL ── */}
-        {step === "report" && reportData && (() => {
-          const answeredCount = reportData.answered_questions_count !== undefined 
-            ? Number(reportData.answered_questions_count) 
-            : (allFeedbacks ? allFeedbacks.length : 0);
-
-          let rawScore = 0;
-          if (reportData.overall_score_100 !== undefined && reportData.overall_score_100 !== null) {
-            rawScore = Number(reportData.overall_score_100);
-          } else if (reportData.overall_score !== undefined && reportData.overall_score !== null) {
-            rawScore = Number(reportData.overall_score);
-          }
-          if (rawScore > 100) {
-            rawScore = rawScore / 10;
-          }
-
-          let score100 = Math.min(100, Math.max(0, Math.round(rawScore)));
-
-          // PrepFly Proration Guard:
-          // If candidate answered < 5 questions and score is not yet prorated, prorate by completion rate.
-          // For early exit (e.g. 1 question), maximum possible score is 10/100.
-          if (answeredCount === 0) {
-            score100 = 0;
-          } else if (answeredCount < 5 && score100 > (answeredCount * 10)) {
-            score100 = Math.min(100, Math.max(0, Math.round(score100 * (answeredCount / 10))));
-          }
-
-          const allZero = reportData.section_grades && reportData.section_grades.length > 0 && reportData.section_grades.every(s => s.score === 0);
-          if (answeredCount === 0 || allZero) {
-            score100 = 0;
-          }
-
-          // PrepFly Standardized Hiring Tiers
-          let gInfo;
-          if (score100 === 0 || answeredCount === 0) {
-            gInfo = {
-              grade: "F",
-              label: "Unevaluated / No Responses",
-              desc: "No responses attempted during interview",
-              color: "#ef4444",
-              bgColor: "rgba(239, 68, 68, 0.15)",
-              rec: "Strong Reject (No Responses Provided)",
-              level: "Beginner / Not Attempted",
-              score: 0
-            };
-          } else if (answeredCount < 3) {
-            // Early exit after only 1-2 questions (e.g. candidate gave only 1 answer)
-            gInfo = {
-              grade: "F",
-              label: "Incomplete / Early Exit",
-              desc: `Only ${answeredCount} of 10 questions answered`,
-              color: "#ef4444",
-              bgColor: "rgba(239, 68, 68, 0.15)",
-              rec: `Strong Reject (Incomplete — only ${answeredCount} of 10 questions answered)`,
-              level: "Incomplete Session",
-              score: score100
-            };
-          } else if (answeredCount < 5) {
-            // Preliminary evaluation (3-4 questions)
-            const rawG = getGradeInfo(score100);
-            gInfo = {
-              ...rawG,
-              grade: rawG.grade.startsWith("A") || rawG.grade.startsWith("B") ? "D" : rawG.grade,
-              label: "Preliminary Assessment",
-              color: "#f59e0b",
-              bgColor: "rgba(245, 158, 11, 0.15)",
-              rec: "Preliminary Evaluation (Requires ≥ 5 answered questions)",
-              level: "Preliminary Evaluation",
-              score: score100
-            };
-          } else {
-            // Full evaluation (5+ questions)
-            gInfo = reportData.grade && reportData.grade_color ? {
-              grade: reportData.grade,
-              label: reportData.grade_label || "Evaluated Candidate",
-              color: reportData.grade_color,
-              bgColor: `${reportData.grade_color}22`,
-              rec: reportData.hiring_recommendation || reportData.recommendation || "Evaluated",
-              level: reportData.performance_level || "Standard Candidate",
-              score: score100
-            } : getGradeInfo(score100);
-          }
-
-          const sectionGrades = reportData.section_grades || computeSectionGrades(score100, allFeedbacks);
-          const earnedBadges = (score100 === 0 || answeredCount < 5) ? [] : (reportData.badges || getBadges(score100, sectionGrades));
-          const isEarlyExit = answeredCount < 3 && answeredCount > 0;
-          const isPrelim = answeredCount < 5 && answeredCount >= 3;
-          const confidence = score100 === 0 ? "None" : (reportData.confidence || (answeredCount < 3 ? "Low" : (answeredCount < 5 ? "Medium" : "High")));
-          const recText = gInfo.rec || reportData.hiring_recommendation || reportData.recommendation;
-
-          const hasNoResponses = answeredCount === 0 || score100 === 0;
-
-          const topStrengths = hasNoResponses
-            ? ["None identified: No responses provided during interview. Complete at least 5 questions to demonstrate strengths."]
-            : (isEarlyExit 
-                ? ["Preliminary observation: Complete more technical/behavioral questions to demonstrate strengths."] 
-                : (reportData.top_strengths || ["Clear Communication", "Technical Understanding", "Structured Approach"]));
-
-          const topImprovements = hasNoResponses
-            ? ["Candidate did not speak or answer any questions. Speak into the microphone or submit answers to get evaluated."]
-            : (isEarlyExit 
-                ? [`Completed only ${answeredCount} of 10 questions. Ensure you complete the full interview to evaluate all 10 core dimensions.`] 
-                : (reportData.top_improvements || ["Provide deeper technical details", "Use STAR technique for behavioral questions", "Structure answers with clear outcomes"]));
-
-          return (
-            <div style={{ maxWidth: "880px", margin: "20px auto", background: "rgba(12,18,32,0.95)", border: `1px solid ${gInfo.color}44`, boxShadow: `0 0 40px ${gInfo.color}15`, borderRadius: "24px", padding: "36px", textAlign: "center" }}>
-              
-              {/* INCOMPLETE / PRELIMINARY CONFIDENCE BANNER */}
-              {(isEarlyExit || isPrelim) && (
-                <div style={{ 
-                  background: isEarlyExit ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)", 
-                  border: `1px solid ${isEarlyExit ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`, 
-                  borderRadius: "16px", 
-                  padding: "14px 20px", 
-                  marginBottom: "20px", 
-                  textAlign: "left", 
-                  display: "flex", 
-                  justifyContent: "space-between", 
-                  alignItems: "center" 
-                }}>
-                  <div>
-                    <div style={{ fontSize: "12px", fontWeight: 800, color: isEarlyExit ? "#ef4444" : "#f59e0b", textTransform: "uppercase" }}>
-                      {isEarlyExit ? "⚠️ Incomplete Interview (Early Exit)" : "⚠️ Preliminary Evaluation"}
-                    </div>
-                    <div style={{ fontSize: "13px", color: "#e2e8f0", marginTop: "2px" }}>
-                      Questions Answered: <strong>{answeredCount} / 10</strong> · {isEarlyExit ? "At least 5 questions required for hiring assessment. Session marked incomplete." : "Complete at least 5 questions for a full hiring recommendation."}
-                    </div>
-                  </div>
-                  <span style={{ 
-                    background: isEarlyExit ? "#ef444422" : "#f59e0b22", 
-                    color: isEarlyExit ? "#ef4444" : "#f59e0b", 
-                    fontSize: "11px", 
-                    fontWeight: 900, 
-                    padding: "4px 12px", 
-                    borderRadius: "20px", 
-                    border: `1px solid ${isEarlyExit ? "#ef444444" : "#f59e0b44"}` 
-                  }}>
-                    Confidence: {confidence}
-                  </span>
+        {/* ── REPORT LOADING SKELETON / ERROR RETRY STATE ── */}
+        {step === "report" && !reportData && (
+          <div style={{ maxWidth: "900px", margin: "20px auto", background: "rgba(12,18,32,0.96)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "24px", padding: "36px", textAlign: "left" }}>
+            {reportError ? (
+              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "16px", padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: "#fca5a5" }}>Could not load interview report</div>
+                  <div style={{ fontSize: "12px", color: "#cbd5e1", marginTop: "4px" }}>{reportError}</div>
                 </div>
-              )}
-
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "20px", marginBottom: "24px" }}>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Executive Candidate Evaluation</div>
-                  <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff" }}>
-                    {isEarlyExit ? "Incomplete Assessment" : (isPrelim ? "Preliminary Assessment" : `${gInfo.label} Candidate`)}
-                  </div>
-                  <div style={{ fontSize: "13px", color: gInfo.color, fontWeight: 800, marginTop: "4px" }}>📌 Hiring Recommendation: {gInfo.rec || recText}</div>
-                  <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: 700, marginTop: "2px" }}>Level: {gInfo.level}</div>
-                </div>
-
-                <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: gInfo.bgColor, border: `4px solid ${gInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 24px ${gInfo.color}44`, flexShrink: 0 }}>
-                  <div style={{ fontSize: "32px", fontWeight: 900, color: gInfo.color, lineHeight: 1 }}>{gInfo.grade}</div>
-                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#fff", marginTop: "2px" }}>{score100}/100</div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!sessionId) return;
+                    setReportLoading(true);
+                    setReportError(null);
+                    apiFetch(`/interview/${sessionId}/report`)
+                      .then(async (r) => {
+                        const d = await r.json();
+                        if (r.ok) setReportData(d);
+                        else setReportError(d.error || "Could not load saved report.");
+                      })
+                      .catch((err) => setReportError(err.message || "Network error."))
+                      .finally(() => setReportLoading(false));
+                  }}
+                  style={{ padding: "8px 16px", borderRadius: "10px", background: "#00c4a7", color: "#050811", border: "none", fontWeight: 800, cursor: "pointer" }}
+                >
+                  Retry Load
+                </button>
               </div>
-
-              {/* EARNED BADGES */}
-              <div style={{ textAlign: "left", marginBottom: "20px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginBottom: "8px" }}>🎖️ EARNED CANDIDATE BADGES</div>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {earnedBadges.map((b, idx) => (
-                    <span key={idx} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", padding: "6px 14px", borderRadius: "20px", fontSize: "12px", color: "#fff", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <span>{b.icon}</span> {b.name}
-                    </span>
+            ) : (
+              <div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#00c4a7", marginBottom: "14px" }}>Loading evidence-grounded report...</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "10px" }}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <div key={n} style={{ height: "64px", borderRadius: "12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }} />
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+        )}
 
-              {/* SECTION GRADES */}
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
-                <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#fff", marginBottom: "4px" }}>📊 Section Grades Breakdown (10 Dimensions)</h4>
-                <p style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "14px" }}>Click on any dimension card below to view detailed FAANG-style behavioral evidence.</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
-                  {sectionGrades.map((sec, idx) => {
-                    const isSelected = selectedEvidenceDimension?.name === sec.name;
-                    const isNotAssessed = sec.score === null || sec.score === undefined || sec.grade === "N/A";
-                    return (
-                      <div 
-                        key={idx} 
-                        onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
-                        style={{ 
-                          background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
-                          border: isSelected ? `2.5px solid ${sec.color}` : `1px solid ${isNotAssessed ? "#475569" : sec.color}33`, 
-                          borderRadius: "12px", 
-                          padding: "10px", 
-                          textAlign: "center",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
-                          transform: isSelected ? "scale(1.03)" : "none",
-                          opacity: isNotAssessed ? 0.75 : 1
-                        }}
+        {/* ── REPORT PANEL (STRICTLY EVIDENCE-GROUNDED, NO HARDCODED TEMPLATES) ── */}
+        {step === "report" && reportData && (() => {
+          const status = reportData.report_status || "INCOMPLETE_INSUFFICIENT_DATA";
+          const statusInfo = STATUS_META[status] || STATUS_META.INCOMPLETE_INSUFFICIENT_DATA;
+          const hdr = reportData.header || {};
+          const candidateName = hdr.candidate_name || reportData.candidate_name || safeUser?.name || "Candidate";
+          const needsNamePrompt = Boolean(hdr.needs_name_prompt || reportData.display_name_source === "fallback");
+          const canShowScore = status === "EVALUATED" || status === "PARTIAL";
+          const overall100 = canShowScore ? reportData.overall_score_100 : null;
+          const displayGrade = canShowScore ? reportData.grade : null;
+          const displayRec = canShowScore ? (reportData.recommendation || reportData.hiring_recommendation) : null;
+          const coveragePct = reportData.coverage !== undefined && reportData.coverage !== null ? Math.round(Number(reportData.coverage) * 100) : 0;
+          const confLabel = (reportData.confidence && (reportData.confidence.label || reportData.confidence.level)) || "NONE";
+          const dims = reportData.dimensions || reportData.section_grades || [];
+          const unassessed = reportData.not_assessed_yet || [];
+          const sm = reportData.speech_metrics || {};
+          const isWpmNull = sm.wpm === null || sm.wpm === undefined;
+          const qReviews = reportData.question_reviews || reportData.turn_evaluations || [];
+          const strengths = Array.isArray(reportData.strengths) ? reportData.strengths : [];
+          const weaknesses = Array.isArray(reportData.weaknesses) ? reportData.weaknesses : [];
+          const recurringTags = Array.isArray(reportData.recurring_misconceptions) ? reportData.recurring_misconceptions : [];
+          const roadmapLinks = Array.isArray(reportData.roadmap_evidence_links) ? reportData.roadmap_evidence_links : [];
+          const reviewsByTurnId = {};
+          qReviews.forEach((qr) => {
+            if (qr && qr.turn_id) reviewsByTurnId[qr.turn_id] = qr;
+          });
+
+          const resetSessionToSetup = () => {
+            try {
+              localStorage.removeItem("prepfly_avatab_session");
+              sessionStorage.removeItem("prepfly_avatab_session");
+            } catch (_) {}
+            isEndingRef.current = false;
+            setStep("resume_upload");
+            setReportData(null);
+            setAllFeedbacks([]);
+            setSessionId(null);
+            setEvidenceDrawer(null);
+            setSetupError(null);
+          };
+
+          const openOverallEvidenceDrawer = () => {
+            setEvidenceDrawer({
+              title: "Overall Score & Coverage Evidence",
+              scoreLabel: overall100 !== null && overall100 !== undefined ? `${overall100}/100 (${displayGrade || ""})` : statusInfo.badge,
+              subtitle: `Formula ${reportData.formula_version || "v1"} · Coverage ${coveragePct}% · Confidence ${confLabel}`,
+              formulaInputs: {
+                formula_version: reportData.formula_version || "v1",
+                evaluated_dimensions: dims.filter(d => d.score !== null && d.score !== undefined).length,
+                total_dimensions: dims.length || 10,
+                coverage: `${coveragePct}%`,
+                substantive_turns: reportData.answered_questions_count ?? 0,
+                confidence: confLabel,
+              },
+              items: dims.filter(d => Array.isArray(d.evidence) && d.evidence.length > 0).flatMap(d => d.evidence.map(ev => ({ ...ev, dimension: d.name }))),
+            });
+          };
+
+          const openDimensionDrawer = (sec) => {
+            const firstTurnId = Array.isArray(sec.contributing_turns) && sec.contributing_turns.length > 0 ? sec.contributing_turns[0] : null;
+            const linkedRev = firstTurnId ? reviewsByTurnId[firstTurnId] : null;
+            setEvidenceDrawer({
+              title: sec.name,
+              scoreLabel: sec.score !== null && sec.score !== undefined ? `${sec.score}/100 (${sec.grade || ""})` : "Not Evaluated",
+              subtitle: `${sec.status === "LIMITED_EVIDENCE" ? "Limited Evidence · " : ""}Weight ${Math.round((sec.weight || 0) * 100)}% · ${sec.turn_count || 0} turn(s)`,
+              formulaInputs: {
+                ...(sec.formula_inputs || {}),
+                evaluator_type: (linkedRev && linkedRev.evaluator_type) || "gemini_rubric_v1",
+                prompt_id: (linkedRev && linkedRev.prompt_id) || "interview_rubric_grader",
+                prompt_version: (linkedRev && linkedRev.prompt_version) || "v1.0",
+                model_used: (linkedRev && linkedRev.model_used) || "recorded_per_turn",
+              },
+              items: Array.isArray(sec.evidence) ? sec.evidence : [],
+              missingReason: sec.reason || null,
+            });
+          };
+
+          return (
+            <div style={{ maxWidth: "920px", margin: "8px auto", background: "#ffffff", border: `1px solid ${statusInfo.border}`, boxShadow: "0 6px 28px rgba(15,23,42,0.06)", borderRadius: "22px", padding: "34px", textAlign: "center", color: "#0f172a" }}>
+              {reportLoading && (
+                <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "12px", padding: "10px 14px", marginBottom: "16px", fontSize: "12px", color: "#6d28d9", fontWeight: 700 }}>
+                  Syncing latest report state from persisted database records...
+                </div>
+              )}
+
+              {/* Add your name banner ONLY when identity fell back to "Candidate" */}
+              {needsNamePrompt && (
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "12px 16px", marginBottom: "18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", textAlign: "left" }}>
+                  <div style={{ fontSize: "12.5px", color: "#334155" }}>
+                    <strong>Add your name:</strong> No profile or resume name was found on this session.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input
+                      type="text"
+                      value={customNameDraft}
+                      onChange={(e) => setCustomNameDraft(e.target.value)}
+                      placeholder="Enter your full name"
+                      style={{ padding: "6px 10px", borderRadius: "8px", background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "12px" }}
+                    />
+                    <button type="button" onClick={saveCustomDisplayName} disabled={nameSaving || !customNameDraft.trim()} style={{ padding: "6px 14px", borderRadius: "8px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
+                      {nameSaving ? "Saving..." : "Save Name"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* NON-ALARMING STATUS BANNER FOR NON-EVALUATED REPORTS */}
+              {status !== "EVALUATED" && (
+                <div style={{
+                  background: statusInfo.bg,
+                  border: `1px solid ${statusInfo.border}`,
+                  borderRadius: "16px",
+                  padding: "16px 20px",
+                  marginBottom: "22px",
+                  textAlign: "left",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                }}>
+                  <div style={{ flex: 1, minWidth: "240px" }}>
+                    <div style={{ fontSize: "11px", fontWeight: 900, color: statusInfo.color, textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                      {statusInfo.badge}
+                    </div>
+                    <div style={{ fontSize: "13px", color: "#334155", marginTop: "4px", lineHeight: "1.5" }}>
+                      {reportData.status_reason || "More evidence is required before issuing a full evaluation."}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {status === "EVALUATION_FAILED" && (
+                      <button
+                        type="button"
+                        onClick={retryFailedEvaluations}
+                        disabled={retryEvalState.loading}
+                        style={{ padding: "9px 16px", borderRadius: "10px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}
                       >
-                        <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
-                        <div style={{ fontSize: "15px", fontWeight: 900, color: isNotAssessed ? "#94a3b8" : sec.color, marginTop: "2px" }}>
-                          {isNotAssessed ? "Not Evaluated" : `${sec.score} (${sec.grade})`}
-                        </div>
-                        <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.3)", marginTop: "4px" }}>
-                          {isSelected ? "Hide Evidence ▲" : "View Evidence ▼"}
-                        </div>
-                      </div>
-                    );
-                  })}
+                        {retryEvalState.loading ? "Retrying Evaluation..." : "Retry Evaluation"}
+                      </button>
+                    )}
+                    {(status === "INCOMPLETE_INSUFFICIENT_DATA" || status === "PARTIAL") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          isEndingRef.current = false;
+                          setStep("live_call");
+                        }}
+                        style={{ padding: "9px 16px", borderRadius: "10px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}
+                      >
+                        Continue Interview →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {retryEvalState.error && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "10px 14px", marginBottom: "16px", fontSize: "12px", color: "#dc2626", textAlign: "left" }}>
+                  Retry notice: {retryEvalState.error}
+                </div>
+              )}
+
+              {/* REPORT HEADER */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e8f2", paddingBottom: "22px", marginBottom: "24px", gap: "16px", flexWrap: "wrap" }}>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                      {hdr.role || "Software Engineer"} · {hdr.level || "Mid"}
+                    </span>
+                    <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 10px", borderRadius: "12px", background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.border}` }}>
+                      {statusInfo.badge}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "26px", fontWeight: 800, color: "#0f172a" }}>
+                    {candidateName}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
+                    Date: {hdr.date ? new Date(hdr.date).toLocaleDateString() : "Today"} · Measured Speech Time: <span style={{ color: hdr.duration_s ? "#0f172a" : "#64748b", fontWeight: 600 }}>{formatDurationDisplay(hdr.duration_s)}</span> · Coverage: {coveragePct}%
+                  </div>
+                  {displayRec ? (
+                    <div style={{ fontSize: "13px", color: statusInfo.color, fontWeight: 800, marginTop: "6px" }}>
+                      Hiring Recommendation: {displayRec} · Confidence: {confLabel}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "12.5px", color: "#64748b", fontWeight: 700, marginTop: "6px" }}>
+                      No grade or hiring verdict issued while status is {statusInfo.badge}.
+                    </div>
+                  )}
                 </div>
 
-
-                {/* Evidence Viewer Panel */}
-                {selectedEvidenceDimension && (
-                  <div style={{ 
-                    marginTop: "20px", 
-                    background: "rgba(255,255,255,0.015)", 
-                    border: `1.5px solid ${selectedEvidenceDimension.color}44`, 
-                    borderRadius: "12px", 
-                    padding: "16px",
-                    textAlign: "left"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
-                        🔍 Evidence Log: {selectedEvidenceDimension?.name || 'Evidence'} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
-                      </div>
-                      <span style={{ 
-                        background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)", 
-                        color: selectedEvidenceDimension.color, 
-                        fontSize: "10px", 
-                        fontWeight: 800,
-                        padding: "2px 8px",
-                        borderRadius: "20px",
-                        border: `1px solid ${selectedEvidenceDimension.color}33`
-                      }}>
-                        Confidence: {selectedEvidenceDimension.evidence_level || "Medium"}
-                      </span>
-                    </div>
-
-                    {selectedEvidenceDimension.evidence && selectedEvidenceDimension.evidence.length > 0 ? (
-                      <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "13px", color: "#cbd5e1", lineHeight: "1.7" }}>
-                        {selectedEvidenceDimension.evidence.map((point, pIdx) => (
-                          <li key={pIdx} style={{ marginBottom: "6px" }}>{point}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>
-                        No specific transcript evidence recorded for this dimension.
-                      </div>
-                    )}
+                {/* Clickable Score Circle */}
+                {canShowScore ? (
+                  <button
+                    type="button"
+                    onClick={openOverallEvidenceDrawer}
+                    title="Click to inspect formula inputs & evidence"
+                    style={{ minWidth: "106px", height: "106px", padding: "0 14px", borderRadius: "50%", background: statusInfo.bg, border: `3px solid ${statusInfo.color}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                  >
+                    <div style={{ fontSize: displayGrade && displayGrade.length > 3 ? "14px" : "28px", fontWeight: 800, color: statusInfo.color, lineHeight: 1.1 }}>{displayGrade}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#0f172a", marginTop: "3px" }}>{overall100}/100</div>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginTop: "2px" }}>Evidence ↗</div>
+                  </button>
+                ) : (
+                  <div style={{ minWidth: "106px", height: "106px", padding: "0 12px", borderRadius: "50%", background: "#f1f5f9", border: "2px dashed #94a3b8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: 800, color: "#475569" }}>Not Scored</div>
+                    <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>{coveragePct}% cov</div>
                   </div>
                 )}
               </div>
 
-
-              {/* ── PREPFLY SPEECH & DELIVERY TELEMETRY DASHBOARD ── */}
-              {(() => {
-                const isSpeechAbsent = hasNoResponses || !reportData.speech_metrics || (reportData.speech_metrics.total_words === 0 && (reportData.speech_metrics.wpm === 0 || !reportData.speech_metrics.wpm));
-
-                const sm = isSpeechAbsent ? {
-                  wpm: 0,
-                  pacing_label: "No Speech Detected",
-                  pacing_color: "#94a3b8",
-                  total_words: 0,
-                  filler_count: 0,
-                  filler_breakdown: {},
-                  vocabulary_diversity_pct: 0
-                } : (reportData.speech_metrics || {
-                  wpm: 0,
-                  pacing_label: "Not Evaluated",
-                  pacing_color: "#94a3b8",
-                  total_words: 0,
-                  filler_count: 0,
-                  filler_breakdown: {},
-                  vocabulary_diversity_pct: 0
-                });
-
-                const eyePct = hasNoResponses ? 0 : (reportData.eye_contact_pct !== undefined ? reportData.eye_contact_pct : (eyeContactPct || 0));
-                const tabCount = reportData.tab_switches !== undefined ? reportData.tab_switches : (tabSwitches || 0);
-
-                return (
-                  <div style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(0,196,167,0.25)",
-                    borderRadius: "20px",
-                    padding: "20px",
-                    marginBottom: "24px",
-                    textAlign: "left"
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                      <div>
-                        <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#fff", margin: 0 }}>
-                          🎙️ Speech & Communication Delivery Dashboard
-                        </h4>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                          Deterministic telemetry: speaking pace, filler word frequency, lexical diversity, and engagement.
+              {/* SECTION GRADES (10 DIMENSIONS) */}
+              <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "18px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
+                <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginBottom: "4px" }}>Section Grades Breakdown (10 Dimensions)</h4>
+                <p style={{ fontSize: "11.5px", color: "#64748b", marginBottom: "14px" }}>Click any dimension card to open the Evidence Drawer (turn citations, quoted snippets, prompt version, formula inputs).</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
+                  {dims.map((sec, idx) => {
+                    const isNotAssessed = sec.score === null || sec.score === undefined || sec.status === "Not evaluated";
+                    const cardColor = isNotAssessed ? "#64748b" : (sec.color === "#00c4a7" ? "#059669" : (sec.color || "#6d28d9"));
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        onClick={() => openDimensionDrawer(sec)}
+                        style={{
+                          background: "#ffffff",
+                          border: `1px solid ${isNotAssessed ? "#e2e8f0" : `${cardColor}44`}`,
+                          borderRadius: "12px",
+                          padding: "12px 10px",
+                          textAlign: "center",
+                          cursor: "pointer",
+                          color: "#0f172a",
+                        }}
+                      >
+                        <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>{sec.name}</div>
+                        <div style={{ fontSize: "15px", fontWeight: 800, color: cardColor, marginTop: "4px" }}>
+                          {isNotAssessed ? "Not evaluated" : `${sec.score} (${sec.grade})`}
                         </div>
-                      </div>
-                      <span style={{ background: "rgba(0,196,167,0.15)", color: "#00c4a7", fontSize: "11px", fontWeight: 800, padding: "4px 12px", borderRadius: "16px", border: "1px solid rgba(0,196,167,0.3)" }}>
-                        FAANG Metric Suite
-                      </span>
-                    </div>
+                        <div style={{ fontSize: "9.5px", color: "#64748b", marginTop: "4px" }}>
+                          {isNotAssessed ? "Excluded from average" : (sec.status === "LIMITED_EVIDENCE" ? "Limited evidence ↗" : `${sec.turn_count || 0} turn(s) ↗`)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                    {/* Notice if no speech was detected */}
-                    {isSpeechAbsent && (
-                      <div style={{
-                        background: "rgba(239, 68, 68, 0.08)",
-                        border: "1px solid rgba(239, 68, 68, 0.25)",
-                        borderRadius: "12px",
-                        padding: "10px 14px",
-                        marginBottom: "16px",
-                        fontSize: "12px",
-                        color: "#fca5a5",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px"
-                      }}>
-                        <span>⚠️</span>
-                        <span><strong>No Verbal Responses Recorded:</strong> Candidate did not speak during this interview. Spoken answers are required to calculate speaking pace, filler words, and lexical range.</span>
+              {/* NOT ASSESSED YET LIST */}
+              {unassessed.length > 0 && (
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "16px 20px", marginBottom: "24px", textAlign: "left" }}>
+                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#475569", textTransform: "uppercase", marginBottom: "8px" }}>
+                    Not Assessed Yet ({unassessed.length} dimension{unassessed.length === 1 ? "" : "s"} — never counted as weaknesses or zero)
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {unassessed.map((dName, i) => (
+                      <span key={i} style={{ background: "#e2e8f0", color: "#334155", fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px" }}>
+                        {dName}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SPEECH & COMMUNICATION TELEMETRY DASHBOARD */}
+              <div style={{ background: "#f8fafc", border: "1px solid #ddd6fe", borderRadius: "18px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>Speech &amp; Communication Telemetry</h4>
+                    <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "2px" }}>
+                      Computed strictly from captured speech duration and transcript words. Unmeasured signals show &quot;Not measurable&quot;.
+                    </div>
+                  </div>
+                  <span style={{ background: "#ede9fe", color: "#5b21b6", fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "12px" }}>
+                    Words: {sm.total_words ?? 0}
+                  </span>
+                </div>
+
+                {sm.missing_reason && (
+                  <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", fontSize: "12px", color: "#475569" }}>
+                    <strong style={{ color: "#0f172a" }}>Telemetry Notice:</strong> {sm.missing_reason}
+                  </div>
+                )}
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "12px" }}>
+                  <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "14px" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Speaking Pace</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: isWpmNull ? "#64748b" : "#0f172a", marginTop: "4px" }}>
+                      {sm.wpm_display || (isWpmNull ? "Not measurable" : `${sm.wpm} WPM`)}
+                    </div>
+                  </div>
+                  <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "14px" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Filler Words</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: sm.filler_count === null || sm.filler_count === undefined ? "#64748b" : "#059669", marginTop: "4px" }}>
+                      {sm.filler_count_display || "Not measurable"}
+                    </div>
+                    {sm.filler_breakdown && Object.keys(sm.filler_breakdown).length > 0 && (
+                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
+                        {Object.entries(sm.filler_breakdown).map(([fw, fc], idx) => (
+                          <span key={idx} style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", fontSize: "10px", padding: "2px 6px", borderRadius: "6px", fontWeight: 700 }}>
+                            {fw}: {fc}
+                          </span>
+                        ))}
                       </div>
                     )}
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-                      {/* WPM Pacing Card */}
-                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Speaking Pace</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : "#fff", marginTop: "4px" }}>
-                          {isSpeechAbsent ? 0 : sm.wpm} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>WPM</span>
-                        </div>
-                        <div style={{ fontSize: "11px", fontWeight: 800, color: isSpeechAbsent ? "#94a3b8" : (sm.pacing_color || "#10b981"), marginTop: "2px" }}>
-                          ● {isSpeechAbsent ? "No Speech Detected" : (sm.pacing_label || "Optimal (130-155 WPM)")}
-                        </div>
-                      </div>
-
-                      {/* Filler Words Card */}
-                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Filler Words</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : (sm.filler_count > 6 ? "#f59e0b" : "#10b981"), marginTop: "4px" }}>
-                          {isSpeechAbsent ? 0 : sm.filler_count} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>detected</span>
-                        </div>
-                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
-                          {isSpeechAbsent ? (
-                            <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700 }}>No speech recorded</span>
-                          ) : Object.keys(sm.filler_breakdown || {}).length > 0 ? (
-                            Object.entries(sm.filler_breakdown).slice(0, 4).map(([w, c], idx) => (
-                              <span key={idx} style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "8px" }}>
-                                {w}: {c}
-                              </span>
-                            ))
-                          ) : (
-                            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700 }}>Clean articulation</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Lexical Diversity */}
-                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Vocabulary Richness</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: isSpeechAbsent ? "#94a3b8" : "#38bdf8", marginTop: "4px" }}>
-                          {isSpeechAbsent ? 0 : (sm.vocabulary_diversity_pct || 0)}%
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                          {isSpeechAbsent ? "No responses evaluated" : "Technical lexical range"}
-                        </div>
-                      </div>
-
-                      {/* Eye Contact & Proctoring Integrity */}
-                      <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "14px" }}>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>Visual & Focus Integrity</div>
-                        <div style={{ fontSize: "22px", fontWeight: 900, color: hasNoResponses ? "#94a3b8" : (eyePct >= 80 ? "#10b981" : "#f59e0b"), marginTop: "4px" }}>
-                          {hasNoResponses ? "N/A" : `${eyePct}%`} <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 600 }}>{hasNoResponses ? "" : "Eye Contact"}</span>
-                        </div>
-                        <div style={{ fontSize: "11px", color: hasNoResponses ? "#94a3b8" : (tabCount === 0 ? "#10b981" : "#f59e0b"), marginTop: "2px", fontWeight: 700 }}>
-                          {hasNoResponses ? "Session Incomplete / Not Evaluated" : (tabCount === 0 ? "✓ 100% Window Focus (0 Tab Switches)" : `⚠️ ${tabCount} Tab Switch(es) Detected`)}
-                        </div>
-                      </div>
+                  </div>
+                  <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "14px" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Pauses</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: sm.pause_count === null || sm.pause_count === undefined ? "#64748b" : "#0f172a", marginTop: "4px" }}>
+                      {sm.pause_count_display || "Not measurable"}
                     </div>
                   </div>
-                );
-              })()}
-
-              {/* ── QUESTION-BY-QUESTION DEEP DIVE WITH STAFF BENCHMARKS ── */}
-              {reportData.turn_evaluations && reportData.turn_evaluations.length > 0 && (
-                <div style={{
-                  background: "rgba(255,255,255,0.02)",
-                  border: "1px solid rgba(124,58,237,0.3)",
-                  borderRadius: "20px",
-                  padding: "20px",
-                  marginBottom: "24px",
-                  textAlign: "left"
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <div>
-                      <h4 style={{ fontSize: "14px", fontWeight: 900, color: "#fff", margin: 0 }}>
-                        📋 Question-by-Question Deep Dive & Staff Benchmark Answers
-                      </h4>
-                      <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-                        Compare your spoken response against top-tier Staff / Senior Engineer model answers and review recorded audio.
-                      </div>
+                  <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "14px" }}>
+                    <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Speaking Duration</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: sm.speaking_time_s ? "#6d28d9" : "#64748b", marginTop: "4px" }}>
+                      {sm.speaking_time_display || "Not measurable"}
                     </div>
                   </div>
+                </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {reportData.turn_evaluations.map((turn, tIdx) => {
+                {Array.isArray(sm.tips) && sm.tips.length > 0 && (
+                  <ul style={{ margin: "12px 0 0", paddingLeft: "18px", fontSize: "12px", color: "#475569", lineHeight: "1.6" }}>
+                    {sm.tips.map((tip, i) => <li key={i}>{tip}</li>)}
+                  </ul>
+                )}
+              </div>
+
+              {/* TOP STRENGTHS & WEAKNESSES (CITED QUOTES ONLY) */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ background: "#ffffff", border: "1px solid #a7f3d0", borderRadius: "18px", padding: "18px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 800, color: "#059669", marginBottom: "12px" }}>Evidence-Backed Strengths</h4>
+                  {strengths.length > 0 ? strengths.map((str, idx) => renderEvidenceCard(str, true, idx)) : (
+                    <div style={{ padding: "10px", color: "#64748b", fontSize: "12px", lineHeight: "1.5" }}>
+                      {reportData.strengths_empty_message || `Not enough strong evidence yet (dimension coverage: ${coveragePct}%).`}
+                    </div>
+                  )}
+                </div>
+                <div style={{ background: "#ffffff", border: "1px solid #fde68a", borderRadius: "18px", padding: "18px" }}>
+                  <h4 style={{ fontSize: "13px", fontWeight: 800, color: "#d97706", marginBottom: "12px" }}>Focus Areas &amp; Weaknesses</h4>
+                  {recurringTags.length > 0 && (
+                    <div style={{ marginBottom: "10px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {recurringTags.map((rt, i) => (
+                        <span key={i} style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a", fontSize: "10.5px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px" }}>
+                          Recurring ({rt.count} turns): {rt.tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {weaknesses.length > 0 ? weaknesses.map((imp, idx) => renderEvidenceCard(imp, false, idx)) : (
+                    <div style={{ padding: "10px", color: "#64748b", fontSize: "12px", lineHeight: "1.5" }}>
+                      No evaluated criteria fell below the weakness threshold.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* QUESTION-BY-QUESTION REVIEW */}
+              {qReviews.length > 0 && (
+                <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "18px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
+                  <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginBottom: "12px" }}>Question-by-Question Review (From Persisted Turns)</h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {qReviews.map((turn, tIdx) => {
                       const isExpanded = expandedTurn === tIdx;
                       const audioSrc = recordedAudios[turn.question_number];
-
+                      const hasTurnScore = turn.score_100 !== null && turn.score_100 !== undefined && !turn.is_small_talk;
                       return (
-                        <div
-                          key={tIdx}
-                          style={{
-                            background: "rgba(255,255,255,0.03)",
-                            border: isExpanded ? "1px solid #7c3aed" : "1px solid rgba(255,255,255,0.08)",
-                            borderRadius: "14px",
-                            padding: "14px 18px",
-                            transition: "all 0.2s"
-                          }}
-                        >
-                          {/* Accordion Header */}
-                          <div
-                            onClick={() => setExpandedTurn(isExpanded ? null : tIdx)}
-                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, paddingRight: "10px" }}>
-                              <span style={{
-                                background: "rgba(124,58,237,0.2)",
-                                color: "#a78bfa",
-                                fontSize: "11px",
-                                fontWeight: 800,
-                                padding: "2px 8px",
-                                borderRadius: "8px",
-                                border: "1px solid rgba(124,58,237,0.3)"
-                              }}>
-                                Q{turn.question_number}
+                        <div key={tIdx} style={{ background: "#ffffff", border: isExpanded ? "1px solid #7c3aed" : "1px solid #e2e8f0", borderRadius: "14px", padding: "14px 16px" }}>
+                          <div onClick={() => setExpandedTurn(isExpanded ? null : tIdx)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", gap: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
+                              <span style={{ background: "#ede9fe", color: "#5b21b6", fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px" }}>
+                                Q{turn.question_number || tIdx + 1}
                               </span>
-                              <span style={{ fontSize: "13px", fontWeight: 700, color: "#fff", lineHeight: "1.4" }}>
-                                {turn.question}
-                              </span>
+                              <span style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{turn.question || "Interview Question"}</span>
+                              {turn.is_small_talk && (
+                                <span style={{ background: "#f1f5f9", color: "#475569", fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "8px" }}>
+                                  Small Talk · Excluded from scoring
+                                </span>
+                              )}
                             </div>
-
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                              <span style={{
-                                background: `${turn.grade_color || '#10b981'}22`,
-                                color: turn.grade_color || "#10b981",
-                                fontSize: "11px",
-                                fontWeight: 800,
-                                padding: "2px 8px",
-                                borderRadius: "8px",
-                                border: `1px solid ${turn.grade_color || '#10b981'}44`
-                              }}>
-                                {turn.score}/100 ({turn.grade})
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", background: hasTurnScore ? "#ecfdf5" : "#f1f5f9", color: hasTurnScore ? "#059669" : "#64748b" }}>
+                                {hasTurnScore ? `${turn.score_100}/100` : (turn.evaluation_status === "failed" ? "Eval Failed" : "Not Scored")}
                               </span>
-                              <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                                {isExpanded ? "▲" : "▼"}
-                              </span>
+                              <span style={{ fontSize: "12px", color: "#64748b" }}>{isExpanded ? "▲" : "▼"}</span>
                             </div>
                           </div>
-
-                          {/* Expanded Content */}
                           {isExpanded && (
-                            <div style={{ marginTop: "16px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-                              {/* Audio Replay if captured */}
+                            <div style={{ marginTop: "12px", borderTop: "1px solid #e5e8f2", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
                               {audioSrc && (
-                                <div style={{ background: "rgba(0,196,167,0.06)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "12px" }}>
-                                  <span style={{ fontSize: "12px", fontWeight: 800, color: "#00c4a7" }}>▶ Audio Replay:</span>
-                                  <audio controls src={audioSrc} style={{ flex: 1, height: "32px" }} />
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                  <span style={{ color: "#6d28d9", fontWeight: 800 }}>▶ Audio Replay:</span>
+                                  <audio controls src={audioSrc} style={{ flex: 1, height: "30px" }} />
                                 </div>
                               )}
-
-                              {/* Your Answer */}
                               <div>
-                                <div style={{ fontSize: "11px", fontWeight: 800, color: "#38bdf8", textTransform: "uppercase", marginBottom: "4px" }}>
-                                  Candidate Spoken Answer
-                                </div>
-                                <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#cbd5e1", fontStyle: "italic", lineHeight: "1.6" }}>
-                                  "{turn.candidate_answer}"
+                                <div style={{ color: "#4f46e5", fontWeight: 800, marginBottom: "4px" }}>Candidate Transcript ({turn.input_mode || "typed"})</div>
+                                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "8px 12px", borderRadius: "8px", color: "#334155", fontStyle: "italic" }}>
+                                  &quot;{turn.candidate_answer}&quot;
                                 </div>
                               </div>
-
-                              {/* Staff Benchmark Model Answer */}
-                              {turn.benchmark && (
-                                <div style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "12px", padding: "14px" }}>
-                                  <div style={{ fontSize: "12px", fontWeight: 900, color: "#c084fc", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                    <span>🎯</span> Staff/Senior Engineer Model Answer Benchmark
-                                  </div>
-                                  <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "12px", color: "#e2e8f0", lineHeight: "1.7" }}>
-                                    {turn.benchmark.key_principles && turn.benchmark.key_principles.map((p, pIdx) => (
-                                      <li key={pIdx} style={{ marginBottom: "4px" }}>{p}</li>
-                                    ))}
-                                  </ul>
-                                  {turn.benchmark.staff_takeaway && (
-                                    <div style={{ marginTop: "8px", fontSize: "11px", color: "#cbd5e1", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" }}>
-                                      <strong style={{ color: "#a78bfa" }}>What Top Interviewers Look For:</strong> {turn.benchmark.staff_takeaway}
+                              {Array.isArray(turn.criteria) && turn.criteria.length > 0 && (
+                                <div>
+                                  <div style={{ color: "#6d28d9", fontWeight: 800, marginBottom: "4px" }}>Rubric Criteria Evidence ({turn.prompt_id || "rubric"} {turn.prompt_version || ""})</div>
+                                  {turn.criteria.map((c, ci) => (
+                                    <div key={ci} style={{ padding: "4px 8px", borderLeft: "2px solid #7c3aed", marginBottom: "4px", color: "#0f172a" }}>
+                                      <strong>{c.criterion}</strong>: {Math.round((c.score || 0) * 100)}/100 — &quot;{c.quoted_justification}&quot;
                                     </div>
-                                  )}
+                                  ))}
+                                </div>
+                              )}
+                              {turn.improved_answer && (
+                                <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "10px", padding: "10px 12px", color: "#1e1b4b" }}>
+                                  <strong style={{ color: "#5b21b6" }}>Model Answer Guidance:</strong> {turn.improved_answer}
                                 </div>
                               )}
                             </div>
@@ -2536,50 +2965,107 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 </div>
               )}
 
-              {/* TOP STRENGTHS & IMPROVEMENTS */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px", textAlign: "left" }}>
-                <div style={{ background: "rgba(0,196,167,0.04)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#00c4a7", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>💪</span> Top Strengths
-                  </h4>
-                  <div>
-                    {hasNoResponses ? (
-                      <div style={{ padding: "12px", color: "#94a3b8", fontSize: "12px", fontStyle: "italic", lineHeight: "1.5" }}>
-                        No strengths identified. Candidate did not provide any spoken or written responses during the interview.
-                      </div>
-                    ) : (reportData.strengths && reportData.strengths.length > 0 && typeof reportData.strengths[0] === 'object' ? (
-                      reportData.strengths.map((str, idx) => renderEvidenceCard(str, true, idx))
-                    ) : (
-                      topStrengths.map((str, idx) => renderEvidenceCard(str, true, idx))
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "20px", padding: "18px" }}>
-                  <h4 style={{ fontSize: "13px", fontWeight: 900, color: "#f59e0b", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>🎯</span> Focus Areas & Weaknesses
-                  </h4>
-                  <div>
-                    {reportData.weaknesses && reportData.weaknesses.length > 0 && typeof reportData.weaknesses[0] === 'object' ? (
-                      reportData.weaknesses.map((imp, idx) => renderEvidenceCard(imp, false, idx))
-                    ) : (
-                      topImprovements.map((imp, idx) => renderEvidenceCard(imp, false, idx))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* AI RECRUITER REPORT */}
-              {reportData.report && !reportData.report.includes("Generating") && (
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", textAlign: "left", color: "#e2e8f0", lineHeight: "1.7", marginBottom: "28px", fontSize: "13px" }}>
-                  {renderMarkdown(reportData.report)}
+              {/* FINAL NARRATIVE SUMMARY */}
+              {(reportData.narrative?.text || reportData.report) && (
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", textAlign: "left", color: "#1e293b", lineHeight: "1.7", marginBottom: "20px", fontSize: "13px" }}>
+                  {renderMarkdown(reportData.narrative?.text || reportData.report)}
                 </div>
               )}
 
+              {/* ROADMAP SKILL LINKS (PROMPT 1 SYNC) */}
+              {roadmapLinks.length > 0 && (
+                <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "14px", padding: "12px 16px", marginBottom: "20px", textAlign: "left" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: "6px" }}>Updated Prep Roadmap Evidence</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {roadmapLinks.map((rl, idx) => (
+                      <span key={idx} style={{ background: "#ffffff", border: "1px solid #ddd6fe", color: "#4c1d95", fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px" }}>
+                        {rl.skill_id} (Turn linked)
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
-                <button onClick={() => { try { sessionStorage.removeItem("prepfly_avatab_session"); } catch (_) {} setStep("resume_upload"); setReportData(null); setAllFeedbacks([]); setSessionId(null); }} style={{ padding: "12px 24px", borderRadius: "12px", background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>Practice Another</button>
-                <button onClick={downloadPDFReport} style={{ padding: "12px 28px", borderRadius: "12px", background: "linear-gradient(135deg,#00c4a7,#7c3aed)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer" }}>📄 Download PDF Report</button>
+              {/* EMAIL REPORT ERROR/SUCCESS FEEDBACK */}
+              {emailState.error && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", fontSize: "12px", color: "#dc2626", textAlign: "left" }}>
+                  Email delivery failed: {emailState.error}
+                </div>
+              )}
+              {emailState.sent && (
+                <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: "10px", padding: "10px 14px", marginBottom: "14px", fontSize: "12px", color: "#059669", textAlign: "left" }}>
+                  Report sent successfully via HTTP email provider.
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+                <button type="button" onClick={resetSessionToSetup} style={{ padding: "12px 22px", borderRadius: "12px", background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#0f172a", fontWeight: 800, cursor: "pointer" }}>
+                  Practice Another
+                </button>
+                <button type="button" onClick={downloadPDFReport} style={{ padding: "12px 24px", borderRadius: "12px", background: "linear-gradient(135deg,#6d28d9,#7c3aed)", border: "none", color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 14px rgba(109,40,217,0.28)" }}>
+                  📄 Download PDF Report
+                </button>
+                <button type="button" onClick={sendReportByEmail} disabled={emailState.sending} style={{ padding: "12px 20px", borderRadius: "12px", background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", fontWeight: 700, cursor: "pointer" }}>
+                  {emailState.sending ? "Sending Email..." : "✉️ Email Report"}
+                </button>
               </div>
+
+              {/* CLICK-TO-INSPECT EVIDENCE DRAWER MODAL */}
+              {evidenceDrawer && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(11,14,26,0.65)", backdropFilter: "blur(6px)", display: "flex", justifyContent: "flex-end", zIndex: 1200 }} onClick={() => setEvidenceDrawer(null)}>
+                  <div onClick={(e) => e.stopPropagation()} style={{ width: "440px", maxWidth: "94vw", height: "100%", background: "#ffffff", borderLeft: "1px solid #e2e8f0", padding: "26px", overflowY: "auto", textAlign: "left", boxShadow: "-20px 0 50px rgba(15,23,42,0.22)", color: "#0f172a" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                      <div>
+                        <div style={{ fontSize: "10.5px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase" }}>Evidence Drawer</div>
+                        <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>{evidenceDrawer.title}</h3>
+                        <div style={{ fontSize: "13px", fontWeight: 800, color: "#334155", marginTop: "2px" }}>{evidenceDrawer.scoreLabel}</div>
+                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>{evidenceDrawer.subtitle}</div>
+                      </div>
+                      <button type="button" onClick={() => setEvidenceDrawer(null)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", color: "#0f172a", borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", fontWeight: 800 }}>
+                        ✕
+                      </button>
+                    </div>
+
+                    {evidenceDrawer.missingReason && (
+                      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px 12px", fontSize: "12px", color: "#475569", marginBottom: "14px" }}>
+                        Excluded from overall calculation ({evidenceDrawer.missingReason}).
+                      </div>
+                    )}
+
+                    <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "12px", marginBottom: "16px" }}>
+                      <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: "8px" }}>Formula Inputs &amp; Provenance</div>
+                      <div style={{ fontSize: "11.5px", color: "#334155", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                        {Object.entries(evidenceDrawer.formulaInputs || {}).map(([k, v]) => (
+                          <div key={k} style={{ background: "#ffffff", border: "1px solid #e2e8f0", padding: "6px 8px", borderRadius: "8px" }}>
+                            <div style={{ fontSize: "9.5px", color: "#64748b", textTransform: "uppercase" }}>{k.replace(/_/g, " ")}</div>
+                            <div style={{ fontWeight: 700, color: "#0f172a", wordBreak: "break-word" }}>{Array.isArray(v) ? v.join(", ") : String(v ?? "null")}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: "8px" }}>
+                      Cited Turn Quotes ({(evidenceDrawer.items || []).length})
+                    </div>
+                    {(evidenceDrawer.items || []).length > 0 ? evidenceDrawer.items.map((ev, idx) => (
+                      <div key={idx} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px", marginBottom: "10px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+                          <strong style={{ color: "#0f172a" }}>{ev.criterion}{ev.dimension ? ` · ${ev.dimension}` : ""}</strong>
+                          <span style={{ color: "#059669", fontWeight: 800 }}>{Math.round((ev.score || 0) * 100)}/100</span>
+                        </div>
+                        <div style={{ fontSize: "10.5px", color: "#64748b", marginBottom: "6px" }}>Turn ID: {ev.turn_id}</div>
+                        <div style={{ fontSize: "12px", color: "#334155", fontStyle: "italic", borderLeft: "2px solid #7c3aed", paddingLeft: "8px" }}>
+                          &quot;{ev.quote}&quot;
+                        </div>
+                      </div>
+                    )) : (
+                      <div style={{ fontSize: "12px", color: "#64748b", fontStyle: "italic" }}>
+                        No evaluated turns contributed to this dimension yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}

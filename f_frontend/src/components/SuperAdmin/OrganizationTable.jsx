@@ -92,7 +92,7 @@ export default function OrganizationTable({
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${o.type || ''}</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${(o.admin_name || '').replace(/</g, "&lt;")} (${o.email || ''})</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${o.student_count || 0}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; color: #7c4fe0; font-weight: bold;">${o.subscription_plan || 'ENTERPRISE'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; color: #7c3aed; font-weight: bold;">${o.subscription_plan || 'ENTERPRISE'}</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${o.health_badge || '🟢 Healthy'}</td>
         <td style="padding: 8px; border-bottom: 1px solid #ddd;">${o.status || 'Active'}</td>
       </tr>
@@ -105,7 +105,7 @@ export default function OrganizationTable({
           <title>PrepFly Global Organizations Executive Audit Report</title>
           <style>
             body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 30px; color: #1e293b; }
-            h1 { color: #00c4a7; margin-bottom: 4px; }
+            h1 { color: #6d28d9; margin-bottom: 4px; }
             p { color: #64748b; font-size: 13px; margin-top: 0; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
             th { background: #0c1220; color: #fff; text-align: left; padding: 10px; }
@@ -157,31 +157,31 @@ export default function OrganizationTable({
             placeholder="🔍 Search name, org ID, admin, email..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: "260px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", fontSize: "12px", outline: "none" }}
+            style={{ width: "260px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "12px", outline: "none" }}
           />
 
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
             <option value="All">All Institution Types</option>
             <option value="College">Colleges / Universities</option>
             <option value="Company">Companies / Recruiters</option>
             <option value="Training Institute">Training Institutes</option>
           </select>
 
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
             <option value="All">All Statuses</option>
             <option value="Active">Active</option>
             <option value="Trial">In Free Trial</option>
             <option value="Suspended">Suspended</option>
           </select>
 
-          <select value={healthFilter} onChange={e => setHealthFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+          <select value={healthFilter} onChange={e => setHealthFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
             <option value="All">All Health Scores</option>
             <option value="Healthy">🟢 Healthy (&gt;90)</option>
             <option value="Attention">🟡 Needs Attention (70-89)</option>
             <option value="Critical">🔴 Critical (&lt;70)</option>
           </select>
 
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
             <option value="name">Sort by Name</option>
             <option value="students">Sort by Students</option>
             <option value="health">Sort by Health Score</option>
@@ -195,7 +195,7 @@ export default function OrganizationTable({
             </button>
           )}
 
-          <button onClick={() => handleExportCSV()} style={{ background: "rgba(0,196,167,0.15)", border: "1px solid rgba(0,196,167,0.3)", color: "#00c4a7", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "6px 12px", cursor: "pointer" }}>
+          <button onClick={() => handleExportCSV()} style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "#6d28d9", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "6px 12px", cursor: "pointer" }}>
             📊 Export CSV
           </button>
           
@@ -210,11 +210,11 @@ export default function OrganizationTable({
       </div>
 
       {/* TABLE */}
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+              <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                 <th style={{ padding: "10px", width: "30px" }}>
                   <input type="checkbox" checked={selectedIds.length === filtered.length && filtered.length > 0} onChange={handleSelectAll} style={{ accentColor: "#ec4899" }} />
                 </th>
@@ -232,14 +232,14 @@ export default function OrganizationTable({
             </thead>
             <tbody>
               {filtered.map(o => (
-                <tr key={o.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <tr key={o.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
                   <td style={{ padding: "12px 10px" }}>
                     <input type="checkbox" checked={selectedIds.includes(o.id)} onChange={() => handleSelectOne(o.id)} style={{ accentColor: "#ec4899" }} />
                   </td>
 
-                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#fff" }}>
+                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#0f172a" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "30px", height: "30px", borderRadius: "6px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px" }}>
+                      <div style={{ width: "30px", height: "30px", borderRadius: "6px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px" }}>
                         {o.name?.[0] || "O"}
                       </div>
                       <div>
@@ -250,13 +250,13 @@ export default function OrganizationTable({
                   </td>
 
                   <td style={{ padding: "12px 10px" }}>
-                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: o.type === "College" ? "rgba(139,92,246,0.15)" : "rgba(0,196,167,0.15)", color: o.type === "College" ? "#a78bfa" : "#00c4a7", fontWeight: 800 }}>
+                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: o.type === "College" ? "rgba(139,92,246,0.15)" : "rgba(109,40,217,0.15)", color: o.type === "College" ? "#a78bfa" : "#6d28d9", fontWeight: 800 }}>
                       {o.type}
                     </span>
                     <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px" }}>{o.industry}</div>
                   </td>
 
-                  <td style={{ padding: "12px 10px", color: "#e2e8f0" }}>
+                  <td style={{ padding: "12px 10px", color: "#334155" }}>
                     <div style={{ fontWeight: 700 }}>{o.admin_name}</div>
                     <div style={{ fontSize: "10px", color: "#94a3b8" }}>{o.email}</div>
                   </td>
@@ -265,7 +265,7 @@ export default function OrganizationTable({
                     {o.city || "San Francisco"}, {o.country || "USA"}
                   </td>
 
-                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#00c4a7" }}>
+                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#6d28d9" }}>
                     {o.student_count} / {o.student_limit || 500}
                   </td>
 
@@ -287,18 +287,18 @@ export default function OrganizationTable({
                   </td>
 
                   <td style={{ padding: "12px 10px" }}>
-                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: o.status === "Active" ? "rgba(0,196,167,0.15)" : "rgba(239,68,68,0.15)", color: o.status === "Active" ? "#00c4a7" : "#f87171", fontWeight: 800 }}>
+                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: o.status === "Active" ? "rgba(109,40,217,0.15)" : "rgba(239,68,68,0.15)", color: o.status === "Active" ? "#6d28d9" : "#f87171", fontWeight: 800 }}>
                       ● {o.status || "Active"}
                     </span>
                   </td>
 
                   <td style={{ padding: "12px 10px", textAlign: "right" }}>
                     <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                      <button onClick={() => onViewDetails ? onViewDetails(o) : alert(`Viewing ${o.name}`)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                      <button onClick={() => onViewDetails ? onViewDetails(o) : alert(`Viewing ${o.name}`)} style={{ background: "#f1f5f9", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                         👁 Details
                       </button>
 
-                      <button onClick={() => onResetPassword ? onResetPassword(o) : alert(`Resetting Admin password for ${o.name}...`)} style={{ background: "rgba(0,196,167,0.15)", border: "none", color: "#00c4a7", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                      <button onClick={() => onResetPassword ? onResetPassword(o) : alert(`Resetting Admin password for ${o.name}...`)} style={{ background: "rgba(109,40,217,0.15)", border: "none", color: "#6d28d9", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                         🔑 Pass
                       </button>
 

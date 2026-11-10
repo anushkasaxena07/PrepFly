@@ -124,11 +124,11 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
           position: "fixed",
           top: "24px",
           right: "24px",
-          background: "linear-gradient(135deg, #00c4a7, #1e293b)",
-          color: "#fff",
+          background: "linear-gradient(135deg, #6d28d9, #1e293b)",
+          color: "#0f172a",
           padding: "16px 24px",
           borderRadius: "14px",
-          boxShadow: "0 12px 32px rgba(0,196,167,0.3)",
+          boxShadow: "0 12px 32px rgba(109,40,217,0.3)",
           zIndex: 9999,
           fontWeight: 700,
           display: "flex",
@@ -147,15 +147,15 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       {/* HEADER SECTION */}
       <div style={{ marginBottom: "28px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "nowrap", gap: "20px" }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <h1 style={{ fontSize: "28px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <span>👑</span> Subscription & Billing
             <span style={{
               fontSize: "12px",
               padding: "4px 10px",
               borderRadius: "20px",
-              background: subStatus === 'ACTIVE' ? "rgba(0,196,167,0.2)" : subStatus === 'EXPIRED' ? "rgba(239,68,68,0.2)" : "rgba(124,79,224,0.2)",
-              color: subStatus === 'ACTIVE' ? "#00c4a7" : subStatus === 'EXPIRED' ? "#ef4444" : "#a855f7",
-              border: `1px solid ${subStatus === 'ACTIVE' ? "#00c4a7" : subStatus === 'EXPIRED' ? "#ef4444" : "#a855f7"}`,
+              background: subStatus === 'ACTIVE' ? "rgba(109,40,217,0.2)" : subStatus === 'EXPIRED' ? "rgba(239,68,68,0.2)" : "rgba(124,79,224,0.2)",
+              color: subStatus === 'ACTIVE' ? "#6d28d9" : subStatus === 'EXPIRED' ? "#ef4444" : "#a855f7",
+              border: `1px solid ${subStatus === 'ACTIVE' ? "#6d28d9" : subStatus === 'EXPIRED' ? "#ef4444" : "#a855f7"}`,
               fontWeight: 800
             }}>
               {subStatus}
@@ -212,7 +212,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
           
           <div>
             <div style={{ fontSize: "12px", color: "var(--text2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>CURRENT PLAN</div>
-            <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff", marginTop: "6px" }}>{planName} Plan</div>
+            <div style={{ fontSize: "24px", fontWeight: 900, color: "#0f172a", marginTop: "6px" }}>{planName} Plan</div>
             <div style={{ fontSize: "14px", color: "var(--cyan)", fontWeight: 800, marginTop: "4px" }}>₹500 / 365 Days (1 Year)</div>
           </div>
 
@@ -221,7 +221,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
             <div style={{
               fontSize: "24px",
               fontWeight: 900,
-              color: isBlocked ? "#ef4444" : daysRemaining <= 3 ? "#f59e0b" : "#00c4a7",
+              color: isBlocked ? "#ef4444" : daysRemaining <= 3 ? "#f59e0b" : "#6d28d9",
               marginTop: "6px"
             }}>
               {isBlocked ? "Expired Access" : `${daysRemaining} Days Left`}
@@ -233,7 +233,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
 
           <div>
             <div style={{ fontSize: "12px", color: "var(--text2)", textTransform: "uppercase", letterSpacing: "1px", fontWeight: 700 }}>DATES</div>
-            <div style={{ fontSize: "13px", color: "#fff", marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+            <div style={{ fontSize: "13px", color: "#0f172a", marginTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
               <div><strong>Started:</strong> {statusData?.trial_start ? statusData.trial_start.split("T")[0] : "2026-07-20"}</div>
               <div><strong>Expires:</strong> {statusData?.trial_end ? statusData.trial_end.split("T")[0] : "2026-07-30"}</div>
             </div>
@@ -260,39 +260,39 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
 
       {/* PLAN BENEFITS SUMMARY */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginTop: "24px" }}>
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>👥</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>All Students Included</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>All Students Included</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Students belonging to your organization automatically receive premium features.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>🤖</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>Unlimited AI Mock Interviews</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Unlimited AI Mock Interviews</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Live speech-to-text feedback, transcript analytics, and STAR method evaluations.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>💻</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>Coding Test Environment</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Coding Test Environment</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Automated code execution, complexity review, and collaborative WebRTC rooms.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>📄</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>Instant PDF Invoices</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Instant PDF Invoices</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>GST-compliant PDF invoices generated automatically after every payment.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>📊</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>Institutional Analytics</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>Institutional Analytics</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Cohort breakdown, skill weakness tracking, and downloadable CSV candidate digests.</div>
         </div>
 
-        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+        <div style={{ background: "rgba(12, 18, 32, 0.6)", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           <div style={{ fontSize: "20px", marginBottom: "8px" }}>⚡</div>
-          <div style={{ fontWeight: 800, color: "#fff", fontSize: "14px" }}>24/7 Priority Support & SLA</div>
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px" }}>24/7 Priority Support & SLA</div>
           <div style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>Dedicated account manager, custom API integrations, and guaranteed 99.9% uptime.</div>
         </div>
       </div>
@@ -305,7 +305,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
         <div style={{ marginTop: "32px", background: "rgba(12, 18, 32, 0.6)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "24px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
             <div>
-              <h3 style={{ color: "#fff", fontSize: "16px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <h3 style={{ color: "#0f172a", fontSize: "16px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
                 <span>👥</span> Covered Organization Students ({students.length})
               </h3>
               <p style={{ color: "var(--text2)", fontSize: "12px", margin: "4px 0 0 0" }}>
@@ -319,8 +319,8 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
                   onClick={handleBulkRenew}
                   disabled={bulkRenewing}
                   style={{
-                    background: "linear-gradient(135deg, #7c4fe0, #00c4a7)",
-                    color: "#fff",
+                    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                    color: "#0f172a",
                     border: "none",
                     borderRadius: "12px",
                     padding: "8px 16px",
@@ -336,7 +336,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
                   <span>⚡</span> {bulkRenewing ? "Renewing..." : `Bulk Renew Access (${selectedIds.length} Selected)`}
                 </button>
               )}
-              <div style={{ background: "rgba(0, 196, 167, 0.15)", color: "#00c4a7", border: "1px solid rgba(0,196,167,0.3)", padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 700 }}>
+              <div style={{ background: "rgba(109, 40, 217, 0.15)", color: "#6d28d9", border: "1px solid rgba(109,40,217,0.3)", padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 700 }}>
                 Active Subscription Coverage
               </div>
             </div>
@@ -350,13 +350,13 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", color: "var(--text2)" }}>
+                  <tr style={{ borderBottom: "1px solid #e5e8f2", color: "var(--text2)" }}>
                     <th style={{ padding: "10px", width: "40px" }}>
                       <input
                         type="checkbox"
                         onChange={handleSelectAll}
                         checked={students.length > 0 && selectedIds.length === students.length}
-                        style={{ cursor: "pointer", accentColor: "#00c4a7" }}
+                        style={{ cursor: "pointer", accentColor: "#6d28d9" }}
                       />
                     </th>
                     <th style={{ padding: "10px" }}>Student Name</th>
@@ -374,14 +374,14 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
                           type="checkbox"
                           checked={selectedIds.includes(s.id)}
                           onChange={() => handleToggleSelect(s.id)}
-                          style={{ cursor: "pointer", accentColor: "#00c4a7" }}
+                          style={{ cursor: "pointer", accentColor: "#6d28d9" }}
                         />
                       </td>
-                      <td style={{ padding: "12px 10px", fontWeight: 700, color: "#fff" }}>{s.name}</td>
+                      <td style={{ padding: "12px 10px", fontWeight: 700, color: "#0f172a" }}>{s.name}</td>
                       <td style={{ padding: "12px 10px", color: "var(--text2)" }}>{s.email}</td>
                       <td style={{ padding: "12px 10px", color: "var(--text2)" }}>{s.department || "Computer Science"}</td>
                       <td style={{ padding: "12px 10px" }}>
-                        <span style={{ background: "rgba(0, 196, 167, 0.15)", color: "#00c4a7", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 }}>
+                        <span style={{ background: "rgba(109, 40, 217, 0.15)", color: "#6d28d9", padding: "4px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: 700 }}>
                           {subStatus === "ACTIVE" || s.subscription === "PREMIUM" ? "PRO INCLUDED" : "TRIAL COVERED"}
                         </span>
                       </td>

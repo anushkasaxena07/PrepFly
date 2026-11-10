@@ -20,7 +20,7 @@ const renderMarkdown = (text) => {
     }
     if (cleanLine.startsWith("### ")) {
       const headerText = cleanLine.replace("### ", "").replace(/^[-—–\s]+/, "").trim();
-      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "#fff" }}>{headerText}</h3>;
+      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "#0f172a" }}>{headerText}</h3>;
     }
 
     // Check if bullet point

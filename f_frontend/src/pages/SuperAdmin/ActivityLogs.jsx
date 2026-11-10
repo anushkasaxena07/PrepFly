@@ -240,7 +240,7 @@ export default function ActivityLogs() {
             <button
               onClick={() => setViewMode('table')}
               style={{
-                background: viewMode === 'table' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'transparent',
+                background: viewMode === 'table' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'transparent',
                 border: 'none', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer'
               }}
             >
@@ -250,7 +250,7 @@ export default function ActivityLogs() {
             <button
               onClick={() => setViewMode('timeline')}
               style={{
-                background: viewMode === 'timeline' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'transparent',
+                background: viewMode === 'timeline' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'transparent',
                 border: 'none', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer'
               }}
             >
@@ -260,7 +260,7 @@ export default function ActivityLogs() {
             <button
               onClick={() => setViewMode('analytics')}
               style={{
-                background: viewMode === 'analytics' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'transparent',
+                background: viewMode === 'analytics' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'transparent',
                 border: 'none', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '6px 12px', borderRadius: '6px', cursor: 'pointer'
               }}
             >
@@ -285,7 +285,7 @@ export default function ActivityLogs() {
             style={{
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '8px', padding: '7px 12px', fontSize: '11px', color: '#00c4a7', fontWeight: 800, cursor: 'pointer'
+              borderRadius: '8px', padding: '7px 12px', fontSize: '11px', color: '#6d28d9', fontWeight: 800, cursor: 'pointer'
             }}
           >
             📊 Export CSV
@@ -342,9 +342,9 @@ export default function ActivityLogs() {
           <div style={{ fontSize: '20px', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>{summary.new_organizations || 4}</div>
         </div>
 
-        <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(0,196,167,0.2)', borderRadius: '12px', padding: '14px' }}>
-          <div style={{ fontSize: '10px', color: '#00c4a7', fontWeight: 800, textTransform: 'uppercase' }}>AI Changes</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#00c4a7', marginTop: '4px' }}>{summary.ai_config_changes || 2}</div>
+        <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(109,40,217,0.2)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ fontSize: '10px', color: '#6d28d9', fontWeight: 800, textTransform: 'uppercase' }}>AI Changes</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#6d28d9', marginTop: '4px' }}>{summary.ai_config_changes || 2}</div>
         </div>
       </div>
 
@@ -456,12 +456,12 @@ export default function ActivityLogs() {
 
       {/* BULK ACTIONS TOOLBAR (WHEN ROWS SELECTED) */}
       {selectedIds.length > 0 && (
-        <div style={{ background: 'rgba(0,196,167,0.12)', border: '1px solid rgba(0,196,167,0.3)', borderRadius: '10px', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ background: 'rgba(109,40,217,0.12)', border: '1px solid rgba(109,40,217,0.3)', borderRadius: '10px', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', fontWeight: 800, color: '#fff' }}>
             ✓ {selectedIds.length} event logs selected
           </span>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={exportCSV} style={{ background: '#00c4a7', border: 'none', color: '#090d16', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 900, cursor: 'pointer' }}>
+            <button onClick={exportCSV} style={{ background: '#6d28d9', border: 'none', color: '#090d16', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 900, cursor: 'pointer' }}>
               📥 Export Selected
             </button>
             <button onClick={handleBulkDelete} style={{ background: '#ef4444', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 900, cursor: 'pointer' }}>
@@ -473,7 +473,7 @@ export default function ActivityLogs() {
 
       {/* VIEW CONTENT: TABLE / TIMELINE / ANALYTICS */}
       {loading ? (
-        <div style={{ color: '#00c4a7', padding: '60px', textAlign: 'center', fontWeight: 800 }}>
+        <div style={{ color: '#6d28d9', padding: '60px', textAlign: 'center', fontWeight: 800 }}>
           ⚡ Loading SOC telemetry & audit events...
         </div>
       ) : viewMode === 'table' ? (
@@ -512,7 +512,7 @@ export default function ActivityLogs() {
                       key={log.id}
                       style={{
                         borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        background: isChecked ? 'rgba(0,196,167,0.05)' : log.severity === 'Critical' ? 'rgba(239,68,68,0.05)' : 'transparent',
+                        background: isChecked ? 'rgba(109,40,217,0.05)' : log.severity === 'Critical' ? 'rgba(239,68,68,0.05)' : 'transparent',
                         borderLeft: log.severity === 'Critical' ? '3px solid #ef4444' : log.severity === 'Warning' ? '3px solid #f59e0b' : '3px solid transparent'
                       }}
                     >
@@ -534,7 +534,7 @@ export default function ActivityLogs() {
                         </span>
                       </td>
 
-                      <td style={{ padding: '12px 10px', fontWeight: 800, color: '#00c4a7' }}>
+                      <td style={{ padding: '12px 10px', fontWeight: 800, color: '#6d28d9' }}>
                         {log.category}
                       </td>
 
@@ -604,7 +604,7 @@ export default function ActivityLogs() {
 
           <div style={{ position: 'relative', paddingLeft: '30px' }}>
             {/* VERTICAL CONNECTING LINE */}
-            <div style={{ position: 'absolute', top: 0, bottom: 0, left: '12px', width: '2px', background: 'linear-gradient(180deg, #00c4a7, #7c4fe0, rgba(255,255,255,0.05))' }} />
+            <div style={{ position: 'absolute', top: 0, bottom: 0, left: '12px', width: '2px', background: 'linear-gradient(180deg, #6d28d9, #7c3aed, rgba(255,255,255,0.05))' }} />
 
             {logsList.map((log, index) => {
               const sInfo = getSeverityBadge(log.severity);
@@ -643,7 +643,7 @@ export default function ActivityLogs() {
                     <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => openInspector(log)}
-                        style={{ background: 'none', border: 'none', color: '#00c4a7', fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}
+                        style={{ background: 'none', border: 'none', color: '#6d28d9', fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}
                       >
                         Inspect Full Context →
                       </button>
@@ -673,7 +673,7 @@ export default function ActivityLogs() {
                     <span style={{ fontWeight: 800, color: '#fff' }}>{h.count} events</span>
                   </div>
                   <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, h.count * 2.2)}%`, height: '100%', background: 'linear-gradient(90deg, #00c4a7, #7c4fe0)', borderRadius: '3px' }} />
+                    <div style={{ width: `${Math.min(100, h.count * 2.2)}%`, height: '100%', background: 'linear-gradient(90deg, #6d28d9, #7c3aed)', borderRadius: '3px' }} />
                   </div>
                 </div>
               ))}
@@ -740,7 +740,7 @@ export default function ActivityLogs() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px' }}>
               <div>
                 <label style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8' }}>CATEGORY</label>
-                <div style={{ color: '#00c4a7', fontWeight: 800, marginTop: '2px' }}>{selectedLog.category}</div>
+                <div style={{ color: '#6d28d9', fontWeight: 800, marginTop: '2px' }}>{selectedLog.category}</div>
               </div>
 
               <div>
@@ -774,7 +774,7 @@ export default function ActivityLogs() {
             {/* TECHNICAL CONTEXT */}
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontSize: '11px', fontWeight: 800, color: '#fff' }}>🌐 Technical Telemetry</div>
-              <div><strong style={{ color: '#94a3b8' }}>IP Address:</strong> <span style={{ fontFamily: 'monospace', color: '#00c4a7' }}>{selectedLog.ip_address}</span></div>
+              <div><strong style={{ color: '#94a3b8' }}>IP Address:</strong> <span style={{ fontFamily: 'monospace', color: '#6d28d9' }}>{selectedLog.ip_address}</span></div>
               {selectedLog.location && <div><strong style={{ color: '#94a3b8' }}>Location:</strong> {selectedLog.location}</div>}
               {selectedLog.device && <div><strong style={{ color: '#94a3b8' }}>Device:</strong> {selectedLog.device}</div>}
               {selectedLog.browser && <div><strong style={{ color: '#94a3b8' }}>Browser:</strong> {selectedLog.browser}</div>}
@@ -830,7 +830,7 @@ export default function ActivityLogs() {
                 <button
                   onClick={handleSaveInvestigation}
                   disabled={updatingLog}
-                  style={{ background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)', border: 'none', color: '#fff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', border: 'none', color: '#fff', padding: '8px 18px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
                 >
                   {updatingLog ? 'Saving...' : '💾 Save Record'}
                 </button>

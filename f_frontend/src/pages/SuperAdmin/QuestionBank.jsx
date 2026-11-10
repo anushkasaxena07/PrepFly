@@ -85,7 +85,7 @@ export default function QuestionBank() {
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
             📚 Global Platform Question Bank
           </h2>
           <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>
@@ -116,9 +116,9 @@ export default function QuestionBank() {
                 fontWeight: 800,
                 padding: "6px 14px",
                 borderRadius: "6px",
-                border: activeCat === cat ? "none" : "1px solid rgba(255,255,255,0.1)",
-                background: activeCat === cat ? "linear-gradient(135deg, #00c4a7, #7c4fe0)" : "rgba(255,255,255,0.03)",
-                color: "#fff",
+                border: activeCat === cat ? "none" : "1px solid #cbd5e1",
+                background: activeCat === cat ? "linear-gradient(135deg, #6d28d9, #7c3aed)" : "#f8fafc",
+                color: "#0f172a",
                 cursor: "pointer"
               }}
             >
@@ -136,11 +136,11 @@ export default function QuestionBank() {
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: "100%",
-              background: "#0c1220",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "#ffffff",
+              border: "1px solid #cbd5e1",
               borderRadius: "8px",
               padding: "8px 12px 8px 32px",
-              color: "#fff",
+              color: "#0f172a",
               fontSize: "12px",
               outline: "none"
             }}
@@ -155,7 +155,7 @@ export default function QuestionBank() {
           ⚡ Loading master question bank...
         </div>
       ) : (
-        <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+        <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
           
           {filtered.length === 0 ? (
             <div style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>
@@ -167,8 +167,8 @@ export default function QuestionBank() {
                 <div
                   key={q.id}
                   style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "#f8fafc",
+                    border: "1px solid #e5e8f2",
                     padding: "16px 18px",
                     borderRadius: "12px",
                     display: "flex",
@@ -201,13 +201,13 @@ export default function QuestionBank() {
                       </span>
                     </div>
 
-                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
+                    <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", lineHeight: 1.4 }}>
                       {q.title}
                     </div>
 
                     {q.solution && (
-                      <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "8px", background: "rgba(0,196,167,0.06)", borderLeft: "3px solid #00c4a7", padding: "6px 10px", borderRadius: "0 6px 6px 0" }}>
-                        💡 <strong style={{ color: "#00c4a7" }}>Solution / Evaluation Guide:</strong> {q.solution}
+                      <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "8px", background: "rgba(109,40,217,0.06)", borderLeft: "3px solid #6d28d9", padding: "6px 10px", borderRadius: "0 6px 6px 0" }}>
+                        💡 <strong style={{ color: "#6d28d9" }}>Solution / Evaluation Guide:</strong> {q.solution}
                       </div>
                     )}
                   </div>
@@ -216,7 +216,7 @@ export default function QuestionBank() {
                     <button
                       className="btn btn-ghost btn-xs"
                       onClick={() => setEditingQ(q)}
-                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}
+                      style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", color: "#0f172a", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}
                     >
                       ✏️ Edit
                     </button>
@@ -239,7 +239,7 @@ export default function QuestionBank() {
       {/* ADD QUESTION MODAL */}
       {showAdd && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#0f172a" }}>
             <h3 style={{ fontSize: "18px", fontWeight: 800, marginBottom: "16px", margin: 0 }}>➕ Add Question to Global Master Bank</h3>
             <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "16px" }}>This question will immediately become available across all institutional admin question pools.</p>
 
@@ -252,7 +252,7 @@ export default function QuestionBank() {
                   value={newQ.title}
                   onChange={e => setNewQ({ ...newQ, title: e.target.value })}
                   placeholder="e.g. Design a High-Throughput Distributed Rate Limiter..."
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -262,7 +262,7 @@ export default function QuestionBank() {
                   <select
                     value={newQ.category}
                     onChange={e => setNewQ({ ...newQ, category: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="HR">HR</option>
                     <option value="Behavioral">Behavioral</option>
@@ -277,7 +277,7 @@ export default function QuestionBank() {
                   <select
                     value={newQ.difficulty}
                     onChange={e => setNewQ({ ...newQ, difficulty: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
@@ -293,7 +293,7 @@ export default function QuestionBank() {
                   value={newQ.solution}
                   onChange={e => setNewQ({ ...newQ, solution: e.target.value })}
                   placeholder="Key evaluation points, time complexity, or model answer..."
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -301,7 +301,7 @@ export default function QuestionBank() {
                 <button
                   type="button"
                   onClick={() => setShowAdd(false)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#0f172a", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
                 >
                   Cancel
                 </button>
@@ -320,7 +320,7 @@ export default function QuestionBank() {
       {/* EDIT QUESTION MODAL */}
       {editingQ && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#0f172a" }}>
             <h3 style={{ fontSize: "18px", fontWeight: 800, marginBottom: "16px", margin: 0 }}>✏️ Edit Global Question</h3>
 
             <form onSubmit={handleSaveEdit} style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px" }}>
@@ -331,7 +331,7 @@ export default function QuestionBank() {
                   required
                   value={editingQ.title}
                   onChange={e => setEditingQ({ ...editingQ, title: e.target.value })}
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -341,7 +341,7 @@ export default function QuestionBank() {
                   <select
                     value={editingQ.category}
                     onChange={e => setEditingQ({ ...editingQ, category: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="HR">HR</option>
                     <option value="Behavioral">Behavioral</option>
@@ -356,7 +356,7 @@ export default function QuestionBank() {
                   <select
                     value={editingQ.difficulty}
                     onChange={e => setEditingQ({ ...editingQ, difficulty: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
@@ -372,7 +372,7 @@ export default function QuestionBank() {
                   value={editingQ.solution || ''}
                   onChange={e => setEditingQ({ ...editingQ, solution: e.target.value })}
                   placeholder="Key evaluation points or model answer..."
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -380,13 +380,13 @@ export default function QuestionBank() {
                 <button
                   type="button"
                   onClick={() => setEditingQ(null)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#0f172a", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: 800 }}
+                  style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: 800 }}
                 >
                   Update Question
                 </button>

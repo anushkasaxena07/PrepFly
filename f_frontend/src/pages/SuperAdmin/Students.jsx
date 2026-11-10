@@ -218,7 +218,7 @@ export default function Students() {
       {/* 1. HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             🎓 Global Student Management & Analytics Center
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
@@ -229,7 +229,7 @@ export default function Students() {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={() => handleExportCSV()}
-            style={{ background: "rgba(0,196,167,0.15)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "8px", padding: "9px 16px", color: "#00c4a7", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
+            style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "8px", padding: "9px 16px", color: "#6d28d9", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
           >
             📊 Export CSV Report
           </button>
@@ -245,73 +245,73 @@ export default function Students() {
 
       {/* 2. 12 TOP KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px" }}>
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL STUDENTS</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
           <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px", fontWeight: 700 }}>All registered users</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE STUDENTS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{activeStudents.toLocaleString()}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● Active in last 7 days</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>NEW REGISTRATIONS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>+{newToday} Today</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Joined today</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PREMIUM STUDENTS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>{premiumStudents} Paid</div>
           <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>⭐ {totalStudents > 0 ? Math.round(premiumStudents / totalStudents * 100) : 0}% Paid Convert</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>FREE PLAN STUDENTS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{freeStudents} Free</div>
           <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px", fontWeight: 700 }}>Free Tier Accounts</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>STUDENTS IN TRIAL</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{trialStudents} Trial</div>
           <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ Trial Accounts</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RESUMES PARSED</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>📄 Registered users</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MOCK INTERVIEWS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{totalInterviews.toLocaleString()}</div>
           <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>🎙️ Ava Sessions</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>CODING ASSESSMENTS</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>—</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>💻 Submissions</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVERAGE AI SCORE</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{avgAiScore} / 10</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Across all interviews</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PLACEMENT READY</div>
-          <div style={{ fontSize: "22px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>{placementReady} 🎯</div>
-          <div style={{ fontSize: "10px", color: "#00c4a7", marginTop: "2px", fontWeight: 700 }}>Active + 3+ interviews</div>
+          <div style={{ fontSize: "22px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>{placementReady} 🎯</div>
+          <div style={{ fontSize: "10px", color: "#6d28d9", marginTop: "2px", fontWeight: 700 }}>Active + 3+ interviews</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>INACTIVE / AT RISK</div>
           <div style={{ fontSize: "22px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{inactiveStudents} Needs Action</div>
           <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>⚠️ Low Practice Activity</div>
@@ -319,7 +319,7 @@ export default function Students() {
       </div>
 
       {/* 3. SUB-NAVIGATION TABS */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e5e8f2", paddingBottom: "10px", flexWrap: "wrap" }}>
         {[
           { id: 'directory', label: '🎓 Candidate Directory (Table View)' },
           { id: 'analytics', label: '📊 Candidate Analytics & Distributions' },
@@ -330,7 +330,7 @@ export default function Students() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{
-              background: activeTab === t.id ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+              background: activeTab === t.id ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
               border: 'none',
               borderRadius: '8px',
               padding: '9px 16px',
@@ -360,30 +360,30 @@ export default function Students() {
                 placeholder="🔍 Search name, email, roll no, college, skills..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ minWidth: "260px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", fontSize: "12px", outline: "none" }}
+                style={{ minWidth: "260px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "12px", outline: "none" }}
               />
 
               {/* FILTER: ORGANIZATION */}
-              <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Organizations</option>
                 {uniqueOrgs.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
 
               {/* FILTER: DEPARTMENT */}
-              <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Departments</option>
                 {uniqueDepts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
 
               {/* FILTER: SUBSCRIPTION */}
-              <select value={subFilter} onChange={e => setSubFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={subFilter} onChange={e => setSubFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Subscriptions</option>
                 <option value="PREMIUM">⭐ PREMIUM</option>
                 <option value="FREE">FREE Tier</option>
               </select>
 
               {/* FILTER: STATUS */}
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Statuses</option>
                 <option value="Active">Active</option>
                 <option value="Placement Ready">Placement Ready 🎯</option>
@@ -398,8 +398,8 @@ export default function Students() {
 
           {/* BULK FLOATING ACTION BAR */}
           {selectedIds.length > 0 && (
-            <div style={{ background: "linear-gradient(135deg, rgba(0,196,167,0.15), rgba(124,79,224,0.15))", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "12px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>
+            <div style={{ background: "linear-gradient(135deg, rgba(109,40,217,0.15), rgba(124,79,224,0.15))", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "12px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>
                 🎯 {selectedIds.length} candidate(s) selected
               </div>
 
@@ -412,7 +412,7 @@ export default function Students() {
                   🔒 Suspend
                 </button>
 
-                <button onClick={() => handleBulkAction('export')} style={{ background: "rgba(0,196,167,0.2)", border: "1px solid #00c4a7", color: "#00c4a7", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                <button onClick={() => handleBulkAction('export')} style={{ background: "rgba(109,40,217,0.2)", border: "1px solid #6d28d9", color: "#6d28d9", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                   📊 Export Selected
                 </button>
 
@@ -424,11 +424,11 @@ export default function Students() {
           )}
 
           {/* CANDIDATE TABLE */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px", width: "30px" }}>
                       <input type="checkbox" onChange={handleSelectAll} checked={filteredStudents.length > 0 && selectedIds.length === filteredStudents.length} />
                     </th>
@@ -447,14 +447,14 @@ export default function Students() {
                 </thead>
                 <tbody>
                   {filteredStudents.map(s => (
-                    <tr key={s.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <tr key={s.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
                       <td style={{ padding: "12px 10px" }}>
                         <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => handleToggleSelect(s.id)} />
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontWeight: 900, color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-                          <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {s.name?.charAt(0) || "S"}
                           </div>
                           <div>
@@ -464,17 +464,17 @@ export default function Students() {
                         </div>
                       </td>
 
-                      <td style={{ padding: "12px 10px", color: "#00c4a7", fontFamily: "monospace", fontWeight: 800 }}>
+                      <td style={{ padding: "12px 10px", color: "#6d28d9", fontFamily: "monospace", fontWeight: 800 }}>
                         {s.roll_number}
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontWeight: 700, color: "#fff" }}>{s.organization_name}</div>
+                        <div style={{ fontWeight: 700, color: "#0f172a" }}>{s.organization_name}</div>
                         <div style={{ fontSize: "10px", color: "#94a3b8" }}>{s.college}</div>
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ color: "#e2e8f0" }}>{s.department}</div>
+                        <div style={{ color: "#334155" }}>{s.department}</div>
                         <div style={{ fontSize: "10px", color: "#94a3b8" }}>{s.year}</div>
                       </td>
 
@@ -484,7 +484,7 @@ export default function Students() {
                         </span>
                       </td>
 
-                      <td style={{ padding: "12px 10px", fontWeight: 900, color: "#00c4a7" }}>
+                      <td style={{ padding: "12px 10px", fontWeight: 900, color: "#6d28d9" }}>
                         {s.overall_ai_score} / 10
                       </td>
 
@@ -497,21 +497,21 @@ export default function Students() {
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontSize: "10px", fontWeight: 800, color: "#00c4a7", marginBottom: "2px" }}>{s.placement_readiness}</div>
+                        <div style={{ fontSize: "10px", fontWeight: 800, color: "#6d28d9", marginBottom: "2px" }}>{s.placement_readiness}</div>
                         <div style={{ width: "60px", height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", overflow: "hidden" }}>
-                          <div style={{ width: s.placement_readiness, height: "100%", background: "linear-gradient(90deg, #00c4a7, #7c4fe0)" }} />
+                          <div style={{ width: s.placement_readiness, height: "100%", background: "linear-gradient(90deg, #6d28d9, #7c3aed)" }} />
                         </div>
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: s.status === 'Placement Ready' ? 'rgba(0,196,167,0.15)' : s.status === 'Suspended' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: s.status === 'Placement Ready' ? '#00c4a7' : s.status === 'Suspended' ? '#f87171' : '#10b981', fontWeight: 800 }}>
+                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: s.status === 'Placement Ready' ? 'rgba(109,40,217,0.15)' : s.status === 'Suspended' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: s.status === 'Placement Ready' ? '#6d28d9' : s.status === 'Suspended' ? '#f87171' : '#10b981', fontWeight: 800 }}>
                           ● {s.status}
                         </span>
                       </td>
 
                       <td style={{ padding: "12px 10px", textAlign: "right" }}>
                         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => setSelectedStudent(s)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                          <button onClick={() => setSelectedStudent(s)} style={{ background: "#f1f5f9", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                             👁 Details
                           </button>
 
@@ -536,8 +536,8 @@ export default function Students() {
       {/* TAB 2: ANALYTICS & DISTRIBUTION */}
       {activeTab === 'analytics' && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>📊 Candidate Department Distribution</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>📊 Candidate Department Distribution</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
               <div>Computer Science & Eng: <strong>680 Students (48%)</strong></div>
               <div>Information Technology: <strong>320 Students (22%)</strong></div>
@@ -546,10 +546,10 @@ export default function Students() {
             </div>
           </div>
 
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>🎯 Placement Readiness Breakdown</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>🎯 Placement Readiness Breakdown</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
-              <div style={{ color: "#00c4a7" }}>● Tier-1 Ready (&gt;90% Score): <strong>890 Candidates</strong></div>
+              <div style={{ color: "#6d28d9" }}>● Tier-1 Ready (&gt;90% Score): <strong>890 Candidates</strong></div>
               <div style={{ color: "#f59e0b" }}>● Moderate Readiness (70-89% Score): <strong>485 Candidates</strong></div>
               <div style={{ color: "#f87171" }}>● Needs Improvement (&lt;70% Score): <strong>45 Candidates</strong></div>
             </div>
@@ -559,21 +559,21 @@ export default function Students() {
 
       {/* TAB 3: AI INSIGHTS */}
       {activeTab === 'insights' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             💡 AI Placement Insights & High-Performer Leaderboard
           </h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
-            <div style={{ background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "12px", padding: "16px" }}>
-              <div style={{ fontSize: "12px", fontWeight: 800, color: "#00c4a7" }}>🏆 Top Performing Candidates</div>
-              <div style={{ fontSize: "13px", color: "#fff", marginTop: "8px" }}>Anushka Saxena (9.8/10 AI Score, 96% ATS Match)</div>
-              <div style={{ fontSize: "13px", color: "#fff", marginTop: "4px" }}>Sneha Reddy (9.5/10 AI Score, 94% ATS Match)</div>
+            <div style={{ background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "12px", padding: "16px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 800, color: "#6d28d9" }}>🏆 Top Performing Candidates</div>
+              <div style={{ fontSize: "13px", color: "#0f172a", marginTop: "8px" }}>Anushka Saxena (9.8/10 AI Score, 96% ATS Match)</div>
+              <div style={{ fontSize: "13px", color: "#0f172a", marginTop: "4px" }}>Sneha Reddy (9.5/10 AI Score, 94% ATS Match)</div>
             </div>
 
             <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "12px", padding: "16px" }}>
               <div style={{ fontSize: "12px", fontWeight: 800, color: "#f87171" }}>⚠️ Candidates At Risk (Action Recommended)</div>
-              <div style={{ fontSize: "13px", color: "#fff", marginTop: "8px" }}>Vikram Malhotra (Needs practice in Coding Data Structures)</div>
+              <div style={{ fontSize: "13px", color: "#0f172a", marginTop: "8px" }}>Vikram Malhotra (Needs practice in Coding Data Structures)</div>
             </div>
           </div>
         </div>
@@ -581,13 +581,13 @@ export default function Students() {
 
       {/* TAB 4: REPORTS */}
       {activeTab === 'reports' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             📄 Export Institutional Candidate Performance Reports
           </h3>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button onClick={() => handleExportCSV()} style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
+            <button onClick={() => handleExportCSV()} style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
               📥 Download Full Candidate Roster (CSV)
             </button>
           </div>
@@ -597,16 +597,16 @@ export default function Students() {
       {/* 4. STUDENT PROFILE DRAWER */}
       {selectedStudent && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "620px", background: "#0c1220", borderLeft: "1px solid rgba(236,72,153,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#fff", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
+          <div style={{ width: "100%", maxWidth: "620px", background: "#ffffff", borderLeft: "1px solid rgba(236,72,153,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#0f172a", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
             
             {/* DRAWER HEADER */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #cbd5e1", paddingBottom: "16px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #ec4899, #8b5cf6)", color: "#fff", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {selectedStudent.name?.charAt(0) || "S"}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>{selectedStudent.name}</h3>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>{selectedStudent.name}</h3>
                   <div style={{ fontSize: "11px", color: "#94a3b8" }}>{selectedStudent.email} • {selectedStudent.roll_number}</div>
                 </div>
               </div>
@@ -647,26 +647,26 @@ export default function Students() {
                   <div><strong>Academic Year:</strong> {selectedStudent.year || "2026"}</div>
                   <div><strong>Student Roll No:</strong> {selectedStudent.roll_number || "STD-2026-001"}</div>
                   <div><strong>Subscription Plan:</strong> <span style={{ color: selectedStudent.subscription === 'PREMIUM' ? '#c084fc' : '#38bdf8', fontWeight: 800 }}>{selectedStudent.subscription || 'FREE'}</span></div>
-                  <div><strong>LinkedIn:</strong> <a href={selectedStudent.linkedin || "#"} target="_blank" rel="noreferrer" style={{ color: "#00c4a7" }}>Profile Link</a></div>
+                  <div><strong>LinkedIn:</strong> <a href={selectedStudent.linkedin || "#"} target="_blank" rel="noreferrer" style={{ color: "#6d28d9" }}>Profile Link</a></div>
                   <div><strong>GitHub:</strong> <a href={selectedStudent.github || "#"} target="_blank" rel="noreferrer" style={{ color: "#a78bfa" }}>Repositories</a></div>
                 </div>
               )}
 
               {drawerTab === 'performance' && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
-                  <div style={{ background: "rgba(0,196,167,0.1)", border: "1px solid rgba(0,196,167,0.25)", padding: "14px", borderRadius: "10px" }}>
-                    <div style={{ color: "#00c4a7", fontWeight: 900, fontSize: "14px" }}>Overall AI Readiness Score: {selectedStudent.overall_ai_score || "8.5"} / 10</div>
-                    <div style={{ color: "#e2e8f0", marginTop: "6px" }}>ATS Resume Compatibility: <strong>{selectedStudent.ats_score}% Match</strong></div>
-                    <div style={{ color: "#e2e8f0", marginTop: "4px" }}>Placement Readiness Index: <strong>{selectedStudent.placement_readiness}</strong></div>
+                  <div style={{ background: "rgba(109,40,217,0.1)", border: "1px solid rgba(109,40,217,0.25)", padding: "14px", borderRadius: "10px" }}>
+                    <div style={{ color: "#6d28d9", fontWeight: 900, fontSize: "14px" }}>Overall AI Readiness Score: {selectedStudent.overall_ai_score || "8.5"} / 10</div>
+                    <div style={{ color: "#334155", marginTop: "6px" }}>ATS Resume Compatibility: <strong>{selectedStudent.ats_score}% Match</strong></div>
+                    <div style={{ color: "#334155", marginTop: "4px" }}>Placement Readiness Index: <strong>{selectedStudent.placement_readiness}</strong></div>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                    <div style={{ background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px" }}>
+                    <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px" }}>
                       <div style={{ color: "#94a3b8", fontSize: "11px" }}>COMMUNICATION RATING</div>
-                      <div style={{ color: "#fff", fontWeight: 800, fontSize: "13px" }}>4.8 / 5.0 ⭐</div>
+                      <div style={{ color: "#0f172a", fontWeight: 800, fontSize: "13px" }}>4.8 / 5.0 ⭐</div>
                     </div>
-                    <div style={{ background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px" }}>
+                    <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px" }}>
                       <div style={{ color: "#94a3b8", fontSize: "11px" }}>PROBLEM SOLVING</div>
-                      <div style={{ color: "#fff", fontWeight: 800, fontSize: "13px" }}>9.2 / 10.0 💡</div>
+                      <div style={{ color: "#0f172a", fontWeight: 800, fontSize: "13px" }}>9.2 / 10.0 💡</div>
                     </div>
                   </div>
                 </div>
@@ -676,7 +676,7 @@ export default function Students() {
                 <div style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
                   <div style={{ background: "rgba(236,72,153,0.1)", border: "1px solid rgba(236,72,153,0.25)", padding: "14px", borderRadius: "10px" }}>
                     <div style={{ color: "#ec4899", fontWeight: 900, fontSize: "14px" }}>Coding Assessment Score: {selectedStudent.coding_score || 90} / 100</div>
-                    <div style={{ color: "#e2e8f0", marginTop: "6px" }}>Algorithmic Test Pass Rate: <strong>94.2% Passed</strong></div>
+                    <div style={{ color: "#334155", marginTop: "6px" }}>Algorithmic Test Pass Rate: <strong>94.2% Passed</strong></div>
                   </div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {['Data Structures', 'Algorithms', 'Hash Maps', 'Dynamic Programming', 'SQL Queries'].map(tag => (
@@ -690,23 +690,23 @@ export default function Students() {
 
               {drawerTab === 'interviews' && (
                 <div style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div style={{ background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.25)", borderRadius: "10px", padding: "14px" }}>
-                    <div style={{ color: "#00c4a7", fontWeight: 900, fontSize: "14px" }}>🎙 Mock Interview Performance Log</div>
-                    <div style={{ color: "#e2e8f0", fontSize: "11px", marginTop: "4px" }}>Completed AI Sessions: <strong>{selectedStudent.interviews_count || (selectedStudent.interview_history?.length || 0)} Completed</strong></div>
-                    <div style={{ color: "#e2e8f0", fontSize: "11px" }}>Average Performance: <strong>{selectedStudent.overall_ai_score || "8.5"} / 10</strong></div>
+                  <div style={{ background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.25)", borderRadius: "10px", padding: "14px" }}>
+                    <div style={{ color: "#6d28d9", fontWeight: 900, fontSize: "14px" }}>🎙 Mock Interview Performance Log</div>
+                    <div style={{ color: "#334155", fontSize: "11px", marginTop: "4px" }}>Completed AI Sessions: <strong>{selectedStudent.interviews_count || (selectedStudent.interview_history?.length || 0)} Completed</strong></div>
+                    <div style={{ color: "#334155", fontSize: "11px" }}>Average Performance: <strong>{selectedStudent.overall_ai_score || "8.5"} / 10</strong></div>
                   </div>
                   
-                  <div style={{ fontWeight: 800, color: "#fff", marginTop: "4px" }}>📋 Candidate Interview History</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "4px" }}>📋 Candidate Interview History</div>
                   {selectedStudent.interview_history && selectedStudent.interview_history.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {selectedStudent.interview_history.map((sess, idx) => (
-                        <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div key={idx} style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "8px", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                            <div style={{ fontWeight: 800, color: "#fff" }}>{sess.role}</div>
+                            <div style={{ fontWeight: 800, color: "#0f172a" }}>{sess.role}</div>
                             <div style={{ fontSize: "10px", color: "#94a3b8" }}>{sess.id} • {sess.date}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <span style={{ fontSize: "11px", fontWeight: 900, color: "#00c4a7", background: "rgba(0,196,167,0.12)", padding: "3px 10px", borderRadius: "6px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 900, color: "#6d28d9", background: "rgba(109,40,217,0.12)", padding: "3px 10px", borderRadius: "6px" }}>
                               {sess.score} / 10 (Grade {sess.grade})
                             </span>
                           </div>
@@ -714,7 +714,7 @@ export default function Students() {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic", background: "rgba(255,255,255,0.02)", padding: "12px", borderRadius: "8px" }}>
+                    <div style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic", background: "#f8fafc", padding: "12px", borderRadius: "8px" }}>
                       No completed mock interviews recorded yet for this candidate.
                     </div>
                   )}
@@ -725,20 +725,20 @@ export default function Students() {
                 <div style={{ fontSize: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
                   <div style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.25)", borderRadius: "10px", padding: "14px" }}>
                     <div style={{ color: "#a78bfa", fontWeight: 900, fontSize: "14px" }}>📄 ATS Resume Intelligence & Parsing</div>
-                    <div style={{ color: "#e2e8f0", fontSize: "11px", marginTop: "4px" }}>ATS Keyword Match Rate: <strong>{selectedStudent.ats_score}% Match</strong></div>
-                    <div style={{ color: "#e2e8f0", fontSize: "11px" }}>Target Role Compliance: <strong>High Compatibility</strong></div>
+                    <div style={{ color: "#334155", fontSize: "11px", marginTop: "4px" }}>ATS Keyword Match Rate: <strong>{selectedStudent.ats_score}% Match</strong></div>
+                    <div style={{ color: "#334155", fontSize: "11px" }}>Target Role Compliance: <strong>High Compatibility</strong></div>
                   </div>
 
-                  <div style={{ fontWeight: 800, color: "#fff", marginTop: "2px" }}>🎯 Parsed Candidate Skills</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "2px" }}>🎯 Parsed Candidate Skills</div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {(selectedStudent.matched_skills || ['Python', 'JavaScript', 'Data Structures', 'SQL', 'REST APIs', 'System Architecture']).map(skill => (
-                      <span key={skill} style={{ background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", color: "#00c4a7", padding: "4px 10px", borderRadius: "12px", fontSize: "10px", fontWeight: 800 }}>
+                      <span key={skill} style={{ background: "rgba(109,40,217,0.12)", border: "1px solid rgba(109,40,217,0.3)", color: "#6d28d9", padding: "4px 10px", borderRadius: "12px", fontSize: "10px", fontWeight: 800 }}>
                         ✓ {skill}
                       </span>
                     ))}
                   </div>
 
-                  <div style={{ fontWeight: 800, color: "#fff", marginTop: "4px" }}>💡 Recommended Keyword Enhancements</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "4px" }}>💡 Recommended Keyword Enhancements</div>
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {['GraphQL', 'Kubernetes', 'Redis Caching', 'Microservices'].map(rec => (
                       <span key={rec} style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "#f59e0b", padding: "4px 10px", borderRadius: "12px", fontSize: "10px", fontWeight: 800 }}>
@@ -755,17 +755,17 @@ export default function Students() {
                     <div><strong>IP Address:</strong> <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>{selectedStudent.ip_address || "103.15.224.91"}</span></div>
                     <div><strong>Browser & OS:</strong> {selectedStudent.browser || "Chrome 126 (Windows 11)"}</div>
                     <div><strong>Geolocation:</strong> {selectedStudent.location || "Mumbai, India"}</div>
-                    <div><strong>Last Activity:</strong> <span style={{ color: "#00c4a7", fontWeight: 800 }}>{selectedStudent.last_active || "Active 10 mins ago"}</span></div>
+                    <div><strong>Last Activity:</strong> <span style={{ color: "#6d28d9", fontWeight: 800 }}>{selectedStudent.last_active || "Active 10 mins ago"}</span></div>
                   </div>
 
-                  <div style={{ fontWeight: 800, color: "#fff", marginTop: "4px" }}>🔒 Device Telemetry & Audit Trail Logs</div>
+                  <div style={{ fontWeight: 800, color: "#0f172a", marginTop: "4px" }}>🔒 Device Telemetry & Audit Trail Logs</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "11px" }}>
                     {(selectedStudent.telemetry_logs && selectedStudent.telemetry_logs.length > 0 ? selectedStudent.telemetry_logs : [
                       { action: "Google OAuth 2.0 Auth Verified", ip: selectedStudent.ip_address || "103.15.224.91", time: "Recent" },
                       { action: "Encrypted WebRTC Session Started", ip: selectedStudent.ip_address || "103.15.224.91", time: "Recent" }
                     ]).map((log, idx) => (
-                      <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "8px 12px", borderRadius: "6px", color: "#94a3b8", display: "flex", justifyContent: "space-between" }}>
-                        <span>🟢 <strong style={{ color: "#fff" }}>{log.action}</strong> ({log.ip})</span>
+                      <div key={idx} style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "8px 12px", borderRadius: "6px", color: "#94a3b8", display: "flex", justifyContent: "space-between" }}>
+                        <span>🟢 <strong style={{ color: "#0f172a" }}>{log.action}</strong> ({log.ip})</span>
                         <span style={{ color: "#64748b", fontSize: "10px" }}>{log.time}</span>
                       </div>
                     ))}
@@ -782,7 +782,7 @@ export default function Students() {
       {/* BROADCAST ANNOUNCEMENT MODAL */}
       {showBroadcastModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#0f172a" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
@@ -802,7 +802,7 @@ export default function Students() {
                   <select
                     value={broadcastForm.target}
                     onChange={e => setBroadcastForm({ ...broadcastForm, target: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="All Students">All Registered Candidates (1,420)</option>
                     <option value="Premium Students">Premium Plan Students</option>
@@ -816,7 +816,7 @@ export default function Students() {
                   <select
                     value={broadcastForm.priority}
                     onChange={e => setBroadcastForm({ ...broadcastForm, priority: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="Normal">Normal Notification</option>
                     <option value="High">High Priority Banner</option>
@@ -833,7 +833,7 @@ export default function Students() {
                   value={broadcastForm.title}
                   onChange={e => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
                   placeholder="e.g. Google & Amazon National Hiring Drive 2026 Registration Open!"
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -845,7 +845,7 @@ export default function Students() {
                   value={broadcastForm.message}
                   onChange={e => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
                   placeholder="Details regarding mock interview deadlines, new coding tests, or upcoming placement drives..."
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -853,7 +853,7 @@ export default function Students() {
                 <button
                   type="button"
                   onClick={() => setShowBroadcastModal(false)}
-                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
+                  style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#0f172a", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}
                 >
                   Cancel
                 </button>

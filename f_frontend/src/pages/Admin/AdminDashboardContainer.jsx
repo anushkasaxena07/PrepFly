@@ -34,15 +34,6 @@ export default function AdminDashboardContainer() {
       return;
     }
 
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "Light" || savedTheme === "light") {
-      document.documentElement.setAttribute("data-theme", "light");
-      document.body.classList.add("light-mode");
-    } else {
-      document.documentElement.setAttribute("data-theme", "dark");
-      document.body.classList.remove("light-mode");
-    }
-
     try {
       const storedAdmin = localStorage.getItem("admin_user");
       const u = storedAdmin ? JSON.parse(storedAdmin) : (JSON.parse(localStorage.getItem("user") || "{}"));
@@ -120,7 +111,7 @@ export default function AdminDashboardContainer() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#070b14", color: "#f0f4fd" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f6f7fb", color: "#0f172a" }}>
       
       {/* SIDEBAR */}
       <Sidebar 
@@ -133,14 +124,16 @@ export default function AdminDashboardContainer() {
       />
 
       {/* MAIN CONTAINER */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div className="pf-portal-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#f6f7fb" }}>
         
-        {/* NAVBAR */}
+        {/* NAVBAR / COSMIC TOP HEADER */}
         <Navbar activeTab={activeTab} setActiveTab={handleTabChange} admin={admin} organization={organization} />
 
         {/* PAGE CONTENT */}
-        <main style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
-          {renderTabContent()}
+        <main className="pf-body-surface" style={{ flex: 1, padding: "24px 28px 48px", overflowY: "auto", marginTop: "-14px" }}>
+          <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+            {renderTabContent()}
+          </div>
         </main>
       </div>
 

@@ -198,7 +198,7 @@ export default function Admins() {
       {/* 1. HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             👔 Global Organization Administration Center
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
@@ -210,14 +210,14 @@ export default function Admins() {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={() => setShowInviteModal(true)}
-            style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,196,167,0.3)" }}
+            style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,40,217,0.3)" }}
           >
             ➕ Invite Admin
           </button>
           
           <button
             onClick={() => handleExportCSV()}
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "9px 14px", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "9px 14px", color: "#0f172a", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
           >
             📤 Export Admin List
           </button>
@@ -234,61 +234,61 @@ export default function Admins() {
       {/* 2. 10 TOP KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "14px" }}>
         
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ADMINS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{admins.length} Directors</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +12.5% MoM</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE ADMINS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>16 Active</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 88.8% Operational</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ONLINE NOW</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>6 Online 🟢</div>
-          <div style={{ fontSize: "10px", color: "#00c4a7", marginTop: "2px", fontWeight: 700 }}>Real-time Sessions</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>6 Online 🟢</div>
+          <div style={{ fontSize: "10px", color: "#6d28d9", marginTop: "2px", fontWeight: 700 }}>Real-time Sessions</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>SUSPENDED ADMINS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>1 Suspended</div>
           <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>🔒 Policy Enforcement</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PENDING INVITATIONS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>1 Pending</div>
           <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>✉️ Awaiting Acceptance</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ORGS MANAGED</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>14 Institutions</div>
           <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>10 Colleges | 4 Corp</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>FAILED LOGINS TODAY</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>0 Failures</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>🛡️ 100% Security SLA</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PASSWORD RESETS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>4 This Month</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Self-service Dispatched</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVG ACTIVITY SCORE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>94.2 / 100</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>94.2 / 100</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>High Placement Growth</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RECENTLY ADDED</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>+2 This Week</div>
           <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>Onboarded Successfully</div>
@@ -297,7 +297,7 @@ export default function Admins() {
       </div>
 
       {/* 3. SUB-NAVIGATION TABS */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e5e8f2", paddingBottom: "10px", flexWrap: "wrap" }}>
         {[
           { id: 'directory', label: '👔 Admin Directory (Table View)' },
           { id: 'analytics', label: '📊 Admin Activity & Login Trends' },
@@ -308,7 +308,7 @@ export default function Admins() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{
-              background: activeTab === t.id ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+              background: activeTab === t.id ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
               border: 'none',
               borderRadius: '8px',
               padding: '9px 16px',
@@ -336,20 +336,20 @@ export default function Admins() {
                 placeholder="🔍 Search name, email, employee ID, organization..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ minWidth: "260px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", fontSize: "12px", outline: "none" }}
+                style={{ minWidth: "260px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "12px", outline: "none" }}
               />
 
-              <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Organizations</option>
                 {uniqueOrgs.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
 
-              <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Roles</option>
                 {uniqueRoles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
 
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Statuses</option>
                 <option value="Active">Active</option>
                 <option value="Online 🟢">Online 🟢</option>
@@ -364,13 +364,13 @@ export default function Admins() {
 
           {/* BULK FLOATING ACTION BAR */}
           {selectedIds.length > 0 && (
-            <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(0,196,167,0.15))", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>
+            <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(109,40,217,0.15))", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>
                 🎯 {selectedIds.length} administrator(s) selected
               </div>
 
               <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => handleBulkAction('reset_pass')} style={{ background: "rgba(0,196,167,0.2)", border: "1px solid #00c4a7", color: "#00c4a7", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                <button onClick={() => handleBulkAction('reset_pass')} style={{ background: "rgba(109,40,217,0.2)", border: "1px solid #6d28d9", color: "#6d28d9", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                   🔑 Reset Passwords
                 </button>
                 
@@ -390,11 +390,11 @@ export default function Admins() {
           )}
 
           {/* ADMIN MANAGEMENT TABLE */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px", width: "30px" }}>
                       <input type="checkbox" onChange={handleSelectAll} checked={filteredAdmins.length > 0 && selectedIds.length === filteredAdmins.length} />
                     </th>
@@ -411,14 +411,14 @@ export default function Admins() {
                 </thead>
                 <tbody>
                   {filteredAdmins.map(a => (
-                    <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <tr key={a.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
                       <td style={{ padding: "12px 10px" }}>
                         <input type="checkbox" checked={selectedIds.includes(a.id)} onChange={() => handleToggleSelect(a.id)} />
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontWeight: 900, color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-                          <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "#fff", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {a.name?.charAt(0) || "A"}
                           </div>
                           <div>
@@ -428,12 +428,12 @@ export default function Admins() {
                         </div>
                       </td>
 
-                      <td style={{ padding: "12px 10px", color: "#00c4a7", fontFamily: "monospace", fontWeight: 800 }}>
+                      <td style={{ padding: "12px 10px", color: "#6d28d9", fontFamily: "monospace", fontWeight: 800 }}>
                         {a.employee_id}
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontWeight: 800, color: "#fff" }}>{a.organization_name}</div>
+                        <div style={{ fontWeight: 800, color: "#0f172a" }}>{a.organization_name}</div>
                         <div style={{ fontSize: "10px", color: "#a78bfa", fontWeight: 700 }}>{a.organization_type}</div>
                       </td>
 
@@ -444,11 +444,11 @@ export default function Admins() {
                         <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px" }}>{a.permission_level}</div>
                       </td>
 
-                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#fff" }}>
+                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#0f172a" }}>
                         {a.students_managed}
                       </td>
 
-                      <td style={{ padding: "12px 10px", color: "#00c4a7", fontWeight: 800 }}>
+                      <td style={{ padding: "12px 10px", color: "#6d28d9", fontWeight: 800 }}>
                         {a.active_drives} Active
                       </td>
 
@@ -457,18 +457,18 @@ export default function Admins() {
                       </td>
 
                       <td style={{ padding: "12px 10px" }}>
-                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: a.status.includes('Online') ? 'rgba(0,196,167,0.15)' : a.status === 'Suspended' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: a.status.includes('Online') ? '#00c4a7' : a.status === 'Suspended' ? '#f87171' : '#10b981', fontWeight: 800 }}>
+                        <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: a.status.includes('Online') ? 'rgba(109,40,217,0.15)' : a.status === 'Suspended' ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)', color: a.status.includes('Online') ? '#6d28d9' : a.status === 'Suspended' ? '#f87171' : '#10b981', fontWeight: 800 }}>
                           {a.status}
                         </span>
                       </td>
 
                       <td style={{ padding: "12px 10px", textAlign: "right" }}>
                         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => setSelectedAdmin(a)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                          <button onClick={() => setSelectedAdmin(a)} style={{ background: "#f1f5f9", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                             👁 Details
                           </button>
 
-                          <button onClick={() => handleSingleResetPass(a.email)} style={{ background: "rgba(0,196,167,0.15)", border: "none", color: "#00c4a7", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                          <button onClick={() => handleSingleResetPass(a.email)} style={{ background: "rgba(109,40,217,0.15)", border: "none", color: "#6d28d9", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                             🔑 Reset Pass
                           </button>
 
@@ -489,18 +489,18 @@ export default function Admins() {
       {/* TAB 2: ANALYTICS & ACTIVITY CHARTS */}
       {activeTab === 'analytics' && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>📊 Administrators by Organization Type</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>📊 Administrators by Organization Type</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
               <div>Academic Institutions (Colleges): <strong>14 Admins (78%)</strong></div>
               <div>Corporate Enterprises (Recruiters): <strong>4 Admins (22%)</strong></div>
             </div>
           </div>
 
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>⚡ Admin Activity SLA Scores</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>⚡ Admin Activity SLA Scores</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
-              <div style={{ color: "#00c4a7" }}>● High Engagement (&gt;90 Activity Score): <strong>14 Admins</strong></div>
+              <div style={{ color: "#6d28d9" }}>● High Engagement (&gt;90 Activity Score): <strong>14 Admins</strong></div>
               <div style={{ color: "#f59e0b" }}>● Moderate Activity (70-89 Score): <strong>3 Admins</strong></div>
               <div style={{ color: "#f87171" }}>● Inactive / Suspended (&lt;70 Score): <strong>1 Admin</strong></div>
             </div>
@@ -510,20 +510,20 @@ export default function Admins() {
 
       {/* TAB 3: SECURITY OPERATIONS */}
       {activeTab === 'security' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             🛡️ Enterprise Multi-Factor Authentication & Access Control (Okta SLA)
           </h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px", fontSize: "12px" }}>
             <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "10px", padding: "14px" }}>
               <div style={{ fontWeight: 800, color: "#10b981" }}>MFA Enforcement</div>
-              <div style={{ color: "#fff", marginTop: "4px" }}>Strict TOTP Authenticator Enabled</div>
+              <div style={{ color: "#0f172a", marginTop: "4px" }}>Strict TOTP Authenticator Enabled</div>
             </div>
 
-            <div style={{ background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "10px", padding: "14px" }}>
-              <div style={{ fontWeight: 800, color: "#00c4a7" }}>Session Timeout</div>
-              <div style={{ color: "#fff", marginTop: "4px" }}>Auto-expire after 60 mins idle</div>
+            <div style={{ background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "10px", padding: "14px" }}>
+              <div style={{ fontWeight: 800, color: "#6d28d9" }}>Session Timeout</div>
+              <div style={{ color: "#0f172a", marginTop: "4px" }}>Auto-expire after 60 mins idle</div>
             </div>
           </div>
         </div>
@@ -533,19 +533,19 @@ export default function Admins() {
       {activeTab === 'insights' && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOP PERFORMING ADMIN</div>
-              <div style={{ fontSize: "18px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>Dr. Robert Chen</div>
+              <div style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>Dr. Robert Chen</div>
               <div style={{ fontSize: "11px", color: "#94a3b8" }}>MIT School of Computing • 98.4 Rating</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL PLACEMENT DRIVES</div>
               <div style={{ fontSize: "18px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>48 Campus Drives</div>
               <div style={{ fontSize: "11px", color: "#10b981" }}>▲ +18% Active Participation</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>CANDIDATE OFFER RATE</div>
               <div style={{ fontSize: "18px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>84.2% Success Rate</div>
               <div style={{ fontSize: "11px", color: "#10b981" }}>High AI Practice Engagement</div>
@@ -553,15 +553,15 @@ export default function Admins() {
           </div>
 
           {/* ADMIN LEADERBOARD TABLE */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
               💡 Organization Administrator Performance Leaderboard
             </h3>
 
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px" }}>Administrator</th>
                     <th style={{ padding: "10px" }}>Organization</th>
                     <th style={{ padding: "10px" }}>Students Onboarded</th>
@@ -572,12 +572,12 @@ export default function Admins() {
                 </thead>
                 <tbody>
                   {admins.map((a, idx) => (
-                    <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#fff" }}>
+                    <tr key={a.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
+                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#0f172a" }}>
                         #{idx + 1} {a.name} ({a.designation || 'Director'})
                       </td>
-                      <td style={{ padding: "12px 10px", color: "#00c4a7" }}>{a.organization_name}</td>
-                      <td style={{ padding: "12px 10px", color: "#fff" }}>{a.students_managed || 120} Students</td>
+                      <td style={{ padding: "12px 10px", color: "#6d28d9" }}>{a.organization_name}</td>
+                      <td style={{ padding: "12px 10px", color: "#0f172a" }}>{a.students_managed || 120} Students</td>
                       <td style={{ padding: "12px 10px", color: "#a78bfa" }}>{a.active_drives || 3} Drives</td>
                       <td style={{ padding: "12px 10px", color: "#10b981", fontWeight: 800 }}>8.4 / 10</td>
                       <td style={{ padding: "12px 10px" }}>
@@ -597,16 +597,16 @@ export default function Admins() {
       {/* 4. ADMIN PROFILE DRAWER */}
       {selectedAdmin && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "620px", background: "#0c1220", borderLeft: "1px solid rgba(139,92,246,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#fff", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
+          <div style={{ width: "100%", maxWidth: "620px", background: "#ffffff", borderLeft: "1px solid rgba(139,92,246,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#0f172a", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
             
             {/* DRAWER HEADER */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #cbd5e1", paddingBottom: "16px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", color: "#fff", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "#fff", fontSize: "16px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {selectedAdmin.name?.charAt(0) || "A"}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>{selectedAdmin.name}</h3>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>{selectedAdmin.name}</h3>
                   <div style={{ fontSize: "11px", color: "#94a3b8" }}>{selectedAdmin.designation} • {selectedAdmin.employee_id}</div>
                 </div>
               </div>
@@ -655,7 +655,7 @@ export default function Admins() {
               {drawerTab === 'permissions' && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
                   {Object.keys(selectedAdmin.permissions || {}).map(pKey => (
-                    <div key={pKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "6px" }}>
+                    <div key={pKey} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "10px", borderRadius: "6px" }}>
                       <span style={{ textTransform: "capitalize" }}>{pKey.replace(/_/g, " ")}</span>
                       <span style={{ color: "#10b981", fontWeight: 800 }}>Enabled ✓</span>
                     </div>
@@ -685,7 +685,7 @@ export default function Admins() {
       {/* 5. INVITE ADMIN MODAL */}
       {showInviteModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#0f172a" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
@@ -698,26 +698,26 @@ export default function Admins() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>FULL NAME *</label>
-                  <input type="text" required value={inviteForm.name} onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Dr. Sarah Connor" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }} />
+                  <input type="text" required value={inviteForm.name} onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Dr. Sarah Connor" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }} />
                 </div>
 
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>EMAIL ADDRESS *</label>
-                  <input type="email" required value={inviteForm.email} onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="admin@stanford.edu" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }} />
+                  <input type="email" required value={inviteForm.email} onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="admin@stanford.edu" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }} />
                 </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>INSTITUTION / COMPANY *</label>
-                  <select value={inviteForm.organization_id} onChange={e => setInviteForm({ ...inviteForm, organization_id: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", outline: "none" }}>
+                  <select value={inviteForm.organization_id} onChange={e => setInviteForm({ ...inviteForm, organization_id: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", outline: "none" }}>
                     {uniqueOrgs.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </div>
 
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>ROLE & PERMISSION LEVEL</label>
-                  <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", outline: "none" }}>
+                  <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", outline: "none" }}>
                     <option value="Organization Admin">Organization Admin</option>
                     <option value="Placement Director">Placement Director</option>
                     <option value="Recruiter Admin">Corporate Recruiter</option>
@@ -728,12 +728,12 @@ export default function Admins() {
 
               <div>
                 <label style={{ display: "block", color: "#94a3b8", fontWeight: 700, marginBottom: "4px" }}>DESIGNATION / JOB TITLE</label>
-                <input type="text" value={inviteForm.designation} onChange={e => setInviteForm({ ...inviteForm, designation: e.target.value })} placeholder="e.g. Dean of Placement & Corporate Relations" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }} />
+                <input type="text" value={inviteForm.designation} onChange={e => setInviteForm({ ...inviteForm, designation: e.target.value })} placeholder="e.g. Dean of Placement & Corporate Relations" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }} />
               </div>
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
                 <button type="button" onClick={() => setShowInviteModal(false)} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
-                <button type="submit" style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Send Official Invitation</button>
+                <button type="submit" style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Send Official Invitation</button>
               </div>
             </form>
           </div>
@@ -743,7 +743,7 @@ export default function Admins() {
       {/* 6. SECURITY AUDIT MODAL */}
       {showSecurityModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "580px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "580px", width: "100%", color: "#0f172a" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
@@ -758,13 +758,13 @@ export default function Admins() {
                 <div style={{ color: "#94a3b8", marginTop: "4px" }}>All 18 active organization administrators have mandatory TOTP Authenticator enabled.</div>
               </div>
 
-              <div style={{ background: "rgba(0,196,167,0.08)", border: "1px solid rgba(0,196,167,0.2)", padding: "14px", borderRadius: "10px" }}>
-                <div style={{ fontWeight: 800, color: "#00c4a7" }}>🛡️ Login Telemetry & Zero Brute-Force Violations</div>
+              <div style={{ background: "rgba(109,40,217,0.08)", border: "1px solid rgba(109,40,217,0.2)", padding: "14px", borderRadius: "10px" }}>
+                <div style={{ fontWeight: 800, color: "#6d28d9" }}>🛡️ Login Telemetry & Zero Brute-Force Violations</div>
                 <div style={{ color: "#94a3b8", marginTop: "4px" }}>0 failed authentication attempts detected in the past 24 hours. Automated IP Rate-limiting active.</div>
               </div>
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "10px" }}>
-                <button onClick={() => alert("✅ Full platform security audit completed. All accounts compliant.")} style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
+                <button onClick={() => alert("✅ Full platform security audit completed. All accounts compliant.")} style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
                   Run Automated Security Scan
                 </button>
               </div>

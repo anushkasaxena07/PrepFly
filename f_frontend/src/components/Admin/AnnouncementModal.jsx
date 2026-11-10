@@ -20,7 +20,7 @@ export default function AnnouncementModal({ isOpen, onClose, onSend }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-      <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "100%", color: "#fff", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "100%", color: "#0f172a", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>📢 Dispatch Announcement</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text2)", fontSize: "18px", cursor: "pointer" }}>✕</button>
@@ -35,7 +35,7 @@ export default function AnnouncementModal({ isOpen, onClose, onSend }) {
               value={form.title} 
               onChange={e => setForm({ ...form, title: e.target.value })} 
               placeholder="e.g. Mandatory Placement Assessment Drive"
-              style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }}
+              style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }}
             />
           </div>
 
@@ -47,7 +47,7 @@ export default function AnnouncementModal({ isOpen, onClose, onSend }) {
               value={form.message} 
               onChange={e => setForm({ ...form, message: e.target.value })} 
               placeholder="Enter announcement details..."
-              style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }}
+              style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }}
             />
           </div>
 
@@ -57,7 +57,7 @@ export default function AnnouncementModal({ isOpen, onClose, onSend }) {
               <select 
                 value={form.target_dept} 
                 onChange={e => setForm({ ...form, target_dept: e.target.value })}
-                style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+                style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
               >
                 <option value="All Departments">All Departments</option>
                 <option value="Computer Science">Computer Science</option>
@@ -72,7 +72,7 @@ export default function AnnouncementModal({ isOpen, onClose, onSend }) {
               <select 
                 value={form.target_sem} 
                 onChange={e => setForm({ ...form, target_sem: e.target.value })}
-                style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+                style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
               >
                 <option value="All Semesters">All Semesters</option>
                 <option value="Sem 2">Sem 2</option>

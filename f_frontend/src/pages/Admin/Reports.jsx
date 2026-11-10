@@ -74,7 +74,7 @@ export default function Reports() {
       {/* PAGE HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0 }}>📊 Executive Reports & Placement Intelligence</h2>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0 }}>📊 Executive Reports & Placement Intelligence</h2>
           <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Actionable candidate performance metrics, skill gap analysis, company target readiness, and multi-format report exports for CS Department.</p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function Reports() {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "12px" }}>
               {(reportsData?.ai_insights || []).map((insight, idx) => (
-                <div key={idx} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "12px 14px", borderRadius: "10px", fontSize: "12px", color: "#e2e8f0", lineHeight: "1.5" }}>
+                <div key={idx} style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "12px 14px", borderRadius: "10px", fontSize: "12px", color: "#334155", lineHeight: "1.5" }}>
                   📌 {insight}
                 </div>
               ))}
@@ -104,39 +104,39 @@ export default function Reports() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
             
             {/* OVERALL READINESS */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.25)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.25)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--cyan)", textTransform: "uppercase" }}>BATCH PLACEMENT READINESS</div>
-              <div style={{ fontSize: "32px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>
+              <div style={{ fontSize: "32px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>
                 {reportsData?.placement_readiness_pct || 84}%
               </div>
               <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "4px" }}>Cohort Average Placement Index</div>
             </div>
 
             {/* PLACEMENT PREDICTION */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--purple)", textTransform: "uppercase" }}>PLACEMENT PREDICTION</div>
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#00c4a7" }}>{reportsData?.tier_distribution?.ready || 124}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Ready</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.tier_distribution?.ready || 124}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Ready</span></div>
                 <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ffb800" }}>{reportsData?.tier_distribution?.needs_improvement || 65}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Improve</span></div>
                 <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ff4d4f" }}>{reportsData?.tier_distribution?.high_risk || 18}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>At Risk</span></div>
               </div>
             </div>
 
             {/* COMPANY READINESS */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#ffb800", textTransform: "uppercase" }}>TARGET COMPANY ALIGNMENT</div>
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
                 <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#a855f7" }}>{reportsData?.company_readiness?.maang_product_ready || 32}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>MAANG</span></div>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#00c4a7" }}>{reportsData?.company_readiness?.tcs_infosys_service_ready || 410}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Tech Enterprise</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.company_readiness?.tcs_infosys_service_ready || 410}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Tech Enterprise</span></div>
               </div>
             </div>
 
             {/* RESUME QUALITY */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#a855f7", textTransform: "uppercase" }}>RESUME QUALITY DIST.</div>
               <div style={{ display: "flex", gap: "10px", marginTop: "8px", fontSize: "11px" }}>
 
-                <span style={{ color: "#00c4a7", fontWeight: 800 }}>{reportsData?.resume_distribution?.excellent || 60} Exc</span>
+                <span style={{ color: "#6d28d9", fontWeight: 800 }}>{reportsData?.resume_distribution?.excellent || 60} Exc</span>
                 <span style={{ color: "#ffb800", fontWeight: 800 }}>{reportsData?.resume_distribution?.good || 180} Good</span>
                 <span style={{ color: "#ff4d4f", fontWeight: 800 }}>{reportsData?.resume_distribution?.needs_improvement || 260} Imp</span>
               </div>
@@ -148,17 +148,17 @@ export default function Reports() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
             
             {/* WEAK SUBJECT AREAS */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "14px" }}>⚠️ Primary Concept & Skill Bottlenecks</h3>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>⚠️ Primary Concept & Skill Bottlenecks</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {(reportsData?.weak_skills || []).map((sk, idx) => (
-                  <div key={idx} style={{ background: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "10px" }}>
+                  <div key={idx} style={{ background: "#f8fafc", padding: "12px", borderRadius: "10px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
-                      <strong style={{ color: "#fff" }}>{sk.subject}</strong>
+                      <strong style={{ color: "#0f172a" }}>{sk.subject}</strong>
                       <span style={{ color: sk.fail_rate > 40 ? "#ff4d4f" : "#ffb800", fontWeight: 800 }}>{sk.fail_rate}% Fail Rate ({sk.avg_score}% Avg)</span>
                     </div>
                     <div style={{ height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: `${sk.avg_score}%`, height: "100%", background: sk.avg_score < 50 ? "#ff4d4f" : sk.avg_score < 70 ? "#ffb800" : "#00c4a7" }} />
+                      <div style={{ width: `${sk.avg_score}%`, height: "100%", background: sk.avg_score < 50 ? "#ff4d4f" : sk.avg_score < 70 ? "#ffb800" : "#6d28d9" }} />
                     </div>
                   </div>
                 ))}
@@ -166,22 +166,22 @@ export default function Reports() {
             </div>
 
             {/* AI INTERVIEW & CODING BREAKDOWN */}
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "14px" }}>🎤 AI Interview & Coding Sub-Metrics</h3>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+              <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>🎤 AI Interview & Coding Sub-Metrics</h3>
               
               <div style={{ fontSize: "12px", color: "var(--cyan)", fontWeight: 700, marginBottom: "8px" }}>AI INTERVIEW SCORECARD</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "10px", fontSize: "11px", marginBottom: "14px" }}>
-                <div>Tech: <strong style={{ color: "#00c4a7" }}>{reportsData?.interview_breakdown?.technical}%</strong></div>
+                <div>Tech: <strong style={{ color: "#6d28d9" }}>{reportsData?.interview_breakdown?.technical}%</strong></div>
                 <div>Comm: <strong style={{ color: "#a855f7" }}>{reportsData?.interview_breakdown?.communication}%</strong></div>
                 <div>Conf: <strong style={{ color: "#ffb800" }}>{reportsData?.interview_breakdown?.confidence}%</strong></div>
-                <div>Grammar: <span style={{ color: "#fff" }}>{reportsData?.interview_breakdown?.grammar}%</span></div>
-                <div>Eye Contact: <span style={{ color: "#fff" }}>{reportsData?.interview_breakdown?.eye_contact}%</span></div>
-                <div>Voice Clarity: <span style={{ color: "#fff" }}>{reportsData?.interview_breakdown?.voice_clarity}%</span></div>
+                <div>Grammar: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.grammar}%</span></div>
+                <div>Eye Contact: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.eye_contact}%</span></div>
+                <div>Voice Clarity: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.voice_clarity}%</span></div>
               </div>
 
               <div style={{ fontSize: "12px", color: "#ffb800", fontWeight: 700, marginBottom: "8px" }}>CODING DIFFICULTY BREAKDOWN</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "10px", fontSize: "11px" }}>
-                <div>Easy: <strong style={{ color: "#00c4a7" }}>{reportsData?.coding_breakdown?.easy_pass}%</strong></div>
+                <div>Easy: <strong style={{ color: "#6d28d9" }}>{reportsData?.coding_breakdown?.easy_pass}%</strong></div>
                 <div>Medium: <strong style={{ color: "#ffb800" }}>{reportsData?.coding_breakdown?.medium_pass}%</strong></div>
                 <div>Hard: <strong style={{ color: "#ff4d4f" }}>{reportsData?.coding_breakdown?.hard_pass}%</strong></div>
               </div>
@@ -190,10 +190,10 @@ export default function Reports() {
           </div>
 
           {/* CANDIDATE PLACEMENT READINESS SCORE MATRIX TABLE */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
               <div>
-                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", margin: 0 }}>📋 Student Placement Readiness Score Matrix</h3>
+                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: 0 }}>📋 Student Placement Readiness Score Matrix</h3>
                 <p style={{ fontSize: "11px", color: "var(--text2)", margin: "2px 0 0 0" }}>Multi-dimensional candidate ratings across Resume, DSA, Technical, HR, and Coding assessments.</p>
               </div>
 
@@ -202,14 +202,14 @@ export default function Reports() {
                 placeholder="🔍 Search student name or roll..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                style={{ background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "6px 12px", color: "#fff", fontSize: "12px", width: "240px" }}
+                style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "6px 12px", color: "#0f172a", fontSize: "12px", width: "240px" }}
               />
             </div>
 
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "var(--text2)", fontSize: "10px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "var(--text2)", fontSize: "10px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px 8px" }}>Candidate</th>
                     <th style={{ padding: "10px 8px" }}>Roll No</th>
                     <th style={{ padding: "10px 8px" }}>Resume</th>
@@ -224,15 +224,15 @@ export default function Reports() {
                 </thead>
                 <tbody>
                   {filteredStudents.map(st => (
-                    <tr key={st.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      <td style={{ padding: "10px 8px", fontWeight: 800, color: "#fff" }}>{st.name}</td>
+                    <tr key={st.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
+                      <td style={{ padding: "10px 8px", fontWeight: 800, color: "#0f172a" }}>{st.name}</td>
                       <td style={{ padding: "10px 8px", color: "var(--text2)" }}>{st.roll_number}</td>
                       <td style={{ padding: "10px 8px" }}>{st.resume}%</td>
                       <td style={{ padding: "10px 8px" }}>{st.dsa}%</td>
                       <td style={{ padding: "10px 8px" }}>{st.technical}%</td>
                       <td style={{ padding: "10px 8px" }}>{st.hr}%</td>
                       <td style={{ padding: "10px 8px", color: "var(--cyan)", fontWeight: 700 }}>{st.coding}%</td>
-                      <td style={{ padding: "10px 8px", fontWeight: 900, color: st.overall >= 78 ? "#00c4a7" : st.overall >= 60 ? "#ffb800" : "#ff4d4f" }}>{st.overall}%</td>
+                      <td style={{ padding: "10px 8px", fontWeight: 900, color: st.overall >= 78 ? "#6d28d9" : st.overall >= 60 ? "#ffb800" : "#ff4d4f" }}>{st.overall}%</td>
                       <td style={{ padding: "10px 8px" }}>
                         <span className={`pill ${st.status === "Ready" ? "pill-cyan" : st.status === "Needs Improvement" ? "pill-purple" : "pill-pink"}`} style={{ fontSize: "9px" }}>
                           ● {st.status}
@@ -251,10 +251,10 @@ export default function Reports() {
           </div>
 
           {/* CUSTOM EXECUTIVE REPORT GENERATOR SUITE */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "16px", padding: "24px" }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "16px", padding: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div>
-                <h3 style={{ fontSize: "17px", fontWeight: 900, color: "#fff", margin: 0 }}>⚙️ Custom Executive Report Generator Suite</h3>
+                <h3 style={{ fontSize: "17px", fontWeight: 900, color: "#0f172a", margin: 0 }}>⚙️ Custom Executive Report Generator Suite</h3>
                 <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Select specific analytical modules and export as PDF, Excel, CSV, or direct email to HOD & faculty.</p>
               </div>
 
@@ -282,8 +282,8 @@ export default function Reports() {
                     key={rep.id} 
                     onClick={() => handleToggleModule(rep.id)}
                     style={{ 
-                      background: isChecked ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.02)", 
-                      border: isChecked ? "1px solid #7c3aed" : "1px solid rgba(255,255,255,0.06)", 
+                      background: isChecked ? "rgba(124,58,237,0.15)" : "#f8fafc", 
+                      border: isChecked ? "1px solid #7c3aed" : "1px solid #e5e8f2", 
                       borderRadius: "12px", 
                       padding: "14px", 
                       cursor: "pointer",
@@ -297,7 +297,7 @@ export default function Reports() {
                         onChange={() => {}} 
                         style={{ cursor: "pointer", accentColor: "#7c3aed" }} 
                       />
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>{rep.name}</span>
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>{rep.name}</span>
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--text2)", paddingLeft: "24px", lineHeight: "1.4" }}>
                       {rep.description}
@@ -308,7 +308,7 @@ export default function Reports() {
             </div>
 
             {/* EXPORT ACTION BUTTONS */}
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", flexWrap: "wrap", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px" }}>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", flexWrap: "wrap", borderTop: "1px solid #e5e8f2", paddingTop: "16px" }}>
               <button 
                 className="btn btn-ghost" 
                 onClick={() => handleGenerate("pdf")}
@@ -331,7 +331,7 @@ export default function Reports() {
                 className="btn btn-primary" 
                 onClick={() => handleGenerate("csv")}
                 disabled={exportingFormat === "csv"}
-                style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", fontWeight: 800 }}
+                style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", fontWeight: 800 }}
               >
                 📈 Download CSV Dataset
               </button>

@@ -29,7 +29,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-      <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#fff", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "16px", padding: "24px", maxWidth: "540px", width: "100%", color: "#0f172a", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>
             {student?.id ? "✏️ Edit Student Record" : "🎓 Add New Student"}
@@ -45,7 +45,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
               required
               value={form.name} 
               onChange={e => setForm({ ...form, name: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }}
+              style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }}
             />
           </div>
 
@@ -56,7 +56,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
               required
               value={form.roll_number} 
               onChange={e => setForm({ ...form, roll_number: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }}
+              style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }}
             />
           </div>
 
@@ -67,7 +67,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
               required
               value={form.email} 
               onChange={e => setForm({ ...form, email: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }}
+              style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }}
             />
           </div>
 
@@ -76,7 +76,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
             <select 
               value={form.department} 
               onChange={e => setForm({ ...form, department: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+              style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
             >
               <option value="Computer Science">Computer Science</option>
               <option value="Information Tech">Information Tech</option>
@@ -90,7 +90,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
             <select 
               value={form.semester} 
               onChange={e => setForm({ ...form, semester: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+              style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
             >
               <option value="Sem 2">Sem 2</option>
               <option value="Sem 4">Sem 4</option>
@@ -104,7 +104,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
             <select 
               value={form.subscription} 
               onChange={e => setForm({ ...form, subscription: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+              style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
             >
               <option value="FREE">FREE</option>
               <option value="PREMIUM">PREMIUM</option>
@@ -116,7 +116,7 @@ export default function StudentModal({ student, isOpen, onClose, onSave }) {
             <select 
               value={form.status} 
               onChange={e => setForm({ ...form, status: e.target.value })} 
-              style={{ width: "100%", background: "#141d30", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}
+              style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}
             >
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>

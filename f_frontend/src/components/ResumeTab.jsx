@@ -182,8 +182,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
         {/* Header */}
         <div className="sec-header mb16" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: "4px" }}>PREPFLY ADVANCED RESUME SUITE</div>
-            <h1 className="sec-title" style={{ fontSize: "24px", fontWeight: 900, color: "#fff", margin: 0 }}>Resume AI Platform</h1>
+            <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: "4px" }}>PREPFLY ADVANCED RESUME SUITE</div>
+            <h1 className="sec-title" style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", margin: 0 }}>Resume AI Platform</h1>
           </div>
           <div style={{ display: "flex", gap: "8px" }}>
             <span className="pill pill-cyan">ATS Optimizer</span>
@@ -192,16 +192,16 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
         </div>
 
         {/* ── RESUME AI MODE SELECTOR ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "rgba(255,255,255,0.03)", padding: "6px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#eaedf6", padding: "6px", borderRadius: "16px", border: "1px solid #d5dbe9", marginBottom: "24px" }}>
           <button
             type="button"
             onClick={() => setActiveMode("score")}
             style={{
               padding: "12px 18px",
               borderRadius: "12px",
-              border: activeMode === "score" ? "1.5px solid #00c4a7" : "1px solid transparent",
-              background: activeMode === "score" ? "linear-gradient(135deg, rgba(0,196,167,0.2), rgba(124,58,237,0.15))" : "transparent",
-              color: activeMode === "score" ? "#00c4a7" : "#94a3b8",
+              border: activeMode === "score" ? "1px solid #6d28d9" : "1px solid transparent",
+              background: activeMode === "score" ? "#ffffff" : "transparent",
+              color: activeMode === "score" ? "#6d28d9" : "#475569",
               fontWeight: 800,
               fontSize: "13px",
               cursor: "pointer",
@@ -209,11 +209,11 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
+              boxShadow: activeMode === "score" ? "0 2px 8px rgba(109,40,217,0.12)" : "none",
               transition: "all 0.2s"
             }}
           >
-            <span style={{ fontSize: "16px" }}>📊</span>
-            <span>Option 1: ATS Resume Score & Keyword Match</span>
+            <span>Option 1: ATS Resume Score &amp; Keyword Match</span>
           </button>
 
           <button
@@ -222,9 +222,9 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
             style={{
               padding: "12px 18px",
               borderRadius: "12px",
-              border: activeMode === "improve" ? "1.5px solid #a78bfa" : "1px solid transparent",
-              background: activeMode === "improve" ? "linear-gradient(135deg, rgba(167,139,250,0.2), rgba(0,196,167,0.15))" : "transparent",
-              color: activeMode === "improve" ? "#a78bfa" : "#94a3b8",
+              border: activeMode === "improve" ? "1px solid #6d28d9" : "1px solid transparent",
+              background: activeMode === "improve" ? "#ffffff" : "transparent",
+              color: activeMode === "improve" ? "#6d28d9" : "#475569",
               fontWeight: 800,
               fontSize: "13px",
               cursor: "pointer",
@@ -232,31 +232,31 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
+              boxShadow: activeMode === "improve" ? "0 2px 8px rgba(109,40,217,0.12)" : "none",
               transition: "all 0.2s"
             }}
           >
-            <span style={{ fontSize: "16px" }}>✨</span>
-            <span>Option 2: AI Resume Improvement & Rewrite [ATS Optimized]</span>
+            <span>Option 2: AI Resume Improvement &amp; Rewrite</span>
           </button>
         </div>
 
         {/* INPUT PANEL */}
         <div className="g2 mb20" id="resume-input-panel">
           {/* Resume text */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
-            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#fff" }}>Your Current Resume</div>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "20px", padding: "24px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#0f172a" }}>Your Current Resume</div>
             <div className="text-xs text-muted mb12">Paste your resume content below or upload your PDF file</div>
             <textarea 
               id="resume-text-input" 
-              className="code-area" 
-              style={{ minHeight: "240px", fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "14px", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }} 
+              className="form-input" 
+              style={{ minHeight: "240px", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "#f8fafc", borderRadius: "12px", padding: "14px", border: "1px solid #cbd5e1", color: "#0f172a" }} 
               placeholder="Paste your full resume here...&#10;&#10;Example:&#10;John Doe · Full Stack Engineer&#10;Skills: React, Node.js, PostgreSQL, AWS, Docker&#10;Experience: 3 years at Tech Inc. — built backend APIs and user interfaces..."
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
             />
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px" }}>
-              <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "10px", background: "rgba(155,109,255,0.08)", border: "1px dashed rgba(155,109,255,0.35)", borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: "var(--purple)" }}>
-                <span>📎 Upload Resume PDF</span>
+              <label style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", padding: "10px", background: "#f5f3ff", border: "1px dashed #c4b5fd", borderRadius: "10px", cursor: "pointer", fontSize: "12px", fontWeight: 700, color: "#6d28d9" }}>
+                <span>Upload Resume PDF</span>
                 <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handleResumePDF} />
               </label>
               <button className="btn btn-ghost btn-sm" onClick={() => setResumeText("")} style={{ borderRadius: "10px" }}>Clear</button>
@@ -264,8 +264,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
           </div>
 
           {/* Job description / Target Role */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px" }}>
-            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#fff" }}>Target Job Description & Role</div>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "20px", padding: "24px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 800, marginBottom: "4px", color: "#0f172a" }}>Target Job Description &amp; Role</div>
             <div className="text-xs text-muted mb12">Target role title and requirements to tailor the analysis or AI rewrite</div>
 
             {activeMode === "improve" && (
@@ -275,15 +275,15 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                   placeholder="Target Role (e.g. Senior Full Stack Engineer, ML Engineer)"
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", fontSize: "12px" }}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "12px" }}
                 />
               </div>
             )}
 
             <textarea 
               id="jd-input" 
-              className="code-area" 
-              style={{ minHeight: activeMode === "improve" ? "190px" : "240px", fontFamily: "'Cabinet Grotesk',sans-serif", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "rgba(0,0,0,0.4)", borderRadius: "12px", padding: "14px", border: "1px solid rgba(255,255,255,0.1)", color: "#e2e8f0" }} 
+              className="form-input" 
+              style={{ minHeight: activeMode === "improve" ? "190px" : "240px", fontSize: "12.5px", lineHeight: "1.65", resize: "vertical", width: "100%", background: "#f8fafc", borderRadius: "12px", padding: "14px", border: "1px solid #cbd5e1", color: "#0f172a" }} 
               placeholder="Paste the target job description here...&#10;&#10;Example:&#10;We're looking for a Senior Full Stack Engineer with:&#10;• 3+ years React/Next.js experience&#10;• Node.js, REST & GraphQL API design&#10;• AWS, Kubernetes, CI/CD automation&#10;• PostgreSQL query optimization, Redis..."
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
@@ -305,20 +305,20 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
           {activeMode === "score" ? (
             <button 
               className="btn btn-primary" 
-              style={{ padding: "14px 36px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #00c4a7, #7c3aed)", fontWeight: 800, cursor: isScoring ? "wait" : "pointer" }} 
+              style={{ padding: "14px 36px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", fontWeight: 800, cursor: isScoring ? "wait" : "pointer" }} 
               onClick={scoreResume} 
               disabled={isScoring}
             >
-              {isScoring ? "⏳ Analyzing ATS Match..." : "⚡ Score & Analyze ATS Match"}
+              {isScoring ? "Analyzing ATS Match..." : "Score & Analyze ATS Match"}
             </button>
           ) : (
             <button 
               className="btn btn-primary" 
-              style={{ padding: "14px 40px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #a78bfa, #00c4a7)", color: "#fff", fontWeight: 900, cursor: isImproving ? "wait" : "pointer", boxShadow: "0 8px 30px rgba(167,139,250,0.3)" }} 
+              style={{ padding: "14px 40px", fontSize: "14px", borderRadius: "14px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", fontWeight: 800, cursor: isImproving ? "wait" : "pointer" }} 
               onClick={improveResumeWithAI} 
               disabled={isImproving}
             >
-              {isImproving ? "✨ AI is Rewriting Your Resume..." : "✨ Improve & Rewrite Resume with AI"}
+              {isImproving ? "AI is Rewriting Your Resume..." : "Improve & Rewrite Resume with AI"}
             </button>
           )}
 
@@ -331,62 +331,62 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* ── OPTION 2 RESULTS: AI RESUME IMPROVEMENT & REWRITE PANEL ── */}
         {improveResults && activeMode === "improve" && (
-          <div id="resume-improve-results" style={{ display: "block", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "32px", marginBottom: "40px" }} className="fade-up">
+          <div id="resume-improve-results" style={{ display: "block", borderTop: "1px solid #e5e8f2", paddingTop: "32px", marginBottom: "40px" }} className="fade-up">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "1px" }}>AI RESUME TRANSFORMATION REPORT</div>
-                <h3 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: "2px 0 0" }}>Enhanced Resume for {improveResults.target_role || "Target Role"}</h3>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", letterSpacing: "1px" }}>AI RESUME TRANSFORMATION REPORT</div>
+                <h3 style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", margin: "2px 0 0" }}>Enhanced Resume for {improveResults.target_role || "Target Role"}</h3>
               </div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button 
                   type="button" 
                   onClick={copyToClipboard} 
-                  style={{ background: copied ? "#10b981" : "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff", padding: "8px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                  style={{ background: copied ? "#059669" : "#ffffff", border: "1px solid #cbd5e1", color: copied ? "#ffffff" : "#0f172a", padding: "8px 18px", borderRadius: "10px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
                 >
-                  {copied ? "✓ Copied!" : "📋 Copy Markdown"}
+                  {copied ? "✓ Copied!" : "Copy Markdown"}
                 </button>
                 <button 
                   type="button" 
                   onClick={downloadImprovedResume} 
-                  style={{ background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", padding: "8px 20px", borderRadius: "10px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
+                  style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "8px 20px", borderRadius: "10px", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
                 >
-                  📄 Download Resume (.md)
+                  Download Resume (.md)
                 </button>
               </div>
             </div>
 
             {/* ATS Score Projection Card */}
-            <div style={{ background: "linear-gradient(135deg, rgba(167,139,250,0.12), rgba(0,196,167,0.12))", border: "1.5px solid rgba(0,196,167,0.35)", borderRadius: "20px", padding: "24px", marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "20px", padding: "24px", marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
               <div>
-                <div style={{ fontSize: "12px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>PROJECTED ATS COMPATIBILITY BOOST</div>
-                <div style={{ fontSize: "28px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>
-                  <span style={{ color: "#f87171", textDecoration: "line-through", marginRight: "10px" }}>{improveResults.original_ats_score}/100</span>
-                  ➔ <span style={{ color: "#00c4a7", marginLeft: "10px" }}>{improveResults.projected_ats_score}/100</span>
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#10b981", marginLeft: "12px", background: "rgba(16,185,129,0.15)", padding: "4px 10px", borderRadius: "12px", border: "1px solid rgba(16,185,129,0.3)" }}>
+                <div style={{ fontSize: "12px", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>PROJECTED ATS COMPATIBILITY BOOST</div>
+                <div style={{ fontSize: "28px", fontWeight: 800, color: "#0f172a", marginTop: "4px" }}>
+                  <span style={{ color: "#dc2626", textDecoration: "line-through", marginRight: "10px" }}>{improveResults.original_ats_score}/100</span>
+                  ➔ <span style={{ color: "#059669", marginLeft: "10px" }}>{improveResults.projected_ats_score}/100</span>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: "#059669", marginLeft: "12px", background: "#ecfdf5", padding: "4px 10px", borderRadius: "12px", border: "1px solid #a7f3d0" }}>
                     +{improveResults.projected_ats_score - improveResults.original_ats_score}% Increase
                   </span>
                 </div>
               </div>
-              <div style={{ maxWidth: "450px", fontSize: "13px", color: "#cbd5e1", lineHeight: "1.6" }}>
+              <div style={{ maxWidth: "450px", fontSize: "13px", color: "#475569", lineHeight: "1.6" }}>
                 AI applied Google's XYZ formula, injected missing job keywords, and replaced passive verbs with quantifiable engineering accomplishments.
               </div>
             </div>
 
             {/* Tailored Professional Summary */}
             {improveResults.tailored_summary && (
-              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
-                <div style={{ fontSize: "12px", fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", marginBottom: "8px" }}>🎯 Tailored Professional Summary</div>
-                <p style={{ fontSize: "14px", color: "#e2e8f0", lineHeight: "1.7", margin: 0 }}>{improveResults.tailored_summary}</p>
+              <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ fontSize: "12px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: "8px" }}>Tailored Professional Summary</div>
+                <p style={{ fontSize: "14px", color: "#334155", lineHeight: "1.7", margin: 0 }}>{improveResults.tailored_summary}</p>
               </div>
             )}
 
             {/* Injected Keywords Badges */}
             {improveResults.key_injected_skills && improveResults.key_injected_skills.length > 0 && (
-              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "18px 20px", marginBottom: "24px", textAlign: "left" }}>
-                <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", marginBottom: "10px" }}>🔑 Injected High-Value ATS Keywords</div>
+              <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px 20px", marginBottom: "24px", textAlign: "left" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", marginBottom: "10px" }}>Injected High-Value ATS Keywords</div>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {improveResults.key_injected_skills.map((skill, sIdx) => (
-                    <span key={sIdx} style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#c4b5fd", padding: "4px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 700 }}>
+                    <span key={sIdx} style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", color: "#5b21b6", padding: "4px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 700 }}>
                       + {skill}
                     </span>
                   ))}
@@ -396,25 +396,25 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
 
             {/* Before vs After Bullet Point Comparison */}
             {improveResults.bullet_point_improvements && improveResults.bullet_point_improvements.length > 0 && (
-              <div style={{ background: "rgba(12,18,32,0.8)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "24px", marginBottom: "28px", textAlign: "left" }}>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#fff", textTransform: "uppercase", marginBottom: "16px" }}>
-                  🔄 High-Impact Bullet Point Rewrites (Before vs After)
+              <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "20px", padding: "24px", marginBottom: "28px", textAlign: "left" }}>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a", textTransform: "uppercase", marginBottom: "16px" }}>
+                  High-Impact Bullet Point Rewrites (Before vs After)
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {improveResults.bullet_point_improvements.map((b, bIdx) => (
-                    <div key={bIdx} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", padding: "16px" }}>
+                    <div key={bIdx} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "16px" }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "10px" }}>
-                        <div style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "10px", padding: "12px" }}>
-                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#f87171", textTransform: "uppercase", marginBottom: "4px" }}>❌ Original Bullet</div>
-                          <div style={{ fontSize: "12.5px", color: "#cbd5e1", lineHeight: "1.5" }}>{b.original}</div>
+                        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "12px" }}>
+                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#dc2626", textTransform: "uppercase", marginBottom: "4px" }}>Original Bullet</div>
+                          <div style={{ fontSize: "12.5px", color: "#475569", lineHeight: "1.5" }}>{b.original}</div>
                         </div>
-                        <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: "10px", padding: "12px" }}>
-                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#10b981", textTransform: "uppercase", marginBottom: "4px" }}>✅ AI High-Impact Rewrite</div>
-                          <div style={{ fontSize: "12.5px", color: "#fff", fontWeight: 600, lineHeight: "1.5" }}>{b.improved}</div>
+                        <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: "10px", padding: "12px" }}>
+                          <div style={{ fontSize: "10px", fontWeight: 800, color: "#059669", textTransform: "uppercase", marginBottom: "4px" }}>AI High-Impact Rewrite</div>
+                          <div style={{ fontSize: "12.5px", color: "#0f172a", fontWeight: 600, lineHeight: "1.5" }}>{b.improved}</div>
                         </div>
                       </div>
-                      <div style={{ fontSize: "11.5px", color: "#94a3b8", fontStyle: "italic", paddingLeft: "4px" }}>
-                        💡 <strong>Why it ranks higher:</strong> {b.impact_reason}
+                      <div style={{ fontSize: "11.5px", color: "#64748b", fontStyle: "italic", paddingLeft: "4px" }}>
+                        <strong>Why it ranks higher:</strong> {b.impact_reason}
                       </div>
                     </div>
                   ))}
@@ -424,14 +424,14 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
 
             {/* Complete Improved Resume Box */}
             {improveResults.full_improved_resume && (
-              <div style={{ background: "rgba(12,18,32,0.95)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "20px", padding: "28px", textAlign: "left" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px" }}>
-                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#00c4a7" }}>📄 Complete Enhanced Resume (Ready to Use)</div>
-                  <button type="button" onClick={copyToClipboard} style={{ background: copied ? "#10b981" : "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
-                    {copied ? "✓ Copied!" : "📋 Copy"}
+              <div style={{ background: "#ffffff", border: "1px solid #ddd6fe", borderRadius: "20px", padding: "28px", textAlign: "left" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid #e5e8f2", paddingBottom: "12px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 800, color: "#6d28d9" }}>Complete Enhanced Resume (Ready to Use)</div>
+                  <button type="button" onClick={copyToClipboard} style={{ background: copied ? "#059669" : "#f1f5f9", border: "1px solid #cbd5e1", color: copied ? "#fff" : "#0f172a", padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                    {copied ? "✓ Copied!" : "Copy"}
                   </button>
                 </div>
-                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "'Courier New', Courier, monospace", fontSize: "12.5px", lineHeight: "1.7", color: "#e2e8f0", maxHeight: "500px", overflowY: "auto" }}>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "'Courier New', Courier, monospace", fontSize: "12.5px", lineHeight: "1.7", color: "#1e293b", maxHeight: "500px", overflowY: "auto" }}>
                   {improveResults.full_improved_resume}
                 </pre>
               </div>
@@ -469,7 +469,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
                   {/* Circular Score Ring */}
                   <div style={{ position: "relative", width: "92px", height: "92px", flexShrink: 0 }}>
                     <svg width="92" height="92" viewBox="0 0 92 92" style={{ transform: "rotate(-90deg)" }}>
-                      <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8"/>
+                      <circle cx="46" cy="46" r="38" fill="none" stroke="#e2e8f0" strokeWidth="8"/>
                       <circle 
                         id="ats-ring-fill" 
                         cx="46" cy="46" r="38" 

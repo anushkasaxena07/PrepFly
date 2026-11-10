@@ -150,8 +150,7 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
       {/* ── Navbar ─────────────────────────────────────────────── */}
       <nav className="pr-navbar">
         <div className="pr-brand" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 12px rgba(0,196,167,0.4)" }} />
-          <span className="pr-brand-name" style={{ fontSize: "19px", fontWeight: 900, color: "#fff", letterSpacing: "-0.5px" }}>Prep<span style={{ color: "#00c4a7" }}>Fly</span></span>
+          <span className="pr-brand-name" style={{ fontSize: "18px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.4px" }}>Prep<span style={{ color: "#c4b5fd" }}>Fly</span></span>
         </div>
         <button className="pr-back-btn" onClick={handleBack}>
           <BackIcon /> Back to Dashboard
@@ -163,35 +162,32 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
 
         {/* Page title */}
         <div className="pr-page-header">
-          <h2 className="pr-page-title">My Profile & Membership</h2>
+          <h2 className="pr-page-title">My Profile &amp; Membership</h2>
           <p className="pr-page-sub">Manage your personal information, preferences, and SaaS subscription.</p>
         </div>
 
         {/* Profile Sub Tabs */}
-        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "12px", position: "relative", zIndex: 10 }}>
+        <div style={{ display: "flex", gap: "10px", marginBottom: "24px", borderBottom: "1px solid #e5e8f2", paddingBottom: "12px", position: "relative", zIndex: 10 }}>
           <button 
             type="button"
-            className={`btn btn-sm ${profileSubTab === "info" ? "btn-cyan" : "btn-ghost"}`} 
+            className={`pf-filter-pill ${profileSubTab === "info" ? "active" : ""}`} 
             onClick={() => setProfileSubTab("info")}
-            style={{ fontWeight: 800, padding: "8px 16px", cursor: "pointer" }}
           >
-            👤 Personal Details
+            Personal Details
           </button>
           <button 
             type="button"
-            className={`btn btn-sm ${profileSubTab === "subscription" ? "btn-primary" : "btn-ghost"}`} 
+            className={`pf-filter-pill ${profileSubTab === "subscription" ? "active" : ""}`} 
             onClick={() => setProfileSubTab("subscription")}
-            style={{ fontWeight: 800, padding: "8px 16px", background: profileSubTab === "subscription" ? "linear-gradient(135deg, #7c4fe0, #00c4a7)" : "transparent", borderColor: "rgba(155,109,255,0.3)", cursor: "pointer" }}
           >
-            👑 Subscription
+            Subscription
           </button>
           <button 
             type="button"
-            className={`btn btn-sm ${profileSubTab === "feedback" ? "btn-cyan" : "btn-ghost"}`} 
+            className={`pf-filter-pill ${profileSubTab === "feedback" ? "active" : ""}`} 
             onClick={() => setProfileSubTab("feedback")}
-            style={{ fontWeight: 800, padding: "8px 16px", cursor: "pointer" }}
           >
-            💬 Send Feedback
+            Send Feedback
           </button>
         </div>
 
@@ -388,42 +384,41 @@ const css = `
 
   /* ── Navbar ───────────────────────────────────────────────── */
   .pr-navbar {
-    position: fixed; top: 0; left: 0; right: 0; height: 70px;
-    background: rgba(8,12,20,0.88); backdrop-filter: blur(20px) saturate(160%);
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    position: sticky; top: 0; height: 64px;
+    background: #0b0e1a; border-bottom: 1px solid rgba(255,255,255,0.08);
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 36px; z-index: 1000;
+    padding: 0 28px; z-index: 50; border-radius: 16px; margin-bottom: 20px;
   }
   .pr-brand { display: flex; align-items: center; gap: 10px; }
   .pr-brand-icon {
     width: 34px; height: 34px;
-    background: linear-gradient(135deg, #00e5c3, #00b8ff);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     border-radius: 9px; display: flex; align-items: center; justify-content: center;
-    color: #080c14; box-shadow: 0 4px 16px rgba(0,229,195,0.3);
+    color: #ffffff; box-shadow: 0 4px 14px rgba(109,40,217,0.3);
   }
-  .pr-brand-name { font-size: 17px; font-weight: 700; color: #e8edf8; letter-spacing: -0.3px; }
+  .pr-brand-name { font-size: 17px; font-weight: 800; color: #ffffff; letter-spacing: -0.3px; }
   .pr-back-btn {
     display: flex; align-items: center; gap: 8px;
-    padding: 9px 16px; background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
-    color: #7a8ba8; font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all 0.22s ease;
-    font-family: 'Sora', sans-serif;
+    padding: 8px 16px; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+    color: #e2e8f0; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+    font-family: inherit;
   }
-  .pr-back-btn:hover { border-color: rgba(0,229,195,0.3); color: #00e5c3; background: rgba(0,229,195,0.06); transform: none; }
+  .pr-back-btn:hover { border-color: #a78bfa; color: #ffffff; background: rgba(124,58,237,0.25); }
 
   /* ── Page ─────────────────────────────────────────────────── */
   .pr-page {
     position: relative; z-index: 1;
-    max-width: 1000px; margin: 0 auto;
-    padding: 106px 36px 80px;
-    animation: prFadeUp 0.5s ease both;
+    max-width: 1060px; margin: 0 auto;
+    padding: 8px 0 60px;
+    animation: prFadeUp 0.4s ease both;
   }
-  @keyframes prFadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes prFadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-  .pr-page-header { margin-bottom: 32px; }
-  .pr-page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; color: #e8edf8; margin-bottom: 4px; }
-  .pr-page-sub { font-size: 14px; color: #7a8ba8; }
+  .pr-page-header { margin-bottom: 24px; }
+  .pr-page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #0f172a; margin-bottom: 4px; }
+  .pr-page-sub { font-size: 14px; color: #64748b; }
 
   /* ── Layout ───────────────────────────────────────────────── */
   .pr-layout {
@@ -432,113 +427,101 @@ const css = `
     gap: 20px;
     align-items: start;
   }
+  @media (max-width: 820px) { .pr-layout { grid-template-columns: 1fr; } }
 
-  /* ── Glass card ───────────────────────────────────────────── */
+  /* ── Light Elevated Card ───────────────────────────────────── */
   .pr-glass-card {
-    background: rgba(13,18,32,0.85);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 20px; padding: 28px;
-    backdrop-filter: blur(24px) saturate(160%);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 20px 60px rgba(0,0,0,0.4);
+    background: #ffffff;
+    border: 1px solid #e5e8f2;
+    border-radius: 18px; padding: 26px;
+    box-shadow: 0 2px 12px rgba(15,23,42,0.04);
     position: relative; overflow: hidden;
-  }
-  .pr-glass-card::before {
-    content: ''; position: absolute; inset: 0; border-radius: 20px; padding: 1px;
-    background: linear-gradient(135deg, rgba(0,229,195,0.18) 0%, transparent 50%, rgba(99,40,255,0.08) 100%);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
   }
 
   /* ── Avatar card ──────────────────────────────────────────── */
   .pr-avatar-card { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 
   .pr-avatar-zone {
-    position: relative; width: 120px; height: 120px; border-radius: 50%;
+    position: relative; width: 112px; height: 112px; border-radius: 50%;
     overflow: hidden; cursor: pointer; flex-shrink: 0;
-    border: 2px solid rgba(0,229,195,0.25);
-    box-shadow: 0 0 0 4px rgba(0,229,195,0.08);
-    transition: border-color 0.22s ease;
+    border: 3px solid #ddd6fe;
+    box-shadow: 0 0 0 4px #f5f3ff;
+    transition: border-color 0.2s ease;
   }
-  .pr-avatar-zone--over { border-color: rgba(0,229,195,0.6); }
+  .pr-avatar-zone--over { border-color: #7c3aed; }
   .pr-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .pr-avatar-placeholder {
     width: 100%; height: 100%;
-    background: linear-gradient(135deg, #00e5c3, #00b8ff);
+    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
     display: flex; align-items: center; justify-content: center;
-    font-size: 36px; font-weight: 700; color: #050d14; letter-spacing: -1px;
+    font-size: 34px; font-weight: 800; color: #ffffff; letter-spacing: -1px;
   }
   .pr-avatar-overlay {
     position: absolute; inset: 0; border-radius: 50%;
-    background: rgba(8,12,20,0.7); display: flex; flex-direction: column;
+    background: rgba(11,14,26,0.72); display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 4px;
-    color: #00e5c3; font-size: 11px; font-weight: 600;
-    opacity: 0; cursor: pointer; transition: opacity 0.22s ease;
+    color: #e9d5ff; font-size: 11px; font-weight: 700;
+    opacity: 0; cursor: pointer; transition: opacity 0.2s ease;
   }
   .pr-avatar-zone:hover .pr-avatar-overlay { opacity: 1; }
-  .pr-avatar-hint { font-size: 11.5px; color: #4a5a72; margin-top: -8px; }
-  .pr-avatar-name { font-size: 16px; font-weight: 700; color: #e8edf8; letter-spacing: -0.3px; }
-  .pr-avatar-role { font-size: 13px; color: #4a5a72; margin-top: 2px; }
+  .pr-avatar-hint { font-size: 11.5px; color: #64748b; margin-top: -8px; }
+  .pr-avatar-name { font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; }
+  .pr-avatar-role { font-size: 13px; color: #64748b; margin-top: 2px; }
 
   .pr-status-badge {
     display: flex; align-items: center; gap: 7px; padding: 6px 14px;
-    background: rgba(0,214,143,0.1); border: 1px solid rgba(0,214,143,0.2);
-    border-radius: 50px; font-size: 12px; font-weight: 600; color: #00d68f;
+    background: #ecfdf5; border: 1px solid #a7f3d0;
+    border-radius: 50px; font-size: 12px; font-weight: 700; color: #059669;
   }
   .pr-status-dot {
     width: 7px; height: 7px; border-radius: 50%;
-    background: #00d68f; box-shadow: 0 0 6px rgba(0,214,143,0.7);
-    animation: prPulse 1.6s ease-in-out infinite;
+    background: #10b981;
   }
-  @keyframes prPulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
   /* ── Stats card ───────────────────────────────────────────── */
   .pr-stats-card { display: flex; align-items: center; justify-content: space-around; padding: 20px 16px; margin-top: 16px; }
   .pr-stat { text-align: center; }
-  .pr-stat-value { font-size: 22px; font-weight: 700; color: #00e5c3; letter-spacing: -0.5px; }
-  .pr-stat-label { font-size: 11px; color: #4a5a72; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
-  .pr-stat-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.07); }
+  .pr-stat-value { font-size: 22px; font-weight: 800; color: #6d28d9; letter-spacing: -0.5px; }
+  .pr-stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+  .pr-stat-divider { width: 1px; height: 36px; background: #e5e8f2; }
 
   /* ── Form card ────────────────────────────────────────────── */
   .pr-main { display: flex; flex-direction: column; gap: 16px; }
   .pr-form-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-  .pr-form-title { font-size: 16px; font-weight: 700; color: #e8edf8; letter-spacing: -0.3px; }
-  .pr-form-sub { font-size: 13px; color: #4a5a72; margin-top: 3px; }
+  .pr-form-title { font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; }
+  .pr-form-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
 
   .pr-message {
     display: flex; align-items: center; gap: 9px;
-    padding: 11px 15px; border-radius: 10px; font-size: 13px; font-weight: 500;
-    margin-bottom: 18px; animation: prMsgIn 0.25s ease both;
+    padding: 11px 15px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    margin-bottom: 18px;
   }
-  @keyframes prMsgIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-  .pr-message--error { background: rgba(255,79,106,0.1); border: 1px solid rgba(255,79,106,0.22); color: #ff4f6a; }
-  .pr-message--success { background: rgba(0,214,143,0.1); border: 1px solid rgba(0,214,143,0.22); color: #00d68f; }
+  .pr-message--error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+  .pr-message--success { background: #ecfdf5; border: 1px solid #a7f3d0; color: #059669; }
 
   .pr-fields { display: flex; flex-direction: column; gap: 18px; }
   .pr-field-group { display: flex; flex-direction: column; gap: 7px; }
-  .pr-field-label { font-size: 12px; font-weight: 500; color: #4a5a72; text-transform: uppercase; letter-spacing: 0.06em; }
+  .pr-field-label { font-size: 11.5px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
   .pr-field-wrap { position: relative; display: flex; align-items: center; }
-  .pr-field-icon { position: absolute; left: 13px; color: #4a5a72; pointer-events: none; transition: color 0.22s; }
+  .pr-field-icon { position: absolute; left: 13px; color: #64748b; pointer-events: none; transition: color 0.2s; }
   .pr-field-input {
     width: 100%; padding: 12px 14px 12px 42px;
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 12px; color: #e8edf8; font-family: 'Sora', sans-serif;
-    font-size: 14px; outline: none; transition: all 0.22s ease;
+    background: #f8fafc; border: 1px solid #cbd5e1;
+    border-radius: 12px; color: #0f172a; font-family: inherit;
+    font-size: 14px; outline: none; transition: all 0.2s ease;
   }
-  .pr-field-input::placeholder { color: #4a5a72; }
-  .pr-field-input:focus { border-color: rgba(0,229,195,0.45); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 3px rgba(0,229,195,0.1); }
-  .pr-field-input:-webkit-autofill, .pr-field-input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 1000px #0d1220 inset; -webkit-text-fill-color: #e8edf8;
-  }
-  .pr-field-wrap:focus-within .pr-field-icon { color: #00e5c3; }
+  .pr-field-input::placeholder { color: #94a3b8; }
+  .pr-field-input:focus { border-color: #7c3aed; background: #ffffff; box-shadow: 0 0 0 3px rgba(124,58,237,0.12); }
+  .pr-field-wrap:focus-within .pr-field-icon { color: #6d28d9; }
 
   .pr-field-view {
     display: flex; align-items: center; gap: 12px;
-    padding: 13px 16px; background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.05); border-radius: 12px;
+    padding: 13px 16px; background: #f8fafc;
+    border: 1px solid #e5e8f2; border-radius: 12px;
   }
   .pr-field-icon--view { position: static; }
-  .pr-field-value { font-size: 14px; color: #e8edf8; }
-  .pr-field-empty { color: #4a5a72; font-style: italic; }
+  .pr-field-value { font-size: 14px; color: #0f172a; font-weight: 500; }
+  .pr-field-empty { color: #94a3b8; font-style: italic; }
 
   .pr-form-actions { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; }
 
@@ -546,38 +529,37 @@ const css = `
   .pr-btn {
     display: inline-flex; align-items: center; gap: 7px;
     padding: 11px 20px; border-radius: 12px; border: none;
-    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600;
-    cursor: pointer; transition: all 0.22s ease;
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.18s ease;
   }
   .pr-btn--primary {
-    background: linear-gradient(135deg, #00e5c3, #00b8ff); color: #050d14;
-    box-shadow: 0 4px 18px rgba(0,229,195,0.25); min-width: 140px; justify-content: center;
+    background: linear-gradient(135deg, #6d28d9, #7c3aed); color: #ffffff;
+    box-shadow: 0 4px 14px rgba(109,40,217,0.25); min-width: 140px; justify-content: center;
   }
-  .pr-btn--primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,229,195,0.38); }
+  .pr-btn--primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(109,40,217,0.34); }
   .pr-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .pr-btn--ghost {
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #7a8ba8;
+    background: #ffffff; border: 1px solid #d5dbe9; color: #475569;
   }
-  .pr-btn--ghost:hover { border-color: rgba(0,229,195,0.3); color: #00e5c3; background: rgba(0,229,195,0.06); transform: none; }
+  .pr-btn--ghost:hover { border-color: #7c3aed; color: #6d28d9; background: #f5f3ff; }
   .pr-btn--sm { padding: 8px 14px; font-size: 13px; }
   .pr-btn--danger {
-    background: rgba(255,79,106,0.1); border: 1px solid rgba(255,79,106,0.25); color: #ff4f6a;
+    background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;
     padding: 9px 18px; font-size: 13px;
   }
-  .pr-btn--danger:hover { background: rgba(255,79,106,0.18); box-shadow: 0 4px 18px rgba(255,79,106,0.2); transform: none; }
+  .pr-btn--danger:hover { background: #fee2e2; }
 
   /* ── Spinner ──────────────────────────────────────────────── */
   .pr-spinner {
     width: 16px; height: 16px; border-radius: 50%;
-    border: 2.5px solid rgba(5,13,20,0.3); border-top-color: #050d14;
+    border: 2.5px solid rgba(255,255,255,0.35); border-top-color: #ffffff;
     animation: prSpin 0.7s linear infinite;
   }
   @keyframes prSpin { to{transform:rotate(360deg)} }
 
   /* ── Danger zone ──────────────────────────────────────────── */
-  .pr-danger-zone { border-color: rgba(255,79,106,0.1); }
-  .pr-danger-zone::before { background: linear-gradient(135deg, rgba(255,79,106,0.1) 0%, transparent 50%); }
-  .pr-danger-title { font-size: 14px; font-weight: 700; color: #ff4f6a; margin-bottom: 16px; }
+  .pr-danger-zone { border-color: #fecaca; }
+  .pr-danger-title { font-size: 14px; font-weight: 700; color: #dc2626; margin-bottom: 16px; }
   .pr-danger-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .pr-danger-label { font-size: 13.5px; font-weight: 500; color: #e8edf8; }
   .pr-danger-sub { font-size: 12px; color: #4a5a72; margin-top: 3px; }

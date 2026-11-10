@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ThemeToggleButton, usePrepFlyTheme } from '../ui/ThemeContext';
 
 export default function Navbar({ activeTab, setActiveTab, superAdmin = {} }) {
+  const { isSunrise } = usePrepFlyTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: "New Organization Onboarded", desc: "IIT Bombay registered with 500 Candidate seats", time: "15 min ago", unread: true },
@@ -44,55 +46,58 @@ export default function Navbar({ activeTab, setActiveTab, superAdmin = {} }) {
   };
 
   return (
-    <header style={{
-      height: "64px",
-      background: "rgba(10,14,26,0.85)",
-      backdropFilter: "blur(16px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)",
+    <header className="pf-portal-header" style={{
+      height: "82px",
+      background: isSunrise
+        ? "linear-gradient(135deg, #fdf7f3 0%, #faf0e8 100%)"
+        : "linear-gradient(135deg, #090c1a 0%, #121633 100%)",
+      borderBottom: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.08)",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "0 24px",
+      padding: "0 28px 14px",
       position: "sticky",
       top: 0,
-      zIndex: 90
+      zIndex: 90,
+      color: isSunrise ? "#1f1916" : "#ffffff"
     }}>
       {/* BREADCRUMB */}
       <div>
-        <div style={{ fontSize: "11px", color: "#ec4899", textTransform: "uppercase", fontWeight: 800, letterSpacing: "1px" }}>
+        <div className="pf-portal-header-sub" style={{ fontSize: "11px", color: isSunrise ? "#c8501d" : "#a78bfa", textTransform: "uppercase", fontWeight: 800, letterSpacing: "1px" }}>
           Super Admin Console / Platform Owner
         </div>
-        <h1 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: 800, margin: 0, color: isSunrise ? "#1f1916" : "#fff", fontFamily: isSunrise ? "'Playfair Display', Georgia, serif" : "inherit" }}>
           {titles[activeTab] || 'Platform Owner Console'}
         </h1>
       </div>
 
       {/* RIGHT HEALTH BADGES */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <ThemeToggleButton />
+
         <div style={{
-          background: "rgba(0,240,200,0.1)",
-          border: "1px solid rgba(0,240,200,0.25)",
-          color: "#00f0c8",
+          background: isSunrise ? "#ecfdf5" : "rgba(16,185,129,0.16)",
+          border: isSunrise ? "1px solid #a7f3d0" : "1px solid rgba(52,211,153,0.35)",
+          color: isSunrise ? "#047857" : "#34d399",
           fontSize: "11px",
           fontWeight: 800,
-          padding: "4px 12px",
+          padding: "5px 12px",
           borderRadius: "20px",
           display: "flex",
           alignItems: "center",
           gap: "6px"
         }}>
-          <span>🟢</span> System Operational (99.99%)
+          <span>System Operational (99.99%)</span>
         </div>
 
         <div style={{
-          background: "rgba(236,72,153,0.15)",
-          border: "1px solid rgba(236,72,153,0.3)",
-          color: "#ec4899",
+          background: isSunrise ? "#fdf0e7" : "rgba(124,58,237,0.22)",
+          border: isSunrise ? "1px solid #f5cbb2" : "1px solid rgba(167,139,250,0.4)",
+          color: isSunrise ? "#b84718" : "#c4b5fd",
           fontSize: "11px",
-          fontWeight: 900,
-          padding: "4px 10px",
-          borderRadius: "6px"
+          fontWeight: 800,
+          padding: "5px 10px",
+          borderRadius: "8px"
         }}>
           SUPER_ADMIN
         </div>

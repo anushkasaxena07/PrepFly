@@ -18,7 +18,7 @@ export default function SubscriptionLockOverlay({ featureName = "This Feature", 
       padding: "48px 24px",
       textAlign: "center",
       boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-      color: "#fff",
+      color: "#0f172a",
       position: "relative",
       overflow: "hidden"
     }}>
@@ -54,7 +54,7 @@ export default function SubscriptionLockOverlay({ featureName = "This Feature", 
         Subscription Required
       </span>
 
-      <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: "0 0 8px 0", maxWidth: "540px" }}>
+      <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "0 0 8px 0", maxWidth: "540px" }}>
         Your organization's trial has expired.
       </h2>
 
@@ -72,8 +72,8 @@ export default function SubscriptionLockOverlay({ featureName = "This Feature", 
         />
       ) : (
         <div style={{
-          background: "rgba(255,255,255,0.03)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "#f8fafc",
+          border: "1px solid #e5e8f2",
           borderRadius: "12px",
           padding: "14px 20px",
           fontSize: "13px",

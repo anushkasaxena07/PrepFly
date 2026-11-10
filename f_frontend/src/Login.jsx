@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./Login.css";
 import { useNavigate } from "react-router-dom";
+import { ThemeToggleButton } from "./components/ui/ThemeContext";
 
 const API = import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:5000" : "https://prepfly.up.railway.app");
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -438,6 +439,9 @@ export default function Login() {
 
   return (
     <div className="auth-root">
+      <div style={{ position: "fixed", top: "20px", right: "24px", zIndex: 50 }}>
+        <ThemeToggleButton />
+      </div>
       {/* Background Stars & Streaks */}
       <div className="stars" id="stars" />
       <svg className="streak s1" viewBox="0 0 280 60" fill="none">

@@ -208,7 +208,7 @@ export default function FeedbackManagement() {
               padding: '8px 14px',
               fontSize: '12px',
               fontWeight: 700,
-              color: '#00c4a7',
+              color: '#6d28d9',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -287,7 +287,7 @@ export default function FeedbackManagement() {
                   <span style={{ fontWeight: 800, color: '#fff' }}>{item.count}</span>
                 </div>
                 <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.min(100, (item.count / (summary.total_feedback || 1)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #00c4a7, #7c4fe0)', borderRadius: '3px' }} />
+                  <div style={{ width: `${Math.min(100, (item.count / (summary.total_feedback || 1)) * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #6d28d9, #7c3aed)', borderRadius: '3px' }} />
                 </div>
               </div>
             ))}
@@ -301,7 +301,7 @@ export default function FeedbackManagement() {
             {(analytics.top_organizations || []).map((item, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '8px' }}>
                 <span style={{ fontSize: '12px', color: '#fff', fontWeight: 700 }}>{item.organization}</span>
-                <span style={{ fontSize: '11px', color: '#00c4a7', fontWeight: 800 }}>{item.count} submissions</span>
+                <span style={{ fontSize: '11px', color: '#6d28d9', fontWeight: 800 }}>{item.count} submissions</span>
               </div>
             ))}
           </div>
@@ -329,7 +329,7 @@ export default function FeedbackManagement() {
             }}
           />
 
-          <button type="submit" style={{ background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)', border: 'none', borderRadius: '8px', padding: '9px 18px', fontWeight: 800, fontSize: '12px', color: '#fff', cursor: 'pointer' }}>
+          <button type="submit" style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', border: 'none', borderRadius: '8px', padding: '9px 18px', fontWeight: 800, fontSize: '12px', color: '#fff', cursor: 'pointer' }}>
             🔍 Search
           </button>
         </form>
@@ -399,7 +399,7 @@ export default function FeedbackManagement() {
       {/* MAIN DATA TABLE */}
       <div style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '20px', overflowX: 'auto' }}>
         {loading ? (
-          <div style={{ color: '#00c4a7', padding: '40px', textAlign: 'center', fontWeight: 800 }}>
+          <div style={{ color: '#6d28d9', padding: '40px', textAlign: 'center', fontWeight: 800 }}>
             ⚡ Loading feedback records...
           </div>
         ) : error ? (
@@ -437,7 +437,7 @@ export default function FeedbackManagement() {
                     <td style={{ padding: '12px 10px', color: '#94a3b8' }}>{fb.created_at ? fb.created_at.split(' ')[0] : ''}</td>
                     <td style={{ padding: '12px 10px', fontWeight: 700, color: '#fff' }}>{fb.submitter_name}</td>
                     <td style={{ padding: '12px 10px' }}>
-                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: fb.submitted_by_role === 'Organization Admin' ? 'rgba(124,79,224,0.15)' : 'rgba(0,196,167,0.15)', color: fb.submitted_by_role === 'Organization Admin' ? '#c084fc' : '#00c4a7', fontWeight: 800 }}>
+                      <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', background: fb.submitted_by_role === 'Organization Admin' ? 'rgba(124,79,224,0.15)' : 'rgba(109,40,217,0.15)', color: fb.submitted_by_role === 'Organization Admin' ? '#c084fc' : '#6d28d9', fontWeight: 800 }}>
                         {fb.submitted_by_role}
                       </span>
                     </td>
@@ -523,7 +523,7 @@ export default function FeedbackManagement() {
             boxShadow: '0 20px 50px rgba(0,0,0,0.8)'
           }}>
             {detailLoading || !selectedFb ? (
-              <div style={{ color: '#00c4a7', padding: '40px', textAlign: 'center' }}>⚡ Loading feedback detail...</div>
+              <div style={{ color: '#6d28d9', padding: '40px', textAlign: 'center' }}>⚡ Loading feedback detail...</div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
@@ -552,7 +552,7 @@ export default function FeedbackManagement() {
                     </div>
                     <div>
                       <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>CATEGORY</div>
-                      <div style={{ color: '#00c4a7', fontWeight: 700, marginTop: '2px' }}>{selectedFb.category}</div>
+                      <div style={{ color: '#6d28d9', fontWeight: 700, marginTop: '2px' }}>{selectedFb.category}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>RATING</div>
@@ -637,7 +637,7 @@ export default function FeedbackManagement() {
                       <button
                         onClick={handleSaveDetail}
                         disabled={updating}
-                        style={{ background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)', border: 'none', color: '#fff', padding: '8px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
+                        style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', border: 'none', color: '#fff', padding: '8px 20px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}
                       >
                         {updating ? 'Saving...' : '💾 Save Changes'}
                       </button>

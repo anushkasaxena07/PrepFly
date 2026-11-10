@@ -31,24 +31,24 @@ export default function Notifications() {
         </div>
       )}
 
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "28px" }}>
-        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", marginBottom: "4px" }}>📢 Targeted Broadcast & Notification Center</h2>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "28px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", marginBottom: "4px" }}>📢 Targeted Broadcast & Notification Center</h2>
         <p style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "20px" }}>Dispatch system announcements to all institutions, specific admins, or candidate groups.</p>
 
         <form onSubmit={handleSend} style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "13px" }}>
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>NOTIFICATION TITLE *</label>
-            <input type="text" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Scheduled System Upgrade & Maintenance Window" style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="text" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Scheduled System Upgrade & Maintenance Window" style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>MESSAGE BODY *</label>
-            <textarea rows="4" required value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Enter message details..." style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <textarea rows="4" required value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Enter message details..." style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>TARGET AUDIENCE</label>
-            <select value={form.target} onChange={e => setForm({ ...form, target: e.target.value })} style={{ width: "100%", background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px" }}>
+            <select value={form.target} onChange={e => setForm({ ...form, target: e.target.value })} style={{ width: "100%", background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px" }}>
               <option value="All Organizations">All Organizations & Colleges</option>
               <option value="Colleges Only">Colleges & Universities Only</option>
               <option value="Companies Only">Recruiter Companies Only</option>

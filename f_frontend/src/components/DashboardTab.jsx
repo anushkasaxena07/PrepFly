@@ -1,7 +1,11 @@
 import React from 'react';
 import { getGradeInfo } from '../utils/gradingSystem';
+import { usePrepFlyTheme } from './ui/ThemeContext';
+import { NavIcon } from './ui/PrepFlyTheme';
+import journeyHikerImg from '../assets/journey-hiker.jpg';
 
 export default function DashboardTab({ setActiveTab, user = {}, history = [], userStats = null }) {
+  const { isSunrise } = usePrepFlyTheme();
   const userName = user?.full_name || user?.name || "Anushka";
 
   const isValidSession = (s) => {
@@ -233,80 +237,247 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
     return "Good evening";
   };
 
+  const sunriseMilestonesDone = userStats?.achievements?.unlocked ?? completedSessions.length;
+  const sunriseMilestonesTotal = userStats?.achievements?.total ?? (hasData ? Math.max(completedSessions.length, 5) : 0);
+  const sunrisePoints = userStats?.achievements?.points ?? (completedSessions.length * 50);
+  const sunriseOverallPct = hasData
+    ? Math.min(100, Math.round((goalsDone / 3) * 100 || displayReadiness || 0))
+    : 0;
+  const diagCount = userStats?.diagnostics?.total ?? 0;
+  const ringRadius = 46;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - Math.min(1, Math.max(0, sunriseOverallPct / 100)));
+
   return (
     <div id="page-dashboard" className="page active" role="tabpanel">
       <div className="container">
 
-        {/* HERO SECTION */}
-        <section className="mb20" aria-label="Welcome banner">
-          <div className="hero-card">
-            <div className="hero-top">
-              <div>
-                <div className="hero-greeting">👋 {getTimeBasedGreeting()}</div>
-                <h1 className="hero-name">Welcome Back, <span>{userName}</span></h1>
-                <p className="hero-sub">{hasData ? `You have completed ${displayTotal} practice sessions so far. Keep practicing!` : `Your AI coach is ready. You're on a ${displayStreak}-day streak — keep it going!`}</p>
+        {isSunrise ? (
+          <>
+            {/* ── ALPINE SUNRISE 3-CARD METRIC STRIP ── */}
+            <section className="pf-sunrise-kpi-row mb20" aria-label="Preparation highlights">
+              <div className="pf-sunrise-kpi-card" onClick={() => setActiveTab('achievements')} role="button" tabIndex={0}>
+                <div className="pf-sunrise-kpi-icon">
+                  <NavIcon name="target" size={20} strokeWidth={2} color="#c8501d" />
+                </div>
+                <div>
+                  <div className="pf-sunrise-kpi-val">{sunriseMilestonesDone}/{sunriseMilestonesTotal}</div>
+                  <div className="pf-sunrise-kpi-lbl">Milestones Completed</div>
+                </div>
               </div>
-              <div className="hero-actions">
-                <button className="btn btn-primary" onClick={() => setActiveTab('ava')}>▶ Start Mock Interview</button>
-                <button className="btn btn-ghost" onClick={() => setActiveTab('coding')}>💻 Resume Practice</button>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        {/* STAT CARDS */}
-        <section className="mb24" aria-label="Performance statistics">
-          <div className="g4 stagger">
-            <div className="stat-card cyan">
-              <div className="stat-icon cyan" aria-hidden="true">🎯</div>
-              <div className="stat-lbl">Mock Interviews</div>
-              <div className="stat-val cyan">{displayTotal}</div>
-              <div className="stat-trend trend-up">↑ total sessions</div>
-              <div className="sparkline" aria-hidden="true">
-                <div className="spark-bar" style={{height:"30%",background:"rgba(0,240,200,0.3)"}}></div>
-                <div className="spark-bar" style={{height:"45%",background:"rgba(0,240,200,0.3)"}}></div>
-                <div className="spark-bar" style={{height:"60%",background:"rgba(0,240,200,0.4)"}}></div>
-                <div className="spark-bar" style={{height:"75%",background:"rgba(0,240,200,0.6)"}}></div>
-                <div className="spark-bar" style={{height:"90%",background:"var(--cyan)"}}></div>
+              <div className="pf-sunrise-kpi-card" onClick={() => setActiveTab('achievements')} role="button" tabIndex={0}>
+                <div className="pf-sunrise-kpi-icon">
+                  <NavIcon name="layers" size={20} strokeWidth={2} color="#d97724" />
+                </div>
+                <div>
+                  <div className="pf-sunrise-kpi-val">{sunrisePoints}</div>
+                  <div className="pf-sunrise-kpi-lbl">Preparation Points</div>
+                </div>
               </div>
-            </div>
-            <div className="stat-card purple">
-              <div className="stat-icon purple" aria-hidden="true">📊</div>
-              <div className="stat-lbl">Avg Score</div>
-              <div className="stat-val purple">{displayAvgScore}</div>
-              <div className="stat-trend trend-up">↑ out of 10</div>
-              <div className="sparkline" aria-hidden="true">
-                <div className="spark-bar" style={{height:"50%",background:"rgba(155,109,255,0.3)"}}></div>
-                <div className="spark-bar" style={{height:"65%",background:"rgba(155,109,255,0.4)"}}></div>
-                <div className="spark-bar" style={{height:"80%",background:"rgba(155,109,255,0.6)"}}></div>
-                <div className="spark-bar" style={{height:"95%",background:"var(--purple)"}}></div>
+
+              <div className="pf-sunrise-kpi-card" onClick={() => setActiveTab('achievements')} role="button" tabIndex={0}>
+                <div className="pf-sunrise-kpi-icon">
+                  <NavIcon name="shield" size={20} strokeWidth={2} color="#c8501d" />
+                </div>
+                <div>
+                  <div className="pf-sunrise-kpi-val" style={{ fontSize: "20px" }}>Zero Duplicates</div>
+                  <div className="pf-sunrise-kpi-lbl">Integrity Standard</div>
+                </div>
               </div>
-            </div>
-            <div className="stat-card blue">
-              <div className="stat-icon blue" aria-hidden="true">💻</div>
-              <div className="stat-lbl">Coding Accuracy</div>
-              <div className="stat-val blue">{codingAccuracy}%</div>
-              <div className="stat-trend trend-up">↑ test pass rate</div>
-              <div className="sparkline" aria-hidden="true">
-                <div className="spark-bar" style={{height:"40%",background:"rgba(77,159,255,0.3)"}}></div>
-                <div className="spark-bar" style={{height:"55%",background:"rgba(77,159,255,0.4)"}}></div>
-                <div className="spark-bar" style={{height:"70%",background:"rgba(77,159,255,0.5)"}}></div>
-                <div className="spark-bar" style={{height:"85%",background:"var(--blue)"}}></div>
+            </section>
+
+            {/* ── ALPINE SUNRISE BENTO ROW: HIKER JOURNEY + OVERALL PROGRESS ── */}
+            <section className="pf-sunrise-bento mb24" aria-label="Preparation journey and progress">
+              <div
+                className="pf-journey-banner"
+                style={{
+                  backgroundImage: `linear-gradient(90deg, rgba(44, 21, 13, 0.96) 0%, rgba(56, 28, 17, 0.88) 44%, rgba(56, 28, 17, 0.16) 100%), url(${journeyHikerImg})`,
+                }}
+              >
+                <div className="pf-journey-content">
+                  <h2 className="pf-journey-title">
+                    Your<br />Preparation<br />Journey
+                  </h2>
+                  <p className="pf-journey-desc">
+                    A structured path to build skills, confidence and interview readiness.
+                  </p>
+                  <button
+                    type="button"
+                    className="pf-journey-btn"
+                    onClick={() => setActiveTab('roadmap')}
+                  >
+                    View Roadmap →
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="stat-card gold">
-              <div className="stat-icon gold" aria-hidden="true">🎤</div>
-              <div className="stat-lbl">Speech Confidence</div>
-              <div className="stat-val gold">{speechConfidence}%</div>
-              <div className="stat-trend trend-up">↑ delivery score</div>
-              <div className="sparkline" aria-hidden="true">
-                <div className="spark-bar" style={{height:"60%",background:"rgba(255,209,102,0.3)"}}></div>
-                <div className="spark-bar" style={{height:"75%",background:"rgba(255,209,102,0.5)"}}></div>
-                <div className="spark-bar" style={{height:"95%",background:"var(--gold)"}}></div>
+
+              <div className="pf-sunrise-progress-card">
+                <div className="pf-sunrise-progress-head">
+                  <h3 className="pf-sunrise-progress-title">Overall Progress</h3>
+                  <button
+                    type="button"
+                    className="pf-sunrise-link-btn"
+                    onClick={() => setActiveTab('analytics')}
+                  >
+                    View Details ↗
+                  </button>
+                </div>
+
+                <div className="pf-sunrise-progress-body">
+                  <div style={{ position: "relative", width: "112px", height: "112px", flexShrink: 0 }}>
+                    <svg width="112" height="112" viewBox="0 0 112 112">
+                      <circle cx="56" cy="56" r={ringRadius} fill="none" stroke="#efe4dc" strokeWidth="10" />
+                      <circle
+                        cx="56"
+                        cy="56"
+                        r={ringRadius}
+                        fill="none"
+                        stroke="#d46326"
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={ringCircumference}
+                        strokeDashoffset={sunriseOverallPct > 0 ? ringOffset : ringCircumference * 0.92}
+                        transform="rotate(-90 56 56)"
+                      />
+                    </svg>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: "22px", fontWeight: 800, color: "#1f1916" }}>{sunriseOverallPct}%</span>
+                    </div>
+                  </div>
+
+                  <div className="pf-sunrise-progress-list">
+                    {[
+                      { dot: "#c8501d", label: "Coding Challenges", val: `${displayCoding} / ${displayCoding}` },
+                      { dot: "#f29d5e", label: "Interviews", val: `${displayTotal} / ${displayTotal}` },
+                      { dot: "#3a9d74", label: "Diagnostics", val: `${diagCount} / ${diagCount}` },
+                      { dot: "#9b87d6", label: "Consistency", val: `${displayStreak} / ${displayStreak}` },
+                    ].map((row) => (
+                      <div key={row.label} className="pf-sunrise-progress-row">
+                        <span className="pf-sunrise-progress-lbl">
+                          <span className="pf-sunrise-dot" style={{ background: row.dot }} />
+                          {row.label}
+                        </span>
+                        <span className="pf-sunrise-progress-val">{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </section>
+            </section>
+
+            {/* ── ALPINE SUNRISE QUICK ACTIONS ROW ── */}
+            <section className="mb24" aria-label="Quick actions">
+              <div className="sec-header mb12">
+                <div className="sec-title" style={{ fontSize: "17px", color: "#1f1916" }}>Quick Actions</div>
+                <button
+                  type="button"
+                  className="pf-sunrise-link-btn"
+                  onClick={() => setActiveTab('roadmap')}
+                >
+                  Explore All →
+                </button>
+              </div>
+              <div className="pf-quick-actions-grid">
+                {[
+                  { tab: "coding", icon: "coding", title: "Coding", desc: "Solve practice problems" },
+                  { tab: "speech", icon: "speech", title: "Speech AI", desc: "Improve communication" },
+                  { tab: "resume", icon: "resume", title: "Resume AI", desc: "Get ATS-ready resume" },
+                  { tab: "ava", icon: "video", title: "AI Interview", desc: "Practice with AI" },
+                  { tab: "analytics", icon: "analytics", title: "Analytics", desc: "Track your progress" },
+                ].map((act) => (
+                  <button
+                    key={act.tab}
+                    type="button"
+                    className="pf-quick-action-card"
+                    onClick={() => setActiveTab(act.tab)}
+                  >
+                    <div className="pf-quick-action-icon">
+                      <NavIcon name={act.icon} size={17} strokeWidth={1.9} color="#c8501d" />
+                    </div>
+                    <div className="pf-quick-action-title">{act.title}</div>
+                    <div className="pf-quick-action-desc">{act.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : (
+          <>
+            {/* QUICK LAUNCH STRIP */}
+            <section className="mb20" aria-label="Quick launch">
+              <div className="hero-card">
+                <div className="hero-top">
+                  <div>
+                    <div className="hero-greeting">{getTimeBasedGreeting()} · Daily Check-In</div>
+                    <h2 className="hero-name" style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", margin: "2px 0 4px" }}>
+                      Ready to level up, <span style={{ color: "#6d28d9" }}>{userName}</span>
+                    </h2>
+                    <p className="hero-sub">{hasData ? `You have completed ${displayTotal} practice sessions so far. Keep practicing!` : `Your AI coach is ready. You're on a ${displayStreak}-day streak — keep it going!`}</p>
+                  </div>
+                  <div className="hero-actions">
+                    <button className="btn btn-primary" onClick={() => setActiveTab('ava')}>▶ Start Mock Interview</button>
+                    <button className="btn btn-ghost" onClick={() => setActiveTab('coding')}>Resume Practice</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* STAT CARDS */}
+            <section className="mb24" aria-label="Performance statistics">
+              <div className="g4 stagger">
+                <div className="stat-card cyan">
+                  <div className="stat-icon cyan" aria-hidden="true">🎯</div>
+                  <div className="stat-lbl">Mock Interviews</div>
+                  <div className="stat-val cyan">{displayTotal}</div>
+                  <div className="stat-trend trend-up">↑ total sessions</div>
+                  <div className="sparkline" aria-hidden="true">
+                    <div className="spark-bar" style={{height:"30%",background:"#ede9fe"}}></div>
+                    <div className="spark-bar" style={{height:"45%",background:"#ddd6fe"}}></div>
+                    <div className="spark-bar" style={{height:"60%",background:"#c4b5fd"}}></div>
+                    <div className="spark-bar" style={{height:"75%",background:"#a78bfa"}}></div>
+                    <div className="spark-bar" style={{height:"90%",background:"#6d28d9"}}></div>
+                  </div>
+                </div>
+                <div className="stat-card purple">
+                  <div className="stat-icon purple" aria-hidden="true">📊</div>
+                  <div className="stat-lbl">Avg Score</div>
+                  <div className="stat-val purple">{displayAvgScore}</div>
+                  <div className="stat-trend trend-up">↑ out of 10</div>
+                  <div className="sparkline" aria-hidden="true">
+                    <div className="spark-bar" style={{height:"50%",background:"rgba(155,109,255,0.3)"}}></div>
+                    <div className="spark-bar" style={{height:"65%",background:"rgba(155,109,255,0.4)"}}></div>
+                    <div className="spark-bar" style={{height:"80%",background:"rgba(155,109,255,0.6)"}}></div>
+                    <div className="spark-bar" style={{height:"95%",background:"var(--purple)"}}></div>
+                  </div>
+                </div>
+                <div className="stat-card blue">
+                  <div className="stat-icon blue" aria-hidden="true">💻</div>
+                  <div className="stat-lbl">Coding Accuracy</div>
+                  <div className="stat-val blue">{codingAccuracy}%</div>
+                  <div className="stat-trend trend-up">↑ test pass rate</div>
+                  <div className="sparkline" aria-hidden="true">
+                    <div className="spark-bar" style={{height:"40%",background:"rgba(77,159,255,0.3)"}}></div>
+                    <div className="spark-bar" style={{height:"55%",background:"rgba(77,159,255,0.4)"}}></div>
+                    <div className="spark-bar" style={{height:"70%",background:"rgba(77,159,255,0.5)"}}></div>
+                    <div className="spark-bar" style={{height:"85%",background:"var(--blue)"}}></div>
+                  </div>
+                </div>
+                <div className="stat-card gold">
+                  <div className="stat-icon gold" aria-hidden="true">🎤</div>
+                  <div className="stat-lbl">Speech Confidence</div>
+                  <div className="stat-val gold">{speechConfidence}%</div>
+                  <div className="stat-trend trend-up">↑ delivery score</div>
+                  <div className="sparkline" aria-hidden="true">
+                    <div className="spark-bar" style={{height:"60%",background:"rgba(255,209,102,0.3)"}}></div>
+                    <div className="spark-bar" style={{height:"75%",background:"rgba(255,209,102,0.5)"}}></div>
+                    <div className="spark-bar" style={{height:"95%",background:"var(--gold)"}}></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
         {/* MAIN TWO-COL LAYOUT */}
         <div className="g-main">
@@ -353,27 +524,27 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                   <div className="continue-info">
                     <div className="continue-title">Coding Playground</div>
                     <div className="continue-meta">Solve algorithm challenges & upload question sheets</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(10, codingAccuracy)}%`, "--p-start":"#4d9fff", "--p-end":"#9b6dff"}}></div></div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${Math.max(10, codingAccuracy)}%`, "--p-start":"#4f46e5", "--p-end":"#7c3aed"}}></div></div>
                   </div>
                   <div className="continue-pct" style={{color:"var(--blue)"}}>{codingAccuracy}%</div>
                   <div className="continue-arrow">›</div>
                 </div>
                 <div className="continue-card" onClick={() => setActiveTab('ava')} tabIndex="0" role="button">
-                  <div className="continue-thumb" style={{background:"rgba(155,109,255,0.1)",border:"1px solid rgba(155,109,255,0.2)"}}>🤖</div>
+                  <div className="continue-thumb" style={{background:"#f5f3ff",border:"1px solid #ddd6fe"}}>🤖</div>
                   <div className="continue-info">
                     <div className="continue-title">Ava AI Interview Coach</div>
                     <div className="continue-meta">Adaptive voice mock interview sessions</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${displayReadiness}%`, "--p-start":"#9b6dff", "--p-end":"#00f0c8"}}></div></div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${displayReadiness}%`, "--p-start":"#7c3aed", "--p-end":"#a78bfa"}}></div></div>
                   </div>
                   <div className="continue-pct" style={{color:"var(--purple)"}}>{displayReadiness}%</div>
                   <div className="continue-arrow">›</div>
                 </div>
                 <div className="continue-card" onClick={() => setActiveTab('resume')} tabIndex="0" role="button">
-                  <div className="continue-thumb" style={{background:"rgba(0,240,200,0.08)",border:"1px solid rgba(0,240,200,0.18)"}}>📄</div>
+                  <div className="continue-thumb" style={{background:"#ecfdf5",border:"1px solid #a7f3d0"}}>📄</div>
                   <div className="continue-info">
                     <div className="continue-title">Resume ATS Scanner</div>
                     <div className="continue-meta">Match resume keywords against target job descriptions</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${resumeSkill}%`, "--p-start":"#00c4a7", "--p-end":"#00f0c8"}}></div></div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${resumeSkill}%`, "--p-start":"#6d28d9", "--p-end":"#8b5cf6"}}></div></div>
                   </div>
                   <div className="continue-pct" style={{color:"var(--cyan)"}}>{resumeSkill}%</div>
                   <div className="continue-arrow">›</div>
@@ -392,39 +563,39 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
               <div className="chart-area">
                 <svg className="main-chart" width="100%" viewBox="0 0 580 160" aria-label="Score trend chart" role="img">
                   <title>Score Trend</title>
-                  <line x1="0" y1="20" x2="580" y2="20" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
-                  <line x1="0" y1="60" x2="580" y2="60" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
-                  <line x1="0" y1="100" x2="580" y2="100" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
-                  <line x1="0" y1="140" x2="580" y2="140" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+                  <line x1="0" y1="20" x2="580" y2="20" stroke="#e2e8f0" strokeWidth="1"/>
+                  <line x1="0" y1="60" x2="580" y2="60" stroke="#e2e8f0" strokeWidth="1"/>
+                  <line x1="0" y1="100" x2="580" y2="100" stroke="#e2e8f0" strokeWidth="1"/>
+                  <line x1="0" y1="140" x2="580" y2="140" stroke="#e2e8f0" strokeWidth="1"/>
                   
                   <defs>
                     <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#00f0c8" stopOpacity="0.18"/>
-                      <stop offset="100%" stopColor="#00f0c8" stopOpacity="0"/>
+                      <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.20"/>
+                      <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"/>
                     </linearGradient>
                   </defs>
                   
                   {hasChartData ? (
                     <>
                       <path d={fillPath} fill="url(#cyanGrad)"/>
-                      <polyline points={polylinePoints} fill="none" stroke="#00f0c8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <polyline points={polylinePoints} fill="none" stroke="#6d28d9" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                       
                       {chartPoints.map((p, idx) => (
-                        <circle key={idx} cx={p.x} cy={p.y} r={idx === chartPoints.length - 1 ? 5 : 3.5} fill="var(--bg2)" stroke={idx === chartPoints.length - 1 ? "#ffd166" : "#00f0c8"} strokeWidth={idx === chartPoints.length - 1 ? 2.5 : 2}/>
+                        <circle key={idx} cx={p.x} cy={p.y} r={idx === chartPoints.length - 1 ? 5 : 3.5} fill="#ffffff" stroke={idx === chartPoints.length - 1 ? "#f59e0b" : "#6d28d9"} strokeWidth={idx === chartPoints.length - 1 ? 2.5 : 2}/>
                       ))}
                       
                       {chartPoints.map((p, idx) => {
                         const shouldShow = idx === 0 || idx === chartPoints.length - 1 || idx === Math.floor(chartPoints.length / 2);
                         if (!shouldShow) return null;
                         return (
-                          <text key={idx} x={p.x} y={156} fontSize="8.5" fill={idx === chartPoints.length - 1 ? "#ffd166" : "#4a5a7a"} textAnchor="middle" fontFamily="Cabinet Grotesk,sans-serif">
+                          <text key={idx} x={p.x} y={156} fontSize="9.5" fill={idx === chartPoints.length - 1 ? "#d97706" : "#64748b"} textAnchor="middle" fontFamily="Plus Jakarta Sans,sans-serif">
                             {p.label}
                           </text>
                         );
                       })}
                     </>
                   ) : (
-                    <text x="290" y="80" fontSize="11" fill="#4a5a7a" textAnchor="middle" fontFamily="Cabinet Grotesk,sans-serif">
+                    <text x="290" y="80" fontSize="11.5" fill="#64748b" textAnchor="middle" fontFamily="Plus Jakarta Sans,sans-serif">
                       No session data recorded yet. Start a session to view real-time score analytics.
                     </text>
                   )}

@@ -82,7 +82,7 @@ export default function Organizations({ onNavigateCreate }) {
 
   if (loading) {
     return (
-      <div style={{ color: "#00c4a7", padding: "60px", textAlign: "center", fontWeight: 800 }}>
+      <div style={{ color: "#6d28d9", padding: "60px", textAlign: "center", fontWeight: 800 }}>
         ⚡ Loading Global Organization Management Center...
       </div>
     );
@@ -94,7 +94,7 @@ export default function Organizations({ onNavigateCreate }) {
       {/* 1. HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             🏢 Global Organization Management Center
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
@@ -106,14 +106,14 @@ export default function Organizations({ onNavigateCreate }) {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={onNavigateCreate}
-            style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,196,167,0.3)" }}
+            style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,40,217,0.3)" }}
           >
             ➕ Create Organization & Admin
           </button>
           
           <button
             onClick={() => setShowBulkImportModal(true)}
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "9px 14px", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "9px 14px", color: "#0f172a", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
           >
             📥 Bulk Import (CSV)
           </button>
@@ -130,73 +130,73 @@ export default function Organizations({ onNavigateCreate }) {
       {/* 2. 12 TOP KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px" }}>
         
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>14 Institutions</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>14 Institutions</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +12.5% MoM</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE ORGANIZATIONS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>12 Active</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 85.7% Active Rate</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TRIAL ORGANIZATIONS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>2 Trial</div>
           <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ 14-Day Free Access</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>EXPIRED / DUE</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>1 Expired</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>⚠️ Renewal Pending</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>SUSPENDED ORGS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>0 Suspended</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Clean Compliance</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL STUDENTS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>1,420</div>
           <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>▲ +24% YoY</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ADMINS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>18 Admins</div>
           <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>Directors & Placement</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL RECRUITERS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>14 Corporate</div>
           <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>Hiring Drives Active</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MONTHLY REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>₹42,850.00</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>₹42,850.00</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +18.4% Growth</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVG HEALTH SCORE</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>94.2% 🟢</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>High Engagement</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ADDED THIS MONTH</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>+3 Colleges</div>
           <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Onboarded Successfully</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RENEWALS DUE</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>2 Orgs Due</div>
           <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>In Next 30 Days</div>
@@ -205,7 +205,7 @@ export default function Organizations({ onNavigateCreate }) {
       </div>
 
       {/* 3. SUB-NAVIGATION TABS */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e5e8f2", paddingBottom: "10px", flexWrap: "wrap" }}>
         {[
           { id: 'directory', label: '🏢 Organization Directory (Table View)' },
           { id: 'analytics', label: '📊 Institution Growth & Revenue Distribution' },
@@ -216,7 +216,7 @@ export default function Organizations({ onNavigateCreate }) {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{
-              background: activeTab === t.id ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+              background: activeTab === t.id ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
               border: 'none',
               borderRadius: '8px',
               padding: '9px 16px',
@@ -243,16 +243,16 @@ export default function Organizations({ onNavigateCreate }) {
       {/* TAB 2: ANALYTICS */}
       {activeTab === 'analytics' && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>📊 Organizations by Type</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>📊 Organizations by Type</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
               <div>Academic Colleges & Universities: <strong>10 (71%)</strong></div>
               <div>Corporate Companies & Recruiters: <strong>4 (29%)</strong></div>
             </div>
           </div>
 
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", margin: "0 0 16px 0" }}>💳 Revenue Contribution</h3>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "0 0 16px 0" }}>💳 Revenue Contribution</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
               <div>Stanford Tech Institute: <strong>₹50,000 / month</strong></div>
               <div>MIT School of Computing: <strong>₹75,000 / month</strong></div>
@@ -264,8 +264,8 @@ export default function Organizations({ onNavigateCreate }) {
 
       {/* TAB 3: HEALTH SCORE INDEX */}
       {activeTab === 'health' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             🩺 Organization Health Score Index (0 – 100 Benchmark)
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", fontSize: "12px" }}>
@@ -287,19 +287,19 @@ export default function Organizations({ onNavigateCreate }) {
       {activeTab === 'subscription' && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE PAID SUBSCRIPTIONS</div>
-              <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>12 Active Paid</div>
+              <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>12 Active Paid</div>
               <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 85.7% Premium Adoption</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>UPCOMING RENEWALS (30 DAYS)</div>
               <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>2 Institutions Due</div>
               <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>Stanford Tech & MIT</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "16px", padding: "18px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MONTHLY CONTRACT REVENUE</div>
               <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>₹42,850.00 / mo</div>
               <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +18.4% YoY</div>
@@ -307,15 +307,15 @@ export default function Organizations({ onNavigateCreate }) {
           </div>
 
           {/* SUBSCRIPTION TABLE BREAKDOWN */}
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
               💳 Institution Subscription & Contract Ledger
             </h3>
 
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px" }}>Institution</th>
                     <th style={{ padding: "10px" }}>Plan Tier</th>
                     <th style={{ padding: "10px" }}>Monthly Revenue</th>
@@ -327,15 +327,15 @@ export default function Organizations({ onNavigateCreate }) {
                 </thead>
                 <tbody>
                   {orgs.map(o => (
-                    <tr key={o.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#fff" }}>{o.name}</td>
+                    <tr key={o.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
+                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#0f172a" }}>{o.name}</td>
                       <td style={{ padding: "12px 10px" }}>
                         <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(139,92,246,0.15)", color: "#a78bfa", fontWeight: 800 }}>
                           {o.subscription_plan || 'ENTERPRISE'}
                         </span>
                       </td>
-                      <td style={{ padding: "12px 10px", color: "#00c4a7", fontWeight: 800 }}>₹{(o.monthly_revenue || 4999).toLocaleString()} / mo</td>
-                      <td style={{ padding: "12px 10px", color: "#fff" }}>{o.subscription_expiry || '2026-12-31'}</td>
+                      <td style={{ padding: "12px 10px", color: "#6d28d9", fontWeight: 800 }}>₹{(o.monthly_revenue || 4999).toLocaleString()} / mo</td>
+                      <td style={{ padding: "12px 10px", color: "#0f172a" }}>{o.subscription_expiry || '2026-12-31'}</td>
                       <td style={{ padding: "12px 10px", color: "#10b981", fontWeight: 800 }}>Enabled 🟢</td>
                       <td style={{ padding: "12px 10px" }}>
                         <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(16,185,129,0.15)", color: "#10b981", fontWeight: 800 }}>
@@ -344,7 +344,7 @@ export default function Organizations({ onNavigateCreate }) {
                       </td>
                       <td style={{ padding: "12px 10px", textAlign: "right" }}>
                         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => alert(`Billing invoice dispatched to ${o.email}`)} style={{ background: "rgba(0,196,167,0.15)", border: "none", color: "#00c4a7", padding: "4px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 800, cursor: "pointer" }}>
+                          <button onClick={() => alert(`Billing invoice dispatched to ${o.email}`)} style={{ background: "rgba(109,40,217,0.15)", border: "none", color: "#6d28d9", padding: "4px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 800, cursor: "pointer" }}>
                             📄 Invoice
                           </button>
                           <button onClick={() => setSelectedOrg(o)} style={{ background: "rgba(139,92,246,0.15)", border: "none", color: "#a78bfa", padding: "4px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 800, cursor: "pointer" }}>
@@ -364,16 +364,16 @@ export default function Organizations({ onNavigateCreate }) {
       {/* 4. ORGANIZATION DETAILS DRAWER */}
       {selectedOrg && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "640px", background: "#0c1220", borderLeft: "1px solid rgba(0,196,167,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#fff", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
+          <div style={{ width: "100%", maxWidth: "640px", background: "#ffffff", borderLeft: "1px solid rgba(109,40,217,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#0f172a", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
             
             {/* DRAWER HEADER */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #cbd5e1", paddingBottom: "16px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", fontSize: "18px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", fontSize: "18px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {selectedOrg.name?.[0] || "O"}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>{selectedOrg.name}</h3>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>{selectedOrg.name}</h3>
                   <div style={{ fontSize: "11px", color: "#94a3b8" }}>{selectedOrg.domain || selectedOrg.website} • {selectedOrg.id}</div>
                 </div>
               </div>
@@ -387,9 +387,9 @@ export default function Organizations({ onNavigateCreate }) {
                   key={t}
                   onClick={() => setDrawerTab(t)}
                   style={{
-                    background: drawerTab === t ? 'rgba(0,196,167,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: drawerTab === t ? '1px solid #00c4a7' : 'none',
-                    color: drawerTab === t ? '#00c4a7' : '#94a3b8',
+                    background: drawerTab === t ? 'rgba(109,40,217,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: drawerTab === t ? '1px solid #6d28d9' : 'none',
+                    color: drawerTab === t ? '#6d28d9' : '#94a3b8',
                     borderRadius: '6px',
                     padding: '6px 12px',
                     fontSize: '11px',
@@ -413,7 +413,7 @@ export default function Organizations({ onNavigateCreate }) {
                   <div><strong>Primary Admin:</strong> {selectedOrg.admin_name}</div>
                   <div><strong>Email:</strong> {selectedOrg.email}</div>
                   <div><strong>Phone:</strong> {selectedOrg.phone}</div>
-                  <div><strong>Website:</strong> <a href={selectedOrg.website} target="_blank" rel="noreferrer" style={{ color: "#00c4a7" }}>{selectedOrg.website}</a></div>
+                  <div><strong>Website:</strong> <a href={selectedOrg.website} target="_blank" rel="noreferrer" style={{ color: "#6d28d9" }}>{selectedOrg.website}</a></div>
                   <div><strong>GST Number:</strong> {selectedOrg.gst_number}</div>
                   <div><strong>Location:</strong> {selectedOrg.city}, {selectedOrg.country}</div>
                 </div>
@@ -464,7 +464,7 @@ export default function Organizations({ onNavigateCreate }) {
       {/* 5. BULK IMPORT CSV MODAL */}
       {showBulkImportModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "100%", color: "#0f172a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
                 📥 Bulk Organization Importer (CSV)
@@ -473,9 +473,9 @@ export default function Organizations({ onNavigateCreate }) {
             </div>
 
             <form onSubmit={handleBulkImport} style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px" }}>
-              <div style={{ border: "2px dashed rgba(0,196,167,0.3)", borderRadius: "12px", padding: "24px", textAlign: "center", background: "rgba(0,196,167,0.04)" }}>
+              <div style={{ border: "2px dashed rgba(109,40,217,0.3)", borderRadius: "12px", padding: "24px", textAlign: "center", background: "rgba(109,40,217,0.04)" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>📁</div>
-                <div style={{ fontWeight: 800, color: "#fff" }}>Choose or Drop Organization CSV File</div>
+                <div style={{ fontWeight: 800, color: "#0f172a" }}>Choose or Drop Organization CSV File</div>
                 <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px" }}>Headers: name, type, admin_name, email, city, student_limit</div>
                 <input
                   type="file"
@@ -488,7 +488,7 @@ export default function Organizations({ onNavigateCreate }) {
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
                 <button type="button" onClick={() => setShowBulkImportModal(false)} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700 }}>Cancel</button>
-                <button type="submit" style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Upload & Process CSV</button>
+                <button type="submit" style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Upload & Process CSV</button>
               </div>
             </form>
           </div>
@@ -498,7 +498,7 @@ export default function Organizations({ onNavigateCreate }) {
       {/* 6. BROADCAST ANNOUNCEMENT MODAL */}
       {showBroadcastModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "520px", width: "100%", color: "#0f172a" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
@@ -514,7 +514,7 @@ export default function Organizations({ onNavigateCreate }) {
                   <select
                     value={broadcastForm.target}
                     onChange={e => setBroadcastForm({ ...broadcastForm, target: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="All Organization Admins">All Institution Directors & Admins</option>
                     <option value="Colleges Only">College Deans & Placement Heads</option>
@@ -527,7 +527,7 @@ export default function Organizations({ onNavigateCreate }) {
                   <select
                     value={broadcastForm.priority}
                     onChange={e => setBroadcastForm({ ...broadcastForm, priority: e.target.value })}
-                    style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
+                    style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", outline: "none" }}
                   >
                     <option value="Normal">Normal Portal Banner</option>
                     <option value="High">High Priority Announcement</option>
@@ -544,7 +544,7 @@ export default function Organizations({ onNavigateCreate }) {
                   value={broadcastForm.title}
                   onChange={e => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
                   placeholder="e.g. Q3 AI Mock Interview Evaluation Criteria Updated"
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 
@@ -556,7 +556,7 @@ export default function Organizations({ onNavigateCreate }) {
                   value={broadcastForm.message}
                   onChange={e => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
                   placeholder="Official announcement text to be displayed on all organization admin dashboards..."
-                  style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }}
                 />
               </div>
 

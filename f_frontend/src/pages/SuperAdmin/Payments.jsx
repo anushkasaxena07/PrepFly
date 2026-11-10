@@ -24,7 +24,7 @@ export default function Payments() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <div>
-        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0 }}>💳 Platform Revenue & Payment Transactions</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0 }}>💳 Platform Revenue & Payment Transactions</h2>
         <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Global transaction ledger across all student subscriptions and enterprise contracts.</p>
       </div>
 

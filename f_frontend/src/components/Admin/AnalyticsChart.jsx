@@ -48,31 +48,31 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
     }).join(" ");
 
     return (
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>📈 {title || "Monthly Activity Trend"}</h3>
+          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>📈 {title || "Monthly Activity Trend"}</h3>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
-            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● {label1 || "AI Mock Practice"}</span>
-            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● {label2 || "Coding Readiness"}</span>
+            <span style={{ color: "#6d28d9", fontWeight: 700 }}>● {label1 || "AI Mock Practice"}</span>
+            <span style={{ color: "#7c3aed", fontWeight: 700 }}>● {label2 || "Coding Readiness"}</span>
           </div>
         </div>
 
         <svg viewBox="0 0 360 160" style={{ width: "100%", height: "auto" }}>
           {/* Grid lines */}
-          <line x1="20" y1="30" x2="340" y2="30" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
-          <line x1="20" y1="80" x2="340" y2="80" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
+          <line x1="20" y1="30" x2="340" y2="30" stroke="#f1f5f9" strokeDasharray="4" />
+          <line x1="20" y1="80" x2="340" y2="80" stroke="#f1f5f9" strokeDasharray="4" />
           <line x1="20" y1="130" x2="340" y2="130" stroke="rgba(255,255,255,0.12)" />
 
           {/* Polyline 1 */}
-          <polyline fill="none" stroke="#00c4a7" strokeWidth="3" points={points1} strokeLinecap="round" />
+          <polyline fill="none" stroke="#6d28d9" strokeWidth="3" points={points1} strokeLinecap="round" />
           {/* Polyline 2 */}
-          <polyline fill="none" stroke="#7c4fe0" strokeWidth="3" points={points2} strokeLinecap="round" />
+          <polyline fill="none" stroke="#7c3aed" strokeWidth="3" points={points2} strokeLinecap="round" />
 
           {/* Data Points */}
           {values1.map((val, idx) => {
             const x = (idx / Math.max(1, labels.length - 1)) * 300 + 30;
             const y = 130 - (val / maxVal) * 100;
-            return <circle key={`p1-${idx}`} cx={x} cy={y} r="3.5" fill="#00c4a7" stroke="#0c1220" strokeWidth="1.5" />;
+            return <circle key={`p1-${idx}`} cx={x} cy={y} r="3.5" fill="#6d28d9" stroke="#ffffff" strokeWidth="1.5" />;
           })}
 
           {/* X Axis Labels */}
@@ -94,18 +94,18 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
     const step = 300 / Math.max(1, numBars);
 
     return (
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>📊 {title || "Department Average Scores"}</h3>
+          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>📊 {title || "Department Average Scores"}</h3>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
-            <span style={{ color: "#00c4a7", fontWeight: 700 }}>● {label1 || "Interview Avg"}</span>
-            <span style={{ color: "#7c4fe0", fontWeight: 700 }}>● {label2 || "Coding Avg"}</span>
+            <span style={{ color: "#6d28d9", fontWeight: 700 }}>● {label1 || "Interview Avg"}</span>
+            <span style={{ color: "#7c3aed", fontWeight: 700 }}>● {label2 || "Coding Avg"}</span>
           </div>
         </div>
 
         <svg viewBox="0 0 360 160" style={{ width: "100%", height: "auto" }}>
-          <line x1="20" y1="30" x2="340" y2="30" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
-          <line x1="20" y1="80" x2="340" y2="80" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
+          <line x1="20" y1="30" x2="340" y2="30" stroke="#f1f5f9" strokeDasharray="4" />
+          <line x1="20" y1="80" x2="340" y2="80" stroke="#f1f5f9" strokeDasharray="4" />
           <line x1="20" y1="130" x2="340" y2="130" stroke="rgba(255,255,255,0.12)" />
 
           {labels.map((lbl, idx) => {
@@ -118,8 +118,8 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
 
             return (
               <g key={idx}>
-                <rect x={groupX} y={130 - h1} width="14" height={h1} rx="4" fill="#00c4a7" />
-                <rect x={groupX + 16} y={130 - h2} width="14" height={h2} rx="4" fill="#7c4fe0" />
+                <rect x={groupX} y={130 - h1} width="14" height={h1} rx="4" fill="#6d28d9" />
+                <rect x={groupX + 16} y={130 - h2} width="14" height={h2} rx="4" fill="#7c3aed" />
                 <text x={groupX + 15} y="148" fill="var(--text2)" fontSize="10" fontWeight="700" textAnchor="middle">
                   {formatShortLabel(lbl)}
                 </text>

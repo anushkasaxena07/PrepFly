@@ -1,6 +1,8 @@
 import React from 'react';
+import { usePrepFlyTheme } from '../ui/ThemeContext';
 
 export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) {
+  const { isSunrise } = usePrepFlyTheme();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '⚡' },
     { id: 'organizations', label: 'Organizations', icon: '🏢' },
@@ -26,36 +28,39 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
   };
 
   return (
-    <aside style={{
-      width: isCollapsed ? "72px" : "260px",
+    <aside className="pf-portal-sidebar" style={{
+      width: isCollapsed ? "74px" : "248px",
       minHeight: "100vh",
-      background: "#050811",
-      borderRight: "1px solid rgba(255,255,255,0.08)",
+      background: isSunrise
+        ? "linear-gradient(180deg, #fdf9f6 0%, #faf4ee 100%)"
+        : "linear-gradient(180deg, #0b0e1a 0%, #0e1222 100%)",
+      borderRight: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.07)",
       display: "flex",
       flexDirection: "column",
       transition: "width 0.2s ease",
       position: "sticky",
       top: 0,
       zIndex: 100,
-      userSelect: "none"
+      userSelect: "none",
+      color: isSunrise ? "#3d322c" : "#e2e8f0"
     }}>
       {/* BRAND & TOGGLE HEADER */}
       <div style={{
-        height: "64px",
+        height: "68px",
         padding: "0 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: isCollapsed ? "center" : "space-between",
-        borderBottom: "1px solid rgba(255,255,255,0.06)"
+        borderBottom: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.06)"
       }}>
         {!isCollapsed && (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover", boxShadow: "0 0 10px rgba(236,72,153,0.5)" }} />
+            <img src="/prepfly-logo.png" alt="PrepFly Logo" style={{ width: "32px", height: "32px", borderRadius: "10px", objectFit: "cover", boxShadow: isSunrise ? "0 4px 14px rgba(200,80,29,0.28)" : "0 4px 14px rgba(109,40,217,0.4)" }} />
             <div>
-              <div style={{ fontWeight: 900, fontSize: "14px", color: "#fff", lineHeight: "1.2" }}>
+              <div style={{ fontWeight: 800, fontSize: "14px", color: isSunrise ? "#1f1916" : "#fff", lineHeight: "1.2" }}>
                 PrepFly Console
               </div>
-              <div style={{ fontSize: "10px", color: "#ec4899", fontWeight: 800, textTransform: "uppercase" }}>
+              <div style={{ fontSize: "10px", color: isSunrise ? "#c8501d" : "#a78bfa", fontWeight: 700, textTransform: "uppercase" }}>
                 Super Admin
               </div>
             </div>
@@ -65,10 +70,10 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           style={{
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
+            background: isSunrise ? "#ffffff" : "rgba(255,255,255,0.05)",
+            border: isSunrise ? "1px solid #e4d2c4" : "1px solid rgba(255,255,255,0.1)",
             borderRadius: "6px",
-            color: "var(--text2)",
+            color: isSunrise ? "#5d4e45" : "var(--text2)",
             padding: "4px 8px",
             cursor: "pointer",
             fontSize: "12px"
@@ -94,10 +99,14 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                 padding: isCollapsed ? "10px 0" : "9px 14px",
                 justifyContent: isCollapsed ? "center" : "flex-start",
                 borderRadius: "10px",
-                background: isActive ? "linear-gradient(135deg, rgba(236,72,153,0.25), rgba(139,92,246,0.2))" : "transparent",
-                border: isActive ? "1px solid rgba(236,72,153,0.4)" : "1px solid transparent",
-                color: isActive ? "#fff" : "var(--text2)",
-                fontWeight: isActive ? 800 : 600,
+                background: isActive
+                  ? (isSunrise ? "#fce3d4" : "linear-gradient(90deg, rgba(109,40,217,0.44) 0%, rgba(79,70,229,0.20) 100%)")
+                  : "transparent",
+                border: isActive
+                  ? (isSunrise ? "1px solid #f5cbb2" : "1px solid rgba(167,139,250,0.34)")
+                  : "1px solid transparent",
+                color: isActive ? (isSunrise ? "#b84718" : "#ffffff") : (isSunrise ? "#4c3f37" : "#94a3b8"),
+                fontWeight: isActive ? 700 : 600,
                 fontSize: "13px",
                 cursor: "pointer",
                 transition: "all 0.15s ease",

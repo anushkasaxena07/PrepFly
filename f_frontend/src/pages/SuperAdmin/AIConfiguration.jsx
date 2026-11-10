@@ -104,7 +104,7 @@ export default function AIConfiguration() {
 
   if (loading) {
     return (
-      <div style={{ color: "#00c4a7", padding: "60px", textAlign: "center", fontWeight: 800 }}>
+      <div style={{ color: "#6d28d9", padding: "60px", textAlign: "center", fontWeight: 800 }}>
         ⚡ Loading enterprise LLM & Speech AI configuration...
       </div>
     );
@@ -116,7 +116,7 @@ export default function AIConfiguration() {
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             🤖 Multi-Provider LLM & AI Engine Command Center
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
@@ -133,15 +133,15 @@ export default function AIConfiguration() {
             onClick={handleSaveConfig}
             disabled={saving}
             style={{
-              background: "linear-gradient(135deg, #00c4a7, #7c4fe0)",
+              background: "linear-gradient(135deg, #6d28d9, #7c3aed)",
               border: "none",
               borderRadius: "8px",
               padding: "10px 20px",
               fontSize: "12px",
               fontWeight: 900,
-              color: "#fff",
+              color: "#0f172a",
               cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(0,196,167,0.3)"
+              boxShadow: "0 4px 14px rgba(109,40,217,0.3)"
             }}
           >
             {saving ? "Saving Configurations..." : "💾 Save All AI Settings"}
@@ -150,21 +150,21 @@ export default function AIConfiguration() {
       </div>
 
       {/* SECTION 1: MULTI-PROVIDER API KEYS & LLM MODELS */}
-      <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-        <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+        <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
           🔑 Enterprise LLM API Keys & Model Routing
         </h3>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "20px" }}>
           
           {/* PROVIDER 1: GOOGLE GEMINI */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "12px", padding: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "18px" }}>✨</span>
-                <span style={{ fontSize: "13px", fontWeight: 800, color: "#00c4a7" }}>Google Gemini API (Primary)</span>
+                <span style={{ fontSize: "13px", fontWeight: 800, color: "#6d28d9" }}>Google Gemini API (Primary)</span>
               </div>
-              <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(0,196,167,0.15)", color: "#00c4a7", fontWeight: 800 }}>PRIMARY ENGINE</span>
+              <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "rgba(109,40,217,0.15)", color: "#6d28d9", fontWeight: 800 }}>PRIMARY ENGINE</span>
             </div>
 
             <div style={{ marginBottom: "12px" }}>
@@ -175,7 +175,7 @@ export default function AIConfiguration() {
                   value={config.gemini_api_key || ''}
                   onChange={(e) => setConfig({ ...config, gemini_api_key: e.target.value })}
                   placeholder="AIzaSy..."
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#fff", fontFamily: "monospace", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#0f172a", fontFamily: "monospace", outline: "none" }}
                 />
                 <button
                   type="button"
@@ -193,7 +193,7 @@ export default function AIConfiguration() {
                 <select
                   value={config.primary_model || 'gemini-1.5-flash'}
                   onChange={(e) => setConfig({ ...config, primary_model: e.target.value })}
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#0f172a", outline: "none" }}
                 >
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Fast)</option>
                   <option value="gemini-1.5-pro">Gemini 1.5 Pro (High Reasoning)</option>
@@ -204,7 +204,7 @@ export default function AIConfiguration() {
               <button
                 onClick={() => handleTestConnection('gemini', config.gemini_api_key, config.primary_model)}
                 disabled={testingProvider === 'gemini'}
-                style={{ background: "rgba(0,196,167,0.15)", border: "1px solid rgba(0,196,167,0.3)", color: "#00c4a7", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "7px 12px", cursor: "pointer", marginTop: "16px" }}
+                style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "#6d28d9", borderRadius: "6px", fontSize: "11px", fontWeight: 800, padding: "7px 12px", cursor: "pointer", marginTop: "16px" }}
               >
                 {testingProvider === 'gemini' ? 'Testing...' : '⚡ Test API'}
               </button>
@@ -218,7 +218,7 @@ export default function AIConfiguration() {
           </div>
 
           {/* PROVIDER 2: OPENAI */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "12px", padding: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "18px" }}>🧠</span>
@@ -235,7 +235,7 @@ export default function AIConfiguration() {
                   value={config.openai_api_key || ''}
                   onChange={(e) => setConfig({ ...config, openai_api_key: e.target.value })}
                   placeholder="sk-proj-..."
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#fff", fontFamily: "monospace", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#0f172a", fontFamily: "monospace", outline: "none" }}
                 />
                 <button
                   type="button"
@@ -253,7 +253,7 @@ export default function AIConfiguration() {
                 <select
                   value={config.fallback_model || 'gpt-4o-mini'}
                   onChange={(e) => setConfig({ ...config, fallback_model: e.target.value })}
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#0f172a", outline: "none" }}
                 >
                   <option value="gpt-4o-mini">GPT-4o Mini (Cost Efficient)</option>
                   <option value="gpt-4o">GPT-4o (High Intelligence)</option>
@@ -278,7 +278,7 @@ export default function AIConfiguration() {
           </div>
 
           {/* PROVIDER 3: ANTHROPIC CLAUDE */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "18px" }}>📜</span>
@@ -295,7 +295,7 @@ export default function AIConfiguration() {
                   value={config.anthropic_api_key || ''}
                   onChange={(e) => setConfig({ ...config, anthropic_api_key: e.target.value })}
                   placeholder="sk-ant-..."
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#fff", fontFamily: "monospace", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#0f172a", fontFamily: "monospace", outline: "none" }}
                 />
                 <button
                   type="button"
@@ -313,7 +313,7 @@ export default function AIConfiguration() {
                 <select
                   value={config.anthropic_model || 'claude-3-5-sonnet'}
                   onChange={(e) => setConfig({ ...config, anthropic_model: e.target.value })}
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#0f172a", outline: "none" }}
                 >
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
                   <option value="claude-3-haiku">Claude 3 Haiku</option>
@@ -337,7 +337,7 @@ export default function AIConfiguration() {
           </div>
 
           {/* PROVIDER 4: DEEPSEEK */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "18px" }}>🤖</span>
@@ -354,7 +354,7 @@ export default function AIConfiguration() {
                   value={config.deepseek_api_key || ''}
                   onChange={(e) => setConfig({ ...config, deepseek_api_key: e.target.value })}
                   placeholder="sk-deepseek-..."
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#fff", fontFamily: "monospace", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#0f172a", fontFamily: "monospace", outline: "none" }}
                 />
                 <button
                   type="button"
@@ -372,7 +372,7 @@ export default function AIConfiguration() {
                 <select
                   value={config.deepseek_model || 'deepseek-reasoner'}
                   onChange={(e) => setConfig({ ...config, deepseek_model: e.target.value })}
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#0f172a", outline: "none" }}
                 >
                   <option value="deepseek-reasoner">DeepSeek R1 Reasoner</option>
                   <option value="deepseek-chat">DeepSeek Chat V3</option>
@@ -396,7 +396,7 @@ export default function AIConfiguration() {
           </div>
 
           {/* PROVIDER 5: ELEVENLABS SPEECH */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "16px" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "16px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <span style={{ fontSize: "18px" }}>🎙️</span>
@@ -413,7 +413,7 @@ export default function AIConfiguration() {
                   value={config.elevenlabs_api_key || ''}
                   onChange={(e) => setConfig({ ...config, elevenlabs_api_key: e.target.value })}
                   placeholder="el-..."
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#fff", fontFamily: "monospace", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 36px 8px 12px", fontSize: "12px", color: "#0f172a", fontFamily: "monospace", outline: "none" }}
                 />
                 <button
                   type="button"
@@ -431,7 +431,7 @@ export default function AIConfiguration() {
                 <select
                   value={config.voice_model || 'rachel_conversational'}
                   onChange={(e) => setConfig({ ...config, voice_model: e.target.value })}
-                  style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#fff", outline: "none" }}
+                  style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "6px 8px", fontSize: "11px", color: "#0f172a", outline: "none" }}
                 >
                   <option value="rachel_conversational">Rachel (Human Conversational)</option>
                   <option value="adam_professional">Adam (Corporate Professional)</option>
@@ -459,8 +459,8 @@ export default function AIConfiguration() {
       </div>
 
       {/* SECTION 2: GLOBAL HYPERPARAMETERS & ORCHESTRATION */}
-      <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-        <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+        <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
           🎛 LLM Hyperparameters & Sampling Controls
         </h3>
 
@@ -487,7 +487,7 @@ export default function AIConfiguration() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
               <label style={{ fontWeight: 800, color: "#94a3b8" }}>TOP-P NUCLEUS SAMPLING</label>
-              <span style={{ fontWeight: 900, color: "#00c4a7" }}>{config.top_p ?? 0.95}</span>
+              <span style={{ fontWeight: 900, color: "#6d28d9" }}>{config.top_p ?? 0.95}</span>
             </div>
             <input
               type="range"
@@ -496,7 +496,7 @@ export default function AIConfiguration() {
               step="0.05"
               value={config.top_p ?? 0.95}
               onChange={(e) => setConfig({ ...config, top_p: parseFloat(e.target.value) })}
-              style={{ width: "100%", accentColor: "#00c4a7" }}
+              style={{ width: "100%", accentColor: "#6d28d9" }}
             />
           </div>
 
@@ -506,14 +506,14 @@ export default function AIConfiguration() {
               type="number"
               value={config.max_tokens ?? 2048}
               onChange={(e) => setConfig({ ...config, max_tokens: parseInt(e.target.value) || 2048 })}
-              style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", outline: "none" }}
+              style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", outline: "none" }}
             />
           </div>
         </div>
       </div>
 
       {/* SECTION 3: SYSTEM PROMPT ENGINEERING STUDIO */}
-      <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
+      <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
         
         {/* PROMPT TABS */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
@@ -521,7 +521,7 @@ export default function AIConfiguration() {
             <button
               onClick={() => setActivePromptTab('interview')}
               style={{
-                background: activePromptTab === 'interview' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+                background: activePromptTab === 'interview' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '12px', fontWeight: 800, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer'
               }}
             >
@@ -531,7 +531,7 @@ export default function AIConfiguration() {
             <button
               onClick={() => setActivePromptTab('resume')}
               style={{
-                background: activePromptTab === 'resume' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+                background: activePromptTab === 'resume' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '12px', fontWeight: 800, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer'
               }}
             >
@@ -541,7 +541,7 @@ export default function AIConfiguration() {
             <button
               onClick={() => setActivePromptTab('coding')}
               style={{
-                background: activePromptTab === 'coding' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+                background: activePromptTab === 'coding' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '12px', fontWeight: 800, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer'
               }}
             >
@@ -551,7 +551,7 @@ export default function AIConfiguration() {
             <button
               onClick={() => setActivePromptTab('report')}
               style={{
-                background: activePromptTab === 'report' ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+                background: activePromptTab === 'report' ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '12px', fontWeight: 800, padding: '8px 14px', borderRadius: '8px', cursor: 'pointer'
               }}
             >
@@ -568,7 +568,7 @@ export default function AIConfiguration() {
               key={idx}
               type="button"
               onClick={() => insertVariable(v)}
-              style={{ background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", color: "#00c4a7", fontSize: "10px", fontWeight: 800, borderRadius: "4px", padding: "3px 8px", cursor: "pointer" }}
+              style={{ background: "rgba(109,40,217,0.12)", border: "1px solid rgba(109,40,217,0.3)", color: "#6d28d9", fontSize: "10px", fontWeight: 800, borderRadius: "4px", padding: "3px 8px", cursor: "pointer" }}
             >
               + {v}
             </button>
@@ -578,14 +578,14 @@ export default function AIConfiguration() {
         {/* PROMPT TEXTAREA */}
         {activePromptTab === 'interview' && (
           <div>
-            <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", display: "block", marginBottom: "6px" }}>
+            <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", display: "block", marginBottom: "6px" }}>
               SYSTEM INSTRUCTIONS FOR AVA (LIVE INTERVIEWER)
             </label>
             <textarea
               rows={6}
               value={config.interview_prompt || ''}
               onChange={(e) => setConfig({ ...config, interview_prompt: e.target.value })}
-              style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "14px", color: "#e2e8f0", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
+              style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "14px", color: "#334155", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
             />
           </div>
         )}
@@ -599,7 +599,7 @@ export default function AIConfiguration() {
               rows={6}
               value={config.resume_prompt || ''}
               onChange={(e) => setConfig({ ...config, resume_prompt: e.target.value })}
-              style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "14px", color: "#e2e8f0", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
+              style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "14px", color: "#334155", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
             />
           </div>
         )}
@@ -613,7 +613,7 @@ export default function AIConfiguration() {
               rows={6}
               value={config.coding_prompt || ''}
               onChange={(e) => setConfig({ ...config, coding_prompt: e.target.value })}
-              style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "14px", color: "#e2e8f0", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
+              style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "14px", color: "#334155", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
             />
           </div>
         )}
@@ -627,7 +627,7 @@ export default function AIConfiguration() {
               rows={6}
               value={config.report_prompt || ''}
               onChange={(e) => setConfig({ ...config, report_prompt: e.target.value })}
-              style={{ width: "100%", background: "#090d16", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", padding: "14px", color: "#e2e8f0", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
+              style={{ width: "100%", background: "#090d16", border: "1px solid #cbd5e1", borderRadius: "10px", padding: "14px", color: "#334155", fontSize: "13px", lineHeight: 1.5, fontFamily: "Inter, monospace" }}
             />
           </div>
         )}

@@ -99,9 +99,9 @@ export default function RenewButton({ onSuccess, label = "Renew Subscription (â‚
       disabled={loading}
       className="btn btn-primary"
       style={{
-        background: "linear-gradient(135deg, #7c3aed, #00c4a7)",
+        background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
         border: "none",
-        color: "#ffffff",
+        color: "#0f172a",
         fontWeight: 800,
         fontSize: "14px",
         padding: "14px 28px",

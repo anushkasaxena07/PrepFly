@@ -58,15 +58,15 @@ export default function PaymentTable({ payments = [] }) {
       
       {/* REVENUE METRIC CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px" }}>
-        <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px" }}>
+        <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "16px" }}>
           <div style={{ fontSize: "10px", color: "var(--text2)", fontWeight: 800 }}>TOTAL COLLECTED REVENUE</div>
-          <div style={{ fontSize: "24px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>₹{totalRev.toFixed(2)}</div>
+          <div style={{ fontSize: "24px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>₹{totalRev.toFixed(2)}</div>
         </div>
-        <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px" }}>
+        <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "16px" }}>
           <div style={{ fontSize: "10px", color: "var(--text2)", fontWeight: 800 }}>TOTAL GST (18%)</div>
           <div style={{ fontSize: "24px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>₹{totalGst.toFixed(2)}</div>
         </div>
-        <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px" }}>
+        <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "16px" }}>
           <div style={{ fontSize: "10px", color: "var(--text2)", fontWeight: 800 }}>TOTAL SUCCESSFUL TRANSACTIONS</div>
           <div style={{ fontSize: "24px", fontWeight: 900, color: "#8b5cf6", marginTop: "4px" }}>{payments.length}</div>
         </div>
@@ -80,10 +80,10 @@ export default function PaymentTable({ payments = [] }) {
             placeholder="🔍 Search organization or txn ID..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ width: "260px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", fontSize: "13px" }}
+            style={{ width: "260px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "13px" }}
           />
 
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
             <option value="All">All Payment Statuses</option>
             <option value="Success">Success</option>
             <option value="Captured">Captured</option>
@@ -98,11 +98,11 @@ export default function PaymentTable({ payments = [] }) {
       </div>
 
       {/* TABLE */}
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
+              <tr style={{ borderBottom: "1px solid #cbd5e1", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
                 <th style={{ padding: "10px" }}>Txn / Invoice ID</th>
                 <th style={{ padding: "10px" }}>Organization</th>
                 <th style={{ padding: "10px" }}>Plan Tier</th>
@@ -115,16 +115,16 @@ export default function PaymentTable({ payments = [] }) {
             </thead>
             <tbody>
               {filtered.map(p => (
-                <tr key={p.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <tr key={p.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
                   <td style={{ padding: "12px 10px", fontWeight: 800, color: "var(--cyan)", fontFamily: "monospace" }}>
                     <div>{p.transaction_id || p.id}</div>
                     <div style={{ fontSize: "10px", color: "var(--text2)" }}>{p.invoice_number || ''}</div>
                   </td>
-                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#fff" }}>
+                  <td style={{ padding: "12px 10px", fontWeight: 800, color: "#0f172a" }}>
                     <div>{p.organization_name}</div>
                   </td>
                   <td style={{ padding: "12px 10px" }}><span className="pill pill-purple" style={{ fontSize: "10px" }}>{p.plan || "Premium (1 Year)"}</span></td>
-                  <td style={{ padding: "12px 10px", fontWeight: 900, color: "#00c4a7" }}>₹{p.amount}</td>
+                  <td style={{ padding: "12px 10px", fontWeight: 900, color: "#6d28d9" }}>₹{p.amount}</td>
                   <td style={{ padding: "12px 10px", color: "var(--text2)" }}>₹{p.gst || round(p.amount * 0.18, 2)}</td>
                   <td style={{ padding: "12px 10px", color: "var(--text1)" }}>{p.payment_method || "Razorpay UPI / Card"}</td>
                   <td style={{ padding: "12px 10px" }}><span className="pill pill-cyan" style={{ fontSize: "10px" }}>● {p.status}</span></td>

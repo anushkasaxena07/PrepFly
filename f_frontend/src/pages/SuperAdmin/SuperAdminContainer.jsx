@@ -85,14 +85,16 @@ export default function SuperAdminContainer() {
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#050811", color: "#f0f4fd" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#f6f7fb", color: "#0f172a" }}>
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div className="pf-portal-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "#f6f7fb" }}>
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} superAdmin={superAdmin} />
         
-        <main style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
-          {renderContent()}
+        <main className="pf-body-surface" style={{ flex: 1, padding: "24px 28px 48px", overflowY: "auto", marginTop: "-14px" }}>
+          <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>

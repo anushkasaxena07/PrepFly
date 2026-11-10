@@ -105,6 +105,40 @@ def evaluate_response_comprehensive(resume_text, question, answer, chat_model, q
     if not target_role or target_role.lower() in ("none", ""):
         target_role = "Software Engineer"
 
+    # Non-Answer & Conversational Turns Guard (Prompt 3 Rule R1 & R6)
+    # Non-answer turns (rapport, repeat, clarification, silence prompts, hints) are NEVER scored.
+    try:
+        from services.intent_classifier import IntentClassifier, INTENT_ANSWER, INTENT_PARTIAL_ANSWER
+        intent_res = IntentClassifier.classify_intent(answer)
+        if intent_res.get("intent") not in (INTENT_ANSWER, INTENT_PARTIAL_ANSWER):
+            return {
+                "score": None,
+                "accuracy_score": None,
+                "is_scored": False,
+                "is_conversational_turn": True,
+                "intent": intent_res.get("intent"),
+                "correctness": "Conversational Turn",
+                "answer_quality": "Not Applicable",
+                "question_type": q_type,
+                "feedback": f"ℹ️ Conversational turn ({intent_res.get('intent')}). Not scored.",
+                "strength": "",
+                "improvement": "",
+                "tip": "",
+                "summary": f"Conversational turn ({intent_res.get('intent')}).",
+                "ideal_answer": "",
+                "what_was_correct": "N/A",
+                "what_was_incorrect": "N/A",
+                "what_to_add": "",
+                "common_mistakes": [],
+                "metrics": {
+                    "communication": None, "confidence": None, "technical_knowledge": None,
+                    "resume_understanding": None, "project_explanation": None, "problem_solving": None,
+                    "behavioral": None, "leadership": None
+                }
+            }
+    except Exception as e:
+        pass
+
     # Deterministic 7-tier classification and scoring gate
     classification, composite_acc, dim_scores, rationale = classify_candidate_response(
         question=question,
@@ -328,6 +362,82 @@ Return ONLY valid JSON:
         print("Feedback comprehensive evaluation notice:", e)
         return generate_dynamic_single_fallback(question, answer, q_type, category=category, role=target_role)
 
+
+def build_conversation_summary(questions: list = None, responses: list = None, feedbacks: list = None) -> dict:
+    """
+    Builds a structured conversation summary section referencing turn IDs (turn_1, turn_2, ...).
+    Categorizes each turn into substantive technical/behavioral responses vs conversational interactions.
+    Guarantees that non-answer turns (rapport, repeat, clarification, silence prompts, hints) are never scored.
+    """
+    from services.intent_classifier import IntentClassifier, INTENT_ANSWER, INTENT_PARTIAL_ANSWER
+
+    questions = questions or []
+    responses = responses or []
+    feedbacks = feedbacks or []
+
+    turn_summaries = []
+    substantive_count = 0
+    conversational_count = 0
+    narrative_parts = []
+
+    total = max(len(questions), len(responses))
+    for idx in range(total):
+        turn_id = f"turn_{idx + 1}"
+        q = questions[idx] if idx < len(questions) else ""
+        a = responses[idx] if idx < len(responses) else "[No response recorded]"
+        fb = feedbacks[idx] if idx < len(feedbacks) and isinstance(feedbacks[idx], dict) else {}
+
+        intent_info = IntentClassifier.classify_intent(a)
+        intent = intent_info.get("intent", "answer")
+        is_conversational_fb = fb.get("is_conversational_turn", False)
+        is_substantive = (
+            intent in (INTENT_ANSWER, INTENT_PARTIAL_ANSWER)
+            and not is_conversational_fb
+            and a not in ("[No response recorded]", "skipped", "skip", "")
+        )
+
+        raw_score = fb.get("accuracy_score", fb.get("score"))
+        if is_substantive:
+            substantive_count += 1
+            turn_type = "technical_response"
+            if isinstance(raw_score, (int, float)):
+                score_val = round(raw_score * 10) if raw_score <= 10 else int(raw_score)
+            else:
+                score_val = 70
+            is_scored = True
+            key_point = fb.get("strength") or (a[:80] + "..." if len(a) > 80 else a)
+            narrative_parts.append(f"In {turn_id.capitalize()}, candidate addressed the question: \"{a[:60]}...\" (Score: {score_val}/100).")
+        else:
+            conversational_count += 1
+            turn_type = f"conversational_{intent}"
+            score_val = None
+            is_scored = False
+            key_point = f"Conversational interaction ({intent})"
+            narrative_parts.append(f"In {turn_id.capitalize()}, candidate engaged in conversational dialogue ({intent}): \"{a[:60]}\" (Not scored).")
+
+        turn_summaries.append({
+            "turn_id": turn_id,
+            "turn_number": idx + 1,
+            "speaker_prompt": q,
+            "candidate_response": a,
+            "turn_type": turn_type,
+            "is_scored": is_scored,
+            "score": score_val,
+            "key_point": key_point,
+            "feedback_summary": fb.get("summary") or fb.get("feedback") or "Turn logged."
+        })
+
+    chronological_narrative = " ".join(narrative_parts) if narrative_parts else "No conversation turns recorded."
+
+    return {
+        "total_turns": total,
+        "substantive_answers_count": substantive_count,
+        "conversational_turns_count": conversational_count,
+        "chronological_narrative": chronological_narrative,
+        "turn_summaries": turn_summaries
+    }
+
+
 def generate_end_of_interview_report(role, track, difficulty, experience_level, questions, responses, chat_model, feedbacks=None):
     # 1. Count valid answers
     valid_count = 0
@@ -350,6 +460,7 @@ def generate_end_of_interview_report(role, track, difficulty, experience_level, 
             "answered_questions_count": 0,
             "recommendation": "Preliminary Evaluation (Requires ≥ 5 answered questions)",
             "confidence": "Low",
+            "conversation_summary": build_conversation_summary(questions, responses, feedbacks),
             "dimensions": [
                 {"name": "Communication", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
                 {"name": "Technical Knowledge", "score": None, "grade": "N/A", "evidence_level": "NONE", "evidence": ["No response recorded"]},
@@ -493,6 +604,7 @@ Transcript:
 
         parsed = json.loads(content)
         parsed["answered_questions_count"] = valid_count
+        parsed["conversation_summary"] = build_conversation_summary(questions, responses, feedbacks)
         return enrich_report_with_grading(parsed)
     except Exception as e:
         print("End-of-interview report generation notice:", e)
@@ -545,6 +657,7 @@ Transcript:
             "overall_score": 70 if valid_indices else 0,
             "recommendation": f"Preliminary Evaluation (Requires ≥ 5 answered questions)" if is_preliminary else "Neutral",
             "confidence": "Low" if valid_count <= 2 else ("Medium" if valid_count < 5 else "High"),
+            "conversation_summary": build_conversation_summary(questions, responses, feedbacks),
             "dimensions": fallback_dims,
             "strengths": dyn_strengths,
             "weaknesses": dyn_weaknesses
@@ -1079,6 +1192,13 @@ def enrich_report_with_grading(report: dict) -> dict:
             report["ai_summary"] = (f"The candidate demonstrated {g_info['label'].lower()} performance ({g_info['grade']} Grade, "
                                     f"{g_info['score']}/100) across {assessed_count} assessed dimension(s). "
                                     f"Based on this evaluation, the candidate is {report['hiring_recommendation'].lower()}.")
+
+    if "conversation_summary" not in report or not report["conversation_summary"]:
+        report["conversation_summary"] = build_conversation_summary(
+            report.get("questions") or [],
+            report.get("responses") or [],
+            report.get("feedbacks") or []
+        )
 
     return report
 

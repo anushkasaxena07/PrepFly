@@ -143,3 +143,43 @@ def get_interview_history():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@interview_bp.route("/session/<session_id>/silence-tick", methods=["POST"])
+def silence_tick_endpoint(session_id: str):
+    """Processes candidate silence timer tick against the personality escalation ladder."""
+    data = request.get_json() or {}
+    elapsed_s = float(data.get("elapsed_seconds", 0.0))
+    current_level = int(data.get("current_level", 0))
+    personality = data.get("personality", "professional")
+    track = data.get("track", "general")
+    candidate_name = data.get("candidate_name", "Candidate")
+
+    from services.silence_manager import SilenceManager
+    new_level, action = SilenceManager.evaluate_silence_state(
+        elapsed_silence_seconds=elapsed_s,
+        current_level_fired=current_level,
+        personality_id=personality,
+        track_id=track,
+        candidate_name=candidate_name
+    )
+
+    return jsonify({
+        "status": "success",
+        "session_id": session_id,
+        "elapsed_seconds": elapsed_s,
+        "new_level": new_level,
+        "action": action
+    }), 200
+
+
+@interview_bp.route("/session/<session_id>/barge-in", methods=["POST"])
+def barge_in_endpoint(session_id: str):
+    """Signals that candidate interrupted Ava while she was speaking."""
+    from services.silence_manager import SilenceManager
+    result = SilenceManager.handle_barge_in(is_ava_talking=True)
+    return jsonify({
+        "status": "success",
+        "session_id": session_id,
+        **result
+    }), 200
+

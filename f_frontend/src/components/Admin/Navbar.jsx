@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getAdminAnnouncements } from '../../services/adminAPI';
+import { ThemeToggleButton, usePrepFlyTheme } from '../ui/ThemeContext';
 
 export default function Navbar({ activeTab, setActiveTab, admin = {}, organization = {} }) {
+  const { isSunrise } = usePrepFlyTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: "AI Interview Completed", desc: "Ananya Patel completed SDE Mock Interview (Score: 9.2/10)", time: "10 min ago", unread: true },
@@ -71,46 +73,49 @@ export default function Navbar({ activeTab, setActiveTab, admin = {}, organizati
   };
 
   return (
-    <header style={{
-      height: "64px",
-      background: "rgba(12,18,32,0.85)",
-      backdropFilter: "blur(16px)",
-      borderBottom: "1px solid rgba(255,255,255,0.08)",
+    <header className="pf-portal-header" style={{
+      height: "82px",
+      background: isSunrise
+        ? "linear-gradient(135deg, #fdf7f3 0%, #faf0e8 100%)"
+        : "linear-gradient(135deg, #090c1a 0%, #121633 100%)",
+      borderBottom: isSunrise ? "1px solid #efe3da" : "1px solid rgba(255,255,255,0.08)",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "0 24px",
+      padding: "0 28px 14px",
       position: "sticky",
       top: 0,
-      zIndex: 90
+      zIndex: 90,
+      color: isSunrise ? "#1f1916" : "#ffffff"
     }}>
       {/* LEFT: SECTION BREADCRUMB */}
       <div>
-        <div style={{ fontSize: "11px", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "1px" }}>
+        <div className="pf-portal-header-sub" style={{ fontSize: "11px", color: isSunrise ? "#c8501d" : "#a78bfa", textTransform: "uppercase", fontWeight: 700, letterSpacing: "1px" }}>
           {organization?.name || "Organization"} / Admin
         </div>
-        <h1 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: 800, margin: 0, color: isSunrise ? "#1f1916" : "#fff", fontFamily: isSunrise ? "'Playfair Display', Georgia, serif" : "inherit" }}>
           {titles[activeTab] || 'Admin Console'}
         </h1>
       </div>
 
       {/* RIGHT: METRICS BADGES & PROFILE */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <ThemeToggleButton />
+
         {/* MULTI-TENANT BADGE */}
         <div style={{
-          background: "rgba(0,240,200,0.1)",
-          border: "1px solid rgba(0,240,200,0.25)",
-          color: "#00f0c8",
+          background: isSunrise ? "#fdf0e7" : "rgba(124,58,237,0.18)",
+          border: isSunrise ? "1px solid #f5cbb2" : "1px solid rgba(167,139,250,0.35)",
+          color: isSunrise ? "#b84718" : "#c4b5fd",
           fontSize: "11px",
           fontWeight: 800,
-          padding: "4px 10px",
+          padding: "5px 12px",
           borderRadius: "20px",
           display: "flex",
           alignItems: "center",
           gap: "6px"
         }}>
-          <span>🔒</span> Multi-Tenant Encrypted
+          <span>Multi-Tenant Encrypted</span>
         </div>
 
         {/* NOTIFICATION BELL WITH DROPDOWN */}

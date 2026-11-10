@@ -38,47 +38,47 @@ export default function Settings() {
   return (
     <div style={{ maxWidth: "700px", margin: "0 auto" }}>
       {toast && (
-        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
+        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
           {toast}
         </div>
       )}
 
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "28px" }}>
-        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", marginBottom: "4px" }}>⚙️ Admin Security & System Settings</h2>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "28px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", marginBottom: "4px" }}>⚙️ Admin Security & System Settings</h2>
         <p style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "24px" }}>Manage authentication security, notification channels, and portal preferences.</p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "20px", fontSize: "13px" }}>
           
           {/* TWO FACTOR AUTH */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "14px 18px", borderRadius: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "14px 18px", borderRadius: "12px" }}>
             <div>
-              <div style={{ fontWeight: 800, color: "#fff" }}>Enable Two-Factor Authentication (2FA)</div>
+              <div style={{ fontWeight: 800, color: "#0f172a" }}>Enable Two-Factor Authentication (2FA)</div>
               <div style={{ fontSize: "11px", color: "var(--text2)" }}>Require TOTP / Authenticator code on admin sign in.</div>
             </div>
             <input 
               type="checkbox" 
               checked={settings.two_factor_enabled} 
               onChange={e => setSettings({ ...settings, two_factor_enabled: e.target.checked })} 
-              style={{ width: "18px", height: "18px", accentColor: "#00c4a7" }}
+              style={{ width: "18px", height: "18px", accentColor: "#6d28d9" }}
             />
           </div>
 
           {/* EMAIL NOTIFICATIONS */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", padding: "14px 18px", borderRadius: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "14px 18px", borderRadius: "12px" }}>
             <div>
-              <div style={{ fontWeight: 800, color: "#fff" }}>Email Activity Digests</div>
+              <div style={{ fontWeight: 800, color: "#0f172a" }}>Email Activity Digests</div>
               <div style={{ fontSize: "11px", color: "var(--text2)" }}>Receive weekly institutional candidate performance summaries.</div>
             </div>
             <input 
               type="checkbox" 
               checked={settings.email_notifications} 
               onChange={e => setSettings({ ...settings, email_notifications: e.target.checked })} 
-              style={{ width: "18px", height: "18px", accentColor: "#00c4a7" }}
+              style={{ width: "18px", height: "18px", accentColor: "#6d28d9" }}
             />
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
-            <button className="btn btn-primary" onClick={handleSave} style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", fontWeight: 800 }}>
+            <button className="btn btn-primary" onClick={handleSave} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800 }}>
               Save Settings
             </button>
           </div>

@@ -35,7 +35,8 @@ export const INTERVIEWER_PERSONALITIES = [
     badge: "Encouraging",
     description: "Supportive, warm, and patient. Ideal for beginners or candidates with interview anxiety.",
     tone: "Warm & Supportive",
-    probing: "Gentle Nudges"
+    probing: "Gentle Nudges",
+    sampleLine: "Take your time! Whenever you're ready, we can talk through your thinking together."
   },
   {
     id: "professional",
@@ -43,7 +44,8 @@ export const INTERVIEWER_PERSONALITIES = [
     badge: "Recommended",
     description: "Objective, balanced, and structured corporate interviewer simulating standard tech rounds.",
     tone: "Standard Corporate",
-    probing: "Balanced Inquiries"
+    probing: "Balanced Inquiries",
+    sampleLine: "Please walk me through your technical approach and your primary considerations."
   },
   {
     id: "challenging",
@@ -51,7 +53,8 @@ export const INTERVIEWER_PERSONALITIES = [
     badge: "Rigorous",
     description: "Deep technical probing, scenario-based trade-offs, and critical boundary condition analysis.",
     tone: "Direct & Inquisitive",
-    probing: "Stress-Test Assumptions"
+    probing: "Stress-Test Assumptions",
+    sampleLine: "Suppose traffic scales 100x overnight. What breaks first in this architecture?"
   },
   {
     id: "strict",
@@ -59,7 +62,8 @@ export const INTERVIEWER_PERSONALITIES = [
     badge: "No-Nonsense",
     description: "Concise and formal. Demands precise definitions and zero conversational filler.",
     tone: "Formal & Strict",
-    probing: "Exact Specifications"
+    probing: "Exact Specifications",
+    sampleLine: "State your algorithm and its exact Big-O time and space complexity."
   },
   {
     id: "senior_engineer",
@@ -67,7 +71,8 @@ export const INTERVIEWER_PERSONALITIES = [
     badge: "Staff / Principal",
     description: "Architecture-first peer dialogue exploring high scale, production resilience, and operations.",
     tone: "Senior Engineering Peer",
-    probing: "Production Constraints"
+    probing: "Production Constraints",
+    sampleLine: "Let's look at failure modes. How does your system handle datacenter partitions?"
   }
 ];
 

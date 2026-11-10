@@ -112,18 +112,18 @@ export default function Students() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {toast && (
-        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000, boxShadow: "0 10px 30px rgba(0,240,200,0.3)" }}>
+        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000, boxShadow: "0 10px 30px rgba(109,40,217,0.3)" }}>
           ✨ {toast}
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0 }}>🎓 Student Management Directory</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0 }}>🎓 Student Management Directory</h2>
           <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>View, edit, filter, and onboard candidate records for your organization.</p>
         </div>
 
-        <button className="btn btn-primary" onClick={handleOpenAdd} style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", fontWeight: 800 }}>
+        <button className="btn btn-primary" onClick={handleOpenAdd} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800 }}>
           ➕ Add New Student
         </button>
       </div>

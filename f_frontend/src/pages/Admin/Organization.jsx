@@ -80,15 +80,15 @@ export default function Organization() {
   return (
     <div style={{ maxWidth: "800px", margin: "0 auto" }}>
       {toast && (
-        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
+        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
           {toast}
         </div>
       )}
 
-      <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "28px" }}>
+      <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "28px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <div>
-            <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0 }}>🏢 Organization Profile</h2>
+            <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0 }}>🏢 Organization Profile</h2>
             <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Institutional credentials, contact details, and subscription tier.</p>
           </div>
 
@@ -98,12 +98,12 @@ export default function Organization() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", fontSize: "13px" }}>
-          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "16px", background: "rgba(255,255,255,0.03)", padding: "16px", borderRadius: "12px" }}>
-            <div style={{ width: "64px", height: "64px", borderRadius: "14px", background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "#fff", fontWeight: 900 }}>
+          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "16px", background: "#f8fafc", padding: "16px", borderRadius: "12px" }}>
+            <div style={{ width: "64px", height: "64px", borderRadius: "14px", background: "linear-gradient(135deg, #7c3aed, #6d28d9)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "#fff", fontWeight: 900 }}>
               🏛
             </div>
             <div>
-              <div style={{ fontSize: "18px", fontWeight: 900, color: "#fff" }}>{org?.name || "Stanford Tech Institute"}</div>
+              <div style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a" }}>{org?.name || "Stanford Tech Institute"}</div>
               <div style={{ fontSize: "12px", color: "var(--cyan)", fontWeight: 700 }}>
                 {org?.type || "College"} • {org?.subscription_plan || "ENTERPRISE"} TIER
               </div>
@@ -112,12 +112,12 @@ export default function Organization() {
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>ORGANIZATION NAME</label>
-            <input type="text" disabled={!isEditing} value={org?.name || ''} onChange={e => setOrg({ ...org, name: e.target.value })} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="text" disabled={!isEditing} value={org?.name || ''} onChange={e => setOrg({ ...org, name: e.target.value })} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>ORGANIZATION TYPE</label>
-            <select disabled={!isEditing} value={org?.type || 'College'} onChange={e => setOrg({ ...org, type: e.target.value })} style={{ width: "100%", background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px" }}>
+            <select disabled={!isEditing} value={org?.type || 'College'} onChange={e => setOrg({ ...org, type: e.target.value })} style={{ width: "100%", background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px" }}>
               <option value="College">College / University</option>
               <option value="Company">Company / Enterprise</option>
             </select>
@@ -125,22 +125,22 @@ export default function Organization() {
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>OFFICIAL EMAIL</label>
-            <input type="email" disabled={!isEditing} value={org?.email || ''} onChange={e => setOrg({ ...org, email: e.target.value })} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="email" disabled={!isEditing} value={org?.email || ''} onChange={e => setOrg({ ...org, email: e.target.value })} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>PHONE NUMBER</label>
-            <input type="text" disabled={!isEditing} value={org?.phone || ''} onChange={e => setOrg({ ...org, phone: e.target.value })} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="text" disabled={!isEditing} value={org?.phone || ''} onChange={e => setOrg({ ...org, phone: e.target.value })} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>WEBSITE URL</label>
-            <input type="text" disabled={!isEditing} value={org?.website || ''} onChange={e => setOrg({ ...org, website: e.target.value })} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="text" disabled={!isEditing} value={org?.website || ''} onChange={e => setOrg({ ...org, website: e.target.value })} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           <div>
             <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px" }}>PHYSICAL ADDRESS</label>
-            <input type="text" disabled={!isEditing} value={org?.address || ''} onChange={e => setOrg({ ...org, address: e.target.value })} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+            <input type="text" disabled={!isEditing} value={org?.address || ''} onChange={e => setOrg({ ...org, address: e.target.value })} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
           </div>
 
           {isEditing && (
@@ -151,7 +151,7 @@ export default function Organization() {
         </div>
 
         {/* FEEDBACK TO SUPER ADMIN SECTION */}
-        <div style={{ marginTop: "32px", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "24px" }}>
+        <div style={{ marginTop: "32px", borderTop: "1px solid #e5e8f2", paddingTop: "24px" }}>
           <StudentFeedbackForm role="Organization Admin" />
         </div>
       </div>

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { adminLogin } from '../../services/adminAPI';
+import { ThemeToggleButton, usePrepFlyTheme } from '../../components/ui/ThemeContext';
 
 export default function AdminLogin() {
+  const { isSunrise } = usePrepFlyTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,9 @@ export default function AdminLogin() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#070b14",
+      background: isSunrise
+        ? "linear-gradient(160deg, #fdf7f3 0%, #faece1 60%, #fcf8f4 100%)"
+        : "linear-gradient(160deg, #090c1a 0%, #121633 60%, #0b0e1a 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -38,11 +42,16 @@ export default function AdminLogin() {
       position: "relative",
       overflow: "hidden"
     }}>
+      <div style={{ position: "fixed", top: "20px", right: "24px", zIndex: 50 }}>
+        <ThemeToggleButton />
+      </div>
       <div style={{
         position: "absolute",
         width: "600px",
         height: "600px",
-        background: "radial-gradient(circle, rgba(124,79,224,0.15) 0%, transparent 70%)",
+        background: isSunrise
+          ? "radial-gradient(circle, rgba(234,88,12,0.16) 0%, transparent 70%)"
+          : "radial-gradient(circle, rgba(124,58,237,0.26) 0%, transparent 70%)",
         top: "-150px",
         left: "-150px",
         borderRadius: "50%",
@@ -50,46 +59,47 @@ export default function AdminLogin() {
       }} />
 
       <div style={{
-        background: "rgba(12,18,32,0.9)",
-        backdropFilter: "blur(20px)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: "20px",
+        background: "#ffffff",
+        border: "1px solid #e5e8f2",
+        borderRadius: "22px",
         padding: "36px",
         maxWidth: "420px",
         width: "100%",
-        boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-        zIndex: 10
+        boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+        zIndex: 10,
+        color: "#0f172a"
       }}>
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div style={{
             width: "48px",
             height: "48px",
             borderRadius: "12px",
-            background: "linear-gradient(135deg, #7c4fe0, #00c4a7)",
+            background: "linear-gradient(135deg, #6d28d9, #7c3aed)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "24px",
+            fontSize: "22px",
+            color: "#ffffff",
             marginBottom: "12px",
-            boxShadow: "0 8px 24px rgba(124,79,224,0.3)"
+            boxShadow: "0 8px 24px rgba(109,40,217,0.3)"
           }}>
             🏛
           </div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0 }}>Organization Admin Login</h2>
-          <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "4px" }}>
-            College & Recruiter Administrative Portal
+          <h2 style={{ fontSize: "22px", fontWeight: 800, color: "#0f172a", margin: 0 }}>Organization Admin Login</h2>
+          <p style={{ fontSize: "12.5px", color: "#64748b", marginTop: "4px" }}>
+            College &amp; Recruiter Administrative Portal
           </p>
         </div>
 
         {error && (
-          <div style={{ background: "rgba(255,84,114,0.15)", border: "1px solid rgba(255,84,114,0.3)", color: "#ff5472", padding: "10px 14px", borderRadius: "10px", fontSize: "12px", marginBottom: "16px", textAlign: "center" }}>
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: "10px", fontSize: "12px", marginBottom: "16px", textAlign: "center" }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text2)", marginBottom: "6px" }}>
+            <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>
               ADMIN EMAIL
             </label>
             <input 
@@ -100,18 +110,18 @@ export default function AdminLogin() {
               placeholder="admin@stanford.edu"
               style={{
                 width: "100%",
-                background: "#0c1220",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: "#f8fafc",
+                border: "1px solid #cbd5e1",
                 borderRadius: "10px",
                 padding: "10px 14px",
-                color: "#fff",
+                color: "#0f172a",
                 fontSize: "14px"
               }}
             />
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--text2)", marginBottom: "6px" }}>
+            <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, color: "#475569", marginBottom: "6px" }}>
               PASSWORD
             </label>
             <input 
@@ -122,11 +132,11 @@ export default function AdminLogin() {
               placeholder="••••••••"
               style={{
                 width: "100%",
-                background: "#0c1220",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: "#f8fafc",
+                border: "1px solid #cbd5e1",
                 borderRadius: "10px",
                 padding: "10px 14px",
-                color: "#fff",
+                color: "#0f172a",
                 fontSize: "14px"
               }}
             />
@@ -142,17 +152,17 @@ export default function AdminLogin() {
               padding: "12px",
               fontSize: "14px",
               fontWeight: 800,
-              background: "linear-gradient(135deg, #7c4fe0, #00c4a7)",
+              background: "linear-gradient(135deg, #6d28d9, #7c3aed)",
               border: "none",
               marginTop: "8px"
             }}
           >
-            {loading ? "🔐 Authenticating..." : "Sign In to Admin Dashboard →"}
+            {loading ? "Authenticating..." : "Sign In to Admin Dashboard →"}
           </button>
         </form>
 
-        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: "11px", color: "var(--text2)", textAlign: "center" }}>
-          🔒 Multi-Tenant Encrypted Isolation • Access Restricted to Authorized Institution Admins
+        <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e5e8f2", fontSize: "11px", color: "#64748b", textAlign: "center" }}>
+          Multi-Tenant Encrypted Isolation · Authorized Institution Admins
         </div>
       </div>
     </div>

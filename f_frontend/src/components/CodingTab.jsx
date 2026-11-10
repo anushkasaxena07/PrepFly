@@ -839,7 +839,7 @@ const renderMarkdown = (text) => {
     }
     if (cleanLine.startsWith("### ")) {
       const headerText = cleanLine.replace("### ", "").replace(/^[-—–\s]+/, "").trim();
-      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "10px", marginBottom: "4px", color: "#fff" }}>{headerText}</h3>;
+      return <h3 key={idx} style={{ fontSize: "13px", fontWeight: 700, marginTop: "10px", marginBottom: "4px", color: "#0f172a" }}>{headerText}</h3>;
     }
     if (cleanLine.startsWith("#### ")) {
       const headerText = cleanLine.replace("#### ", "").replace(/^[-—–\s]+/, "").trim();
@@ -1482,7 +1482,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", width: "100%", alignItems: "center" }}>
               <div>
                 <div style={{fontSize:"10px", fontWeight:800, color:"var(--cyan)", textTransform:"uppercase", marginBottom:"2px"}}>ACTIVE ROOM</div>
-                <div style={{fontSize: "14px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "6px"}}>
+                <div style={{fontSize: "14px", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "6px"}}>
                   {roomId} 
                   <button className="btn-xs btn-ghost" style={{padding: "2px 6px"}} onClick={() => {
                     navigator.clipboard.writeText(roomId);
@@ -1548,23 +1548,23 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
               <select 
                 className="lang-select prob-select" 
                 style={{
-                  height: "24px", 
-                  padding: "0 6px", 
-                  fontSize: "10.5px", 
-                  maxWidth: "135px", 
+                  height: "28px", 
+                  padding: "0 8px", 
+                  fontSize: "11px", 
+                  maxWidth: "155px", 
                   overflow: "hidden", 
                   textOverflow: "ellipsis", 
                   whiteSpace: "nowrap",
-                  backgroundColor: "#0c1220",
-                  color: "#f0f4fd",
-                  borderRadius: "6px"
+                  backgroundColor: "#ffffff",
+                  color: "#0f172a",
+                  borderRadius: "8px"
                 }}
                 value={currentProblem?.problem_id || ""} 
                 onChange={handleProblemChange}
               >
-                <option value="" disabled style={{ background: "#0c1220", color: "#8a9bc0" }}>Select Problem...</option>
+                <option value="" disabled style={{ background: "#ffffff", color: "#64748b" }}>Select Problem...</option>
                 {problems.map(p => (
-                  <option key={p.problem_id} value={p.problem_id} style={{ background: "#0c1220", color: "#f0f4fd" }}>
+                  <option key={p.problem_id} value={p.problem_id} style={{ background: "#ffffff", color: "#0f172a" }}>
                     {p.title}
                   </option>
                 ))}
@@ -1572,11 +1572,11 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
             </div>
 
             <div>
-              <div style={{fontSize:"17px", fontWeight:800, marginBottom:"3px"}}>{currentProblem?.title || "Loading Problem..."}</div>
+              <div style={{fontSize:"17px", fontWeight:800, color:"#0f172a", marginBottom:"3px"}}>{currentProblem?.title || "Loading Problem..."}</div>
               {currentProblem?.sheet_id && <div style={{fontSize:"10px", color:"var(--purple)", fontWeight:700}}>CUSTOM SHEET ASSIGNED</div>}
             </div>
 
-            <div className="text-sm" style={{color:"#b0c0d8", lineHeight:1.7, marginTop: "10px", overflowY: "auto", maxHeight: "220px"}}>
+            <div className="text-sm" style={{color:"#475569", lineHeight:1.7, marginTop: "10px", overflowY: "auto", maxHeight: "220px"}}>
               {currentProblem?.description}
             </div>
 
@@ -1606,13 +1606,13 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                   }
                   return Array.isArray(ex) ? ex.map((e, idx) => (
                     <div key={idx} style={{
-                      background: "rgba(0,0,0,0.3)", 
+                      background: "#f8fafc", 
                       border: "1px solid var(--border)", 
                       borderRadius: "10px", 
                       padding: "8px 12px", 
                       fontFamily: "'DM Mono',monospace", 
                       fontSize: "11px", 
-                      color: "var(--cyan)"
+                      color: "#5b21b6"
                     }}>
                       <strong>Example {idx + 1}:</strong><br/>
                       Input: {e.input}<br/>
@@ -1626,8 +1626,8 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
             <div style={{marginTop:"auto", paddingTop: "20px"}}>
               <div className="sec-sub fw7 mb8">AI Hints</div>
-              <div className="hint-box" style={{color: hintBox.startsWith('Getting') ? 'var(--text2)' : '#b0c0d8'}}>{hintBox}</div>
-              <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", marginTop:"8px"}} onClick={getHint}>💡 Get AI Hint</button>
+              <div className="hint-box" style={{color: hintBox.startsWith('Getting') ? 'var(--text2)' : '#334155'}}>{hintBox}</div>
+              <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", marginTop:"8px"}} onClick={getHint}>Get AI Hint</button>
             </div>
           </div>
 
@@ -1636,24 +1636,24 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
             <div className="flex items-center" style={{justifyContent:"space-between"}}>
               <select 
                 className="lang-select" 
-                style={{ backgroundColor: "#0c1220", color: "#f0f4fd" }}
+                style={{ backgroundColor: "#ffffff", color: "#0f172a" }}
                 value={lang} 
                 onChange={(e) => handleLangChange(e.target.value)} 
                 aria-label="Select programming language"
               >
-                <option value="python" style={{ background: "#0c1220", color: "#f0f4fd" }}>Python</option>
-                <option value="javascript" style={{ background: "#0c1220", color: "#f0f4fd" }}>JavaScript</option>
-                <option value="typescript" style={{ background: "#0c1220", color: "#f0f4fd" }}>TypeScript</option>
-                <option value="java" style={{ background: "#0c1220", color: "#f0f4fd" }}>Java</option>
-                <option value="cpp" style={{ background: "#0c1220", color: "#f0f4fd" }}>C++</option>
-                <option value="csharp" style={{ background: "#0c1220", color: "#f0f4fd" }}>C#</option>
-                <option value="go" style={{ background: "#0c1220", color: "#f0f4fd" }}>Go</option>
-                <option value="rust" style={{ background: "#0c1220", color: "#f0f4fd" }}>Rust</option>
-                <option value="php" style={{ background: "#0c1220", color: "#f0f4fd" }}>PHP</option>
-                <option value="ruby" style={{ background: "#0c1220", color: "#f0f4fd" }}>Ruby</option>
-                <option value="swift" style={{ background: "#0c1220", color: "#f0f4fd" }}>Swift</option>
-                <option value="kotlin" style={{ background: "#0c1220", color: "#f0f4fd" }}>Kotlin</option>
-                <option value="sql" style={{ background: "#0c1220", color: "#f0f4fd" }}>SQL</option>
+                <option value="python" style={{ background: "#ffffff", color: "#0f172a" }}>Python</option>
+                <option value="javascript" style={{ background: "#ffffff", color: "#0f172a" }}>JavaScript</option>
+                <option value="typescript" style={{ background: "#ffffff", color: "#0f172a" }}>TypeScript</option>
+                <option value="java" style={{ background: "#ffffff", color: "#0f172a" }}>Java</option>
+                <option value="cpp" style={{ background: "#ffffff", color: "#0f172a" }}>C++</option>
+                <option value="csharp" style={{ background: "#ffffff", color: "#0f172a" }}>C#</option>
+                <option value="go" style={{ background: "#ffffff", color: "#0f172a" }}>Go</option>
+                <option value="rust" style={{ background: "#ffffff", color: "#0f172a" }}>Rust</option>
+                <option value="php" style={{ background: "#ffffff", color: "#0f172a" }}>PHP</option>
+                <option value="ruby" style={{ background: "#ffffff", color: "#0f172a" }}>Ruby</option>
+                <option value="swift" style={{ background: "#ffffff", color: "#0f172a" }}>Swift</option>
+                <option value="kotlin" style={{ background: "#ffffff", color: "#0f172a" }}>Kotlin</option>
+                <option value="sql" style={{ background: "#ffffff", color: "#0f172a" }}>SQL</option>
               </select>
               <div className="flex gap8" style={{ alignItems: "center", flexWrap: "wrap" }}>
                 {roomId && <span className="pill pill-cyan" style={{ fontSize: "11px", fontWeight: 800 }}>👥 {Math.max(1, roomParticipants.length)} Participant{roomParticipants.length === 1 ? '' : 's'} Active</span>}

@@ -139,6 +139,7 @@ class TestSubscriptionService(unittest.TestCase):
 
     def test_next_question_bounded_to_five_questions(self):
         """Calling /next after 5 answers must signal done=True and not spawn unbounded questions."""
+        import json
         from app import app, _get_jwt_secret
         import jwt
         import uuid
@@ -163,24 +164,39 @@ class TestSubscriptionService(unittest.TestCase):
             "active": True
         }).execute()
 
-        # Submit 5th and final answer
-        res = client.post("/next", headers=headers, json={
-            "session_id": session_id,
-            "answer": "This is my final comprehensive response to question 5."
-        })
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertTrue(data.get("done"))
-        self.assertEqual(data.get("question_number"), 5)
-        self.assertIsNone(data.get("next_question"))
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(
+            content=json.dumps({
+                "score": 8.5,
+                "accuracy_score": 85,
+                "feedback": "Solid final answer.",
+                "strengths": ["Clear explanation"],
+                "improvements": [],
+                "concept_match": 85,
+                "clarity": 85,
+            })
+        )
 
-        # Subsequent call must immediately return done=True without calling LLM
-        res_after = client.post("/next", headers=headers, json={
-            "session_id": session_id,
-            "answer": "Another redundant response"
-        })
-        self.assertEqual(res_after.status_code, 200)
-        self.assertTrue(res_after.get_json().get("done"))
+        # Submit 5th and final answer offline with mocked Gemini client
+        with patch.dict(os.environ, {"ENVIRONMENT": "", "FLASK_ENV": "", "GEMINI_API_KEY": ""}), \
+             patch("app.chat_model", mock_llm):
+            res = client.post("/next", headers=headers, json={
+                "session_id": session_id,
+                "answer": "This is my final comprehensive response to question 5."
+            })
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertTrue(data.get("done"))
+            self.assertEqual(data.get("question_number"), 5)
+            self.assertIsNone(data.get("next_question"))
+
+            # Subsequent call must immediately return done=True without calling LLM
+            res_after = client.post("/next", headers=headers, json={
+                "session_id": session_id,
+                "answer": "Another redundant response"
+            })
+            self.assertEqual(res_after.status_code, 200)
+            self.assertTrue(res_after.get_json().get("done"))
 
     def test_affirmative_consent_recording(self):
         """Backend must only record consent_given=1 if the user actively provided consent."""
@@ -263,7 +279,7 @@ class TestSubscriptionService(unittest.TestCase):
                 _SESSION_IN_FLIGHT.discard(session_id)
 
     def test_hint_caching_avoids_repeated_llm_calls(self):
-        """Subsequent hint calls on the exact same question return cached hint."""
+        """First hint request calls mocked Gemini client once; subsequent identical requests use cache with zero extra calls."""
         from app import app, _get_jwt_secret
         import jwt
         import uuid
@@ -271,39 +287,62 @@ class TestSubscriptionService(unittest.TestCase):
         client = app.test_client()
         user_id = f"user_{uuid.uuid4().hex[:6]}"
         session_id = str(uuid.uuid4())
+        session_id_2 = str(uuid.uuid4())
+        # Unique question ensures L1/Redis prompt cache starts cold for this run without mocking cache_service
+        question_text = f"Explain how Python GIL works in CPython [{uuid.uuid4().hex[:8]}]."
+        resume_text = "Experienced Python Engineer"
+        expected_hint = "Consider how the Global Interpreter Lock serializes Python bytecode execution across OS threads."
+
         token = jwt.encode({"sub": user_id, "role": "candidate"}, _get_jwt_secret(), algorithm="HS256")
         headers = {"Authorization": f"Bearer {token}"}
 
         from services.subscription_service import get_supabase
         sb = get_supabase()
-        sb.table("sessions").insert({
-            "session_id": session_id,
-            "user_id": user_id,
-            "resume_text": "Experienced Python Engineer",
-            "questions": ["Explain how Python GIL works."],
-            "responses": [],
-            "feedbacks": [],
-            "question_index": 1,
-            "active": True
-        }).execute()
+        for sid in (session_id, session_id_2):
+            sb.table("sessions").insert({
+                "session_id": sid,
+                "user_id": user_id,
+                "resume_text": resume_text,
+                "questions": [question_text],
+                "responses": [],
+                "feedbacks": [],
+                "question_index": 1,
+                "active": True
+            }).execute()
 
-        # 1st hint request generates hint
-        res1 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
-        self.assertEqual(res1.status_code, 200)
-        hint1 = res1.get_json()["hint"]
+        mock_gemini = MagicMock()
+        mock_gemini.invoke.return_value = MagicMock(content=expected_hint)
 
-        # 2nd hint request returns cached hint
-        res2 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
-        self.assertEqual(res2.status_code, 200)
-        self.assertTrue(res2.get_json().get("cached"))
-        self.assertEqual(res2.get_json()["hint"], hint1)
+        # Mock Gemini client at app.chat_model boundary; clear env keys so safe_invoke_llm stays offline with no API key
+        with patch.dict(os.environ, {"ENVIRONMENT": "", "FLASK_ENV": "", "GEMINI_API_KEY": "", "GEMINI_INTERVIEW_KEY": ""}), \
+             patch("app.chat_model", mock_gemini):
+            # 1st hint request must invoke Gemini exactly once
+            res1 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
+            self.assertEqual(res1.status_code, 200)
+            body1 = res1.get_json()
+            self.assertEqual(body1["hint"], expected_hint)
+            self.assertFalse(body1.get("cached", False))
+            self.assertEqual(mock_gemini.invoke.call_count, 1)
+
+            # 2nd identical hint request on same session hits session cache without another Gemini call
+            res2 = client.post("/get-hint", headers=headers, json={"session_id": session_id})
+            self.assertEqual(res2.status_code, 200)
+            body2 = res2.get_json()
+            self.assertTrue(body2.get("cached"))
+            self.assertEqual(body2["hint"], expected_hint)
+            self.assertEqual(mock_gemini.invoke.call_count, 1)
+
+            # 3rd identical request on a fresh session with empty cached_hints hits prompt cache without calling Gemini
+            res3 = client.post("/get-hint", headers=headers, json={"session_id": session_id_2})
+            self.assertEqual(res3.status_code, 200)
+            self.assertEqual(res3.get_json()["hint"], expected_hint)
+            self.assertEqual(mock_gemini.invoke.call_count, 1)
 
     def test_exception_in_next_releases_session_lock(self):
         """Even if an internal error occurs during /next, the finally block must release the in-flight lock."""
         from app import app, _get_jwt_secret, _SESSION_IN_FLIGHT, _SESSION_IN_FLIGHT_LOCK
         import jwt
         import uuid
-        from unittest.mock import patch
 
         client = app.test_client()
         user_id = f"user_{uuid.uuid4().hex[:6]}"
@@ -324,8 +363,14 @@ class TestSubscriptionService(unittest.TestCase):
             "active": True
         }).execute()
 
-        # Simulate exception during evaluate_response_comprehensive
-        with patch("app.evaluate_response_comprehensive", side_effect=RuntimeError("Simulated LLM network error")):
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content="How would you benchmark latency under load?")
+
+        # Simulate exception during evaluate_response_comprehensive while keeping background/question LLM calls offline
+        with patch.dict(os.environ, {"ENVIRONMENT": "", "FLASK_ENV": "", "GEMINI_API_KEY": ""}), \
+             patch("app.chat_model", mock_llm), \
+             patch("services.interview_reliability_service.submit_background_turn_eval"), \
+             patch("app.evaluate_response_comprehensive", side_effect=RuntimeError("Simulated LLM network error")):
             res = client.post("/next", headers=headers, json={
                 "session_id": session_id,
                 "answer": "My answer that encounters a network error"
@@ -338,6 +383,7 @@ class TestSubscriptionService(unittest.TestCase):
 
     def test_hint_invalidated_when_interview_advances(self):
         """When an interview advances to question 2, the hint cache must be invalidated."""
+        import json
         from app import app, _get_jwt_secret
         import jwt
         import uuid
@@ -354,22 +400,38 @@ class TestSubscriptionService(unittest.TestCase):
             "session_id": session_id,
             "user_id": user_id,
             "resume_text": "Experienced Python Engineer",
-            "questions": ["Question 1: Explain Python GIL."],
+            "questions": [f"Question 1: Explain Python GIL [{uuid.uuid4().hex[:6]}]."],
             "responses": [],
             "feedbacks": [],
             "question_index": 1,
             "active": True
         }).execute()
 
-        # 1. Generate hint for Q1
-        client.post("/get-hint", headers=headers, json={"session_id": session_id})
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(
+            content=json.dumps({
+                "score": 8.0,
+                "accuracy_score": 80,
+                "feedback": "Good explanation of CPython threading.",
+                "strengths": ["Accurate GIL summary"],
+                "improvements": [],
+                "next_question": "How does multiprocessing differ from multithreading in Python?"
+            })
+        )
 
-        # 2. Advance to Q2 via /next
-        res_next = client.post("/next", headers=headers, json={
-            "session_id": session_id,
-            "answer": "GIL prevents multiple native threads from executing Python bytecodes simultaneously."
-        })
-        self.assertEqual(res_next.status_code, 200)
+        with patch.dict(os.environ, {"ENVIRONMENT": "", "FLASK_ENV": "", "GEMINI_API_KEY": ""}), \
+             patch("app.chat_model", mock_llm), \
+             patch("services.interview_reliability_service.submit_background_turn_eval"):
+            # 1. Generate hint for Q1
+            res_hint = client.post("/get-hint", headers=headers, json={"session_id": session_id})
+            self.assertEqual(res_hint.status_code, 200)
+
+            # 2. Advance to Q2 via /next
+            res_next = client.post("/next", headers=headers, json={
+                "session_id": session_id,
+                "answer": "GIL prevents multiple native threads from executing Python bytecodes simultaneously."
+            })
+            self.assertEqual(res_next.status_code, 200)
 
         # 3. Check that cached_hints on session is reset
         sess_data = sb.table("sessions").select("cached_hints").eq("session_id", session_id).execute().data[0]

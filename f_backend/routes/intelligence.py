@@ -889,3 +889,79 @@ def evaluate_project_defense():
         "status": "success",
         "evaluation": eval_result
     }), 200
+
+
+# ============================================================================
+# 8. ADAPTIVE AI INTERVIEW MENTOR: ONBOARDING & CONTEXT ROUTES
+# ============================================================================
+
+@intelligence_bp.route("/api/interview-onboarding/start", methods=["POST"])
+@intelligence_auth_required
+def start_interview_onboarding():
+    """Starts or resumes conversational onboarding, skipping pre-known fields."""
+    from services.interview_onboarding_service import InterviewOnboardingService
+    user_id = _get_uid()
+    data = request.get_json(silent=True) or {}
+    goal_id = data.get("goal_id")
+
+    step = InterviewOnboardingService.start_or_resume_onboarding(user_id=user_id, goal_id=goal_id)
+    return jsonify({
+        "status": "success",
+        **step
+    }), 200
+
+
+@intelligence_bp.route("/api/interview-onboarding/answer", methods=["POST"])
+@intelligence_auth_required
+def submit_interview_onboarding_answer():
+    """Submits answer to current conversational question, advances flow, or finalizes goal."""
+    from services.interview_onboarding_service import InterviewOnboardingService
+    from services.interview_context_service import InterviewContextService
+    user_id = _get_uid()
+    data = request.get_json(silent=True) or {}
+    goal_id = data.get("goal_id")
+    field = data.get("field")
+    value = data.get("value")
+
+    if not goal_id or not field:
+        return jsonify({"error": "Missing goal_id or field parameter"}), 400
+
+    try:
+        step = InterviewOnboardingService.submit_onboarding_answer(
+            user_id=user_id,
+            goal_id=goal_id,
+            field=field,
+            value=value
+        )
+        # Invalidate context cache upon updating goals
+        InterviewContextService.invalidate_cache(user_id, goal_id)
+
+        return jsonify({
+            "status": "success",
+            **step
+        }), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to submit onboarding answer: {str(e)}"}), 500
+
+
+@intelligence_bp.route("/api/interview-context", methods=["GET"])
+@intelligence_auth_required
+def get_interview_context():
+    """Returns compact, cached, versioned context object for downstream mentor and planner calls."""
+    from services.interview_context_service import InterviewContextService
+    user_id = _get_uid()
+    goal_id = request.args.get("goal_id")
+    force_refresh = request.args.get("force_refresh", "false").lower() == "true"
+
+    context = InterviewContextService.get_context(
+        user_id=user_id,
+        goal_id=goal_id,
+        force_refresh=force_refresh
+    )
+    return jsonify({
+        "status": "success",
+        "context": context
+    }), 200
+

@@ -193,9 +193,9 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
         onClick={() => setShowMethodsModal(true)}
         disabled={isProcessing}
         style={{
-          background: "linear-gradient(135deg, #7c3aed, #00c4a7)",
+          background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
           border: "none",
-          color: "#ffffff",
+          color: "#0f172a",
           fontWeight: 800,
           fontSize: "13px",
           padding: "12px 24px",
@@ -235,7 +235,7 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <div style={{ width: "42px", height: "42px", background: "rgba(124, 58, 237, 0.2)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }}>💳</div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>Select Payment Method</h3>
+                  <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>Select Payment Method</h3>
                   <p style={{ fontSize: "12px", color: "var(--cyan)", margin: 0, fontWeight: 700 }}>1-Year Enterprise Plan (₹500 INR)</p>
                 </div>
               </div>
@@ -245,25 +245,25 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>
               
               {/* UPI */}
-              <div onClick={handlePayment} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(0, 196, 167, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
+              <div onClick={handlePayment} style={{ background: "#f8fafc", border: "1px solid rgba(109, 40, 217, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
                 <div style={{ fontSize: "20px", marginBottom: "6px" }}>📱 UPI / QR Code</div>
                 <div style={{ fontSize: "12px", color: "var(--text2)", fontWeight: 600 }}>GPay, PhonePe, Paytm, BHIM & Any UPI ID</div>
               </div>
 
               {/* Cards */}
-              <div onClick={handlePayment} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
+              <div onClick={handlePayment} style={{ background: "#f8fafc", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
                 <div style={{ fontSize: "20px", marginBottom: "6px" }}>💳 Credit & Debit Cards</div>
                 <div style={{ fontSize: "12px", color: "var(--text2)", fontWeight: 600 }}>Visa, Mastercard, RuPay, Maestro & Amex</div>
               </div>
 
               {/* NetBanking */}
-              <div onClick={handlePayment} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
+              <div onClick={handlePayment} style={{ background: "#f8fafc", border: "1px solid rgba(59, 130, 246, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
                 <div style={{ fontSize: "20px", marginBottom: "6px" }}>🏦 Net Banking</div>
                 <div style={{ fontSize: "12px", color: "var(--text2)", fontWeight: 600 }}>HDFC, ICICI, SBI, Axis & All Major Indian Banks</div>
               </div>
 
               {/* Wallets & EMI */}
-              <div onClick={handlePayment} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
+              <div onClick={handlePayment} style={{ background: "#f8fafc", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all 0.2s ease" }}>
                 <div style={{ fontSize: "20px", marginBottom: "6px" }}>👛 Wallets & EMI</div>
                 <div style={{ fontSize: "12px", color: "var(--text2)", fontWeight: 600 }}>Paytm Wallet, Amazon Pay, Mobikwik & EMI</div>
               </div>
@@ -272,7 +272,7 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
 
             <button
               onClick={handlePayment}
-              style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #00c4a7)", border: "none", color: "#fff", fontWeight: 900, padding: "14px", borderRadius: "14px", cursor: "pointer", fontSize: "14px", boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+              style={{ width: "100%", background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", color: "#fff", fontWeight: 900, padding: "14px", borderRadius: "14px", cursor: "pointer", fontSize: "14px", boxShadow: "0 8px 24px rgba(124, 58, 237, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
             >
               <span>🔒 Proceed to Pay ₹500 via Razorpay Secure Checkout</span>
             </button>

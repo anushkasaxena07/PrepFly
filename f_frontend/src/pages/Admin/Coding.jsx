@@ -188,11 +188,11 @@ export default function Coding() {
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0 }}>💻 Coding Test & Assessment Manager</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0 }}>💻 Coding Test & Assessment Manager</h2>
           <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Create automated coding challenges, configure hidden test cases, and inspect student leaderboards.</p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", fontWeight: 800 }}>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800 }}>
           ➕ Create Coding Challenge
         </button>
       </div>
@@ -202,19 +202,19 @@ export default function Coding() {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
           {tests.map((t) => (
-            <div key={t.id} className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+            <div key={t.id} className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span className="pill pill-cyan" style={{ fontSize: "10px" }}>{t.difficulty}</span>
                 <span style={{ fontSize: "11px", color: "var(--cyan)", fontWeight: 700 }}>⏱ {t.duration} Mins</span>
               </div>
 
-              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", margin: "0 0 6px 0" }}>{t.title}</h3>
-              <div style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "12px" }}>Supported Languages: <strong style={{ color: "#fff" }}>{t.language}</strong></div>
+              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>{t.title}</h3>
+              <div style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "12px" }}>Supported Languages: <strong style={{ color: "#0f172a" }}>{t.language}</strong></div>
 
               <div style={{ background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px", fontSize: "11px", display: "flex", justifyContent: "space-between", marginBottom: "14px" }}>
                 <div>Visible Tests: <strong>{t.visible_tests || (t.visible_test_cases ? t.visible_test_cases.length : 3)}</strong></div>
                 <div>Hidden Tests: <strong>{t.hidden_tests || (t.hidden_test_cases ? t.hidden_test_cases.length : 7)}</strong></div>
-                <div>Acceptance: <strong style={{ color: "#00c4a7" }}>{t.accepted_rate || "84%"}</strong></div>
+                <div>Acceptance: <strong style={{ color: "#6d28d9" }}>{t.accepted_rate || "84%"}</strong></div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -233,14 +233,14 @@ export default function Coding() {
       {/* SUBMISSIONS LEADERBOARD MODAL */}
       {selectedTest && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "800px", width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "16px", padding: "24px", maxWidth: "800px", width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", color: "#0f172a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div>
                 <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>🏆 Student Submissions & Leaderboard</h3>
                 <p style={{ fontSize: "12px", color: "var(--text2)", margin: "2px 0 0 0" }}>Test: <strong style={{ color: "var(--cyan)" }}>{selectedTest.title}</strong></p>
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
-                <button className="btn btn-primary btn-xs" onClick={() => handleDownloadCSV(selectedTest.id)} style={{ background: "linear-gradient(135deg,#7c4fe0,#00c4a7)", border: "none", fontWeight: 800 }}>
+                <button className="btn btn-primary btn-xs" onClick={() => handleDownloadCSV(selectedTest.id)} style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", border: "none", fontWeight: 800 }}>
                   📥 Download CSV
                 </button>
                 <button className="btn btn-ghost btn-xs" onClick={() => setSelectedTest(null)}>✕ Close</button>
@@ -255,7 +255,7 @@ export default function Coding() {
               <div style={{ overflowY: "auto", flex: 1 }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
+                    <tr style={{ borderBottom: "1px solid #cbd5e1", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
                       <th style={{ padding: "10px 8px" }}>Rank</th>
                       <th style={{ padding: "10px 8px" }}>Candidate Name</th>
                       <th style={{ padding: "10px 8px" }}>Roll No</th>
@@ -268,12 +268,12 @@ export default function Coding() {
                   </thead>
                   <tbody>
                     {leaderboard.map((r, idx) => (
-                      <tr key={r.id || idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                        <td style={{ padding: "10px 8px", fontWeight: 800, color: idx === 0 ? "#ffb800" : idx === 1 ? "#00c4a7" : "var(--text2)" }}>#{idx + 1}</td>
-                        <td style={{ padding: "10px 8px", fontWeight: 700, color: "#fff" }}>{r.student_name}</td>
+                      <tr key={r.id || idx} style={{ borderBottom: "1px solid #e5e8f2" }}>
+                        <td style={{ padding: "10px 8px", fontWeight: 800, color: idx === 0 ? "#ffb800" : idx === 1 ? "#6d28d9" : "var(--text2)" }}>#{idx + 1}</td>
+                        <td style={{ padding: "10px 8px", fontWeight: 700, color: "#0f172a" }}>{r.student_name}</td>
                         <td style={{ padding: "10px 8px", color: "var(--text2)" }}>{r.roll_number}</td>
                         <td style={{ padding: "10px 8px", color: "var(--text2)" }}>{r.department}</td>
-                        <td style={{ padding: "10px 8px", fontWeight: 800, color: r.score_pct >= 80 ? "#00c4a7" : r.score_pct >= 60 ? "#ffb800" : "#ff4d4f" }}>{r.score_pct}%</td>
+                        <td style={{ padding: "10px 8px", fontWeight: 800, color: r.score_pct >= 80 ? "#6d28d9" : r.score_pct >= 60 ? "#ffb800" : "#ff4d4f" }}>{r.score_pct}%</td>
                         <td style={{ padding: "10px 8px" }}>{r.passed}/{r.total}</td>
                         <td style={{ padding: "10px 8px", color: "var(--cyan)" }}>{r.language}</td>
                         <td style={{ padding: "10px 8px", fontSize: "11px", color: "var(--text2)" }}>{r.submitted_at}</td>
@@ -289,7 +289,7 @@ export default function Coding() {
 
       {showModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "16px", padding: "24px", maxWidth: "780px", width: "100%", maxHeight: "90vh", overflowY: "auto", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "16px", padding: "24px", maxWidth: "780px", width: "100%", maxHeight: "90vh", overflowY: "auto", color: "#0f172a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>💻 Create Coding Challenge</h3>
               <button className="btn btn-ghost btn-xs" onClick={() => setShowModal(false)}>✕ Close</button>
@@ -301,11 +301,11 @@ export default function Coding() {
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Challenge Title *</label>
-                  <input type="text" required value={newTest.title} onChange={e => setNewTest({ ...newTest, title: e.target.value })} placeholder="e.g. Dynamic Programming & Subarrays" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }} />
+                  <input type="text" required value={newTest.title} onChange={e => setNewTest({ ...newTest, title: e.target.value })} placeholder="e.g. Dynamic Programming & Subarrays" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }} />
                 </div>
                 <div>
                   <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Difficulty Level *</label>
-                  <select value={newTest.difficulty} onChange={e => setNewTest({ ...newTest, difficulty: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}>
+                  <select value={newTest.difficulty} onChange={e => setNewTest({ ...newTest, difficulty: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}>
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
                     <option value="Hard">Hard</option>
@@ -316,22 +316,22 @@ export default function Coding() {
               {/* PROBLEM DESCRIPTION */}
               <div>
                 <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Problem Description & Input/Output Specs</label>
-                <textarea rows="3" value={newTest.description} onChange={e => setNewTest({ ...newTest, description: e.target.value })} placeholder="Write problem statement, input formats, constraints, and instructions for candidates..." style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }} />
+                <textarea rows="3" value={newTest.description} onChange={e => setNewTest({ ...newTest, description: e.target.value })} placeholder="Write problem statement, input formats, constraints, and instructions for candidates..." style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }} />
               </div>
 
               {/* TIMINGS & LANGUAGES */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                 <div>
                   <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Total Duration (Mins) *</label>
-                  <input type="number" required min="5" max="300" value={newTest.duration} onChange={e => setNewTest({ ...newTest, duration: Number(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }} />
+                  <input type="number" required min="5" max="300" value={newTest.duration} onChange={e => setNewTest({ ...newTest, duration: Number(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }} />
                 </div>
                 <div>
                   <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Execution Limit (Secs)</label>
-                  <input type="number" required min="1" max="15" value={newTest.time_limit_sec} onChange={e => setNewTest({ ...newTest, time_limit_sec: Number(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }} />
+                  <input type="number" required min="1" max="15" value={newTest.time_limit_sec} onChange={e => setNewTest({ ...newTest, time_limit_sec: Number(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }} />
                 </div>
                 <div>
                   <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Allowed Language</label>
-                  <select value={newTest.language} onChange={e => setNewTest({ ...newTest, language: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px" }}>
+                  <select value={newTest.language} onChange={e => setNewTest({ ...newTest, language: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px" }}>
                     <option value="Python 3">Python 3</option>
                     <option value="C++">C++</option>
                     <option value="Java 17">Java 17</option>
@@ -345,7 +345,7 @@ export default function Coding() {
               <div style={{ background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "12px", padding: "14px", marginTop: "4px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
                   <div>
-                    <strong style={{ fontSize: "14px", color: "#fff" }}>🧪 Test Cases & Automated Evaluation Suite</strong>
+                    <strong style={{ fontSize: "14px", color: "#0f172a" }}>🧪 Test Cases & Automated Evaluation Suite</strong>
                     <div style={{ fontSize: "11px", color: "var(--text2)" }}>Configure visible sample test cases and hidden edge-case evaluation inputs.</div>
                   </div>
                   <button 
@@ -353,7 +353,7 @@ export default function Coding() {
                     className="btn btn-xs" 
                     onClick={handleAIGenerateTestCases}
                     disabled={generatingAI}
-                    style={{ background: "linear-gradient(135deg, #00c4a7, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, padding: "6px 12px" }}
+                    style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, padding: "6px 12px" }}
                   >
                     {generatingAI ? "⚡ Auto-Generating AI Cases..." : "🤖 Auto-Generate All Test Cases with AI"}
                   </button>
@@ -362,16 +362,16 @@ export default function Coding() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                   <div>
                     <label style={{ display: "block", color: "var(--cyan)", marginBottom: "4px", fontWeight: 700, fontSize: "12px" }}>Visible Test Cases Count</label>
-                    <input type="number" min="1" max="20" value={newTest.visible_tests} onChange={e => setNewTest({ ...newTest, visible_tests: Number(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "6px 10px", color: "#fff" }} />
+                    <input type="number" min="1" max="20" value={newTest.visible_tests} onChange={e => setNewTest({ ...newTest, visible_tests: Number(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "6px 10px", color: "#0f172a" }} />
                   </div>
                   <div>
                     <label style={{ display: "block", color: "#a855f7", marginBottom: "4px", fontWeight: 700, fontSize: "12px" }}>Hidden Evaluation Test Cases</label>
-                    <input type="number" min="0" max="50" value={newTest.hidden_tests} onChange={e => setNewTest({ ...newTest, hidden_tests: Number(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "6px 10px", color: "#fff" }} />
+                    <input type="number" min="0" max="50" value={newTest.hidden_tests} onChange={e => setNewTest({ ...newTest, hidden_tests: Number(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "6px 10px", color: "#0f172a" }} />
                   </div>
                 </div>
 
                 {/* TEST CASE MANAGEMENT TABS */}
-                <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px", marginBottom: "12px" }}>
+                <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #cbd5e1", paddingBottom: "8px", marginBottom: "12px" }}>
                   <button 
                     type="button" 
                     onClick={() => setTestCaseTab('hidden')}
@@ -392,8 +392,8 @@ export default function Coding() {
                     type="button" 
                     onClick={() => setTestCaseTab('visible')}
                     style={{ 
-                      background: testCaseTab === 'visible' ? "rgba(0,196,167,0.25)" : "transparent", 
-                      border: testCaseTab === 'visible' ? "1px solid #00c4a7" : "none", 
+                      background: testCaseTab === 'visible' ? "rgba(109,40,217,0.25)" : "transparent", 
+                      border: testCaseTab === 'visible' ? "1px solid #6d28d9" : "none", 
                       color: testCaseTab === 'visible' ? "#fff" : "var(--text2)", 
                       borderRadius: "6px", 
                       padding: "6px 12px", 
@@ -409,7 +409,7 @@ export default function Coding() {
                 {/* ACTIVE TEST CASES LIST EDITOR */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "220px", overflowY: "auto", paddingRight: "4px" }}>
                   {(testCaseTab === 'visible' ? newTest.visible_test_cases : newTest.hidden_test_cases).map((tc, idx) => (
-                    <div key={idx} style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", padding: "10px", borderRadius: "8px" }}>
+                    <div key={idx} style={{ background: "rgba(0,0,0,0.3)", border: "1px solid #e5e8f2", padding: "10px", borderRadius: "8px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                         <span style={{ fontSize: "11px", fontWeight: 800, color: testCaseTab === 'visible' ? "var(--cyan)" : "#a855f7" }}>
                           #{idx + 1} {tc.description || (testCaseTab === 'visible' ? 'Visible Sample Case' : 'Hidden Evaluation Case')}
@@ -422,14 +422,14 @@ export default function Coding() {
                           value={tc.input} 
                           onChange={e => handleTestCaseChange(testCaseTab, idx, 'input', e.target.value)} 
                           placeholder="Input (e.g. nums = [-1, 0, 5], target = -1)" 
-                          style={{ background: "#141d30", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "4px 8px", color: "#fff", fontSize: "11px", fontFamily: "monospace" }} 
+                          style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "4px 8px", color: "#0f172a", fontSize: "11px", fontFamily: "monospace" }} 
                         />
                         <textarea 
                           rows="1" 
                           value={tc.output} 
                           onChange={e => handleTestCaseChange(testCaseTab, idx, 'output', e.target.value)} 
                           placeholder="Expected Output (e.g. [0, 1])" 
-                          style={{ background: "#141d30", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "4px 8px", color: "#fff", fontSize: "11px", fontFamily: "monospace" }} 
+                          style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", padding: "4px 8px", color: "#0f172a", fontSize: "11px", fontFamily: "monospace" }} 
                         />
                       </div>
                     </div>
@@ -438,7 +438,7 @@ export default function Coding() {
                   <button 
                     type="button" 
                     onClick={() => handleAddTestCase(testCaseTab)}
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px dashed rgba(255,255,255,0.2)", color: "#fff", padding: "6px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
+                    style={{ background: "#f1f5f9", border: "1px dashed rgba(255,255,255,0.2)", color: "#0f172a", padding: "6px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}
                   >
                     ➕ Add Custom {testCaseTab === 'visible' ? 'Visible' : 'Hidden Evaluation'} Test Case
                   </button>
@@ -447,8 +447,8 @@ export default function Coding() {
               </div>
 
               {/* STARTER CODE TEMPLATE */}
-              <div style={{ background: "rgba(0,240,200,0.03)", border: "1px solid rgba(0,240,200,0.15)", borderRadius: "12px", padding: "14px" }}>
-                <strong style={{ fontSize: "14px", color: "#fff", display: "block", marginBottom: "4px" }}>💻 Starter Code Template Editor</strong>
+              <div style={{ background: "rgba(109,40,217,0.03)", border: "1px solid rgba(109,40,217,0.15)", borderRadius: "12px", padding: "14px" }}>
+                <strong style={{ fontSize: "14px", color: "#0f172a", display: "block", marginBottom: "4px" }}>💻 Starter Code Template Editor</strong>
                 <div style={{ fontSize: "11px", color: "var(--text2)", marginBottom: "10px" }}>Set the initial code boilerplate candidates see when loading the problem in the IDE.</div>
                 
                 <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
@@ -464,7 +464,7 @@ export default function Coding() {
                         borderRadius: "6px",
                         border: "none",
                         cursor: "pointer",
-                        background: templateLangTab === lang ? "var(--cyan)" : "rgba(255,255,255,0.05)",
+                        background: templateLangTab === lang ? "var(--cyan)" : "#f1f5f9",
                         color: templateLangTab === lang ? "#000" : "var(--text2)"
                       }}
                     >
@@ -480,19 +480,19 @@ export default function Coding() {
                     setNewTest({ ...newTest, starter_code: updatedStarter });
                   }}
                   placeholder={`Write the starter template code that candidates will see in the editor for ${templateLangTab}...`}
-                  style={{ width: "100%", background: "#141d30", fontFamily: "monospace", fontSize: "12px", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", resize: "vertical", lineHeight: "1.5" }}
+                  style={{ width: "100%", background: "#f1f5f9", fontFamily: "monospace", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", resize: "vertical", lineHeight: "1.5" }}
                 />
               </div>
 
               {/* CONSTRAINTS */}
               <div>
                 <label style={{ display: "block", color: "var(--text2)", marginBottom: "4px", fontWeight: 700 }}>Execution Constraints</label>
-                <input type="text" value={newTest.constraints} onChange={e => setNewTest({ ...newTest, constraints: e.target.value })} placeholder="e.g. 1 <= N <= 10^5, Time: 2.0s | Memory: 256MB" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff" }} />
+                <input type="text" value={newTest.constraints} onChange={e => setNewTest({ ...newTest, constraints: e.target.value })} placeholder="e.g. 1 <= N <= 10^5, Time: 2.0s | Memory: 256MB" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a" }} />
               </div>
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "12px" }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ background: "linear-gradient(135deg,#7c4fe0,#00c4a7)", border: "none", fontWeight: 800 }}>
+                <button type="submit" className="btn btn-primary" style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", border: "none", fontWeight: 800 }}>
                   🚀 Save & Launch Coding Challenge
                 </button>
               </div>

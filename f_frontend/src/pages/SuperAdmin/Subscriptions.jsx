@@ -275,7 +275,7 @@ export default function Subscriptions() {
       {/* 1. HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
             👑 SaaS Plan Tiers & Limits
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
@@ -286,14 +286,14 @@ export default function Subscriptions() {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             onClick={handleOpenNewPlan}
-            style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(0,196,167,0.3)" }}
+            style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,40,217,0.3)" }}
           >
             ➕ Create New Plan
           </button>
           
           <button
             onClick={() => setPreviewPricingModal(true)}
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "9px 14px", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "9px 14px", color: "#0f172a", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
           >
             👁 Preview Pricing Page
           </button>
@@ -307,14 +307,14 @@ export default function Subscriptions() {
 
           <button
             onClick={handleExportRevenueCSV}
-            style={{ background: "rgba(0,196,167,0.15)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "8px", padding: "9px 14px", color: "#00c4a7", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
+            style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "8px", padding: "9px 14px", color: "#6d28d9", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
           >
             📊 Export Revenue CSV
           </button>
 
           <button
             onClick={() => setShowHistoryModal(true)}
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "9px 14px", color: "#94a3b8", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "8px", padding: "9px 14px", color: "#94a3b8", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
           >
             📜 Pricing History
           </button>
@@ -324,70 +324,70 @@ export default function Subscriptions() {
       {/* 2. 10 DYNAMIC KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "14px" }}>
         
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TODAY'S REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>₹{(stats?.today_revenue || "1,495.00")}</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>₹{(stats?.today_revenue || "1,495.00")}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +14.2% vs Yesterday</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MONTHLY REVENUE</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>₹{(stats?.monthly_revenue || "42,850.00")}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +22.8% vs Last Mo</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ANNUAL REVENUE</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>₹{(stats?.yearly_revenue || "3,80,000.00")}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +35.0% YoY</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#fff", marginTop: "4px" }}>{stats?.total_organizations || 14}</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>{stats?.total_organizations || 14}</div>
           <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>10 Colleges | 4 Corp</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE SUBSCRIPTIONS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{stats?.active_subscriptions || 12}</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 85.7% Active Paid</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TRIAL ORGANIZATIONS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{stats?.trial_organizations || 2}</div>
           <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ 14-Day Free Trial</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>EXPIRED PLANS</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{stats?.expired_subscriptions || 1}</div>
           <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>⚠️ Renewal Due</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MRR (RECURRING)</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>₹42,850</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +18.4% MRR Growth</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ARR (PROJECTED)</div>
           <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>₹5,14,200</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +28% Milestone</div>
         </div>
 
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "14px" }}>
+        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RENEWAL RATE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>94.2%</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>94.2%</div>
           <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ Top 5% Industry SLA</div>
         </div>
 
       </div>
 
       {/* 3. SUB-NAVIGATION TABS */}
-      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e5e8f2", paddingBottom: "10px", flexWrap: "wrap" }}>
         {[
           { id: 'plans', label: '👑 Plans Management Table' },
           { id: 'coupons', label: '🏷️ Coupons & Discounts' },
@@ -399,7 +399,7 @@ export default function Subscriptions() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{
-              background: activeTab === t.id ? 'linear-gradient(135deg, #00c4a7, #7c4fe0)' : 'rgba(255,255,255,0.04)',
+              background: activeTab === t.id ? 'linear-gradient(135deg, #6d28d9, #7c3aed)' : 'rgba(255,255,255,0.04)',
               border: 'none',
               borderRadius: '8px',
               padding: '9px 16px',
@@ -425,10 +425,10 @@ export default function Subscriptions() {
                 placeholder="🔍 Search plan tiers..."
                 value={searchPlan}
                 onChange={e => setSearchPlan(e.target.value)}
-                style={{ width: "240px", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", color: "#fff", fontSize: "12px" }}
+                style={{ width: "240px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "12px" }}
               />
 
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#0c1220", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", fontSize: "12px" }}>
                 <option value="All">All Statuses</option>
                 <option value="Active">Active</option>
                 <option value="Archived">Archived</option>
@@ -441,11 +441,11 @@ export default function Subscriptions() {
             </div>
           </div>
 
-          <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+          <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1", color: "#94a3b8", fontSize: "11px", textTransform: "uppercase" }}>
                     <th style={{ padding: "10px" }}>Plan Name & Badge</th>
                     <th style={{ padding: "10px" }}>Monthly Price</th>
                     <th style={{ padding: "10px" }}>Yearly Price</th>
@@ -461,25 +461,25 @@ export default function Subscriptions() {
                 </thead>
                 <tbody>
                   {filteredPlans.map(plan => (
-                    <tr key={plan.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                    <tr key={plan.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
                       <td style={{ padding: "12px 10px" }}>
-                        <div style={{ fontWeight: 900, color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <div style={{ fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
                           <span>☰</span> {plan.plan_name}
-                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: plan.badge === 'Enterprise' ? 'rgba(236,72,153,0.15)' : 'rgba(0,196,167,0.15)', color: plan.badge === 'Enterprise' ? '#ec4899' : '#00c4a7', fontWeight: 800 }}>
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: plan.badge === 'Enterprise' ? 'rgba(236,72,153,0.15)' : 'rgba(109,40,217,0.15)', color: plan.badge === 'Enterprise' ? '#ec4899' : '#6d28d9', fontWeight: 800 }}>
                             {plan.badge || 'Popular'}
                           </span>
                         </div>
                         <div style={{ fontSize: "11px", color: "#94a3b8" }}>{plan.subtitle || "Enterprise SaaS Tier"}</div>
                       </td>
 
-                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#00c4a7" }}>₹{plan.price_monthly} / mo</td>
+                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#6d28d9" }}>₹{plan.price_monthly} / mo</td>
                       <td style={{ padding: "12px 10px", fontWeight: 800, color: "#a78bfa" }}>₹{plan.price_yearly} / yr</td>
                       <td style={{ padding: "12px 10px", color: "#f59e0b" }}>{plan.trial_days || 14} Days</td>
-                      <td style={{ padding: "12px 10px", color: "#fff" }}>{plan.student_limit}</td>
-                      <td style={{ padding: "12px 10px", color: "#fff" }}>{plan.admin_limit || "10 Admins"}</td>
+                      <td style={{ padding: "12px 10px", color: "#0f172a" }}>{plan.student_limit}</td>
+                      <td style={{ padding: "12px 10px", color: "#0f172a" }}>{plan.admin_limit || "10 Admins"}</td>
                       <td style={{ padding: "12px 10px", color: "#38bdf8" }}>{plan.ai_credits || "5,000 Credits"}</td>
-                      <td style={{ padding: "12px 10px", color: "#fff" }}>{plan.ai_interviews || "Unlimited"}</td>
-                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#00c4a7" }}>{plan.orgs_count || 8} Orgs</td>
+                      <td style={{ padding: "12px 10px", color: "#0f172a" }}>{plan.ai_interviews || "Unlimited"}</td>
+                      <td style={{ padding: "12px 10px", fontWeight: 800, color: "#6d28d9" }}>{plan.orgs_count || 8} Orgs</td>
                       
                       <td style={{ padding: "12px 10px" }}>
                         <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(16,185,129,0.15)", color: "#10b981", fontWeight: 800 }}>
@@ -489,7 +489,7 @@ export default function Subscriptions() {
 
                       <td style={{ padding: "12px 10px", textAlign: "right" }}>
                         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                          <button onClick={() => handleEditPlan(plan)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
+                          <button onClick={() => handleEditPlan(plan)} style={{ background: "#f1f5f9", border: "none", color: "#fff", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
                             ✏️ Edit
                           </button>
                           <button onClick={() => handleDuplicatePlan(plan)} style={{ background: "rgba(139,92,246,0.15)", border: "none", color: "#a78bfa", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontWeight: 700 }}>
@@ -514,29 +514,29 @@ export default function Subscriptions() {
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", margin: 0 }}>🏷️ Promotional Coupons & Educational Discounts</h3>
+              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: 0 }}>🏷️ Promotional Coupons & Educational Discounts</h3>
               <p style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>Create coupon codes for institutional onboarding, events, and seasonal discounts.</p>
             </div>
 
-            <button onClick={() => setShowCouponModal(true)} style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
+            <button onClick={() => setShowCouponModal(true)} style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
               ➕ Create Coupon Code
             </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
             {coupons.map(c => (
-              <div key={c.id} style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "12px" }}>
+              <div key={c.id} style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between", gap: "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <span style={{ fontSize: "16px", fontWeight: 900, color: "#00c4a7", fontFamily: "monospace", letterSpacing: "1px" }}>{c.code}</span>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#fff", marginTop: "2px" }}>{c.name}</div>
+                    <span style={{ fontSize: "16px", fontWeight: 900, color: "#6d28d9", fontFamily: "monospace", letterSpacing: "1px" }}>{c.code}</span>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a", marginTop: "2px" }}>{c.name}</div>
                   </div>
                   <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(16,185,129,0.15)", color: "#10b981", fontWeight: 800 }}>
                     {c.status || "Active"}
                   </span>
                 </div>
 
-                <div style={{ fontSize: "12px", color: "#94a3b8", display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.03)", padding: "10px", borderRadius: "8px" }}>
+                <div style={{ fontSize: "12px", color: "#94a3b8", display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "10px", borderRadius: "8px" }}>
                   <div>
                     <div style={{ fontSize: "10px", fontWeight: 800 }}>DISCOUNT</div>
                     <div style={{ fontSize: "14px", fontWeight: 900, color: "#ec4899" }}>
@@ -549,7 +549,7 @@ export default function Subscriptions() {
                   </div>
                   <div>
                     <div style={{ fontSize: "10px", fontWeight: 800 }}>EXPIRATION</div>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#fff" }}>{c.valid_until}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#0f172a" }}>{c.valid_until}</div>
                   </div>
                 </div>
 
@@ -566,31 +566,31 @@ export default function Subscriptions() {
 
       {/* TAB 3: RENEWAL & BILLING CONFIG */}
       {activeTab === 'renewals' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             🔄 Global Renewal Policies & Billing Configuration
           </h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", fontSize: "13px" }}>
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "16px", borderRadius: "12px" }}>
-              <label style={{ fontWeight: 800, color: "#00c4a7", display: "block", marginBottom: "6px" }}>AUTO-RENEWAL POLICY</label>
-              <select style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", padding: "8px", borderRadius: "6px" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "16px", borderRadius: "12px" }}>
+              <label style={{ fontWeight: 800, color: "#6d28d9", display: "block", marginBottom: "6px" }}>AUTO-RENEWAL POLICY</label>
+              <select style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", padding: "8px", borderRadius: "6px" }}>
                 <option>Automatic Recurring (Razorpay Auto-Debit)</option>
                 <option>Manual Invoice Reminders (PO Based)</option>
               </select>
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "16px", borderRadius: "12px" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "16px", borderRadius: "12px" }}>
               <label style={{ fontWeight: 800, color: "#a78bfa", display: "block", marginBottom: "6px" }}>GRACE PERIOD (DAYS)</label>
-              <input type="number" defaultValue={7} style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", padding: "8px", borderRadius: "6px" }} />
+              <input type="number" defaultValue={7} style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", padding: "8px", borderRadius: "6px" }} />
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "16px", borderRadius: "12px" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "16px", borderRadius: "12px" }}>
               <label style={{ fontWeight: 800, color: "#ec4899", display: "block", marginBottom: "6px" }}>STATUTORY GST TAX RATE</label>
-              <input type="text" defaultValue="18% CGST + SGST" readOnly style={{ width: "100%", background: "#0c1220", border: "1px solid rgba(255,255,255,0.12)", color: "#fff", padding: "8px", borderRadius: "6px" }} />
+              <input type="text" defaultValue="18% CGST + SGST" readOnly style={{ width: "100%", background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", padding: "8px", borderRadius: "6px" }} />
             </div>
 
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", padding: "16px", borderRadius: "12px" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e5e8f2", padding: "16px", borderRadius: "12px" }}>
               <label style={{ fontWeight: 800, color: "#38bdf8", display: "block", marginBottom: "6px" }}>WEBHOOK SECRET STATUS</label>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#10b981", fontWeight: 800, marginTop: "8px" }}>
                 <span>🟢</span> Connected (Razorpay whsec_883491209)
@@ -604,17 +604,17 @@ export default function Subscriptions() {
       {activeTab === 'analytics' && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(0,196,167,0.2)", borderRadius: "12px", padding: "16px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "16px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MOST PURCHASED PLAN</div>
-              <div style={{ fontSize: "18px", fontWeight: 900, color: "#00c4a7", marginTop: "4px" }}>Institutional Pro (₹4,999)</div>
+              <div style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>Institutional Pro (₹4,999)</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "16px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "16px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVERAGE REVENUE PER ORG</div>
               <div style={{ fontSize: "18px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>₹4,285.00 / yr</div>
             </div>
 
-            <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "16px" }}>
+            <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "16px" }}>
               <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TRIAL-TO-PAID CONVERSION</div>
               <div style={{ fontSize: "18px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>85.7% Conversion Rate</div>
             </div>
@@ -624,8 +624,8 @@ export default function Subscriptions() {
 
       {/* TAB 5: A/B EXPERIMENTS & LOG */}
       {activeTab === 'ab' && (
-        <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "16px", margin: 0 }}>
+        <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "24px" }}>
+          <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", marginBottom: "16px", margin: 0 }}>
             📜 Pricing Audit Log & A/B Experiment Records
           </h3>
 
@@ -636,8 +636,8 @@ export default function Subscriptions() {
               { time: "2026-07-18 11:05", action: "Updated Free Trial Duration from 7 Days to 14 Days", user: "Super Admin" },
               { time: "2026-07-15 09:30", action: "Enabled Razorpay Auto-Debit Webhook Integration", user: "System System" }
             ].map((log, idx) => (
-              <div key={idx} style={{ background: "rgba(255,255,255,0.03)", padding: "12px 14px", borderRadius: "8px", display: "flex", justifyContent: "space-between" }}>
-                <div style={{ color: "#fff", fontWeight: 700 }}>{log.action}</div>
+              <div key={idx} style={{ background: "#f8fafc", padding: "12px 14px", borderRadius: "8px", display: "flex", justifyContent: "space-between" }}>
+                <div style={{ color: "#0f172a", fontWeight: 700 }}>{log.action}</div>
                 <div style={{ color: "#94a3b8", fontSize: "11px" }}>{log.time} • {log.user}</div>
               </div>
             ))}
@@ -646,12 +646,12 @@ export default function Subscriptions() {
       )}
 
       {/* 4. FOOTER QUICK ACTION BAR */}
-      <div style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "14px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 800, color: "#fff" }}>⚡ Super Admin Quick Pricing Controls</div>
+      <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        <div style={{ fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>⚡ Super Admin Quick Pricing Controls</div>
         
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button onClick={handleOpenNewPlan} style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>➕ New Plan</button>
-          <button onClick={handleExportRevenueCSV} style={{ background: "rgba(0,196,167,0.15)", border: "1px solid rgba(0,196,167,0.3)", color: "#00c4a7", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>📊 Export Revenue Report</button>
+          <button onClick={handleOpenNewPlan} style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>➕ New Plan</button>
+          <button onClick={handleExportRevenueCSV} style={{ background: "rgba(109,40,217,0.15)", border: "1px solid rgba(109,40,217,0.3)", color: "#6d28d9", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>📊 Export Revenue Report</button>
           <button onClick={() => setShowCouponModal(true)} style={{ background: "rgba(139,92,246,0.15)", border: "none", color: "#a78bfa", padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>🏷️ Manage Coupons</button>
         </div>
       </div>
@@ -659,12 +659,12 @@ export default function Subscriptions() {
       {/* 5. SLIDING SIDE DRAWER PLAN EDITOR */}
       {drawerOpen && editingPlan && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ width: "100%", maxWidth: "620px", background: "#0c1220", borderLeft: "1px solid rgba(0,196,167,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#fff", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
+          <div style={{ width: "100%", maxWidth: "620px", background: "#ffffff", borderLeft: "1px solid rgba(109,40,217,0.3)", height: "100%", display: "flex", flexDirection: "column", padding: "24px", color: "#0f172a", boxShadow: "-10px 0 30px rgba(0,0,0,0.8)" }}>
             
             {/* DRAWER HEADER */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #cbd5e1", paddingBottom: "16px", marginBottom: "16px" }}>
               <div>
-                <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#fff" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0, color: "#0f172a" }}>
                   {editingPlan.id ? "✏️ Edit Subscription Plan" : "➕ Create SaaS Plan Tier"}
                 </h3>
                 <p style={{ fontSize: "11px", color: "#94a3b8", margin: "2px 0 0 0" }}>Configure pricing, billing limits, and feature toggles.</p>
@@ -679,9 +679,9 @@ export default function Subscriptions() {
                   key={t}
                   onClick={() => setDrawerTab(t)}
                   style={{
-                    background: drawerTab === t ? 'rgba(0,196,167,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: drawerTab === t ? '1px solid #00c4a7' : 'none',
-                    color: drawerTab === t ? '#00c4a7' : '#94a3b8',
+                    background: drawerTab === t ? 'rgba(109,40,217,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: drawerTab === t ? '1px solid #6d28d9' : 'none',
+                    color: drawerTab === t ? '#6d28d9' : '#94a3b8',
                     borderRadius: '6px',
                     padding: '6px 12px',
                     fontSize: '11px',
@@ -703,16 +703,16 @@ export default function Subscriptions() {
                 <>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>PLAN NAME *</label>
-                    <input type="text" value={editingPlan.plan_name} onChange={e => setEditingPlan({ ...editingPlan, plan_name: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }} />
+                    <input type="text" value={editingPlan.plan_name} onChange={e => setEditingPlan({ ...editingPlan, plan_name: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }} />
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>SUBTITLE / TAGLINE</label>
-                    <input type="text" value={editingPlan.subtitle} onChange={e => setEditingPlan({ ...editingPlan, subtitle: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", outline: "none" }} />
+                    <input type="text" value={editingPlan.subtitle} onChange={e => setEditingPlan({ ...editingPlan, subtitle: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", outline: "none" }} />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>BADGE</label>
-                      <select value={editingPlan.badge} onChange={e => setEditingPlan({ ...editingPlan, badge: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px" }}>
+                      <select value={editingPlan.badge} onChange={e => setEditingPlan({ ...editingPlan, badge: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px" }}>
                         <option value="Popular">Popular</option>
                         <option value="Enterprise">Enterprise</option>
                         <option value="Recommended">Recommended</option>
@@ -722,7 +722,7 @@ export default function Subscriptions() {
                     </div>
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>VISIBILITY</label>
-                      <select value={editingPlan.visibility} onChange={e => setEditingPlan({ ...editingPlan, visibility: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px" }}>
+                      <select value={editingPlan.visibility} onChange={e => setEditingPlan({ ...editingPlan, visibility: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px" }}>
                         <option value="Public">Public (On Pricing Page)</option>
                         <option value="Unlisted">Unlisted (Custom Quotes)</option>
                         <option value="Custom Enterprise">Custom Enterprise</option>
@@ -737,17 +737,17 @@ export default function Subscriptions() {
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
-                      <label style={{ fontSize: "11px", fontWeight: 800, color: "#00c4a7", display: "block", marginBottom: "4px" }}>MONTHLY PRICE (₹)</label>
-                      <input type="number" value={editingPlan.price_monthly} onChange={e => setEditingPlan({ ...editingPlan, price_monthly: parseFloat(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+                      <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", display: "block", marginBottom: "4px" }}>MONTHLY PRICE (₹)</label>
+                      <input type="number" value={editingPlan.price_monthly} onChange={e => setEditingPlan({ ...editingPlan, price_monthly: parseFloat(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
                     </div>
                     <div>
                       <label style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", display: "block", marginBottom: "4px" }}>ANNUAL PRICE (₹)</label>
-                      <input type="number" value={editingPlan.price_yearly} onChange={e => setEditingPlan({ ...editingPlan, price_yearly: parseFloat(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+                      <input type="number" value={editingPlan.price_yearly} onChange={e => setEditingPlan({ ...editingPlan, price_yearly: parseFloat(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
                     </div>
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>RAZORPAY PRODUCT PLAN ID</label>
-                    <input type="text" value={editingPlan.razorpay_plan_id} onChange={e => setEditingPlan({ ...editingPlan, razorpay_plan_id: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", fontFamily: "monospace" }} />
+                    <input type="text" value={editingPlan.razorpay_plan_id} onChange={e => setEditingPlan({ ...editingPlan, razorpay_plan_id: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", fontFamily: "monospace" }} />
                   </div>
                 </>
               )}
@@ -757,11 +757,11 @@ export default function Subscriptions() {
                 <>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <input type="checkbox" checked={editingPlan.enable_trial} onChange={e => setEditingPlan({ ...editingPlan, enable_trial: e.target.checked })} id="chkTrial" />
-                    <label htmlFor="chkTrial" style={{ fontSize: "13px", fontWeight: 800, color: "#fff" }}>Enable Institutional Free Trial</label>
+                    <label htmlFor="chkTrial" style={{ fontSize: "13px", fontWeight: 800, color: "#0f172a" }}>Enable Institutional Free Trial</label>
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>TRIAL DURATION (DAYS)</label>
-                    <input type="number" value={editingPlan.trial_days} onChange={e => setEditingPlan({ ...editingPlan, trial_days: parseInt(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+                    <input type="number" value={editingPlan.trial_days} onChange={e => setEditingPlan({ ...editingPlan, trial_days: parseInt(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
                   </div>
                 </>
               )}
@@ -771,19 +771,19 @@ export default function Subscriptions() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>MAX STUDENTS</label>
-                    <input type="text" value={editingPlan.student_limit} onChange={e => setEditingPlan({ ...editingPlan, student_limit: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px", color: "#fff" }} />
+                    <input type="text" value={editingPlan.student_limit} onChange={e => setEditingPlan({ ...editingPlan, student_limit: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", color: "#0f172a" }} />
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>MAX ADMINS</label>
-                    <input type="text" value={editingPlan.admin_limit} onChange={e => setEditingPlan({ ...editingPlan, admin_limit: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px", color: "#fff" }} />
+                    <input type="text" value={editingPlan.admin_limit} onChange={e => setEditingPlan({ ...editingPlan, admin_limit: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", color: "#0f172a" }} />
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>STORAGE LIMIT</label>
-                    <input type="text" value={editingPlan.storage_limit} onChange={e => setEditingPlan({ ...editingPlan, storage_limit: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px", color: "#fff" }} />
+                    <input type="text" value={editingPlan.storage_limit} onChange={e => setEditingPlan({ ...editingPlan, storage_limit: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", color: "#0f172a" }} />
                   </div>
                   <div>
                     <label style={{ fontSize: "11px", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "4px" }}>AI INTERVIEWS</label>
-                    <input type="text" value={editingPlan.ai_interviews} onChange={e => setEditingPlan({ ...editingPlan, ai_interviews: e.target.value })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px", color: "#fff" }} />
+                    <input type="text" value={editingPlan.ai_interviews} onChange={e => setEditingPlan({ ...editingPlan, ai_interviews: e.target.value })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", color: "#0f172a" }} />
                   </div>
                 </div>
               )}
@@ -792,7 +792,7 @@ export default function Subscriptions() {
               {drawerTab === 'features' && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "12px" }}>
                   {Object.keys(editingPlan.features || {}).map(fKey => (
-                    <div key={fKey} style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.03)", padding: "8px 10px", borderRadius: "6px" }}>
+                    <div key={fKey} style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f8fafc", padding: "8px 10px", borderRadius: "6px" }}>
                       <input
                         type="checkbox"
                         checked={editingPlan.features[fKey]}
@@ -802,7 +802,7 @@ export default function Subscriptions() {
                         })}
                         id={`feat_${fKey}`}
                       />
-                      <label htmlFor={`feat_${fKey}`} style={{ textTransform: "capitalize", color: "#fff", cursor: "pointer" }}>
+                      <label htmlFor={`feat_${fKey}`} style={{ textTransform: "capitalize", color: "#0f172a", cursor: "pointer" }}>
                         {fKey.replace(/_/g, " ")}
                       </label>
                     </div>
@@ -813,11 +813,11 @@ export default function Subscriptions() {
             </div>
 
             {/* DRAWER FOOTER */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", pt: "16px", display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            <div style={{ borderTop: "1px solid #cbd5e1", pt: "16px", display: "flex", gap: "10px", justifyContent: "flex-end" }}>
               <button onClick={() => setDrawerOpen(false)} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "10px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>
                 Cancel
               </button>
-              <button onClick={handleSaveDrawerPlan} style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
+              <button onClick={handleSaveDrawerPlan} style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "10px 20px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>
                 Publish Plan Tier
               </button>
             </div>
@@ -829,7 +829,7 @@ export default function Subscriptions() {
       {/* 6. PUBLIC PRICING PAGE PREVIEW MODAL */}
       {previewPricingModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "20px", width: "100%", maxWidth: "900px", maxHeight: "90vh", overflowY: "auto", padding: "32px", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.3)", borderRadius: "20px", width: "100%", maxWidth: "900px", maxHeight: "90vh", overflowY: "auto", padding: "32px", color: "#0f172a" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
@@ -841,20 +841,20 @@ export default function Subscriptions() {
 
             {/* BILLING TOGGLE */}
             <div style={{ display: "flex", justifyContent: "center", marginBottom: "30px" }}>
-              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: "20px", padding: "4px", display: "flex", gap: "4px" }}>
-                <button onClick={() => setPreviewBillingCycle('monthly')} style={{ background: previewBillingCycle === 'monthly' ? '#00c4a7' : 'none', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '16px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>Monthly</button>
-                <button onClick={() => setPreviewBillingCycle('yearly')} style={{ background: previewBillingCycle === 'yearly' ? '#00c4a7' : 'none', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '16px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>Yearly (Save 20%)</button>
+              <div style={{ background: "#f1f5f9", borderRadius: "20px", padding: "4px", display: "flex", gap: "4px" }}>
+                <button onClick={() => setPreviewBillingCycle('monthly')} style={{ background: previewBillingCycle === 'monthly' ? '#6d28d9' : 'none', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '16px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>Monthly</button>
+                <button onClick={() => setPreviewBillingCycle('yearly')} style={{ background: previewBillingCycle === 'yearly' ? '#6d28d9' : 'none', border: 'none', color: '#fff', padding: '6px 16px', borderRadius: '16px', fontSize: '12px', fontWeight: 800, cursor: 'pointer' }}>Yearly (Save 20%)</button>
               </div>
             </div>
 
             {/* CARDS GRID */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px" }}>
               {plans.map(p => (
-                <div key={p.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div key={p.id} style={{ background: "#f8fafc", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div>
-                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(0,196,167,0.15)", color: "#00c4a7", fontWeight: 800 }}>{p.badge || "Popular"}</span>
+                    <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: "rgba(109,40,217,0.15)", color: "#6d28d9", fontWeight: 800 }}>{p.badge || "Popular"}</span>
                     <h3 style={{ fontSize: "16px", fontWeight: 900, margin: "10px 0 4px 0" }}>{p.plan_name}</h3>
-                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#fff", marginBottom: "14px" }}>
+                    <div style={{ fontSize: "24px", fontWeight: 900, color: "#0f172a", marginBottom: "14px" }}>
                       ₹{previewBillingCycle === 'monthly' ? p.price_monthly : p.price_yearly} <span style={{ fontSize: "12px", color: "#94a3b8" }}>/{previewBillingCycle === 'monthly' ? 'mo' : 'yr'}</span>
                     </div>
 
@@ -866,7 +866,7 @@ export default function Subscriptions() {
                     </div>
                   </div>
 
-                  <button style={{ width: "100%", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "10px", borderRadius: "8px", fontWeight: 800, marginTop: "20px", cursor: "pointer" }}>
+                  <button style={{ width: "100%", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "10px", borderRadius: "8px", fontWeight: 800, marginTop: "20px", cursor: "pointer" }}>
                     Start 14-Day Free Trial
                   </button>
                 </div>
@@ -880,36 +880,36 @@ export default function Subscriptions() {
       {/* 7. COUPON MODAL */}
       {showCouponModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "480px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "480px", width: "100%", color: "#0f172a" }}>
             <h3 style={{ fontSize: "18px", fontWeight: 800, marginBottom: "16px", margin: 0 }}>🏷️ Create Promotional Coupon</h3>
             
             <form onSubmit={handleSaveCoupon} style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px" }}>
               <div>
                 <label style={{ display: "block", color: "#94a3b8", marginBottom: "4px" }}>COUPON CODE *</label>
-                <input type="text" required value={couponForm.code} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} placeholder="e.g. SUMMER25" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff", fontFamily: "monospace" }} />
+                <input type="text" required value={couponForm.code} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} placeholder="e.g. SUMMER25" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a", fontFamily: "monospace" }} />
               </div>
               <div>
                 <label style={{ display: "block", color: "#94a3b8", marginBottom: "4px" }}>CAMPAIGN NAME</label>
-                <input type="text" value={couponForm.name} onChange={e => setCouponForm({ ...couponForm, name: e.target.value })} placeholder="e.g. Summer Launch Grant" style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "10px", color: "#fff" }} />
+                <input type="text" value={couponForm.name} onChange={e => setCouponForm({ ...couponForm, name: e.target.value })} placeholder="e.g. Summer Launch Grant" style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "10px", color: "#0f172a" }} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", marginBottom: "4px" }}>DISCOUNT TYPE</label>
-                  <select value={couponForm.discount_type} onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })} style={{ width: "100%", background: "#141d30", color: "#fff", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px" }}>
+                  <select value={couponForm.discount_type} onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })} style={{ width: "100%", background: "#f1f5f9", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px" }}>
                     <option value="Percentage">Percentage (%)</option>
                     <option value="Flat">Flat Amount (₹)</option>
                   </select>
                 </div>
                 <div>
                   <label style={{ display: "block", color: "#94a3b8", marginBottom: "4px" }}>VALUE</label>
-                  <input type="number" value={couponForm.value} onChange={e => setCouponForm({ ...couponForm, value: parseFloat(e.target.value) })} style={{ width: "100%", background: "#141d30", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px", color: "#fff" }} />
+                  <input type="number" value={couponForm.value} onChange={e => setCouponForm({ ...couponForm, value: parseFloat(e.target.value) })} style={{ width: "100%", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px", color: "#0f172a" }} />
                 </div>
               </div>
 
               <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "12px" }}>
                 <button type="button" onClick={() => setShowCouponModal(false)} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: "#fff", padding: "8px 16px", borderRadius: "8px", cursor: "pointer" }}>Cancel</button>
-                <button type="submit" style={{ background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Save Coupon</button>
+                <button type="submit" style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", padding: "8px 18px", borderRadius: "8px", fontWeight: 800, cursor: "pointer" }}>Save Coupon</button>
               </div>
             </form>
           </div>
@@ -919,18 +919,18 @@ export default function Subscriptions() {
       {/* 8. PRICING HISTORY MODAL */}
       {showHistoryModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#0c1220", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "600px", width: "100%", color: "#fff" }}>
+          <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.3)", borderRadius: "16px", padding: "24px", maxWidth: "600px", width: "100%", color: "#0f172a" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 900, margin: 0 }}>📜 Pricing Version History & Audit Trail</h3>
               <button onClick={() => setShowHistoryModal(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "18px", cursor: "pointer" }}>✕</button>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
-              <div style={{ background: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "8px" }}>
-                <div style={{ fontWeight: 800, color: "#00c4a7" }}>v2.4 - Academic Starter Plan Updated</div>
+              <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px" }}>
+                <div style={{ fontWeight: 800, color: "#6d28d9" }}>v2.4 - Academic Starter Plan Updated</div>
                 <div style={{ color: "#94a3b8", marginTop: "2px" }}>Changed annual price from ₹1,499 to ₹1,999. Added 500 coding test limit.</div>
               </div>
-              <div style={{ background: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "8px" }}>
+              <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px" }}>
                 <div style={{ fontWeight: 800, color: "#a78bfa" }}>v2.3 - Global Enterprise Scale Published</div>
                 <div style={{ color: "#94a3b8", marginTop: "2px" }}>Published Enterprise tier with 2TB storage limit and white-label options.</div>
               </div>

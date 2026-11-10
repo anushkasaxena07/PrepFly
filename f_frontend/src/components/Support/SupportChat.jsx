@@ -302,7 +302,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
             background: 'rgba(255,255,255,0.06)',
             padding: '6px 12px',
             borderRadius: '6px',
-            color: 'var(--cyan, #00c4a7)',
+            color: 'var(--cyan, #6d28d9)',
             fontSize: '12px',
             textDecoration: 'none',
             border: '1px solid rgba(255,255,255,0.1)'
@@ -360,11 +360,11 @@ export default function SupportChat({ role = "Organization Admin" }) {
         }
 
         .conv-card.active {
-          background: linear-gradient(135deg, rgba(124, 79, 224, 0.18), rgba(0, 196, 167, 0.12));
-          border-left: 3px solid #00c4a7;
+          background: linear-gradient(135deg, rgba(124, 79, 224, 0.18), rgba(109, 40, 217, 0.12));
+          border-left: 3px solid #6d28d9;
         }
 
-        .badge-open { background: rgba(0, 196, 167, 0.15); color: #00c4a7; border: 1px solid rgba(0, 196, 167, 0.3); }
+        .badge-open { background: rgba(109, 40, 217, 0.15); color: #6d28d9; border: 1px solid rgba(109, 40, 217, 0.3); }
         .badge-inprogress { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
         .badge-resolved { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
         .badge-closed { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.3); }
@@ -386,7 +386,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
 
         .bubble-me {
           align-self: flex-end;
-          background: linear-gradient(135deg, #7c4fe0, #5c28c6);
+          background: linear-gradient(135deg, #7c3aed, #5c28c6);
           color: #fff;
           border-bottom-right-radius: 2px;
           box-shadow: 0 4px 12px rgba(124, 79, 224, 0.25);
@@ -419,7 +419,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
             className="btn btn-primary"
             onClick={() => setShowModal(true)}
             style={{
-              background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)',
+              background: 'linear-gradient(135deg, #6d28d9, #7c3aed)',
               border: 'none',
               borderRadius: '8px',
               padding: '8px 16px',
@@ -466,9 +466,9 @@ export default function SupportChat({ role = "Organization Admin" }) {
                   key={tab}
                   onClick={() => setStatusFilter(tab)}
                   style={{
-                    background: statusFilter === tab ? 'rgba(0,196,167,0.2)' : 'transparent',
-                    border: statusFilter === tab ? '1px solid rgba(0,196,167,0.4)' : '1px solid transparent',
-                    color: statusFilter === tab ? '#00c4a7' : '#94a3b8',
+                    background: statusFilter === tab ? 'rgba(109,40,217,0.2)' : 'transparent',
+                    border: statusFilter === tab ? '1px solid rgba(109,40,217,0.4)' : '1px solid transparent',
+                    color: statusFilter === tab ? '#6d28d9' : '#94a3b8',
                     padding: '3px 8px',
                     borderRadius: '6px',
                     fontSize: '11px',
@@ -486,7 +486,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
           {/* CONVERSATION LIST */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ color: '#00c4a7', padding: '24px', textAlign: 'center', fontSize: '12px' }}>
+              <div style={{ color: '#6d28d9', padding: '24px', textAlign: 'center', fontSize: '12px' }}>
                 ⚡ Loading conversations...
               </div>
             ) : conversations.length === 0 ? (
@@ -638,9 +638,9 @@ export default function SupportChat({ role = "Organization Admin" }) {
                     <button
                       onClick={() => handleStatusChange('Open')}
                       style={{
-                        background: 'rgba(0,196,167,0.15)',
-                        border: '1px solid rgba(0,196,167,0.3)',
-                        color: '#00c4a7',
+                        background: 'rgba(109,40,217,0.15)',
+                        border: '1px solid rgba(109,40,217,0.3)',
+                        color: '#6d28d9',
                         borderRadius: '6px',
                         fontSize: '11px',
                         fontWeight: 700,
@@ -657,7 +657,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
               {/* MESSAGES FEED */}
               <div style={{ flex: 1, padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {detailLoading ? (
-                  <div style={{ color: '#00c4a7', textAlign: 'center', margin: 'auto', fontSize: '12px' }}>
+                  <div style={{ color: '#6d28d9', textAlign: 'center', margin: 'auto', fontSize: '12px' }}>
                     ⚡ Loading messages...
                   </div>
                 ) : (
@@ -691,7 +691,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
 
                 {/* TYPING INDICATOR */}
                 {isOtherTyping && (
-                  <div className="chat-bubble bubble-other" style={{ fontSize: '11px', fontStyle: 'italic', color: '#00c4a7' }}>
+                  <div className="chat-bubble bubble-other" style={{ fontSize: '11px', fontStyle: 'italic', color: '#6d28d9' }}>
                     ✍️ {isSuperAdmin ? 'Organization Admin' : 'Super Admin'} is typing...
                   </div>
                 )}
@@ -702,7 +702,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
               <form onSubmit={handleSendReply} style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(6,10,20,0.6)' }}>
                 {replyFile && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', background: 'rgba(255,255,255,0.05)', padding: '6px 10px', borderRadius: '6px', width: 'fit-content' }}>
-                    <span style={{ fontSize: '11px', color: '#00c4a7' }}>📎 {replyFile.name}</span>
+                    <span style={{ fontSize: '11px', color: '#6d28d9' }}>📎 {replyFile.name}</span>
                     <button type="button" onClick={() => setReplyFile(null)} style={{ background: 'none', border: 'none', color: '#ff5472', cursor: 'pointer', fontSize: '12px' }}>✕</button>
                   </div>
                 )}
@@ -750,7 +750,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
                     type="submit"
                     disabled={sending || uploadingFile || (!replyText.trim() && !replyFile)}
                     style={{
-                      background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)',
+                      background: 'linear-gradient(135deg, #6d28d9, #7c3aed)',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '10px 18px',
@@ -818,7 +818,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
                   <select
                     value={modalTargetOrg}
                     onChange={(e) => setModalTargetOrg(e.target.value)}
-                    style={{ width: '100%', background: '#141d30', border: '1px solid rgba(0,196,167,0.3)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#fff', outline: 'none' }}
+                    style={{ width: '100%', background: '#141d30', border: '1px solid rgba(109,40,217,0.3)', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#fff', outline: 'none' }}
                   >
                     {superAdminOrgs.map(o => (
                       <option key={o.id} value={o.id}>
@@ -902,7 +902,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
                 <button
                   type="submit"
                   disabled={modalUploading || (!modalMessage.trim() && !modalFile)}
-                  style={{ background: 'linear-gradient(135deg, #00c4a7, #7c4fe0)', border: 'none', color: '#fff', borderRadius: '8px', padding: '8px 20px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
+                  style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', border: 'none', color: '#fff', borderRadius: '8px', padding: '8px 20px', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
                 >
                   {modalUploading ? 'Creating...' : 'Submit Support Ticket'}
                 </button>

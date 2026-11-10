@@ -169,16 +169,37 @@ class TestInterviewSessionE2ELifecycle(unittest.TestCase):
         )
         self.assertEqual(b_res.status_code, 404)
 
-    def test_03_non_existent_session_id_returns_404(self):
-        """Non-existent UUID returns clean 404."""
-        bogus_id = str(uuid.uuid4())
+    @patch("app.generate_dynamic_question", return_value=("Explain the difference between a process and a thread.", "technical", {}))
+    def test_03_missing_session_auto_creates_and_malformed_returns_400(self, mock_gen_q):
+        """Missing session UUID auto-creates a persisted session cleanly; malformed session_id returns 400."""
+        bad_res = self.client.post(
+            "/start-interview",
+            headers={"Authorization": f"Bearer {self.user_a_token}"},
+            json={"session_id": "not-a-valid-uuid!"}
+        )
+        self.assertEqual(bad_res.status_code, 400)
+
+        new_sid = str(uuid.uuid4())
+        idem_key = f"idem_{uuid.uuid4().hex}"
         res = self.client.post(
             "/start-interview",
             headers={"Authorization": f"Bearer {self.user_a_token}"},
-            json={"session_id": bogus_id}
+            json={"session_id": new_sid, "idempotency_key": idem_key, "role": "Backend Engineer"}
         )
-        self.assertEqual(res.status_code, 404)
-        self.assertIn("not found", res.get_json()["error"].lower())
+        self.assertEqual(res.status_code, 200)
+        body = res.get_json()
+        self.assertEqual(body["session_id"], new_sid)
+        self.assertTrue(body.get("question"))
+
+        # Retry with same idempotency_key returns identical session and question
+        retry_res = self.client.post(
+            "/start-interview",
+            headers={"Authorization": f"Bearer {self.user_a_token}"},
+            json={"session_id": new_sid, "idempotency_key": idem_key}
+        )
+        self.assertEqual(retry_res.status_code, 200)
+        self.assertEqual(retry_res.get_json()["session_id"], new_sid)
+        self.assertTrue(retry_res.get_json().get("idempotent_replay"))
 
     @patch("werkzeug.datastructures.FileStorage.save", return_value=None)
     @patch("app.generate_dynamic_question", return_value=("Tell me about a challenging project from your resume.", "resume", {}))

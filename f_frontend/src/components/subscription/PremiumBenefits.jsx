@@ -14,15 +14,15 @@ export default function PremiumBenefits() {
 
   return (
     <div style={{ margin: "32px 0" }}>
-      <div style={{ fontSize: "18px", fontWeight: 900, color: "#fff", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+      <div style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
         <span>💎</span> Premium Member Benefits
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
         {benefits.map((b, idx) => (
-          <div key={idx} style={{ background: "rgba(12,18,32,0.75)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "18px", transition: "transform 0.2s ease, border-color 0.2s ease" }}>
+          <div key={idx} style={{ background: "rgba(12,18,32,0.75)", border: "1px solid #e5e8f2", borderRadius: "14px", padding: "18px", transition: "transform 0.2s ease, border-color 0.2s ease" }}>
             <div style={{ fontSize: "28px", marginBottom: "10px" }}>{b.icon}</div>
-            <div style={{ fontSize: "14px", fontWeight: 800, color: "#fff", marginBottom: "4px" }}>{b.title}</div>
+            <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", marginBottom: "4px" }}>{b.title}</div>
             <div style={{ fontSize: "12px", color: "var(--text2)", lineHeight: "1.5" }}>{b.desc}</div>
           </div>
         ))}

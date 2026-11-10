@@ -64,7 +64,7 @@ export default function StudentTable({
   };
 
   return (
-    <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+    <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
       
       {/* TOOLBAR: SEARCH & FILTERS */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -78,11 +78,11 @@ export default function StudentTable({
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
             style={{
               width: "100%",
-              background: "#0c1220",
-              border: "1px solid rgba(255,255,255,0.12)",
+              background: "#ffffff",
+              border: "1px solid #cbd5e1",
               borderRadius: "8px",
               padding: "8px 12px",
-              color: "#fff",
+              color: "#0f172a",
               fontSize: "13px"
             }}
           />
@@ -93,7 +93,7 @@ export default function StudentTable({
           <select 
             value={deptFilter} 
             onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}
-            style={{ background: "#0c1220", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
+            style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
           >
             <option value="All">All Departments</option>
             {departments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -102,7 +102,7 @@ export default function StudentTable({
           <select 
             value={semFilter} 
             onChange={(e) => { setSemFilter(e.target.value); setCurrentPage(1); }}
-            style={{ background: "#0c1220", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
+            style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
           >
             <option value="All">All Semesters</option>
             {semesters.map(s => <option key={s} value={s}>{s}</option>)}
@@ -111,7 +111,7 @@ export default function StudentTable({
           <select 
             value={statusFilter} 
             onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-            style={{ background: "#0c1220", color: "#f0f4fd", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
+            style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 10px", fontSize: "12px" }}
           >
             <option value="All">All Status</option>
             <option value="Active">Active</option>
@@ -133,7 +133,7 @@ export default function StudentTable({
                 <button 
                   className="btn btn-xs" 
                   onClick={() => onBulkRenew(selectedIds)}
-                  style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", color: "#fff", border: "none", fontWeight: 800 }}
+                  style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "#fff", border: "none", fontWeight: 800 }}
                 >
                   ⚡ Bulk Renew Sub ({selectedIds.length})
                 </button>
@@ -150,7 +150,7 @@ export default function StudentTable({
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", textAlign: "left" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
+            <tr style={{ borderBottom: "1px solid #cbd5e1", color: "var(--text2)", fontSize: "11px", textTransform: "uppercase" }}>
               <th style={{ padding: "10px 8px" }}>
                 <input 
                   type="checkbox" 
@@ -174,7 +174,7 @@ export default function StudentTable({
               paginated.map((std) => {
                 const isSelected = selectedIds.includes(std.id);
                 return (
-                  <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: isSelected ? "rgba(0,196,167,0.06)" : "transparent" }}>
+                  <tr key={std.id} style={{ borderBottom: "1px solid #e5e8f2", background: isSelected ? "rgba(109,40,217,0.06)" : "transparent" }}>
                     <td style={{ padding: "10px 8px" }}>
                       <input 
                         type="checkbox" 
@@ -182,7 +182,7 @@ export default function StudentTable({
                         onChange={() => handleSelectOne(std.id)} 
                       />
                     </td>
-                    <td style={{ padding: "10px 8px", fontWeight: 700, color: "#fff" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 700, color: "#0f172a" }}>
                       {std.name}
                     </td>
                     <td style={{ padding: "10px 8px", color: "var(--cyan)", fontFamily: "monospace" }}>
@@ -194,10 +194,10 @@ export default function StudentTable({
                     <td style={{ padding: "10px 8px", color: "var(--text2)" }}>
                       {std.semester}
                     </td>
-                    <td style={{ padding: "10px 8px", fontWeight: 800, color: "#00c4a7" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 800, color: "#6d28d9" }}>
                       {std.interview_score} / 10
                     </td>
-                    <td style={{ padding: "10px 8px", fontWeight: 800, color: "#7c4fe0" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 800, color: "#7c3aed" }}>
                       {std.coding_score}%
                     </td>
                     <td style={{ padding: "10px 8px" }}>
@@ -239,7 +239,7 @@ export default function StudentTable({
 
       {/* PAGINATION FOOTER */}
       {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", borderTop: "1px solid #e5e8f2", paddingTop: "12px" }}>
           <div style={{ fontSize: "12px", color: "var(--text2)" }}>
             Showing Page {currentPage} of {totalPages} ({filtered.length} total students)
           </div>

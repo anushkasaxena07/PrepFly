@@ -41,18 +41,18 @@ export default function Announcements() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {toast && (
-        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #00c4a7, #7c4fe0)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
+        <div style={{ position: "fixed", top: "20px", right: "20px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", color: "#fff", padding: "12px 20px", borderRadius: "10px", fontWeight: 800, zIndex: 2000 }}>
           {toast}
         </div>
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#fff", margin: 0 }}>📢 Announcements & Email Notifications</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", margin: 0 }}>📢 Announcements & Email Notifications</h2>
           <p style={{ fontSize: "12px", color: "var(--text2)", marginTop: "2px" }}>Dispatch targeted announcements and push notifications to departments or semesters.</p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ background: "linear-gradient(135deg, #7c4fe0, #00c4a7)", border: "none", fontWeight: 800 }}>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800 }}>
           ➕ New Announcement
         </button>
       </div>
@@ -62,9 +62,9 @@ export default function Announcements() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           {safeAnnouncements.map((ann) => (
-            <div key={ann.id} className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+            <div key={ann.id} className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#fff", margin: 0 }}>{ann.title}</h3>
+                <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: 0 }}>{ann.title}</h3>
                 <span style={{ fontSize: "11px", color: "var(--text2)" }}>📅 {ann.created_at}</span>
               </div>
               <p style={{ fontSize: "13px", color: "var(--text1)", lineHeight: "1.5", margin: "0 0 12px 0" }}>{ann.message}</p>

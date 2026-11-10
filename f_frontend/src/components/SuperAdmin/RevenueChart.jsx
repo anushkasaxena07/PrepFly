@@ -25,10 +25,10 @@ export default function RevenueChart({ title, data = {} }) {
   const areaPoints = `20,140 ${points} 340,140`;
 
   return (
-    <div className="card" style={{ background: "rgba(12,18,32,0.85)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "20px" }}>
+    <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#fff", margin: 0 }}>💰 {title || "Monthly Platform Revenue ($)"}</h3>
-        <span style={{ fontSize: "12px", color: "#00c4a7", fontWeight: 800 }}>{growthYoY}</span>
+        <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>💰 {title || "Monthly Platform Revenue ($)"}</h3>
+        <span style={{ fontSize: "12px", color: "#6d28d9", fontWeight: 800 }}>{growthYoY}</span>
       </div>
 
       <svg viewBox="0 0 360 160" style={{ width: "100%", height: "auto" }}>
@@ -40,8 +40,8 @@ export default function RevenueChart({ title, data = {} }) {
         </defs>
 
         {/* Grid Lines */}
-        <line x1="20" y1="30" x2="340" y2="30" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
-        <line x1="20" y1="85" x2="340" y2="85" stroke="rgba(255,255,255,0.05)" strokeDasharray="4" />
+        <line x1="20" y1="30" x2="340" y2="30" stroke="#f1f5f9" strokeDasharray="4" />
+        <line x1="20" y1="85" x2="340" y2="85" stroke="#f1f5f9" strokeDasharray="4" />
         <line x1="20" y1="140" x2="340" y2="140" stroke="rgba(255,255,255,0.1)" />
 
         {/* Area */}
