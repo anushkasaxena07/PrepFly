@@ -166,8 +166,8 @@ def _validate_parsed_resume(parsed: object) -> dict:
 
 
 def _is_transient_gemini_error(err: Exception) -> bool:
-    s = str(err).lower()
-    return any(tok in s for tok in ("503", "504", "429", "unavailable", "deadline", "timed out", "timeout", "resource exhausted"))
+    from services.ai_service import is_transient_gemini_error
+    return is_transient_gemini_error(err)
 
 
 def parse_resume_content(raw_text, chat_model):
@@ -212,15 +212,25 @@ Expected JSON Schema:
 }}"""
 
     from langchain_core.messages import HumanMessage
+    from services.ai_service import (
+        get_fallback_gemini_models,
+        is_model_not_found_error,
+        is_test_gemini_key,
+        mark_gemini_model_unavailable,
+    )
 
     model_used = getattr(chat_model, "model", None) or getattr(chat_model, "model_name", None) or "gemini"
     last_err = None
     prompt_to_send = base_prompt
+    started_at = time.monotonic()
+    total_budget_s = 20.0
 
-    # Up to 3 attempts with exponential backoff + jitter on transient 503/504,
+    # Up to 3 attempts with bounded exponential backoff + jitter on transient 503/504,
     # and validation-error feedback on invalid JSON.
     max_attempts = 3
     for attempt in range(max_attempts):
+        if attempt > 0 and (time.monotonic() - started_at) >= total_budget_s:
+            break
         try:
             response = chat_model.invoke([HumanMessage(content=prompt_to_send)])
             raw_content = getattr(response, "content", "") if response is not None else ""
@@ -248,8 +258,13 @@ Expected JSON Schema:
         except Exception as err:
             last_err = err
             logger.warning("Resume parse Gemini call failed (attempt %d/%d): %s", attempt + 1, max_attempts, err)
+            if is_model_not_found_error(err):
+                mark_gemini_model_unavailable(str(model_used))
+                break
             if _is_transient_gemini_error(err) and attempt < max_attempts - 1:
-                sleep_s = (0.4 * (2 ** attempt)) + random.uniform(0.0, 0.25)
+                if (time.monotonic() - started_at) >= total_budget_s:
+                    break
+                sleep_s = (0.3 * (2 ** attempt)) + random.uniform(0.0, 0.2)
                 time.sleep(sleep_s)
                 continue
             if not _is_transient_gemini_error(err):
@@ -259,19 +274,19 @@ Expected JSON Schema:
     from unittest.mock import NonCallableMock
     live_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY") or ""
     is_mock_client = isinstance(chat_model, NonCallableMock)
-    is_test_key = not live_api_key or live_api_key.startswith("test-") or "dummy" in live_api_key.lower()
-    if not is_mock_client and not is_test_key and os.getenv("ENVIRONMENT") != "test":
-        for fallback_model in ("gemini-2.0-flash", "gemini-flash-latest"):
-            if fallback_model == str(model_used):
-                continue
+    if not is_mock_client and not is_test_gemini_key(live_api_key):
+        discover_live = last_err is not None and is_model_not_found_error(last_err)
+        for fallback_model in get_fallback_gemini_models(live_api_key, exclude_model=str(model_used), include_discovery=discover_live):
+            if (time.monotonic() - started_at) >= total_budget_s + 2.0:
+                break
             try:
                 from langchain_google_genai import ChatGoogleGenerativeAI
                 fb_chat = ChatGoogleGenerativeAI(
                     api_key=live_api_key,
                     model=fallback_model,
                     temperature=0.3,
-                    max_retries=1,
-                    timeout=25,
+                    max_retries=0,
+                    timeout=12,
                 )
                 fb_resp = fb_chat.invoke([HumanMessage(content=base_prompt)])
                 fb_raw = getattr(fb_resp, "content", "") if fb_resp is not None else ""
@@ -290,6 +305,8 @@ Expected JSON Schema:
                 }
             except Exception as fb_err:
                 last_err = fb_err
+                if is_model_not_found_error(fb_err):
+                    mark_gemini_model_unavailable(fallback_model)
                 logger.warning("Resume parse fallback model '%s' failed: %s", fallback_model, fb_err)
 
     status_code = 504 if (last_err and ("504" in str(last_err) or "deadline" in str(last_err).lower() or "timed out" in str(last_err).lower())) else 503

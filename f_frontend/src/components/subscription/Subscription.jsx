@@ -26,11 +26,12 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
     setLoading(true);
     try {
       const subStatus = await fetchSubscriptionStatus(apiFetch, organizationId);
-      const payHist = await fetchPaymentHistory(apiFetch, organizationId);
       setStatusData(subStatus);
-      setPayments(payHist || []);
 
       if (isAdmin) {
+        const payHist = await fetchPaymentHistory(apiFetch, organizationId);
+        setPayments(payHist || []);
+
         const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
         const headers = { "Content-Type": "application/json" };
         if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -40,6 +41,8 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
           const sData = await sRes.json();
           setStudents(sData.students || []);
         }
+      } else {
+        setPayments([]);
       }
     } catch (e) {
       console.error("Error loading subscription data:", e);
@@ -298,7 +301,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       </div>
 
       {/* PAYMENT HISTORY & INVOICES */}
-      <PaymentHistory payments={payments} />
+      {isAdmin && <PaymentHistory payments={payments} />}
 
       {/* COVERED ORGANIZATION STUDENTS ROSTER (ADMIN ONLY) */}
       {isAdmin && (

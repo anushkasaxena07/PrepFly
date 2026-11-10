@@ -75,13 +75,30 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
 
   useEffect(() => {
     const userId = user?._id || user?.id || user?.user_id;
-    if (userId) {
+    const token =
+      localStorage.getItem("access_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("admin_access_token") ||
+      localStorage.getItem("superadmin_token");
+    if (userId && token) {
       const fetchStats = async () => {
         try {
-          const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-          const res = await axios.get(`${BACKEND_URL}/user-stats/${userId}`);
-          if (res.status === 200) {
-            const data = res.data;
+          let data = null;
+          if (typeof apiFetch === "function") {
+            const res = await apiFetch(`/user-stats/me`);
+            if (res && res.ok) {
+              data = await res.json();
+            }
+          } else {
+            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+            const res = await axios.get(`${BACKEND_URL}/user-stats/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.status === 200) {
+              data = res.data;
+            }
+          }
+          if (data) {
             const totalSessions = (data.interviews?.total || 0) + (data.coding?.total || 0) + (data.speech?.total || 0) + (data.resume?.total || 0);
             setStats({
               interviews: data.interviews?.total || 0,
@@ -95,7 +112,7 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
       };
       fetchStats();
     }
-  }, [user?._id, user?.id, user?.user_id]);
+  }, [user?._id, user?.id, user?.user_id, apiFetch]);
 
   const processImage = (file) => {
     if (!file) return;

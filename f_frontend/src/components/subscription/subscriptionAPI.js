@@ -27,6 +27,7 @@ export const fetchPaymentHistory = async (apiFetch, orgId) => {
     const id = orgId || localStorage.getItem("organization_id") || localStorage.getItem("user_id") || "org_default";
     const res = await apiFetch(`/payment/history?org_id=${id}`);
     if (res && res.ok) return await res.json();
+    if (res && (res.status === 401 || res.status === 403)) return [];
   } catch (e) {
     console.error("fetchPaymentHistory error:", e);
   }

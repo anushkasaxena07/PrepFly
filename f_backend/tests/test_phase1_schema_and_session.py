@@ -312,6 +312,97 @@ class TestPhase1SchemaAndSession(unittest.TestCase):
         rep_b = client_b.table("interview_reports").select("*").eq("session_id", sid).execute()
         self.assertEqual(len(rep_b.data), 0)
 
+    def test_09_resume_404_model_not_found_switches_to_gemini_38_flash(self):
+        from services import ai_service, resume_service
+
+        class _Live404Model:
+            model = "gemini-2.5-flash"
+
+            def invoke(self, _messages):
+                raise RuntimeError("404 NOT_FOUND. This model models/gemini-2.5-flash is no longer available")
+
+        class _FakeResp:
+            def __init__(self, content):
+                self.content = content
+
+        class _FakeFallbackChat:
+            def __init__(self, **kwargs):
+                self.model = kwargs["model"]
+
+            def invoke(self, _messages):
+                if self.model == "gemini-3.8-flash":
+                    return _FakeResp('{"full_name":"Ava Test","skills":["Python"],"ats_score":88,"missing_info":[]}')
+                raise RuntimeError(f"Unexpected model {self.model}")
+
+        orig_env = os.environ.get("ENVIRONMENT")
+        orig_flask_env = os.environ.get("FLASK_ENV")
+        orig_key = os.environ.get("GEMINI_API_KEY")
+        ai_service._UNAVAILABLE_GEMINI_MODELS.clear()
+        try:
+            os.environ["ENVIRONMENT"] = "production"
+            os.environ["FLASK_ENV"] = "production"
+            os.environ["GEMINI_API_KEY"] = "AIzaLiveMockKeyFor404SwitchTest"
+            with patch("langchain_google_genai.ChatGoogleGenerativeAI", side_effect=_FakeFallbackChat), \
+                 patch.object(ai_service, "discover_gemini_flash_models", return_value=[]):
+                parsed = resume_service.parse_resume_content(
+                    f"Unique Resume 404 Switch Test {uuid.uuid4().hex}\nPython Flask React",
+                    _Live404Model(),
+                )
+            self.assertEqual(parsed["model_used"], "gemini-3.8-flash")
+            self.assertIn("Python", parsed["structured_data"]["skills"])
+            self.assertIn("gemini-2.5-flash", ai_service._UNAVAILABLE_GEMINI_MODELS)
+        finally:
+            ai_service._UNAVAILABLE_GEMINI_MODELS.clear()
+            if orig_env is None:
+                os.environ.pop("ENVIRONMENT", None)
+            else:
+                os.environ["ENVIRONMENT"] = orig_env
+            if orig_flask_env is None:
+                os.environ.pop("FLASK_ENV", None)
+            else:
+                os.environ["FLASK_ENV"] = orig_flask_env
+            if orig_key is not None:
+                os.environ["GEMINI_API_KEY"] = orig_key
+
+    def test_10_notifications_pgrst205_suppresses_poll_spam(self):
+        app_module._NOTIFICATIONS_TABLE_MISSING_UNTIL = 0.0
+        notif_calls = []
+
+        class _RaisingNotifBuilder:
+            def select(self, *_a, **_kw):
+                return self
+
+            def eq(self, *_a, **_kw):
+                return self
+
+            def neq(self, *_a, **_kw):
+                return self
+
+            def execute(self):
+                notif_calls.append(1)
+                raise RuntimeError(
+                    "Database execute failed on 'notifications': "
+                    "{'message': \"Could not find the table 'public.notifications' in the schema cache\", 'code': 'PGRST205'}"
+                )
+
+        orig_table = supabase.table
+
+        def _fake_table(name, *args, **kwargs):
+            if name == "notifications":
+                return _RaisingNotifBuilder()
+            return orig_table(name, *args, **kwargs)
+
+        try:
+            with patch.object(supabase, "table", side_effect=_fake_table):
+                r1 = self.client.get("/notifications", headers={"Authorization": f"Bearer {self.user_a_token}"})
+                r2 = self.client.get("/notifications", headers={"Authorization": f"Bearer {self.user_a_token}"})
+            self.assertEqual(r1.status_code, 200)
+            self.assertEqual(r2.status_code, 200)
+            # Step 1 triggers PGRST205 once, skipping Step 2 and the entire next poll!
+            self.assertEqual(len(notif_calls), 1)
+        finally:
+            app_module._NOTIFICATIONS_TABLE_MISSING_UNTIL = 0.0
+
 
 if __name__ == "__main__":
     unittest.main()

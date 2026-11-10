@@ -2,6 +2,8 @@ import os
 import json
 import random
 import re
+import time
+import urllib.request
 from langchain_core.messages import HumanMessage
 from services.ai_config import AI_INTERVIEWER, AVA_SYSTEM_PROMPT, build_ava_system_prompt
 from services.topic_engine import (
@@ -11,6 +13,87 @@ from services.topic_engine import (
     get_curated_fallback_question,
     normalize_topic_identifier
 )
+
+GEMINI_MODEL_CANDIDATES = (
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+)
+_UNAVAILABLE_GEMINI_MODELS = set()
+_DISCOVERED_MODELS_CACHE = {"ts": 0.0, "models": []}
+
+
+def is_test_gemini_key(api_key: str) -> bool:
+    if not api_key or not isinstance(api_key, str):
+        return True
+    low = api_key.lower()
+    return api_key.startswith("test-") or "dummy" in low or os.getenv("ENVIRONMENT") == "test" or os.getenv("FLASK_ENV") == "test"
+
+
+def is_model_not_found_error(err: Exception) -> bool:
+    s = str(err).lower()
+    return any(tok in s for tok in ("404", "not_found", "is not found", "no longer available", "not supported for generatecontent"))
+
+
+def is_transient_gemini_error(err: Exception) -> bool:
+    s = str(err).lower()
+    return any(tok in s for tok in ("503", "504", "429", "unavailable", "deadline", "timed out", "timeout", "resource exhausted"))
+
+
+def mark_gemini_model_unavailable(model_name: str) -> None:
+    if model_name:
+        _UNAVAILABLE_GEMINI_MODELS.add(str(model_name).replace("models/", ""))
+
+
+def discover_gemini_flash_models(api_key: str, timeout: float = 4.0) -> list:
+    if is_test_gemini_key(api_key):
+        return []
+    now = time.monotonic()
+    if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["ts"]) < 300.0:
+        return list(_DISCOVERED_MODELS_CACHE["models"])
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        flash_models = []
+        for m in payload.get("models", []):
+            name = str(m.get("name", "")).replace("models/", "")
+            methods = m.get("supportedGenerationMethods") or []
+            low = name.lower()
+            if "generateContent" in methods and "flash" in low and not any(x in low for x in ("tts", "image", "audio", "live", "8b")):
+                flash_models.append(name)
+        # Prefer newer flash versions first
+        def _rank(name: str):
+            for idx, pref in enumerate(("gemini-3.8", "gemini-3.5", "gemini-3", "gemini-2.5", "gemini-2.0", "gemini-1.5")):
+                if pref in name:
+                    return (0, idx, len(name), name)
+            return (1, 99, len(name), name)
+        flash_models.sort(key=_rank)
+        _DISCOVERED_MODELS_CACHE["ts"] = now
+        _DISCOVERED_MODELS_CACHE["models"] = flash_models
+        return list(flash_models)
+    except Exception:
+        return []
+
+
+def get_fallback_gemini_models(api_key: str, exclude_model: str = "", include_discovery: bool = True) -> list:
+    excluded = {str(exclude_model).replace("models/", "")} if exclude_model else set()
+    excluded.update(_UNAVAILABLE_GEMINI_MODELS)
+    candidates = list(GEMINI_MODEL_CANDIDATES)
+    if include_discovery and not is_test_gemini_key(api_key):
+        candidates.extend(discover_gemini_flash_models(api_key))
+    seen = set()
+    ordered = []
+    for name in candidates:
+        clean = str(name).replace("models/", "")
+        if clean and clean not in excluded and clean not in seen:
+            seen.add(clean)
+            ordered.append(clean)
+    return ordered
+
 
 def safe_invoke_llm(chat_model, prompt_content):
     if not chat_model:
@@ -35,6 +118,7 @@ def safe_invoke_llm(chat_model, prompt_content):
             return "\n".join(parts).strip()
         return str(content).strip()
 
+    primary_name = str(getattr(chat_model, "model", None) or getattr(chat_model, "model_name", None) or "")
     try:
         res = chat_model.invoke([HumanMessage(content=prompt_content)])
         if res and hasattr(res, "content"):
@@ -42,21 +126,25 @@ def safe_invoke_llm(chat_model, prompt_content):
             if txt:
                 return txt
     except Exception as e_prim:
+        if is_model_not_found_error(e_prim):
+            mark_gemini_model_unavailable(primary_name)
         api_key = getattr(chat_model, "google_api_key", None) or os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_INTERVIEW_KEY")
-        if not api_key or (isinstance(api_key, str) and (api_key.startswith("test-") or "dummy" in api_key.lower())) or os.getenv("ENVIRONMENT") == "test":
+        if is_test_gemini_key(api_key):
             return None
         print(f"[AI_SERVICE NOTICE] Primary model failed ({e_prim}), checking fallback models...")
         if api_key:
-            for alt_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]:
+            for alt_name in get_fallback_gemini_models(api_key, exclude_model=primary_name, include_discovery=is_model_not_found_error(e_prim)):
                 try:
                     from langchain_google_genai import ChatGoogleGenerativeAI
-                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=1, timeout=25)
+                    alt_chat = ChatGoogleGenerativeAI(api_key=api_key, model=alt_name, temperature=0.6, max_retries=0, timeout=14)
                     res = alt_chat.invoke([HumanMessage(content=prompt_content)])
                     if res and hasattr(res, "content"):
                         txt = _extract_text(res.content)
                         if txt:
                             return txt
-                except Exception:
+                except Exception as e_alt:
+                    if is_model_not_found_error(e_alt):
+                        mark_gemini_model_unavailable(alt_name)
                     continue
     return None
 

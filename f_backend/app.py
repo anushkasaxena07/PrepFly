@@ -635,6 +635,8 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 chat_model = None
 
 GEMINI_MODEL_CANDIDATES = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
     "gemini-flash-latest",
@@ -643,7 +645,7 @@ GEMINI_MODEL_CANDIDATES = [
 for model_name in GEMINI_MODEL_CANDIDATES:
     try:
         chat_model = ChatGoogleGenerativeAI(
-            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=1, timeout=25
+            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=0, timeout=15
         )
         print(f"[GEMINI INIT] Successfully initialized model '{model_name}'")
         break
@@ -652,20 +654,23 @@ for model_name in GEMINI_MODEL_CANDIDATES:
 
 def invoke_gemini_with_fallback(prompt_or_messages):
     global chat_model
+    from services.ai_service import get_fallback_gemini_models, is_model_not_found_error, mark_gemini_model_unavailable
     messages = prompt_or_messages if isinstance(prompt_or_messages, list) else [HumanMessage(content=str(prompt_or_messages))]
-    
-    for m_name in GEMINI_MODEL_CANDIDATES:
+
+    for m_name in get_fallback_gemini_models(GEMINI_API_KEY, include_discovery=True):
         try:
             temp_chat = ChatGoogleGenerativeAI(
-                api_key=GEMINI_API_KEY, model=m_name, temperature=0.3
+                api_key=GEMINI_API_KEY, model=m_name, temperature=0.3, max_retries=0, timeout=15
             )
             res = temp_chat.invoke(messages)
             if res and hasattr(res, 'content') and res.content:
                 chat_model = temp_chat
                 return res.content.strip()
         except Exception as e_gen:
+            if is_model_not_found_error(e_gen):
+                mark_gemini_model_unavailable(m_name)
             print(f"[GEMINI INVOICE NOTICE] Model '{m_name}' failed:", e_gen)
-            
+
     if chat_model:
         try:
             res = chat_model.invoke(messages)
@@ -8359,9 +8364,13 @@ def _push_notification(notif):
         print("Push notification DB notice:", e)
 
 
+_NOTIFICATIONS_TABLE_MISSING_UNTIL = 0.0
+
+
 @app.route("/api/notifications", methods=["GET", "POST", "OPTIONS"])
 @app.route("/notifications", methods=["GET", "POST", "OPTIONS"])
 def get_user_notifications():
+    global _NOTIFICATIONS_TABLE_MISSING_UNTIL
     if request.method == "OPTIONS":
         return Response("", status=200)
     user_payload = _get_optional_user()
@@ -8384,64 +8393,78 @@ def get_user_notifications():
             seen_ids.add(item_id)
             notifications_list.append(item)
 
+    notifications_table_available = time.monotonic() >= _NOTIFICATIONS_TABLE_MISSING_UNTIL
+
     # 1. Fetch Super Admin broadcasts
-    try:
-        sa_res = supabase.table("notifications").select("*").eq("sender_type", "SUPER_ADMIN").execute()
-        if sa_res and sa_res.data:
-            for n in sa_res.data:
-                add_item({
-                    "id": n.get("id"),
-                    "title": f"👑 Platform Alert: {n.get('title')}",
-                    "desc": n.get("message"),
-                    "time": n.get("created_at") or "Recently",
-                    "type": "system",
-                    "sender": "Platform Super Admin",
-                    "read": bool(n.get("read", 0)),
-                    "raw_message": n.get("message")
-                })
-    except Exception as e:
-        print("Fetch SA notifications notice:", e)
-
-    # 2. Fetch Org Admin notifications from Supabase
-    try:
-        org_res = supabase.table("notifications").select("*").neq("sender_type", "FEEDBACK_SYSTEM").execute()
-        if org_res and org_res.data:
-            import json
-            for n in org_res.data:
-                n_org = n.get("organization_id")
-                if not n_org or n_org == "All" or (org_id and n_org == org_id) or (org_id == "All") or n.get("sender_type") == "SUPER_ADMIN":
-                    title = n.get("title") or ""
-                    message_content = n.get("message") or ""
-                    notif_type = "announcement"
-                    desc = message_content
-                    if title.startswith("🎯"):
-                        notif_type = "practice_question"
-                        try:
-                            q_data = json.loads(message_content)
-                            desc = f"Difficulty: {q_data.get('difficulty')} | Category: {q_data.get('category')}. Click to view details and practice."
-                        except Exception:
-                            pass
-                    elif title.startswith("💻"):
-                        notif_type = "coding"
-                    elif title.startswith("🎙️"):
-                        notif_type = "interviews"
-
-                    formatted_title = title
-                    if not (title.startswith("🎯") or title.startswith("💻") or title.startswith("🎙️") or title.startswith("📢")):
-                        formatted_title = f"📢 Campus Announcement: {title}"
-
+    if notifications_table_available:
+        try:
+            sa_res = supabase.table("notifications").select("*").eq("sender_type", "SUPER_ADMIN").execute()
+            if sa_res and sa_res.data:
+                for n in sa_res.data:
                     add_item({
                         "id": n.get("id"),
-                        "title": formatted_title,
-                        "desc": desc,
+                        "title": f"👑 Platform Alert: {n.get('title')}",
+                        "desc": n.get("message"),
                         "time": n.get("created_at") or "Recently",
-                        "type": notif_type,
-                        "sender": n.get("sender_name") or "Organization Admin",
+                        "type": "system",
+                        "sender": "Platform Super Admin",
                         "read": bool(n.get("read", 0)),
-                        "raw_message": message_content
+                        "raw_message": n.get("message")
                     })
-    except Exception as e:
-        print("Fetch Org notifications (Supabase) notice:", e)
+        except Exception as e:
+            err_s = str(e)
+            if "PGRST205" in err_s or "42P01" in err_s:
+                _NOTIFICATIONS_TABLE_MISSING_UNTIL = time.monotonic() + 300.0
+                notifications_table_available = False
+                print("Notifications table missing in Supabase (PGRST205); suppressing notifications queries for 300s until migration 010 runs.")
+            else:
+                print("Fetch SA notifications notice:", e)
+
+    # 2. Fetch Org Admin notifications from Supabase
+    if notifications_table_available:
+        try:
+            org_res = supabase.table("notifications").select("*").neq("sender_type", "FEEDBACK_SYSTEM").execute()
+            if org_res and org_res.data:
+                import json
+                for n in org_res.data:
+                    n_org = n.get("organization_id")
+                    if not n_org or n_org == "All" or (org_id and n_org == org_id) or (org_id == "All") or n.get("sender_type") == "SUPER_ADMIN":
+                        title = n.get("title") or ""
+                        message_content = n.get("message") or ""
+                        notif_type = "announcement"
+                        desc = message_content
+                        if title.startswith("🎯"):
+                            notif_type = "practice_question"
+                            try:
+                                q_data = json.loads(message_content)
+                                desc = f"Difficulty: {q_data.get('difficulty')} | Category: {q_data.get('category')}. Click to view details and practice."
+                            except Exception:
+                                pass
+                        elif title.startswith("💻"):
+                            notif_type = "coding"
+                        elif title.startswith("🎙️"):
+                            notif_type = "interviews"
+
+                        formatted_title = title
+                        if not (title.startswith("🎯") or title.startswith("💻") or title.startswith("🎙️") or title.startswith("📢")):
+                            formatted_title = f"📢 Campus Announcement: {title}"
+
+                        add_item({
+                            "id": n.get("id"),
+                            "title": formatted_title,
+                            "desc": desc,
+                            "time": n.get("created_at") or "Recently",
+                            "type": notif_type,
+                            "sender": n.get("sender_name") or "Organization Admin",
+                            "read": bool(n.get("read", 0)),
+                            "raw_message": message_content
+                        })
+        except Exception as e:
+            err_s = str(e)
+            if "PGRST205" in err_s or "42P01" in err_s:
+                _NOTIFICATIONS_TABLE_MISSING_UNTIL = time.monotonic() + 300.0
+            else:
+                print("Fetch Org notifications (Supabase) notice:", e)
 
     # 3. Fetch from announcements table in Supabase directly
     try:
@@ -9971,13 +9994,13 @@ def superadmin_test_ai_provider():
         try:
             import google.generativeai as genai
             genai.configure(api_key=key_to_use)
-            t_model = genai.GenerativeModel(model or 'gemini-2.5-flash')
+            t_model = genai.GenerativeModel(model or 'gemini-3.8-flash')
             response = t_model.generate_content("Respond with 'OK' if connected.")
             latency_ms = int((time.time() - start_t) * 1000)
             return jsonify({
                 "status": "Success",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-2.5-flash",
+                "model": model or "gemini-3.8-flash",
                 "latency_ms": latency_ms,
                 "message": f"Connection Verified! Returned HTTP 200 OK ({latency_ms}ms latency). Response: '{response.text.strip()}'"
             }), 200
@@ -9986,7 +10009,7 @@ def superadmin_test_ai_provider():
             return jsonify({
                 "status": "Failed",
                 "provider": "Google Gemini API",
-                "model": model or "gemini-2.5-flash",
+                "model": model or "gemini-3.8-flash",
                 "latency_ms": latency_ms,
                 "message": f"Gemini connectivity test failed: {e}"
             }), 502
