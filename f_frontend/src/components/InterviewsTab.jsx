@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getGradeInfo } from '../utils/gradingSystem';
+import { safePlayMedia } from '../utils/mediaPlayback';
 
 const AUDIO_CONSTRAINTS = {
   echoCancellation: true,
@@ -80,33 +81,29 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
 
   const safeAttachStream = async (element, stream, isMuted = false) => {
     if (!element || !stream) return;
-    if (element.srcObject !== stream) {
+    const streamChanged = element.srcObject !== stream;
+    if (streamChanged) {
       element.srcObject = stream;
     }
     element.muted = isMuted;
     element.playsInline = true;
     element.autoplay = true;
-    try {
-      await element.play();
-    } catch (err) {
-      if (err.name === 'NotAllowedError') {
-        console.warn("Autoplay blocked on laptop browser. Muting video temporarily to start playback and waiting for user gesture...");
+    if (!streamChanged && element.paused === false) return;
+    await safePlayMedia(element, {
+      onAutoplayBlocked: () => {
+        console.warn("Autoplay blocked on browser. Muting video temporarily to start playback and waiting for user gesture...");
         element.muted = true;
-        try {
-          await element.play();
-        } catch (e2) {}
+        safePlayMedia(element);
         const unmuteOnUserAction = () => {
           if (!isMuted) element.muted = false;
-          element.play().catch(() => {});
+          safePlayMedia(element);
           window.removeEventListener('click', unmuteOnUserAction);
           window.removeEventListener('keydown', unmuteOnUserAction);
         };
         window.addEventListener('click', unmuteOnUserAction);
         window.addEventListener('keydown', unmuteOnUserAction);
-      } else if (err.name !== 'AbortError') {
-        console.warn("Media play notice:", err);
-      }
-    }
+      },
+    });
   };
 
   useEffect(() => {
@@ -1527,10 +1524,10 @@ export default function InterviewsTab({ setActiveTab, apiFetch, isLoggedIn, user
                     {/* DEDICATED AUDIO PLAYER TO GUARANTEE HEARING REMOTE PEER */}
                     <audio 
                       ref={(el) => {
-                        if (el && remoteStream) {
+                        if (el && remoteStream && el.srcObject !== remoteStream) {
                           el.srcObject = remoteStream;
                           el.muted = false;
-                          el.play().catch(e => console.warn("Remote audio element play notice:", e));
+                          safePlayMedia(el);
                         }
                       }} 
                       autoPlay 

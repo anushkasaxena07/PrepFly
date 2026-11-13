@@ -54,6 +54,10 @@ services:
       # Google Gemini Generative AI
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_PRIMARY_MODEL
+        sync: false
+      - key: GEMINI_FALLBACK_MODELS
+        sync: false
 
       # Razorpay Payment Gateway & Webhooks
       - key: RAZORPAY_KEY_ID
@@ -67,14 +71,24 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-      # Optional Email Transport (Resend / SMTP)
+      # Optional Email Transport (Resend HTTPS preferred on PaaS; SMTP fallback)
       - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_EMAIL
         sync: false
       - key: SMTP_PASSWORD
         sync: false
 
-      # Optional Distributed Rate Limiting (Redis / Upstash)
+      # Optional Distributed Rate Limiting & Cache (Redis / Upstash rediss:// TLS URL)
       - key: REDIS_URL
+        sync: false
+      - key: REDIS_CONNECT_TIMEOUT_S
+        sync: false
+      - key: REDIS_SOCKET_TIMEOUT_S
         sync: false
 
   # ----------------------------------------------------------------------------

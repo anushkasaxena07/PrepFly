@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPaymentOrder, verifyPayment, recordFailedPayment } from './subscriptionAPI';
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label = "Renew Subscription (₹500 / Year)", style = {} }) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -8,7 +9,6 @@ export default function RenewButton({ apiFetch, orgId, onSuccess, onError, label
   const getFetch = () => {
     if (apiFetch && typeof apiFetch === 'function') return apiFetch;
     return async (endpoint, options = {}) => {
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
       const token = localStorage.getItem("access_token") || localStorage.getItem("superadmin_access_token");
       const headers = {
         "Content-Type": "application/json",

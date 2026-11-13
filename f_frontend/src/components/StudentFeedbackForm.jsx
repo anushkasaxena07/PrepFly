@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { submitFeedback, uploadFeedbackScreenshot, getMyFeedback, updateMyFeedback } from '../services/feedbackAPI';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../config/apiConfig';
 
 export default function StudentFeedbackForm({ role = "Student" }) {
   const [subject, setSubject] = useState("");
@@ -10,7 +9,7 @@ export default function StudentFeedbackForm({ role = "Student" }) {
   const [message, setMessage] = useState("");
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState("");
-  
+
   const [submitting, setSubmitting] = useState(false);
   const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -122,7 +121,7 @@ export default function StudentFeedbackForm({ role = "Student" }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "28px", maxWidth: "750px" }}>
-      
+
       {/* SUBMISSION FORM CARD */}
       <div className="pf-card" style={{ background: "#ffffff", border: "1px solid var(--border)", borderRadius: "16px", padding: "28px" }}>
         <h3 style={{ fontSize: "20px", fontWeight: 900, color: "var(--text)", marginBottom: "6px" }}>
@@ -145,7 +144,7 @@ export default function StudentFeedbackForm({ role = "Student" }) {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          
+
           {/* SUBJECT */}
           <div>
             <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "var(--text2, #94a3b8)", marginBottom: "6px", textTransform: "uppercase" }}>SUBJECT / TITLE</label>
@@ -264,56 +263,56 @@ export default function StudentFeedbackForm({ role = "Student" }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {safeFeedbacks.map(fb => (
                 <div key={fb.id} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px" }}>
-                
-                {editingId === fb.id ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <input type="text" value={editSubject} onChange={e => setEditSubject(e.target.value)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "13px" }} />
-                    <textarea rows={3} value={editMessage} onChange={e => setEditMessage(e.target.value)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "13px" }} />
-                    <div style={{ display: "flex", gap: "10px" }}>
-                      <button onClick={() => handleSaveEdit(fb.id)} style={{ background: "#6d28d9", border: "none", color: "#fff", borderRadius: "6px", padding: "6px 12px", fontWeight: 700, fontSize: "12px" }}>Save</button>
-                      <button onClick={() => setEditingId(null)} style={{ background: "transparent", border: "1px solid #cbd5e1", color: "#475569", borderRadius: "6px", padding: "6px 12px", fontSize: "12px" }}>Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                      <div>
-                        <span style={{ fontSize: "11px", color: "#6d28d9", fontWeight: 800 }}>{fb.category}</span>
-                        <h4 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "2px 0 0 0" }}>{fb.subject}</h4>
-                      </div>
 
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 800, background: fb.status === "Resolved" ? "#ecfdf5" : "#eef2ff", color: fb.status === "Resolved" ? "#059669" : "#4f46e5" }}>
-                          {fb.status}
-                        </span>
-
-                        {!["Resolved", "Closed"].includes(fb.status) && (
-                          <button onClick={() => startEdit(fb)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}>
-                            Edit
-                          </button>
-                        )}
+                  {editingId === fb.id ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <input type="text" value={editSubject} onChange={e => setEditSubject(e.target.value)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "13px" }} />
+                      <textarea rows={3} value={editMessage} onChange={e => setEditMessage(e.target.value)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "8px 12px", color: "#0f172a", fontSize: "13px" }} />
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={() => handleSaveEdit(fb.id)} style={{ background: "#6d28d9", border: "none", color: "#fff", borderRadius: "6px", padding: "6px 12px", fontWeight: 700, fontSize: "12px" }}>Save</button>
+                        <button onClick={() => setEditingId(null)} style={{ background: "transparent", border: "1px solid #cbd5e1", color: "#475569", borderRadius: "6px", padding: "6px 12px", fontSize: "12px" }}>Cancel</button>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div>
+                          <span style={{ fontSize: "11px", color: "#6d28d9", fontWeight: 800 }}>{fb.category}</span>
+                          <h4 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", margin: "2px 0 0 0" }}>{fb.subject}</h4>
+                        </div>
 
-                    <p style={{ fontSize: "13px", color: "#475569", lineHeight: 1.5, margin: "0 0 8px 0" }}>{fb.message}</p>
-                    
-                    {fb.screenshot_url && (
-                      <div style={{ marginTop: "8px" }}>
-                        <img src={fb.screenshot_url.startsWith('/') ? `${BACKEND_URL}${fb.screenshot_url}` : fb.screenshot_url} alt="Attachment" style={{ maxHeight: "80px", borderRadius: "6px" }} />
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 800, background: fb.status === "Resolved" ? "#ecfdf5" : "#eef2ff", color: fb.status === "Resolved" ? "#059669" : "#4f46e5" }}>
+                            {fb.status}
+                          </span>
+
+                          {!["Resolved", "Closed"].includes(fb.status) && (
+                            <button onClick={() => startEdit(fb)} style={{ background: "#ffffff", border: "1px solid #cbd5e1", color: "#0f172a", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}>
+                              Edit
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
 
-                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "8px" }}>
-                      Submitted on: {fb.created_at} {fb.rating ? `· Rating: ${fb.rating} ⭐` : ""}
-                    </div>
-                  </>
-                )}
+                      <p style={{ fontSize: "13px", color: "#475569", lineHeight: 1.5, margin: "0 0 8px 0" }}>{fb.message}</p>
 
-              </div>
-            ))}
-          </div>
-        );
-      })()}
+                      {fb.screenshot_url && (
+                        <div style={{ marginTop: "8px" }}>
+                          <img src={fb.screenshot_url.startsWith('/') ? `${BACKEND_URL}${fb.screenshot_url}` : fb.screenshot_url} alt="Attachment" style={{ maxHeight: "80px", borderRadius: "6px" }} />
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: "11px", color: "#64748b", marginTop: "8px" }}>
+                        Submitted on: {fb.created_at} {fb.rating ? `· Rating: ${fb.rating} ⭐` : ""}
+                      </div>
+                    </>
+                  )}
+
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { attachStreamToMediaElement } from '../utils/mediaPlayback';
 
 const USER_COLORS = [
   "#3b82f6", // Blue (Anushka)
@@ -81,16 +82,15 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
   const toggleScreenShare = async () => {
     if (!isScreenSharing) {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ 
-          video: true, 
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
           audio: false
         });
         screenStreamRef.current = stream;
         setIsScreenSharing(true);
         setTimeout(() => {
           if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(e => console.warn("Video play notice:", e));
+            attachStreamToMediaElement(videoRef.current, stream, { muted: true });
           }
         }, 100);
         stream.getVideoTracks()[0].onended = () => {
@@ -151,7 +151,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
       const currentLineText = val.substring(0, selectionStart).split("\n").pop() || "";
       const matchIndent = currentLineText.match(/^(\s*)/);
       let indent = matchIndent ? matchIndent[1] : "";
-      
+
       const charBefore = val.charAt(selectionStart - 1);
       const charAfter = val.charAt(selectionStart);
 
@@ -276,7 +276,7 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
               👤 Single-User Mode (Local Edit)
             </span>
           )}
-          
+
           {/* Case 2: Coding Room = ON -> Live Multi-Participant Cursor Indicators */}
           {isRoomActive && (
             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
@@ -384,8 +384,8 @@ const SmartCodeEditor = ({ value, onChange, lang, isRoomActive = false, particip
             }
 
             return (
-              <div 
-                key={n} 
+              <div
+                key={n}
                 style={{
                   color: numColor,
                   fontWeight: fontWeight,
@@ -579,19 +579,19 @@ SELECT * FROM table_name;
 
 const getDynamicStarterCode = (problem, targetLang) => {
   if (!problem) return "";
-  
+
   // 1. Check if problem already has starter_code for the language
   let starter = problem.starter_code || {};
   if (typeof starter === 'string') {
-    try { starter = JSON.parse(starter); } catch(e) { starter = {}; }
+    try { starter = JSON.parse(starter); } catch (e) { starter = {}; }
   }
   if (starter[targetLang]) {
     return starter[targetLang];
   }
-  
+
   // 2. Derive function name from problem_id slug or title
   let slug = (problem.problem_id || "solution").toLowerCase();
-  
+
   // Determine problem type flags
   const isParentheses = slug.includes("parentheses");
   const isReverseString = slug.includes("reverse") && slug.includes("string");
@@ -808,15 +808,15 @@ const renderMarkdown = (text) => {
   const lines = text.split("\n");
   return lines.map((line, idx) => {
     const trimmed = line.trim();
-    
+
     // Filter out common raw JSON brackets or prompt leaks
     if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[{" || trimmed === "}]" || trimmed === '"' || trimmed === "'") {
       return null;
     }
     const lowerLine = trimmed.toLowerCase();
     if (
-      lowerLine.startsWith("return only") || 
-      lowerLine.startsWith("expected json") || 
+      lowerLine.startsWith("return only") ||
+      lowerLine.startsWith("expected json") ||
       lowerLine.startsWith("return a json") ||
       lowerLine.includes("preamble") ||
       lowerLine.includes("markdown codeblock") ||
@@ -845,7 +845,7 @@ const renderMarkdown = (text) => {
       const headerText = cleanLine.replace("#### ", "").replace(/^[-—–\s]+/, "").trim();
       return <h4 key={idx} style={{ fontSize: "12px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "var(--purple)" }}>{headerText}</h4>;
     }
-    
+
     // Check if bullet point (supporting *, -, and dashes)
     let content = cleanLine;
     let isBullet = false;
@@ -854,7 +854,7 @@ const renderMarkdown = (text) => {
       isBullet = true;
       content = cleanTrimmed.substring(2);
     }
-    
+
     // Parse bold text like **something**
     const parts = [];
     let lastIndex = 0;
@@ -870,9 +870,9 @@ const renderMarkdown = (text) => {
     if (lastIndex < content.length) {
       parts.push(content.substring(lastIndex));
     }
-    
+
     const displayContent = parts.length > 0 ? parts : content;
-    
+
     if (isBullet) {
       return (
         <div key={idx} style={{ display: "flex", gap: "6px", paddingLeft: "12px", marginBottom: "4px" }}>
@@ -881,7 +881,7 @@ const renderMarkdown = (text) => {
         </div>
       );
     }
-    
+
     return (
       <div key={idx} style={{ marginBottom: "6px" }}>
         {displayContent}
@@ -907,11 +907,11 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   // --- Coding Room and Sheet Upload States ---
   const [problems, setProblems] = useState([]);
   const [currentProblem, setCurrentProblem] = useState(null);
-  
+
   const [roomId, setRoomId] = useState("");
   const [roomParticipants, setRoomParticipants] = useState([]);
   const [joinRoomInput, setJoinRoomInput] = useState("");
-  
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [selectedSheetId, setSelectedSheetId] = useState("");
@@ -970,7 +970,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         window.history.replaceState(null, "", window.location.pathname);
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 1. Fetch available problems on mount
@@ -986,7 +986,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         const data = await res.json();
         const problemsList = data.problems || [];
         setProblems(problemsList);
-        
+
         const pendingPid = localStorage.getItem("selected_problem_id");
         if (pendingPid) {
           const found = problemsList.find(p => p.problem_id === pendingPid);
@@ -1018,7 +1018,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     return () => {
       if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
   const syncRoomState = async (isExplicitEdit = false) => {
@@ -1027,7 +1027,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
       const myUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "anonymous_user";
       const myUserName = user?.name || localStorage.getItem("user_name") || localStorage.getItem("user_email")?.split('@')[0] || "User";
       const shouldSendEdit = isExplicitEdit || isEditingRef.current;
-      
+
       if (shouldSendEdit) {
         isEditingRef.current = false;
       }
@@ -1046,11 +1046,11 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setRoomParticipants(data.participants || []);
-        
+
         const timeSinceType = Date.now() - lastTypedRef.current;
         // Update local editor if server code comes from another participant or differs
         if (data.current_code !== undefined && data.last_editor !== myUserId && timeSinceType > 300) {
@@ -1107,7 +1107,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           output: outputText,
         })
       });
-    } catch (_) {}
+    } catch (_) { }
   };
 
 
@@ -1119,9 +1119,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     const lineList = textBefore.split("\n");
     const currentLine = lineList.length;
     const lastLineText = lineList[lineList.length - 1];
-    return { 
-      line: currentLine, 
-      col: lastLineText.length + 1, 
+    return {
+      line: currentLine,
+      col: lastLineText.length + 1,
       ch: lastLineText.length,
       selectionStart: area.selectionStart,
       selectionEnd: area.selectionEnd
@@ -1133,7 +1133,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     setCurrentProblem(problem);
     setHintIdx(0);
     setHintBox("Click below to get a hint from your AI coach.");
-    
+
     const template = getDynamicStarterCode(problem, lang);
     setCode(template);
     codeRef.current = template;
@@ -1259,32 +1259,32 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   const handleSheetUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     setIsUploading(true);
     setUploadError("");
-    
+
     const formData = new FormData();
     formData.append("sheet", file);
     formData.append("user_id", user?._id || user?.user_id || user?.id || localStorage.getItem("user_id") || "recruiter");
-    
+
     try {
       const res = await apiFetch('/api/coding/upload-sheet', {
         method: "POST",
         body: formData
       });
-      
+
       const data = await res.json();
       if (res.ok) {
         // Save sheet info to checklist
         setSheetsList(prev => [...prev, { id: data.sheet_id, name: data.filename }]);
         setSelectedSheetId(data.sheet_id);
-        
+
         // Refresh problems list with parsed questions
         await fetchProblems(data.sheet_id);
         if (data.problems && data.problems.length > 0) {
           selectProblem(data.problems[0]);
         }
-        
+
         alert(`Questions parsed successfully! Extracted ${data.problems.length} problems.`);
       } else {
         setUploadError(data.error || "Failed to parse document");
@@ -1341,16 +1341,16 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
     } catch (e) {
       console.warn("Hint fetch notice:", e);
     }
-    
+
     const pid = (currentProblem?.problem_id || '').toLowerCase();
     let localHint = "💡 Analyze the problem constraints to determine if a linear O(N) or logarithmic O(log N) algorithm is expected.";
     if (pid.includes("two-sum")) {
-      localHint = hintIdx === 0 
-        ? "💡 Try using a hash map to store each number's value and its index as you iterate." 
+      localHint = hintIdx === 0
+        ? "💡 Try using a hash map to store each number's value and its index as you iterate."
         : "💡 For each number x, check if (target - x) is already in your hash map.";
     } else if (pid.includes("parentheses")) {
-      localHint = hintIdx === 0 
-        ? "💡 A stack data structure is ideal for tracking open brackets in correct order." 
+      localHint = hintIdx === 0
+        ? "💡 A stack data structure is ideal for tracking open brackets in correct order."
         : "💡 Push open brackets onto stack. For closing brackets, check if they match top of stack.";
     } else if (currentProblem?.title) {
       localHint = `💡 For '${currentProblem.title}', trace a small example input by hand to identify pattern boundaries.`;
@@ -1412,7 +1412,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
         setConsoleOut(errText);
         if (roomId) pushOutputToRoom(errText);
       }
-    } catch(e) {
+    } catch (e) {
       setTestCaseResults([]);
       setConsoleColor('var(--red)');
       setConsoleOut('Execution error: Network connection timeout.');
@@ -1423,11 +1423,11 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
   return (
     <div id="page-coding" className="page active" role="tabpanel">
       <div className="container">
-        
+
         {/* Header */}
         <div className="sec-header mb16">
           <div className="flex items-center gap8">
-            <h1 className="sec-title" style={{fontSize:"18px"}}>Coding Room</h1>
+            <h1 className="sec-title" style={{ fontSize: "18px" }}>Coding Room</h1>
             <span className="pill pill-cyan">{roomId ? `Room ${roomId}` : "Local Playground"}</span>
             {roomId && <span className="pill pill-purple">Sync Polling Active</span>}
           </div>
@@ -1435,44 +1435,44 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* Dynamic Collaboration and Room Management Panel */}
         <div className="collab-bar mb16" style={{
-          display: "flex", 
-          flexWrap: "wrap", 
-          gap: "12px", 
-          padding: "14px 18px", 
-          background: "var(--bg3)", 
-          border: "1px solid var(--border)", 
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "12px",
+          padding: "14px 18px",
+          background: "var(--bg3)",
+          border: "1px solid var(--border)",
           borderRadius: "14px"
         }}>
           {!roomId ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", width: "100%", alignItems: "center" }}>
               <div style={{ marginRight: "10px" }}>
-                <div style={{fontSize:"10px", fontWeight:800, color:"var(--text2)", textTransform:"uppercase", marginBottom:"2px"}}>COLLABORATION</div>
+                <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--text2)", textTransform: "uppercase", marginBottom: "2px" }}>COLLABORATION</div>
                 <div className="text-sm font-semibold">Join or create a live room to code together</div>
               </div>
               <button className="btn btn-primary btn-sm" onClick={createRoom}>➕ Create Room</button>
               <div style={{ display: "flex", gap: "4px" }}>
-                <input 
-                  type="text" 
-                  className="lang-select" 
+                <input
+                  type="text"
+                  className="lang-select"
                   style={{ width: "110px", height: "32px", fontSize: "12px", padding: "0 8px", background: "rgba(255,255,255,0.03)" }}
-                  placeholder="ROOM ID" 
+                  placeholder="ROOM ID"
                   value={joinRoomInput}
                   onChange={(e) => setJoinRoomInput(e.target.value)}
                 />
                 <button className="btn btn-ghost btn-sm" onClick={joinRoom}>Join</button>
               </div>
-              
+
               {/* Question Sheet Uploader */}
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
                 <label htmlFor="coding-sheet-upload" className="btn btn-cyan btn-sm" style={{ cursor: "pointer", margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}>
                   📂 Upload Sheet
                 </label>
-                <input 
+                <input
                   id="coding-sheet-upload"
-                  type="file" 
-                  style={{ display: "none" }} 
-                  accept=".pdf,.doc,.docx,.xlsx,.csv,.txt,.md,.json" 
-                  onChange={handleSheetUpload} 
+                  type="file"
+                  style={{ display: "none" }}
+                  accept=".pdf,.doc,.docx,.xlsx,.csv,.txt,.md,.json"
+                  onChange={handleSheetUpload}
                 />
                 {isUploading && <span style={{ fontSize: "11px", color: "var(--cyan)" }}>Parsing...</span>}
                 {uploadError && <span style={{ fontSize: "11px", color: "var(--red)" }} title={uploadError}>⚠️ Error</span>}
@@ -1481,26 +1481,26 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
           ) : (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", width: "100%", alignItems: "center" }}>
               <div>
-                <div style={{fontSize:"10px", fontWeight:800, color:"var(--cyan)", textTransform:"uppercase", marginBottom:"2px"}}>ACTIVE ROOM</div>
-                <div style={{fontSize: "14px", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "6px"}}>
-                  {roomId} 
-                  <button className="btn-xs btn-ghost" style={{padding: "2px 6px"}} onClick={() => {
+                <div style={{ fontSize: "10px", fontWeight: 800, color: "var(--cyan)", textTransform: "uppercase", marginBottom: "2px" }}>ACTIVE ROOM</div>
+                <div style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "6px" }}>
+                  {roomId}
+                  <button className="btn-xs btn-ghost" style={{ padding: "2px 6px" }} onClick={() => {
                     navigator.clipboard.writeText(roomId);
                     alert("Room ID copied to clipboard!");
                   }}>📋 Copy</button>
                 </div>
               </div>
-              
+
               {/* Connected participants list */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px" }}>
-                <div style={{display:"flex", gap:"-4px", marginRight: "6px"}}>
+                <div style={{ display: "flex", gap: "-4px", marginRight: "6px" }}>
                   {roomParticipants.map((p, idx) => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
                     const isSelf = p.user_id === myId;
                     return (
-                      <div 
-                        key={p.user_id} 
-                        className="c-av" 
+                      <div
+                        key={p.user_id}
+                        className="c-av"
                         style={{
                           background: p.role === "interviewer" ? "#7c3aed" : "#0e7a5e",
                           border: isSelf ? "2px solid #f59e0b" : p.active ? "2px solid var(--cyan)" : "2px solid transparent",
@@ -1509,12 +1509,12 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                         }}
                         title={`${p.name}${isSelf ? ' (You)' : ''} · ${p.role} · ${p.active ? 'Active' : 'Idle'}`}
                       >
-                        {(p.name || "?").split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
+                        {(p.name || "?").split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                       </div>
                     );
                   })}
                 </div>
-                <span className="text-xs text-muted" style={{maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                <span className="text-xs text-muted" style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {(() => {
                     const myId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
                     const others = roomParticipants.filter(p => p.user_id !== myId && p.active);
@@ -1533,33 +1533,33 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
         {/* Main Coding Layout */}
         <div className="code-layout">
-          
+
           {/* Left panel: Problem description */}
           <div className="prob-panel">
-            <div className="flex items-center gap8 mb8" style={{justifyContent: "space-between"}}>
+            <div className="flex items-center gap8 mb8" style={{ justifyContent: "space-between" }}>
               <div className="flex gap8">
                 <span className={`pill ${currentProblem?.difficulty === 'Hard' ? 'pill-red' : currentProblem?.difficulty === 'Medium' ? 'pill-gold' : 'pill-cyan'}`}>
                   {currentProblem?.difficulty || "Easy"}
                 </span>
                 <span className="tag">{currentProblem?.category || "Algorithm"}</span>
               </div>
-              
+
               {/* Problem selector dropdown */}
-              <select 
-                className="lang-select prob-select" 
+              <select
+                className="lang-select prob-select"
                 style={{
-                  height: "28px", 
-                  padding: "0 8px", 
-                  fontSize: "11px", 
-                  maxWidth: "155px", 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
+                  height: "28px",
+                  padding: "0 8px",
+                  fontSize: "11px",
+                  maxWidth: "155px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                   backgroundColor: "#ffffff",
                   color: "#0f172a",
                   borderRadius: "8px"
                 }}
-                value={currentProblem?.problem_id || ""} 
+                value={currentProblem?.problem_id || ""}
                 onChange={handleProblemChange}
               >
                 <option value="" disabled style={{ background: "#ffffff", color: "#64748b" }}>Select Problem...</option>
@@ -1572,23 +1572,23 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
             </div>
 
             <div>
-              <div style={{fontSize:"17px", fontWeight:800, color:"#0f172a", marginBottom:"3px"}}>{currentProblem?.title || "Loading Problem..."}</div>
-              {currentProblem?.sheet_id && <div style={{fontSize:"10px", color:"var(--purple)", fontWeight:700}}>CUSTOM SHEET ASSIGNED</div>}
+              <div style={{ fontSize: "17px", fontWeight: 800, color: "#0f172a", marginBottom: "3px" }}>{currentProblem?.title || "Loading Problem..."}</div>
+              {currentProblem?.sheet_id && <div style={{ fontSize: "10px", color: "var(--purple)", fontWeight: 700 }}>CUSTOM SHEET ASSIGNED</div>}
             </div>
 
-            <div className="text-sm" style={{color:"#475569", lineHeight:1.7, marginTop: "10px", overflowY: "auto", maxHeight: "220px"}}>
+            <div className="text-sm" style={{ color: "#475569", lineHeight: 1.7, marginTop: "10px", overflowY: "auto", maxHeight: "220px" }}>
               {currentProblem?.description}
             </div>
 
             {/* Constraints */}
             {currentProblem?.constraints && (
-              <div style={{marginTop: "12px"}}>
-                <div style={{fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text2)", marginBottom: "4px"}}>Constraints</div>
-                <ul style={{paddingLeft: "16px", margin: 0, fontSize: "12px", color: "var(--text2)"}}>
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", color: "var(--text2)", marginBottom: "4px" }}>Constraints</div>
+                <ul style={{ paddingLeft: "16px", margin: 0, fontSize: "12px", color: "var(--text2)" }}>
                   {(() => {
                     let cons = currentProblem.constraints;
                     if (typeof cons === 'string') {
-                      try { cons = JSON.parse(cons); } catch(e) { cons = []; }
+                      try { cons = JSON.parse(cons); } catch (e) { cons = []; }
                     }
                     return Array.isArray(cons) ? cons.map((c, i) => <li key={i}>{c}</li>) : null;
                   })()}
@@ -1598,47 +1598,47 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
 
             {/* Examples */}
             {currentProblem?.examples && (
-              <div style={{marginTop: "14px", display: "flex", flexDirection: "column", gap: "8px"}}>
+              <div style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "8px" }}>
                 {(() => {
                   let ex = currentProblem.examples;
                   if (typeof ex === 'string') {
-                    try { ex = JSON.parse(ex); } catch(e) { ex = []; }
+                    try { ex = JSON.parse(ex); } catch (e) { ex = []; }
                   }
                   return Array.isArray(ex) ? ex.map((e, idx) => (
                     <div key={idx} style={{
-                      background: "#f8fafc", 
-                      border: "1px solid var(--border)", 
-                      borderRadius: "10px", 
-                      padding: "8px 12px", 
-                      fontFamily: "'DM Mono',monospace", 
-                      fontSize: "11px", 
+                      background: "#f8fafc",
+                      border: "1px solid var(--border)",
+                      borderRadius: "10px",
+                      padding: "8px 12px",
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: "11px",
                       color: "#5b21b6"
                     }}>
-                      <strong>Example {idx + 1}:</strong><br/>
-                      Input: {e.input}<br/>
-                      Output: {e.output}<br/>
-                      {e.explanation && <span style={{color: "var(--text3)"}}>Explanation: {e.explanation}</span>}
+                      <strong>Example {idx + 1}:</strong><br />
+                      Input: {e.input}<br />
+                      Output: {e.output}<br />
+                      {e.explanation && <span style={{ color: "var(--text3)" }}>Explanation: {e.explanation}</span>}
                     </div>
                   )) : null;
                 })()}
               </div>
             )}
 
-            <div style={{marginTop:"auto", paddingTop: "20px"}}>
+            <div style={{ marginTop: "auto", paddingTop: "20px" }}>
               <div className="sec-sub fw7 mb8">AI Hints</div>
-              <div className="hint-box" style={{color: hintBox.startsWith('Getting') ? 'var(--text2)' : '#334155'}}>{hintBox}</div>
-              <button className="btn btn-ghost btn-sm" style={{width:"100%", justifyContent:"center", marginTop:"8px"}} onClick={getHint}>Get AI Hint</button>
+              <div className="hint-box" style={{ color: hintBox.startsWith('Getting') ? 'var(--text2)' : '#334155' }}>{hintBox}</div>
+              <button className="btn btn-ghost btn-sm" style={{ width: "100%", justifyContent: "center", marginTop: "8px" }} onClick={getHint}>Get AI Hint</button>
             </div>
           </div>
 
           {/* Right panel: Code editor, runner outcome */}
           <div className="flex-col gap10">
-            <div className="flex items-center" style={{justifyContent:"space-between"}}>
-              <select 
-                className="lang-select" 
+            <div className="flex items-center" style={{ justifyContent: "space-between" }}>
+              <select
+                className="lang-select"
                 style={{ backgroundColor: "#ffffff", color: "#0f172a" }}
-                value={lang} 
-                onChange={(e) => handleLangChange(e.target.value)} 
+                value={lang}
+                onChange={(e) => handleLangChange(e.target.value)}
                 aria-label="Select programming language"
               >
                 <option value="python" style={{ background: "#ffffff", color: "#0f172a" }}>Python</option>
@@ -1662,23 +1662,23 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 <button className="btn btn-primary btn-sm" onClick={runCode}>▶ Run Code</button>
               </div>
             </div>
-            
-            <SmartCodeEditor 
-              value={code} 
-              onChange={handleCodeChange} 
-              lang={lang} 
-              isRoomActive={Boolean(roomId)} 
-              participants={roomParticipants} 
-              currentUserId={user?._id || user?.user_id || user?.id || localStorage.getItem("user_id")} 
+
+            <SmartCodeEditor
+              value={code}
+              onChange={handleCodeChange}
+              lang={lang}
+              isRoomActive={Boolean(roomId)}
+              participants={roomParticipants}
+              currentUserId={user?._id || user?.user_id || user?.id || localStorage.getItem("user_id")}
             />
-            
+
             {/* Console execution outputs */}
             <div>
               <div className="sec-sub fw7 mb8">Console Output</div>
               <div className="console-out" id="console-out" style={{
-                color: consoleColor, 
-                whiteSpace: "pre-wrap", 
-                maxHeight: "140px", 
+                color: consoleColor,
+                whiteSpace: "pre-wrap",
+                maxHeight: "140px",
                 overflowY: "auto",
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "12px"
@@ -1686,7 +1686,7 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 {consoleOut}
               </div>
             </div>
-            
+
             {/* Detailed Test Cases Outcome */}
             {testCaseResults && testCaseResults.length > 0 && (
               <div className="card-sm" style={{
@@ -1723,9 +1723,9 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                   <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", marginTop: "4px" }}>
                     <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--purple)", textTransform: "uppercase", marginBottom: "8px", letterSpacing: "0.5px" }}>Hidden Tests</div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#b0c0d8" }}>
-                      <span style={{ 
-                        color: testCaseResults.filter(tc => tc.is_hidden).every(tc => tc.passed) ? "#00d68f" : "var(--red)", 
-                        fontWeight: "bold" 
+                      <span style={{
+                        color: testCaseResults.filter(tc => tc.is_hidden).every(tc => tc.passed) ? "#00d68f" : "var(--red)",
+                        fontWeight: "bold"
                       }}>
                         {testCaseResults.filter(tc => tc.is_hidden).every(tc => tc.passed) ? "✔" : "✘"}
                       </span>
@@ -1737,20 +1737,20 @@ export default function CodingTab({ apiFetch, isLoggedIn, user = {} }) {
                 )}
               </div>
             )}
-            
+
             {/* AI Review Tab */}
-            <div className="card-sm" style={{background:"rgba(0,240,200,0.03)", borderColor:"rgba(0,240,200,0.13)", flex: 1, overflowY: "auto", maxHeight: "180px"}}>
+            <div className="card-sm" style={{ background: "rgba(0,240,200,0.03)", borderColor: "rgba(0,240,200,0.13)", flex: 1, overflowY: "auto", maxHeight: "180px" }}>
               <div className="sec-sub fw7 mb8">AI Code Review</div>
-              <div id="ai-review" className="text-sm" style={{color:"#b0c0d8", lineHeight:"1.6", whiteSpace: "pre-wrap"}}>
+              <div id="ai-review" className="text-sm" style={{ color: "#b0c0d8", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
                 {renderMarkdown(aiReview)}
               </div>
             </div>
 
             {/* Complexity and test indicators */}
             <div className="flex gap8">
-              <div className="complexity-badge"><div className="cb-lbl">Time Complexity</div><div className="cb-val" style={{color:"var(--cyan)"}}>{timeComplexity}</div></div>
-              <div className="complexity-badge"><div className="cb-lbl">Space Complexity</div><div className="cb-val" style={{color:"var(--blue)"}}>{spaceComplexity}</div></div>
-              <div className="complexity-badge"><div className="cb-lbl">Test Cases Passed</div><div className="cb-val" style={{color: testPassColor}}>{testPass}</div></div>
+              <div className="complexity-badge"><div className="cb-lbl">Time Complexity</div><div className="cb-val" style={{ color: "var(--cyan)" }}>{timeComplexity}</div></div>
+              <div className="complexity-badge"><div className="cb-lbl">Space Complexity</div><div className="cb-val" style={{ color: "var(--blue)" }}>{spaceComplexity}</div></div>
+              <div className="complexity-badge"><div className="cb-lbl">Test Cases Passed</div><div className="cb-val" style={{ color: testPassColor }}>{testPass}</div></div>
             </div>
           </div>
 

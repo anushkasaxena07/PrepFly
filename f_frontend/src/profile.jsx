@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 import StudentFeedbackForm from "./components/StudentFeedbackForm";
+import { BACKEND_URL } from "./config/apiConfig";
 
 /* ─── Small SVG icons ────────────────────────────────────────── */
 const Icon = ({ d, size = 15 }) => (
@@ -90,7 +91,6 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
               data = await res.json();
             }
           } else {
-            const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
             const res = await axios.get(`${BACKEND_URL}/user-stats/me`, {
               headers: { Authorization: `Bearer ${token}` },
             });
@@ -154,7 +154,6 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
           throw new Error(errData.error || "Failed to update profile");
         }
       } else {
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
         await axios.put(
           `${BACKEND_URL}/update-profile`,
           { user_id: user._id, ...user },

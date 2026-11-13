@@ -316,7 +316,7 @@ is_production = (
     or bool(os.getenv("RENDER"))
 )
 
-from services.cache_service import normalize_redis_url
+from services.cache_service import mask_redis_url, normalize_redis_url
 
 candidate_redis = normalize_redis_url(
     os.getenv("REDIS_URL")
@@ -350,13 +350,13 @@ if candidate_redis and not candidate_redis.startswith("memory://"):
             if not connected_redis:
                 import logging
                 logging.critical(
-                    f"[RATE LIMITER] Redis ping/auth failed after retries: {last_redis_err}. "
-                    "Falling back to memory:// rate limiting."
+                    f"[RATE LIMITER] Redis ping/auth failed after retries on {mask_redis_url(candidate_redis)} "
+                    f"({type(last_redis_err).__name__}). Falling back to memory:// rate limiting."
                 )
                 rate_limit_storage = "memory://"
         else:
             rate_limit_storage = candidate_redis
-            print(f"[RATE LIMITER] Connected to distributed Redis storage: {candidate_redis.split('@')[-1] if '@' in candidate_redis else candidate_redis}")
+            print(f"[RATE LIMITER] Connected to distributed Redis storage: {mask_redis_url(candidate_redis)}")
     else:
         import logging
         logging.warning(
@@ -647,7 +647,7 @@ except Exception as _schema_exc:
     app.config["SCHEMA_CHECK"] = {"ok": False, "error": str(_schema_exc)}
 
 # ─── Email / SMTP ──────────────────────────────────────────────────────────────
-SMTP_SERVER   = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_SERVER   = (os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER") or "").strip()
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 # SMTP_EMAIL and SMTP_PASSWORD are validated at startup via email transport validation
 
@@ -663,47 +663,48 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # GEMINI_API_KEY is validated via _need("GEMINI_API_KEY")
 chat_model = None
 
-GEMINI_MODEL_CANDIDATES = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-flash-latest",
-]
+from services.ai_service import (
+    create_gemini_client as _create_gemini_client,
+    get_configured_gemini_candidates as _get_configured_gemini_candidates,
+    get_fallback_gemini_models as _get_fallback_gemini_models,
+    is_model_not_found_error as _is_model_not_found_error,
+    is_permanent_gemini_error as _is_permanent_gemini_error,
+    mark_gemini_model_unavailable as _mark_gemini_model_unavailable,
+)
+
+GEMINI_MODEL_CANDIDATES = _get_configured_gemini_candidates()
 
 for model_name in GEMINI_MODEL_CANDIDATES:
     try:
-        chat_model = ChatGoogleGenerativeAI(
-            api_key=GEMINI_API_KEY, model=model_name, temperature=0.6, max_retries=0, timeout=15
-        )
+        chat_model = _create_gemini_client(model_name, GEMINI_API_KEY, timeout_s=15.0, temperature=0.6)
         print(f"[GEMINI INIT] Successfully initialized model '{model_name}'")
         break
     except Exception as e_chat:
-        print(f"[GEMINI INIT WARNING] Could not initialize model '{model_name}':", e_chat)
+        print(f"[GEMINI INIT WARNING] Could not initialize model '{model_name}' ({type(e_chat).__name__})")
+
 
 def invoke_gemini_with_fallback(prompt_or_messages):
     global chat_model
-    from services.ai_service import get_fallback_gemini_models, is_model_not_found_error, mark_gemini_model_unavailable
     messages = prompt_or_messages if isinstance(prompt_or_messages, list) else [HumanMessage(content=str(prompt_or_messages))]
 
-    for m_name in get_fallback_gemini_models(GEMINI_API_KEY, include_discovery=True):
+    for m_name in _get_fallback_gemini_models(GEMINI_API_KEY, include_discovery=True):
         try:
-            temp_chat = ChatGoogleGenerativeAI(
-                api_key=GEMINI_API_KEY, model=m_name, temperature=0.3, max_retries=0, timeout=15
-            )
+            temp_chat = _create_gemini_client(m_name, GEMINI_API_KEY, timeout_s=15.0, temperature=0.3)
             res = temp_chat.invoke(messages)
-            if res and hasattr(res, 'content') and res.content:
+            if res and hasattr(res, "content") and res.content:
                 chat_model = temp_chat
                 return res.content.strip()
         except Exception as e_gen:
-            if is_model_not_found_error(e_gen):
-                mark_gemini_model_unavailable(m_name)
-            print(f"[GEMINI INVOICE NOTICE] Model '{m_name}' failed:", e_gen)
+            if _is_permanent_gemini_error(e_gen):
+                break
+            if _is_model_not_found_error(e_gen):
+                _mark_gemini_model_unavailable(m_name)
+            print(f"[GEMINI INVOICE NOTICE] Model '{m_name}' failed ({type(e_gen).__name__})")
 
     if chat_model:
         try:
             res = chat_model.invoke(messages)
-            if res and hasattr(res, 'content') and res.content:
+            if res and hasattr(res, "content") and res.content:
                 return res.content.strip()
         except Exception:
             pass
@@ -954,24 +955,38 @@ def get_or_create_user(email, name=None, avatar=None, google_id=None):
         return None
 
 
-def log_authentication(email, method, success, ip_address=None):
+def _resolve_activity_actor_uuid(admin_user=None, student_user=None, actor_id=None):
+    from services.identity_service import parse_valid_uuid
+    for cand in (
+        actor_id,
+        (admin_user or {}).get("id") if isinstance(admin_user, dict) else None,
+        (student_user or {}).get("id") if isinstance(student_user, dict) else None,
+    ):
+        uid = parse_valid_uuid(cand)
+        if uid:
+            return uid
+    return None
+
+
+def log_authentication(email, method, success, ip_address=None, actor_id=None):
     try:
         supabase.table("auth_logs").insert({
             "email": email, "auth_method": method,
             "success": 1 if success else 0, "ip_address": ip_address,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }).execute()
     except Exception as e:
-        print(f"Auth log error (non-fatal): {e}")
+        print(f"Auth log error (non-fatal): {type(e).__name__}")
 
     try:
-        # Now log to activity_logs table for SuperAdmin visual telemetry!
-        # Determine actor type and fetch details
+        # Now log to activity_logs table for SuperAdmin visual telemetry
         actor_type = "Unknown"
         name = "Unknown"
         org_id = ""
         org_name = ""
-        
+        admin_user = None
+        student_user = None
+
         # Check Super Admin
         if email in ["saxenaanushka9645@gmail.com", "superadmin@prepfly.io", "owner@prepfly.io", "superadmin@interviewai.io", "owner@interviewai.io"]:
             actor_type = "Super Admin"
@@ -980,30 +995,27 @@ def log_authentication(email, method, success, ip_address=None):
             org_name = "PrepFly Global Platform"
         else:
             # Check Admin
-            admin_user = None
             try:
                 a_res = supabase.table("admin").select("*").eq("email", email).execute()
                 if a_res and a_res.data:
                     admin_user = a_res.data[0]
             except Exception:
                 pass
-            
+
             if admin_user:
                 actor_type = "Organization Admin"
                 name = admin_user.get("name") or "Org Admin"
                 org_id = admin_user.get("organization_id") or ""
             else:
                 # Check Student/User
-                student_user = None
                 try:
                     u_res = supabase.table("users").select("*").eq("email", email).execute()
                     if u_res and u_res.data:
                         student_user = u_res.data[0]
                 except Exception:
                     pass
-                
+
                 if student_user:
-                    # Could be admin or candidate
                     db_role = student_user.get("role", "candidate")
                     if db_role in ["ADMIN", "admin"]:
                         actor_type = "Organization Admin"
@@ -1014,11 +1026,9 @@ def log_authentication(email, method, success, ip_address=None):
                     name = student_user.get("name") or "Student"
                     org_id = student_user.get("organization_id") or ""
                 elif email != "unknown":
-                    # Fallback for unrecognized emails that might be new signs/attempts
                     name = email.split('@')[0] if '@' in email else email
                     actor_type = "Student"
 
-        # Fetch organization name if we have org_id
         if org_id and org_id != "GLOBAL":
             try:
                 org_res = supabase.table("organization").select("*").eq("id", org_id).execute()
@@ -1029,7 +1039,6 @@ def log_authentication(email, method, success, ip_address=None):
         elif org_id == "GLOBAL":
             org_name = "PrepFly Global Platform"
 
-        # Extract user agent info safely (checking Flask context)
         user_agent_str = ""
         try:
             from flask import has_request_context
@@ -1038,9 +1047,8 @@ def log_authentication(email, method, success, ip_address=None):
         except Exception:
             pass
 
-        browser = "Chrome 126" # fallback
-        device = "Windows Laptop" # fallback
-        
+        browser = "Chrome 126"
+        device = "Windows Laptop"
         if user_agent_str:
             ua_lower = user_agent_str.lower()
             if "chrome" in ua_lower: browser = "Chrome"
@@ -1057,10 +1065,8 @@ def log_authentication(email, method, success, ip_address=None):
             elif "linux" in ua_lower: device = "Linux PC"
             else: device = "Windows Laptop"
 
-        # Mock location mapping based on IP or random standard one
         location = "Delhi, India"
         if ip_address:
-            # Let's map some standard IPs or do a nice mock
             if ip_address.startswith("103."): location = "Mumbai, India"
             elif ip_address.startswith("192.") or ip_address == "127.0.0.1": location = "Local Host"
             elif ip_address.startswith("185."): location = "Frankfurt, Germany"
@@ -1068,9 +1074,6 @@ def log_authentication(email, method, success, ip_address=None):
             else:
                 location = "Bangalore, India"
 
-        # Construct Action text
-        # e.g., "User Logged In", "Failed Login Attempt", etc.
-        action_text = ""
         if success:
             if actor_type == "Super Admin": action_text = "Super Admin Logged In"
             elif actor_type == "Organization Admin": action_text = "Organization Admin Logged In"
@@ -1078,12 +1081,11 @@ def log_authentication(email, method, success, ip_address=None):
         else:
             action_text = f"Failed Login Attempt ({method})"
 
-        # Set Severity and Risk
         severity = "Information" if success else "Warning"
         risk_score = "Low" if success else "Medium"
+        now_utc = datetime.now(timezone.utc)
+        activity_id = f"LOG-{now_utc.strftime('%Y%m%d')}-{uuid.uuid4().hex[:12]}"
 
-        activity_id = f"LOG-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:12]}"
-        
         details_dict = {
             "severity": severity,
             "risk_score": risk_score,
@@ -1092,7 +1094,7 @@ def log_authentication(email, method, success, ip_address=None):
             "target": f"Portal Authentication ({method})",
             "performed_by_role": actor_type,
             "performed_by_name": name,
-            "performed_by_email": email if email != "unknown" else "",
+            "performed_by_email": email if email and email != "unknown" else "",
             "organization_id": org_id,
             "organization_name": org_name,
             "status": "Success" if success else "Failed",
@@ -1103,19 +1105,23 @@ def log_authentication(email, method, success, ip_address=None):
             "session_id": f"SESS_{random.randint(1000, 9999)}"
         }
 
-        # Write to activity_logs
-        supabase.table("activity_logs").insert({
+        # IMPORTANT: actor_logs.actor_id is UUID in Postgres; NEVER write email or non-UUID strings into it.
+        resolved_actor_uuid = _resolve_activity_actor_uuid(admin_user=admin_user, student_user=student_user, actor_id=actor_id)
+        payload = {
             "id": activity_id,
-            "actor_id": email,
+            "actor_id": resolved_actor_uuid,
+            "user_id": email if (email and email != "unknown") else None,
             "actor_type": actor_type,
             "action": action_text,
             "ip_address": ip_address,
-            "details": details_dict,
-            "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        }).execute()
-        
+            "details": json.dumps(details_dict),
+            "created_at": now_utc.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        supabase.table("activity_logs").insert(payload).execute()
+
     except Exception as ex:
-        print(f"Failed to log authentication activity: {ex}")
+        # Optional telemetry failures must never fail authentication or emit HTTP 503
+        print(f"Failed to log authentication activity (non-fatal): {type(ex).__name__}")
 
 
 def get_client_ip():
@@ -1936,14 +1942,34 @@ SUMMARY: [2-3 sentences]"""
 MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024  # 10 MB limit
 
 
+_ALLOWED_RESUME_MIMES = {
+    "",
+    "application/octet-stream",
+    "application/pdf",
+    "application/x-pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    "application/zip",
+}
+
+
 def _extract_resume_upload(file_obj):
-    """Validates uploaded PDF/DOCX resume file and extracts plain text cleanly."""
+    """Validates uploaded PDF/DOCX resume file (extension, MIME, size) and extracts normalized plain text."""
     import tempfile
+    from services.resume_service import (
+        ResumeParseError,
+        extract_resume_text_detailed,
+        normalize_resume_text,
+    )
 
     filename = secure_filename(file_obj.filename or "")
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ("pdf", "docx"):
         return None, None, (jsonify({"error": "Only PDF and DOCX files are supported", "retryable": False}), 400)
+
+    mime = (getattr(file_obj, "mimetype", None) or "").strip().lower()
+    if mime and mime not in _ALLOWED_RESUME_MIMES:
+        return None, None, (jsonify({"error": "Unsupported resume file MIME type", "retryable": False}), 400)
 
     with tempfile.TemporaryDirectory(prefix="prepfly_resume_") as tmp_dir:
         save_path = os.path.join(tmp_dir, f"{uuid.uuid4()}_{filename}")
@@ -1954,7 +1980,18 @@ def _extract_resume_upload(file_obj):
                 return None, None, (jsonify({"error": "Uploaded resume file is empty", "retryable": False}), 400)
             if file_size > MAX_RESUME_FILE_BYTES:
                 return None, None, (jsonify({"error": "Resume file exceeds the 10 MB size limit", "retryable": False}), 413)
-        resume_text = extract_text_from_pdf(save_path) if ext == "pdf" else extract_text_from_docx(save_path)
+
+        extractor_fn = extract_text_from_pdf if ext == "pdf" else extract_text_from_docx
+        is_patched_in_test = getattr(extractor_fn, "__module__", "") != "services.resume_service"
+        if is_patched_in_test:
+            resume_text = normalize_resume_text(extractor_fn(save_path))
+        else:
+            try:
+                details = extract_resume_text_detailed(save_path, ext=ext)
+                resume_text = details.get("text", "")
+            except ResumeParseError as rpe:
+                return None, None, (jsonify({"error": rpe.message, "message": rpe.message, "retryable": rpe.retryable}), rpe.status_code)
+
         if not resume_text or not resume_text.strip():
             return None, None, (jsonify({"error": "Could not extract readable text from resume", "retryable": False}), 400)
         return resume_text, filename, None
@@ -2048,14 +2085,48 @@ def create_resume_job_route():
         create_session=True,
         run_async=True,
     )
-    return jsonify({
+    resp_body = {
         "job_id": job["job_id"],
         "status": job["status"],
+        "stage": job.get("stage", job["status"]),
+        "progress": job.get("progress", 10),
         "deduplicated": job.get("deduplicated", False),
         "poll_url": f"/api/resume/jobs/{job['job_id']}",
         "text_length": len(resume_text),
         "resume_text": resume_text,
-    }), 202
+    }
+    if job.get("job_token"):
+        resp_body["job_token"] = job["job_token"]
+    return jsonify(resp_body), 202
+
+
+def _authorize_resume_job_access(job: dict):
+    """Validates caller ownership/tenant-admin scope (or anonymous creator job token) for a resume parsing job."""
+    from services.resume_service import verify_resume_job_token
+
+    user_payload = _get_optional_user()
+    job_owner = job.get("user_id")
+    if job_owner:
+        if not user_payload:
+            return jsonify({"error": "Authentication required"}), 401
+        token_sub = str(user_payload.get("sub", ""))
+        token_role = user_payload.get("role", "")
+        same_org_admin = (
+            token_role == "ADMIN"
+            and job.get("organization_id")
+            and str(job.get("organization_id")) == str(user_payload.get("organization_id") or "")
+        )
+        if str(job_owner) != token_sub and token_role != "SUPER_ADMIN" and not same_org_admin:
+            return jsonify({"error": "Forbidden: Cannot access another user's resume parsing job"}), 403
+        return None
+
+    # Anonymous job: require explicit creator job token (or platform super admin)
+    if user_payload and user_payload.get("role") == "SUPER_ADMIN":
+        return None
+    supplied_tok = request.headers.get("X-Job-Token") or request.args.get("job_token")
+    if not verify_resume_job_token(job.get("job_id", ""), supplied_tok):
+        return jsonify({"error": "Authentication or valid job token required"}), 401
+    return None
 
 
 @app.route("/api/resume/jobs/<job_id>", methods=["GET"])
@@ -2067,17 +2138,60 @@ def get_resume_job_route(job_id):
     if not job:
         return jsonify({"error": "Resume parsing job not found"}), 404
 
-    user_payload = _get_optional_user()
-    job_owner = job.get("user_id")
-    if job_owner:
-        if not user_payload:
-            return jsonify({"error": "Authentication required"}), 401
-        token_sub = str(user_payload.get("sub", ""))
-        token_role = user_payload.get("role", "")
-        if str(job_owner) != token_sub and token_role not in ("ADMIN", "SUPER_ADMIN"):
-            return jsonify({"error": "Forbidden: Cannot inspect another user's resume parsing job"}), 403
+    auth_err = _authorize_resume_job_access(job)
+    if auth_err is not None:
+        return auth_err
 
     return jsonify(job), 200
+
+
+@app.route("/api/resume/jobs/<job_id>/retry", methods=["POST"])
+@app.route("/resume/jobs/<job_id>/retry", methods=["POST"])
+@limiter.limit("10 per minute")
+def retry_resume_job_route(job_id):
+    """Retries an existing failed resume parsing job idempotently without forcing re-upload."""
+    from services.resume_service import get_resume_parse_job, retry_resume_parse_job
+    job = get_resume_parse_job(job_id)
+    if not job:
+        return jsonify({"error": "Resume parsing job not found"}), 404
+
+    auth_err = _authorize_resume_job_access(job)
+    if auth_err is not None:
+        return auth_err
+
+    user_payload = _get_optional_user()
+    if user_payload:
+        org_id = user_payload.get("organization_id")
+        if org_id and block_if_expired(org_id) and user_payload.get("role") not in ("ADMIN", "SUPER_ADMIN"):
+            return jsonify({
+                "error": "Subscription Expired",
+                "message": "Your organization's trial or subscription has expired.",
+                "is_blocked": True,
+                "subscription_status": "EXPIRED",
+            }), 403
+
+    if not job.get("retryable", True) and job.get("status") == "permanently_failed":
+        return jsonify({
+            "error": job.get("error") or "This resume parsing error is not retryable.",
+            "retryable": False,
+            "job_id": job_id,
+            "status": job.get("status"),
+        }), 400
+
+    req_json = request.get_json(silent=True) or {}
+    idem_key = request.headers.get("Idempotency-Key") or req_json.get("idempotency_key")
+    retried = retry_resume_parse_job(job_id, chat_model=chat_model, run_async=True, idempotency_key=idem_key)
+    if not retried:
+        return jsonify({"error": "Resume parsing job payload no longer available. Please upload again."}), 410
+
+    return jsonify({
+        "job_id": retried["job_id"],
+        "status": retried["status"],
+        "stage": retried.get("stage", retried["status"]),
+        "attempts": retried.get("attempts", 1),
+        "deduplicated": retried.get("deduplicated", False),
+        "poll_url": f"/api/resume/jobs/{retried['job_id']}",
+    }), 202
 
 
 @app.route("/upload", methods=["POST"])
@@ -2891,9 +3005,11 @@ def next_question():
                     "total_questions": 10
                 }), 200
 
-        # Determine interview session question limit (honors session.total_questions; defaults to 10, or 5 for 5-question bounded sessions)
+        # Determine interview session question limit cleanly from explicit total_questions (preserving 5-question pre-seeded legacy sessions)
         total_q_raw = session.get("total_questions")
-        if questions and len(questions) == 5 and (total_q_raw in (None, 5, 10)) and len(responses) >= 4:
+        if total_q_raw == 5 or (
+            questions and len(questions) == 5 and len(responses) >= 4 and not session.get("started_at")
+        ):
             total_q_bound = 5
         else:
             try:

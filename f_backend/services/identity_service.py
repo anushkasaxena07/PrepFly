@@ -9,9 +9,23 @@ Priority order:
 
 import json
 import logging
+import uuid
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def parse_valid_uuid(value: Any) -> Optional[str]:
+    """Returns canonical UUID string if `value` is a valid RFC-4122 UUID, else None."""
+    if value is None or not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or "@" in candidate:
+        return None
+    try:
+        return str(uuid.UUID(candidate))
+    except (ValueError, AttributeError, TypeError):
+        return None
 
 _PLACEHOLDER_NAMES = {
     "", "candidate", "user", "anonymous", "guest", "null", "none", "undefined", "me", "student"

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getAdminOrganization, updateAdminOrganization } from '../../services/adminAPI';
 
 import StudentFeedbackForm from '../../components/StudentFeedbackForm';
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function Organization() {
   const [org, setOrg] = useState(null);
@@ -47,7 +48,6 @@ export default function Organization() {
   const handleSendSaFeedback = async () => {
     if (!saFeedbackText.trim()) return;
     try {
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
       const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
       const res = await fetch(`${BACKEND_URL}/api/admin/feedback-to-superadmin`, {
         method: "POST",

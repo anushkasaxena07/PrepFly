@@ -271,11 +271,15 @@ class TestInterviewPipelineComprehensive(unittest.TestCase):
         self.assertEqual(eval_res["strength"], "")
 
     # ------------------------------------------------------------------------
-    # 13. SCORING — NON-ANSWER ("I don't know" or empty)
+    # 13. SCORING — NON-ANSWER ("I don't know", "skip", empty, "idk")
     # ------------------------------------------------------------------------
     def test_13_scoring_non_answer(self):
         q = "Explain how database indexing works."
-        for non_ans in ["I don't know.", "skip", "", "idk", "no idea"]:
+        # Phase 6 Operating Rules R1 & R6: IntentClassifier-matched conversational/skip/noise
+        # turns are NEVER scored (is_scored=False, score=None), while bare fallback no-answer ("idk")
+        # returns deterministic 0.0 / 0 with zero fabricated strengths.
+        unscored_intents = ["I don't know.", "skip", "", "no idea"]
+        for non_ans in unscored_intents:
             eval_res = evaluate_response_comprehensive(
                 resume_text="CS Candidate",
                 question=q,
@@ -284,20 +288,52 @@ class TestInterviewPipelineComprehensive(unittest.TestCase):
                 question_index=2,
                 category=TOPIC_CS_FUNDAMENTALS
             )
-            self.assertEqual(eval_res["accuracy_score"], 0)
-            self.assertEqual(eval_res["score"], 0.0)
+            self.assertFalse(eval_res.get("is_scored", True))
+            self.assertTrue(eval_res.get("is_conversational_turn"))
+            self.assertIsNone(eval_res["accuracy_score"])
+            self.assertIsNone(eval_res["score"])
             self.assertEqual(eval_res["strength"], "")
 
+        bare_res = evaluate_response_comprehensive(
+            resume_text="CS Candidate",
+            question=q,
+            answer="idk",
+            chat_model=None,
+            question_index=2,
+            category=TOPIC_CS_FUNDAMENTALS
+        )
+        self.assertEqual(bare_res["accuracy_score"], 0)
+        self.assertEqual(bare_res["score"], 0.0)
+        self.assertEqual(bare_res["strength"], "")
+
     # ------------------------------------------------------------------------
-    # 14. SCORING — EARLY EXIT ("can i end inw")
+    # 14. SCORING — EARLY EXIT ("can i end inw", "quit interview")
     # ------------------------------------------------------------------------
     def test_14_scoring_early_exit(self):
         q = "How would you shard a MySQL database?"
-        for exit_ans in ["can i end inw", "i want to end", "quit interview", "please end now"]:
+        # Operating Rules R1 & R6: explicit end_interview_request intents are treated as
+        # unscored control turns (score=None, is_scored=False); direct fallback early-exit
+        # strings without end intent return 0.0 / Early Exit with zero fabricated strengths.
+        for exit_intent_ans in ["can i end inw", "i want to end"]:
             eval_res = evaluate_response_comprehensive(
                 resume_text="Candidate",
                 question=q,
-                answer=exit_ans,
+                answer=exit_intent_ans,
+                chat_model=None,
+                question_index=3,
+                category=TOPIC_SYSTEM_DESIGN
+            )
+            self.assertEqual(eval_res.get("intent"), "end_interview_request")
+            self.assertFalse(eval_res.get("is_scored", True))
+            self.assertIsNone(eval_res["accuracy_score"])
+            self.assertIsNone(eval_res["score"])
+            self.assertEqual(eval_res["strength"], "")
+
+        for fallback_exit_ans in ["quit interview", "please end now"]:
+            eval_res = evaluate_response_comprehensive(
+                resume_text="Candidate",
+                question=q,
+                answer=fallback_exit_ans,
                 chat_model=None,
                 question_index=3,
                 category=TOPIC_SYSTEM_DESIGN

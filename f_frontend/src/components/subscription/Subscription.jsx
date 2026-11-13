@@ -4,6 +4,7 @@ import PaymentHistory from './PaymentHistory';
 import PaymentSuccess from './PaymentSuccess';
 import PaymentFailed from './PaymentFailed';
 import { fetchSubscriptionStatus, fetchPaymentHistory } from './subscriptionAPI';
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
   const [statusData, setStatusData] = useState(null);
@@ -36,7 +37,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
         const headers = { "Content-Type": "application/json" };
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const sRes = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/admin/students`, { headers });
+        const sRes = await fetch(`${BACKEND_URL}/api/admin/students`, { headers });
         if (sRes.ok) {
           const sData = await sRes.json();
           setStudents(sData.students || []);
@@ -73,7 +74,7 @@ export default function Subscription({ apiFetch, orgId, isAdmin = false }) {
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/admin/students/bulk-renew`, {
+      const res = await fetch(`${BACKEND_URL}/api/admin/students/bulk-renew`, {
         method: "POST",
         headers,
         body: JSON.stringify({ student_ids: selectedIds })

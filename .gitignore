@@ -39,3 +39,4 @@ local_db.sqlite
 *.db
 git_backups_immutable/
 .agents/
+f_frontend/src/assets/test.txt

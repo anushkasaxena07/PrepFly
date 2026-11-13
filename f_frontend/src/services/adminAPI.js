@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../config/apiConfig';
 
 export const adminFetch = async (endpoint, options = {}) => {
   const token = localStorage.getItem("admin_access_token");
@@ -17,7 +17,7 @@ export const adminFetch = async (endpoint, options = {}) => {
   }
 
   let urlPath = endpoint.startsWith("/api") ? endpoint : `/api${endpoint}`;
-  
+
   const res = await fetch(`${BACKEND_URL}${urlPath}`, {
     ...options,
     headers
@@ -105,7 +105,6 @@ export const createAdminInterview = async (interviewData) => {
 };
 
 export const openAdminInterviewPDF = (interviewId) => {
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
   window.open(`${BACKEND_URL}/admin/interview-pdf/${interviewId}`, "_blank");
 };
 
@@ -145,10 +144,9 @@ export const downloadCodingLeaderboardCSV = async (testId) => {
   const token = localStorage.getItem("admin_access_token");
   const headers = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+
   const response = await fetch(`${BACKEND_URL}/admin/coding-test/${testId}/export-csv`, { headers });
-  
+
   if (!response.ok) throw new Error("Failed to export CSV");
   const blob = await response.blob();
   const downloadUrl = window.URL.createObjectURL(blob);
@@ -275,7 +273,6 @@ export const generateCustomReport = async (selectedReports, format = "csv") => {
 };
 
 export const openStudentDossierPDF = (studentId) => {
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
   window.open(`${BACKEND_URL}/admin/reports/student/${studentId}/pdf`, "_blank");
 };
 

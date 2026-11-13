@@ -140,7 +140,7 @@ class TestStabilizationAcceptance(unittest.TestCase):
                 poll = self.client.get(f"/api/resume/jobs/{job_id}", headers={"Authorization": f"Bearer {self.token_a}"})
                 self.assertEqual(poll.status_code, 200)
                 job_state = poll.get_json()
-                if job_state["status"] in ("completed", "failed"):
+                if job_state["status"] in ("completed", "failed", "retryable_failed", "permanently_failed"):
                     break
                 time.sleep(0.05)
 

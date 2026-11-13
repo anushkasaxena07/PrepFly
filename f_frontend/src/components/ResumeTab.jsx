@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { calculateATSMatch } from '../utils/atsEngine';
+import { BACKEND_URL } from '../config/apiConfig';
 
 const SAMPLE_JDS = {
   fullstack: `Senior Full Stack Engineer with:\n• 3+ years React/Next.js experience\n• Node.js, REST & GraphQL API design\n• AWS, Kubernetes, Docker, CI/CD\n• PostgreSQL, Redis\n• Strong frontend styling & system design`,
@@ -22,6 +23,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
   const [copied, setCopied] = useState(false);
   const [lastUploadedFile, setLastUploadedFile] = useState(null);
   const [uploadRetryable, setUploadRetryable] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const fillSampleJD = (type) => {
     setJdText(SAMPLE_JDS[type] || "");
@@ -32,7 +34,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
   };
 
   const extractResumeFile = async (file) => {
-    if (!file) return;
+    if (!file || isExtracting) return;
     const ext = (file.name || "").split(".").pop()?.toLowerCase();
     if (!["pdf", "docx"].includes(ext)) {
       setStatusMsg("⚠️ Only PDF and DOCX resume files are supported.");
@@ -48,6 +50,7 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
     }
     setLastUploadedFile(file);
     setUploadRetryable(false);
+    setIsExtracting(true);
     setStatusMsg("⏳ Uploading and extracting resume text...");
     setStatusColor("var(--text2)");
 
@@ -57,7 +60,6 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       formData.append('consent', 'true');
 
       const token = localStorage.getItem('access_token');
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
       const res = typeof apiFetch === "function"
         ? await apiFetch('/api/resume/extract', { method: 'POST', body: formData })
         : await fetch(`${BACKEND_URL}/api/resume/extract`, {
@@ -82,6 +84,8 @@ export default function ResumeTab({ apiFetch, isLoggedIn, user = {} }) {
       setUploadRetryable(true);
       setStatusMsg("❌ Upload notice: " + err.message + " — you can retry or paste resume text directly.");
       setStatusColor("var(--orange)");
+    } finally {
+      setIsExtracting(false);
     }
   };
 

@@ -11,16 +11,12 @@ import SuperAdminLogin from './pages/SuperAdmin/SuperAdminLogin';
 import SuperAdminContainer from './pages/SuperAdmin/SuperAdminContainer';
 import { ProtectedRoute, AdminRoute, SuperAdminRoute } from './components/ProtectedRoute';
 import { ThemeProvider } from './components/ui/ThemeContext';
+import { BACKEND_URL } from './config/apiConfig';
 
 function App() {
   // Non-blocking Render cold-start wake-up call on app load
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_BACKEND_URL || (
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-        ? "http://localhost:5000"
-        : "https://prepfly.up.railway.app"
-    );
-    fetch(`${apiBase}/health`, { method: "GET" }).catch(() => {});
+    fetch(`${BACKEND_URL}/health`, { method: "GET" }).catch(() => {});
   }, []);
 
   return (

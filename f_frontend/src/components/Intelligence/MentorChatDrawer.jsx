@@ -251,11 +251,10 @@ export default function MentorChatDrawer({
                 className={`flex ${isUser ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl p-3.5 text-xs leading-relaxed space-y-2 ${
-                    isUser
-                      ? "bg-cyan-600 text-white rounded-br-none"
-                      : "bg-slate-800/90 border border-slate-700/60 text-slate-200 rounded-bl-none shadow-md"
-                  }`}
+                  className={`max-w-[85%] rounded-2xl p-3.5 text-xs leading-relaxed space-y-2 ${isUser
+                    ? "bg-cyan-600 text-white rounded-br-none"
+                    : "bg-slate-800/90 border border-slate-700/60 text-slate-200 rounded-bl-none shadow-md"
+                    }`}
                 >
                   <FormattedMentorMessage content={m.content} />
 

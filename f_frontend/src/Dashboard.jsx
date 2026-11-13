@@ -17,10 +17,7 @@ import ProgressDashboard from "./components/Intelligence/ProgressDashboard";
 import JobPreparationTab from "./components/Intelligence/JobPreparationTab";
 import AchievementsTab from "./components/Intelligence/AchievementsTab";
 import "./components/Intelligence/intelligence.css";
-
-const BACKEND_URL = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
-  ? "http://localhost:5000"
-  : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+import { BACKEND_URL } from "./config/apiConfig";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },

@@ -9,8 +9,7 @@ import {
   updateTypingStatus,
   getTypingStatus
 } from '../../services/supportAPI';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function SupportChat({ role = "Organization Admin" }) {
   const isSuperAdmin = role === "Super Admin";

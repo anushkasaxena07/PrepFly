@@ -2,6 +2,7 @@ import unittest
 import json
 import os
 import sys
+from unittest.mock import patch
 
 import uuid
 import jwt
@@ -22,87 +23,111 @@ class TestInterviewLifecycleIntegration(unittest.TestCase):
 
     def test_complete_recruiter_interview_flow(self):
         """Full interview lifecycle: Create Session -> Start -> Hint -> Repeat -> Next Question -> End Interview."""
-        # 1. Create session without resume
-        create_res = self.client.post("/create-session-no-resume", headers=self.headers, json={
-            "user_id": self.user_id,
-            "role": "Cloud Solutions Architect",
-            "tools": "AWS, Kubernetes, Terraform, Docker, Python",
-            "experience": "3-5 Years",
-            "category": "System Design",
-            "difficulty": "Hard",
-            "consent": True
+        mock_rubric_json = json.dumps({
+            "criteria": [
+                {"criterion": "technical_accuracy", "weight": 0.25, "score": 0.85, "quoted_justification": "deployed microservices on AWS EKS using Terraform"},
+                {"criterion": "technical_depth", "weight": 0.20, "score": 0.80, "quoted_justification": "used Redis for caching to reduce database read load"},
+                {"criterion": "problem_solving", "weight": 0.20, "score": 0.80, "quoted_justification": "implemented horizontal pod autoscalers"},
+                {"criterion": "role_relevance", "weight": 0.15, "score": 0.85, "quoted_justification": "deployed microservices on AWS EKS"},
+                {"criterion": "examples", "weight": 0.10, "score": 0.80, "quoted_justification": "Redis for caching"},
+                {"criterion": "clarity", "weight": 0.10, "score": 0.85, "quoted_justification": "horizontal pod autoscalers"},
+                {"criterion": "structure", "weight": 0.10, "score": 0.80, "quoted_justification": "deployed microservices on AWS EKS using Terraform"},
+                {"criterion": "professionalism", "weight": 0.05, "score": 0.85, "quoted_justification": "used Redis for caching to reduce database read load"}
+            ],
+            "missing_concepts": ["Multi-region failover"],
+            "technical_mistakes": [],
+            "misconception_tags": [],
+            "improved_answer": "Include multi-region active-active failover details."
         })
-        self.assertEqual(create_res.status_code, 200)
-        c_data = create_res.get_json()
-        session_id = c_data["session_id"]
-        self.assertIsNotNone(session_id)
 
-        # 2. Start Interview
-        start_res = self.client.post("/start-interview", headers=self.headers, json={"session_id": session_id})
-        self.assertEqual(start_res.status_code, 200)
-        start_data = start_res.get_json()
-        self.assertIn("question", start_data)
-        self.assertEqual(start_data["question_number"], 1)
-        self.assertIn("Phase 1", start_data["stage"])
-        first_question = start_data["question"]
+        with patch("services.interview_rubric_grader._invoke_gemini_temp0", return_value=(mock_rubric_json, "gemini-3.8-flash")), \
+             patch("app.chat_model", None):
+                # 1. Create session without resume
+            create_res = self.client.post("/create-session-no-resume", headers=self.headers, json={
+                "user_id": self.user_id,
+                "role": "Cloud Solutions Architect",
+                "tools": "AWS, Kubernetes, Terraform, Docker, Python",
+                "experience": "3-5 Years",
+                "category": "System Design",
+                "difficulty": "Hard",
+                "consent": True
+            })
+            self.assertEqual(create_res.status_code, 200)
+            c_data = create_res.get_json()
+            session_id = c_data["session_id"]
+            self.assertIsNotNone(session_id)
 
-        # 3. Request Hint
-        hint_res = self.client.post("/get-hint", headers=self.headers, json={"session_id": session_id})
-        self.assertEqual(hint_res.status_code, 200)
-        hint_data = hint_res.get_json()
-        self.assertIn("hint", hint_data)
-        self.assertTrue(len(hint_data["hint"]) > 10)
+            # 2. Start Interview
+            start_res = self.client.post("/start-interview", headers=self.headers, json={"session_id": session_id})
+            self.assertEqual(start_res.status_code, 200)
+            start_data = start_res.get_json()
+            self.assertIn("question", start_data)
+            self.assertEqual(start_data["question_number"], 1)
+            self.assertIn("Phase 1", start_data["stage"])
+            first_question = start_data["question"]
 
-        # 4. Request Question Repetition (simulating candidate asking 'repeat')
-        repeat_res = self.client.post("/next", headers=self.headers, json={
-            "session_id": session_id,
-            "answer": "Pardon, could you repeat the question?"
-        })
-        self.assertEqual(repeat_res.status_code, 200)
-        repeat_data = repeat_res.get_json()
-        self.assertEqual(repeat_data["next_question"], first_question)
-        self.assertEqual(repeat_data["question_number"], 1)
+            # 3. Request Hint
+            hint_res = self.client.post("/get-hint", headers=self.headers, json={"session_id": session_id})
+            self.assertEqual(hint_res.status_code, 200)
+            hint_data = hint_res.get_json()
+            self.assertIn("hint", hint_data)
+            self.assertTrue(len(hint_data["hint"]) > 10)
 
-        # 5. Submit real technical answer for Question 1
-        answer_q1 = "In my previous project, we deployed microservices on AWS EKS using Terraform. We used Redis for caching to reduce database read load and implemented horizontal pod autoscalers."
-        next_res = self.client.post("/next", headers=self.headers, json={
-            "session_id": session_id,
-            "answer": answer_q1
-        })
-        self.assertEqual(next_res.status_code, 200)
-        next_data = next_res.get_json()
-        self.assertIn("feedback", next_data)
-        self.assertIn("score", next_data["feedback"])
-        self.assertEqual(next_data["question_number"], 2)
-        self.assertIn("next_question", next_data)
+            # 4. Request Question Repetition (simulating candidate asking 'repeat')
+            repeat_res = self.client.post("/next", headers=self.headers, json={
+                "session_id": session_id,
+                "answer": "Pardon, could you repeat the question?"
+            })
+            self.assertEqual(repeat_res.status_code, 200)
+            repeat_data = repeat_res.get_json()
+            self.assertEqual(repeat_data["next_question"], first_question)
+            self.assertEqual(repeat_data["question_number"], 1)
 
-        # 6. Query /get-session state (allow async daemon thread to persist responses)
-        import time
-        session_data = {}
-        for _ in range(10):
-            time.sleep(0.15)
-            session_res = self.client.get(f"/get-session?session_id={session_id}", headers=self.headers)
-            self.assertEqual(session_res.status_code, 200)
-            session_data = session_res.get_json()
-            if len(session_data.get("responses", [])) >= 1:
-                break
+            # 5. Submit 3 substantive technical answers (Phase 5 requires >= 3 substantive turns for an EVALUATED grade)
+            answers = [
+                "In my previous project, we deployed microservices on AWS EKS using Terraform. We used Redis for caching to reduce database read load and implemented horizontal pod autoscalers.",
+                "To optimize EKS scaling and Terraform state, we deployed microservices on AWS EKS using Terraform with remote S3 state locking, used Redis for caching to reduce database read load, and implemented horizontal pod autoscalers.",
+                "For observability and reliability, we deployed microservices on AWS EKS using Terraform with CloudWatch alarms, used Redis for caching to reduce database read load, and implemented horizontal pod autoscalers under load spikes.",
+            ]
+            for idx, ans in enumerate(answers, start=1):
+                next_res = self.client.post("/next", headers=self.headers, json={
+                    "session_id": session_id,
+                    "answer": ans
+                })
+                self.assertEqual(next_res.status_code, 200)
+                next_data = next_res.get_json()
+                self.assertIn("feedback", next_data)
+                self.assertIn("score", next_data["feedback"])
+                self.assertEqual(next_data["question_number"], idx + 1)
+                self.assertIn("next_question", next_data)
 
-        self.assertEqual(session_data["session_id"], session_id)
-        self.assertTrue(session_data["active"])
-        self.assertEqual(len(session_data["responses"]), 1)
+            # 6. Query /get-session state (allow async daemon thread to persist responses)
+            import time
+            session_data = {}
+            for _ in range(15):
+                time.sleep(0.15)
+                session_res = self.client.get(f"/get-session?session_id={session_id}", headers=self.headers)
+                self.assertEqual(session_res.status_code, 200)
+                session_data = session_res.get_json()
+                if len(session_data.get("responses", [])) >= 3:
+                    break
 
-        # 7. End Interview and generate comprehensive evaluation
-        end_res = self.client.post("/end-interview", headers=self.headers, json={"session_id": session_id})
-        self.assertEqual(end_res.status_code, 200)
-        end_data = end_res.get_json()
-        self.assertIn("overall_score", end_data)
-        self.assertIn("grade", end_data)
-        self.assertIn(end_data["grade"], ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "D", "F"])
+            self.assertEqual(session_data["session_id"], session_id)
+            self.assertTrue(session_data["active"])
+            self.assertEqual(len(session_data["responses"]), 3)
 
-        # 8. Verify session is now closed (active = False)
-        db_session = supabase.table("sessions").select("active,final_grade").eq("session_id", session_id).execute()
-        self.assertTrue(len(db_session.data) > 0)
-        self.assertFalse(db_session.data[0]["active"])
+            # 7. End Interview and generate comprehensive evaluation
+            end_res = self.client.post("/end-interview", headers=self.headers, json={"session_id": session_id})
+            self.assertEqual(end_res.status_code, 200)
+            end_data = end_res.get_json()
+            self.assertIn("overall_score", end_data)
+            self.assertIn("grade", end_data)
+            self.assertIn(end_data["grade"], ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "D", "F"])
+
+            # 8. Verify session is now closed (active = False)
+            db_session = supabase.table("sessions").select("active,final_grade").eq("session_id", session_id).execute()
+            self.assertTrue(len(db_session.data) > 0)
+            self.assertFalse(db_session.data[0]["active"])
 
 if __name__ == "__main__":
     unittest.main()

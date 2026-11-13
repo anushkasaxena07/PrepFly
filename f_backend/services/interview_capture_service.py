@@ -149,6 +149,24 @@ def classify_turn_status(
     return "answered", "substantive"
 
 
+def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
+    try:
+        supabase_client.table("interview_turns").upsert(row, on_conflict="id").execute()
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "pgrst204" in err_msg or "column" in err_msg or "schema cache" in err_msg:
+            # Fallback by dropping optional drift columns
+            fallback_row = dict(row)
+            for opt_col in ("stage", "question_type", "turn_status", "intent", "decision", "candidate_response", "audio_ref", "stt_engine", "stt_confidence", "word_count"):
+                fallback_row.pop(opt_col, None)
+            try:
+                supabase_client.table("interview_turns").upsert(fallback_row, on_conflict="id").execute()
+                return
+            except Exception as e_fallback:
+                logger.warning("interview_turns fallback upsert also failed: %s", e_fallback)
+        raise e
+
+
 def persist_interviewer_turn(
     supabase_client: Any,
     session_id: str,
@@ -181,7 +199,7 @@ def persist_interviewer_turn(
         "turn_status": "small_talk" if (stage or "").lower() == "small_talk" else "answered",
         "created_at": now_iso,
     }
-    supabase_client.table("interview_turns").upsert(row, on_conflict="id").execute()
+    _safe_upsert_turn(supabase_client, row)
     return row
 
 
@@ -255,7 +273,7 @@ def persist_candidate_turn(
         "created_at": now_iso,
     }
 
-    supabase_client.table("interview_turns").upsert(turn_row, on_conflict="id").execute()
+    _safe_upsert_turn(supabase_client, turn_row)
 
     speech_metrics = compute_speech_metrics(
         text=clean_text,

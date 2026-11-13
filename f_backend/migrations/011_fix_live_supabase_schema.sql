@@ -31,12 +31,15 @@ BEGIN
     END IF;
 END $$;
 
--- 3. Ensure activity_logs has actor_id and actor_type
+-- 3. Ensure activity_logs has actor_id, actor_type, user_id, and entity columns
 DO $$
 BEGIN
     IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'activity_logs') THEN
         ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS actor_id TEXT;
+        ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_id TEXT;
         ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS actor_type TEXT;
+        ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS entity_type TEXT;
+        ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS entity_id TEXT;
     END IF;
 END $$;
 
@@ -136,6 +139,45 @@ END $$;
 --    in case partial tables pre-existed before CREATE TABLE IF NOT EXISTS ran.
 DO $$
 BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions') THEN
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS hiring_recommendation TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS report_status TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS final_score REAL;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS final_score_100 REAL;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS final_grade TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS final_report TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS report_json TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS display_name TEXT;
+        ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS display_name_source TEXT;
+    END IF;
+
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_turns') THEN
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS turn_number INTEGER;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS turn_index INTEGER;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS speaker TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS question_id TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS question_text TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS question_type TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS skill_id TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS stage TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS text TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS candidate_response TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS intent TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS decision TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS score REAL;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS accuracy_score INTEGER;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS evaluation_json TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS input_mode TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS stt_engine TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS stt_confidence REAL;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS audio_ref TEXT;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS audio_duration_s REAL;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS started_at TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS ended_at TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS word_count INTEGER;
+        ALTER TABLE public.interview_turns ADD COLUMN IF NOT EXISTS turn_status TEXT DEFAULT 'answered';
+    END IF;
+
     IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'interview_speech_metrics') THEN
         ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
         ALTER TABLE public.interview_speech_metrics ADD COLUMN IF NOT EXISTS wpm REAL;

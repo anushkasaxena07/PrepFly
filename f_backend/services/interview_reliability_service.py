@@ -189,10 +189,13 @@ def record_report_audit_log(
         if previous_status and previous_status != report_status
         else f"interview_report_generated:{report_status}"
     )
+    from services.identity_service import parse_valid_uuid
+    actor_uuid = parse_valid_uuid(actor_id)
     audit_payload = {
         "id": f"act_{uuid.uuid4().hex[:14]}",
-        "actor_id": str(actor_id or "anonymous"),
+        "actor_id": actor_uuid,
         "user_id": str(actor_id or "anonymous"),
+        "actor_type": "Candidate",
         "action": action,
         "entity_type": "interview_report",
         "entity_id": session_id,
@@ -209,7 +212,15 @@ def record_report_audit_log(
         try:
             supabase_client.table("activity_logs").insert(audit_payload).execute()
         except Exception as err:
-            log_structured_event("report_audit_insert_failed", level=logging.WARNING, session_id=session_id, error=str(err))
+            # If live Supabase table omits optional entity_type/entity_id columns (PGRST204), retry with core columns only
+            if "PGRST204" in str(err) or "42703" in str(err):
+                try:
+                    core_payload = {k: v for k, v in audit_payload.items() if k not in ("entity_type", "entity_id")}
+                    supabase_client.table("activity_logs").insert(core_payload).execute()
+                except Exception as err2:
+                    log_structured_event("report_audit_insert_failed", level=logging.WARNING, session_id=session_id, error=str(err2))
+            else:
+                log_structured_event("report_audit_insert_failed", level=logging.WARNING, session_id=session_id, error=str(err))
 
     log_structured_event(
         "interview_report_audit",

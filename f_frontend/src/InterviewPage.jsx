@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import AI_INTERVIEWER from "./config/aiInterviewerConfig";
 import { getGradeInfo, computeSectionGrades, getBadges } from "./utils/gradingSystem";
-
-const BACKEND_URL = (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"))
-  ? "http://localhost:5000"
-  : (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000");
+import { safePlayMedia } from "./utils/mediaPlayback";
+import { BACKEND_URL } from "./config/apiConfig";
 
 
 // ── futur21 Circle Waves Avatar for Ava AI ──────────────────────────────────
@@ -347,7 +345,7 @@ const InterviewPage = () => {
 
         if (item.onStart) item.onStart();
 
-        audio.play();
+        safePlayMedia(audio);
         audio.playbackRate = speechSpeedRef.current;
         audio.onended = () => {
           isAudioPlaying.current = false;
@@ -439,12 +437,12 @@ const InterviewPage = () => {
           const token = localStorage.getItem("access_token");
           const res = await fetch(`${BACKEND_URL}/speech-to-text`, {
             method: "POST",
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               ...(token ? { "Authorization": `Bearer ${token}` } : {})
             },
-            body: JSON.stringify({ 
-              audio_base64: b64, 
+            body: JSON.stringify({
+              audio_base64: b64,
               mime_type: "audio/webm",
               consent: true,
               consent_given: true,
@@ -994,14 +992,14 @@ const InterviewPage = () => {
                     const isUnassessed = sec.score === null || sec.score === undefined || sec.status === "Not evaluated";
                     const secColor = isUnassessed ? "#94a3b8" : (sec.color || "#00c4a7");
                     return (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         onClick={() => setSelectedEvidenceDimension(isSelected ? null : sec)}
-                        style={{ 
-                          background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)", 
-                          border: isSelected ? `2.5px solid ${secColor}` : `1px solid ${secColor}33`, 
-                          borderRadius: "12px", 
-                          padding: "12px", 
+                        style={{
+                          background: isSelected ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.02)",
+                          border: isSelected ? `2.5px solid ${secColor}` : `1px solid ${secColor}33`,
+                          borderRadius: "12px",
+                          padding: "12px",
                           textAlign: "center",
                           cursor: "pointer",
                           transition: "all 0.15s ease",
@@ -1022,11 +1020,11 @@ const InterviewPage = () => {
 
                 {/* Evidence Viewer Panel */}
                 {selectedEvidenceDimension && (
-                  <div style={{ 
-                    marginTop: "20px", 
-                    background: "rgba(255,255,255,0.015)", 
-                    border: `1.5px solid ${selectedEvidenceDimension.color}44`, 
-                    borderRadius: "12px", 
+                  <div style={{
+                    marginTop: "20px",
+                    background: "rgba(255,255,255,0.015)",
+                    border: `1.5px solid ${selectedEvidenceDimension.color}44`,
+                    borderRadius: "12px",
                     padding: "16px",
                     textAlign: "left"
                   }}>
@@ -1034,10 +1032,10 @@ const InterviewPage = () => {
                       <div style={{ fontSize: "13px", fontWeight: 800, color: selectedEvidenceDimension.color }}>
                         🔍 Evidence Log: {selectedEvidenceDimension.name} ({selectedEvidenceDimension.score !== undefined ? `${selectedEvidenceDimension.score}/100` : "N/A"})
                       </div>
-                      <span style={{ 
-                        background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)", 
-                        color: selectedEvidenceDimension.color, 
-                        fontSize: "10px", 
+                      <span style={{
+                        background: selectedEvidenceDimension.bgColor || "rgba(255,255,255,0.05)",
+                        color: selectedEvidenceDimension.color,
+                        fontSize: "10px",
                         fontWeight: 800,
                         padding: "2px 8px",
                         borderRadius: "20px",

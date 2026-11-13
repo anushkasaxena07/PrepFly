@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminFetch, downloadInvoice } from '../../services/adminAPI';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function PaymentHistory() {
   const [history, setHistory] = useState([]);

@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AI_INTERVIEWER, { INTERVIEWER_PERSONALITIES, getInterviewerPersonality } from '../config/aiInterviewerConfig';
+import { attachStreamToMediaElement } from '../utils/mediaPlayback';
+import { executeResumeUploadOrRetry } from '../utils/resumeWorkflow';
+import { BACKEND_URL } from '../config/apiConfig';
+import { usePrepFlyTheme } from './ui/ThemeContext';
+import { AVA_AVATAR_DARK, AVA_AVATAR_SUNRISE } from '../assets/avaAvatarAssets';
 
 const STATUS_META = {
   EVALUATED: {
@@ -38,51 +43,137 @@ const formatDurationDisplay = (seconds) => {
   return m > 0 ? `${m}m ${rem}s` : `${rem}s`;
 };
 
-// ── futur21 Concentric Circle Waves Avatar for Ava ──────────────────────────
-const CircleWavesAvatar = ({ isTalking, isThinking }) => {
+// ── Ava Voice Anime Avatar with Soundwave Equalizer ──────────────────────────
+const AvaVoiceAnimeAvatar = ({ isTalking, isThinking, isListening, audioLevel = 0, isSunrise = false }) => {
+  const avatarSrc = isSunrise ? AVA_AVATAR_SUNRISE : AVA_AVATAR_DARK;
+  const glowColor = isSunrise ? "rgba(249, 115, 22, 0.75)" : "rgba(0, 212, 255, 0.85)";
+  const glowColorSecondary = isSunrise ? "rgba(251, 146, 60, 0.4)" : "rgba(0, 150, 255, 0.45)";
+  const ringBorderColor = isSunrise ? "#f97316" : "#00d4ff";
+  const waveBarColor = isSunrise ? "#f97316" : "#00d4ff";
+
+  // Symmetrical soundwave heights (12 bars on each side)
+  const leftBarHeights = [4, 6, 9, 14, 19, 26, 32, 24, 18, 13, 8, 4];
+  const rightBarHeights = [4, 8, 13, 18, 24, 32, 26, 19, 14, 9, 6, 4];
+
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", margin: "4px 0" }}>
       <style>{`
-        @keyframes futurWave1 { 0% { transform: scale(0.5); opacity: 1; border-width: 3px; } 100% { transform: scale(1.75); opacity: 0; border-width: 1px; } }
-        @keyframes futurWave2 { 0% { transform: scale(0.5); opacity: 1; border-width: 3px; } 100% { transform: scale(1.75); opacity: 0; border-width: 1px; } }
-        @keyframes futurWave3 { 0% { transform: scale(0.5); opacity: 1; border-width: 3px; } 100% { transform: scale(1.75); opacity: 0; border-width: 1px; } }
-        @keyframes futurWave4 { 0% { transform: scale(0.5); opacity: 1; border-width: 3px; } 100% { transform: scale(1.75); opacity: 0; border-width: 1px; } }
-        @keyframes coreGlowPulse { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 25px #00e5c3) drop-shadow(0 0 45px rgba(124,58,237,0.7)); } 50% { transform: scale(1.1); filter: drop-shadow(0 0 40px #00b8ff) drop-shadow(0 0 60px rgba(0,229,195,0.9)); } }
-        @keyframes ringRotateClockwise { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes ringRotateCounter { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+        @keyframes avaVoiceDance1 { 0%, 100% { height: 6px; } 50% { height: 32px; } }
+        @keyframes avaVoiceDance2 { 0%, 100% { height: 10px; } 50% { height: 38px; } }
+        @keyframes avaVoiceDance3 { 0%, 100% { height: 4px; } 50% { height: 24px; } }
+        @keyframes avaVoiceDance4 { 0%, 100% { height: 12px; } 50% { height: 34px; } }
+        @keyframes avaRingPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        @keyframes avaGlowBreath { 0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 20px ${glowColor}); } 50% { opacity: 1; filter: drop-shadow(0 0 35px ${glowColor}) drop-shadow(0 0 50px ${glowColorSecondary}); } }
       `}</style>
-      
-      {/* Circle Waves GIF by futur21 Asset */}
-      <img src="/Circle Waves GIF by futur21.gif" alt="" onError={e => e.target.style.display='none'} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "contain", borderRadius: "50%", pointerEvents: "none" }} />
 
-      {/* futur21 Concentric Expanding Waves */}
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00e5c3", animation: isTalking ? "futurWave1 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite" : isThinking ? "futurWave1 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite" : "futurWave1 5s cubic-bezier(0.1, 0.8, 0.3, 1) 0s infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #00b8ff", animation: isTalking ? "futurWave2 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite" : isThinking ? "futurWave2 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite" : "futurWave2 5s cubic-bezier(0.1, 0.8, 0.3, 1) 0.55s infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #8b5cf6", animation: isTalking ? "futurWave3 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite" : isThinking ? "futurWave3 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite" : "futurWave3 5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.1s infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", width: "160px", height: "160px", borderRadius: "50%", border: "2px solid #ec4899", animation: isTalking ? "futurWave4 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite" : isThinking ? "futurWave4 3.5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite" : "futurWave4 5s cubic-bezier(0.1, 0.8, 0.3, 1) 1.65s infinite", pointerEvents: "none" }} />
+      {/* Main Avatar Row with Flanking Audio Wave Equalizer Bars */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", width: "100%", height: "135px" }}>
+        
+        {/* Left Audio Equalizer Waves */}
+        <div style={{ display: "flex", alignItems: "center", gap: "3.5px", height: "42px", justifyContent: "flex-end" }}>
+          {leftBarHeights.map((baseH, idx) => {
+            let anim = "none";
+            let h = baseH;
+            if (isTalking) {
+              const danceNum = (idx % 4) + 1;
+              anim = `avaVoiceDance${danceNum} ${0.35 + (idx * 0.05)}s ease-in-out infinite`;
+            } else if (isListening) {
+              const boost = Math.min(26, (audioLevel || 0) * (0.3 + (idx * 0.04)));
+              h = Math.max(4, baseH + boost);
+            }
+            return (
+              <div
+                key={`left-wave-${idx}`}
+                style={{
+                  width: "2.5px",
+                  height: `${h}px`,
+                  borderRadius: "2px",
+                  background: waveBarColor,
+                  opacity: 0.85,
+                  animation: anim,
+                  transition: isTalking ? "none" : "height 0.08s ease"
+                }}
+              />
+            );
+          })}
+        </div>
 
-      {/* Rotating Orb Rings */}
-      <svg viewBox="0 0 200 200" style={{ width: "180px", height: "180px", position: "absolute", animation: isThinking ? "ringRotateClockwise 4s linear infinite" : isTalking ? "ringRotateClockwise 8s linear infinite" : "ringRotateClockwise 16s linear infinite" }}>
-        <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(0, 229, 195, 0.35)" strokeWidth="1.5" strokeDasharray="8 12" />
-        <circle cx="100" cy="100" r="78" fill="none" stroke="rgba(0, 184, 255, 0.4)" strokeWidth="1" strokeDasharray="16 8" />
-      </svg>
+        {/* Circular Anime Avatar with Neon Glowing Ring */}
+        <div style={{
+          position: "relative",
+          width: "124px",
+          height: "124px",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          animation: isTalking ? "avaRingPulse 1.2s ease-in-out infinite, avaGlowBreath 1.6s ease-in-out infinite" : "avaGlowBreath 3s ease-in-out infinite",
+          boxShadow: `0 0 24px ${glowColor}, 0 0 45px ${glowColorSecondary}`,
+          border: `2.5px solid ${ringBorderColor}`,
+          overflow: "hidden",
+          flexShrink: 0
+        }}>
+          <img
+            src={avatarSrc}
+            alt="Ava AI Interviewer"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: "50%"
+            }}
+          />
+        </div>
 
-      <svg viewBox="0 0 200 200" style={{ width: "180px", height: "180px", position: "absolute", animation: isThinking ? "ringRotateCounter 5s linear infinite" : isTalking ? "ringRotateCounter 10s linear infinite" : "ringRotateCounter 20s linear infinite" }}>
-        <circle cx="100" cy="100" r="64" fill="none" stroke="rgba(139, 92, 246, 0.5)" strokeWidth="1.5" strokeDasharray="6 6" />
-      </svg>
+        {/* Right Audio Equalizer Waves */}
+        <div style={{ display: "flex", alignItems: "center", gap: "3.5px", height: "42px", justifyContent: "flex-start" }}>
+          {rightBarHeights.map((baseH, idx) => {
+            let anim = "none";
+            let h = baseH;
+            if (isTalking) {
+              const danceNum = ((idx + 2) % 4) + 1;
+              anim = `avaVoiceDance${danceNum} ${0.38 + (idx * 0.045)}s ease-in-out infinite`;
+            } else if (isListening) {
+              const boost = Math.min(26, (audioLevel || 0) * (0.3 + ((11 - idx) * 0.04)));
+              h = Math.max(4, baseH + boost);
+            }
+            return (
+              <div
+                key={`right-wave-${idx}`}
+                style={{
+                  width: "2.5px",
+                  height: `${h}px`,
+                  borderRadius: "2px",
+                  background: waveBarColor,
+                  opacity: 0.85,
+                  animation: anim,
+                  transition: isTalking ? "none" : "height 0.08s ease"
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Central Glowing futur21 Core with Wave GIF */}
-      <div style={{ width: "96px", height: "96px", borderRadius: "50%", background: isTalking ? "radial-gradient(circle, #00e5c3 0%, #00b8ff 45%, #8b5cf6 85%, #050811 100%)" : isThinking ? "radial-gradient(circle, #8b5cf6 0%, #00b8ff 55%, #050811 100%)" : "radial-gradient(circle, #00e5c3 0%, #081226 80%)", animation: isTalking ? "coreGlowPulse 0.7s ease-in-out infinite" : "coreGlowPulse 2.2s ease-in-out infinite", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 0 35px rgba(0, 229, 195, 0.6)", overflow: "hidden" }}>
-        <img src="/Circle Waves GIF by futur21.gif" alt="" onError={e => e.target.style.display='none'} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+      {/* Ava Label & Subtitle */}
+      <div style={{ textAlign: "center", marginTop: "2px" }}>
+        <div style={{ fontSize: "17px", fontWeight: 800, color: isSunrise ? "#3c1b0a" : "#ffffff", letterSpacing: "0.4px" }}>
+          Ava
+        </div>
+        <div style={{ fontSize: "11.5px", fontWeight: 600, color: isSunrise ? "#8a3810" : "#38bdf8", marginTop: "1px" }}>
+          Your AI Interviewer
+        </div>
       </div>
     </div>
   );
 };
 
+const CircleWavesAvatar = AvaVoiceAnimeAvatar;
+
 const renderEvidenceCard = (item, isStrength, idx) => {
   let rawTitle = typeof item === 'string' ? item : (item.title || "Observation");
   let rawEvidence = typeof item === 'object' ? (item.evidence || "") : "";
-  
+
   // Extract Turn or Question label
   let turnBadge = null;
   const turnMatch = rawTitle.match(/(Turn\s*\d+|Question\s*\d+|Q\d+)/i) || rawEvidence.match(/(Turn\s*\d+|Question\s*\d+|Q\d+)/i);
@@ -170,15 +261,15 @@ const renderMarkdown = (text) => {
   const lines = text.split("\n");
   return lines.map((line, idx) => {
     const trimmed = line.trim();
-    
+
     // Filter out common raw JSON brackets or prompt leaks
     if (trimmed === "{" || trimmed === "}" || trimmed === "}," || trimmed === "[{" || trimmed === "}]" || trimmed === '"' || trimmed === "'") {
       return null;
     }
     const lowerLine = trimmed.toLowerCase();
     if (
-      lowerLine.startsWith("return only") || 
-      lowerLine.startsWith("expected json") || 
+      lowerLine.startsWith("return only") ||
+      lowerLine.startsWith("expected json") ||
       lowerLine.startsWith("return a json") ||
       lowerLine.includes("preamble") ||
       lowerLine.includes("markdown codeblock") ||
@@ -207,7 +298,7 @@ const renderMarkdown = (text) => {
       const headerText = cleanLine.replace("#### ", "").replace(/^[-—–\s]+/, "").trim();
       return <h4 key={idx} style={{ fontSize: "12px", fontWeight: 700, marginTop: "8px", marginBottom: "4px", color: "#a78bfa" }}>{headerText}</h4>;
     }
-    
+
     // Check if bullet point (supporting *, -, and dashes)
     let content = cleanLine;
     let isBullet = false;
@@ -216,7 +307,7 @@ const renderMarkdown = (text) => {
       isBullet = true;
       content = cleanTrimmed.substring(2);
     }
-    
+
     // Parse bold text like **something**
     const parts = [];
     let lastIndex = 0;
@@ -232,9 +323,9 @@ const renderMarkdown = (text) => {
     if (lastIndex < content.length) {
       parts.push(content.substring(lastIndex));
     }
-    
+
     const displayContent = parts.length > 0 ? parts : content;
-    
+
     if (isBullet) {
       return (
         <div key={idx} style={{ display: "flex", gap: "6px", paddingLeft: "12px", marginBottom: "4px" }}>
@@ -243,7 +334,7 @@ const renderMarkdown = (text) => {
         </div>
       );
     }
-    
+
     return (
       <div key={idx} style={{ marginBottom: "6px" }}>
         {displayContent}
@@ -254,6 +345,17 @@ const renderMarkdown = (text) => {
 
 export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const safeUser = user || {};
+
+  let isSunrise = false;
+  try {
+    const themeCtx = usePrepFlyTheme();
+    isSunrise = Boolean(themeCtx?.isSunrise);
+  } catch {
+    if (typeof document !== 'undefined') {
+      isSunrise = document.documentElement.getAttribute('data-theme') === 'sunrise';
+    }
+  }
+
   // Steps: "resume_upload" -> "type_selection" -> "device_check" -> "loading" -> "live_call" -> "report"
   const [step, setStep] = useState("resume_upload");
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
@@ -261,7 +363,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [selectedEvidenceDimension, setSelectedEvidenceDimension] = useState(null);
   const [selectedPersonality, setSelectedPersonality] = useState("professional");
   const [useTextInput, setUseTextInput] = useState(false);
-  
+
   // Non-Resume Form State
   const [roleTitle, setRoleTitle] = useState("Software Engineer");
   const [roleTools, setRoleTools] = useState("Python, React, SQL, Algorithms");
@@ -271,6 +373,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [resumeFile, setResumeFile] = useState(null);
   const [previewResumeUrl, setPreviewResumeUrl] = useState(null);
   const [atsScore, setAtsScore] = useState(null);
+  const [activeResumeJobId, setActiveResumeJobId] = useState(null);
+  const [activeResumeJobToken, setActiveResumeJobToken] = useState(null);
+  const [isProcessingResume, setIsProcessingResume] = useState(false);
+  const [resumeProgress, setResumeProgress] = useState({ stage: "", label: "", uploadPct: 0, parsePct: 0 });
+  const isStartingRef = useRef(false);
 
   // Device check toggles & webcam stream
   const [cameraOn, setCameraOn] = useState(true);
@@ -300,29 +407,31 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   const bindStreamToVideo = (videoEl, stream) => {
     if (!videoEl || !stream) return;
-    try {
-      videoEl.muted = true;
-      videoEl.defaultMuted = true;
-      videoEl.playsInline = true;
-      videoEl.autoplay = true;
-      if (videoEl.srcObject !== stream) {
-        videoEl.srcObject = stream;
-      }
-      if (stream.getVideoTracks) {
-        stream.getVideoTracks().forEach(t => {
-          if (!t.enabled) t.enabled = true;
-        });
-      }
-      const p = videoEl.play();
-      if (p && typeof p.catch === "function") {
-        p.catch(err => {
-          console.warn("Video playback deferred/notice:", err);
-        });
-      }
-    } catch (err) {
-      console.warn("Error binding stream to video:", err);
-    }
+    attachStreamToMediaElement(videoEl, stream, { muted: true });
   };
+
+  useEffect(() => {
+    const stream = mediaStreamRef.current;
+    if (!stream || !cameraOn) return;
+    if (step === "device_check" && videoRefDevice.current) {
+      bindStreamToVideo(videoRefDevice.current, stream);
+    } else if (step === "live_call" && videoRefCall.current) {
+      bindStreamToVideo(videoRefCall.current, stream);
+    }
+  }, [step, hasCameraStream, cameraOn]);
+
+  useEffect(() => {
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        } catch { }
+      }
+    };
+  }, []);
 
   const startAudioMeter = (stream) => {
     if (!stream || stream.getAudioTracks().length === 0) return;
@@ -334,7 +443,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       }
       const ctx = audioContextRef.current;
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        ctx.resume().catch(() => { });
       }
       if (analyserRef.current) return;
 
@@ -371,7 +480,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       animFrameRef.current = null;
     }
     if (audioSourceRef.current) {
-      try { audioSourceRef.current.disconnect(); } catch {}
+      try { audioSourceRef.current.disconnect(); } catch { }
       audioSourceRef.current = null;
     }
     analyserRef.current = null;
@@ -402,7 +511,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [isAvaThinking, setIsAvaThinking] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
   const [reportData, setReportData] = useState(null);
-  
+
   // Hands-Free Conversational Voice VAD
   const [isHandsFree, setIsHandsFree] = useState(true);
   const [autoSubmitCountdown, setAutoSubmitCountdown] = useState(null);
@@ -470,7 +579,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (forceReacquire && mediaStreamRef.current) {
         try {
           mediaStreamRef.current.getTracks().forEach(t => t.stop());
-        } catch (e) {}
+        } catch (e) { }
         mediaStreamRef.current = null;
       }
 
@@ -615,7 +724,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               }
               turnStartIsoRef.current = new Date().toISOString();
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
     } catch (e) {
@@ -639,7 +748,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         });
         localStorage.setItem("prepfly_avatab_session", payload);
         sessionStorage.setItem("prepfly_avatab_session", payload);
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [step, sessionId, reportData, allFeedbacks, atsScore, question, questionNumber]);
 
@@ -749,17 +858,26 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     const file = e.target.files[0];
     if (file) {
       setResumeFile(file);
+      setActiveResumeJobId(null);
+      setActiveResumeJobToken(null);
+      setSetupError(null);
+      setResumeProgress({ stage: "", label: "", uploadPct: 0, parsePct: 0 });
       setPreviewResumeUrl(URL.createObjectURL(file));
     }
   };
 
   const clearResume = () => {
     setResumeFile(null);
+    setActiveResumeJobId(null);
+    setActiveResumeJobToken(null);
+    setSetupError(null);
+    setResumeProgress({ stage: "", label: "", uploadPct: 0, parsePct: 0 });
     setPreviewResumeUrl(null);
   };
 
   // Step 3 -> 4: Start Interview & Loading Flow
-  const triggerStartInterview = async (overrideSetupMode = null) => {
+  const triggerStartInterview = async (overrideSetupMode = null, forceFreshUpload = false) => {
+    if (isStartingRef.current) return;
     if (!consentGiven) {
       setSetupError({
         message: "Affirmative privacy consent is required before starting your AI interview.",
@@ -769,9 +887,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       return;
     }
     const activeMode = (typeof overrideSetupMode === "string" ? overrideSetupMode : null) || setupMode;
+    isStartingRef.current = true;
+    setIsProcessingResume(true);
     setSetupError(null);
     setStep("loading");
     setLoadingStepIndex(0);
+    setResumeProgress({ stage: "", label: "", uploadPct: 0, parsePct: 0 });
 
     const interval = setInterval(() => {
       setLoadingStepIndex(prev => {
@@ -783,104 +904,57 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
     try {
       let activeSessionId = null;
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-
       const resolvedUserId = user?._id || user?.user_id || user?.id || localStorage.getItem("user_id");
-      if (activeMode === "resume" && resumeFile) {
-        const formData = new FormData();
-        formData.append("resume", resumeFile);
-        formData.append("consent", "true");
-        if (resolvedUserId) formData.append("user_id", resolvedUserId);
 
+      if (activeMode === "resume" && resumeFile) {
         const authHeaders = localStorage.getItem("access_token")
           ? { "Authorization": "Bearer " + localStorage.getItem("access_token") }
           : {};
-
-        const postResume = async (path) =>
+        const requestFn = (path, opts = {}) =>
           typeof apiFetch === "function"
-            ? apiFetch(path, { method: "POST", body: formData })
-            : fetch(`${BACKEND_URL}${path}`, { method: "POST", headers: authHeaders, body: formData });
+            ? apiFetch(path, opts)
+            : fetch(`${BACKEND_URL}${path}`, {
+              ...opts,
+              headers: { ...authHeaders, ...(opts.headers || {}) },
+            });
 
-        const parseResp = async (r) => {
-          const txt = await r.text();
-          try {
-            return txt ? JSON.parse(txt) : {};
-          } catch {
-            return { message: `Resume upload timed out or returned HTTP ${r.status}. Please retry or continue without a resume.` };
-          }
-        };
+        const wfResult = await executeResumeUploadOrRetry({
+          file: resumeFile,
+          existingJobId: forceFreshUpload ? null : activeResumeJobId,
+          existingJobToken: forceFreshUpload ? null : activeResumeJobToken,
+          userId: resolvedUserId,
+          consentGiven: true,
+          requestFn,
+          onProgress: (prog) => {
+            if (prog.jobId) setActiveResumeJobId(prog.jobId);
+            if (prog.jobToken) setActiveResumeJobToken(prog.jobToken);
+            setResumeProgress({
+              stage: prog.stage || "",
+              label: prog.label || "",
+              uploadPct: prog.uploadPct ?? 0,
+              parsePct: prog.parsePct ?? 0,
+            });
+          },
+        });
 
-        let res = await postResume("/api/resume/jobs");
-        let data = await parseResp(res);
-
-        // Fallback to sync /upload if async job endpoint unavailable (e.g. older test stub)
-        if (res.status === 404) {
-          res = await postResume("/upload");
-          data = await parseResp(res);
-        }
-
-        if (!res.ok) {
+        if (!wfResult.ok) {
           clearInterval(interval);
+          if (wfResult.jobId) setActiveResumeJobId(wfResult.jobId);
+          if (wfResult.jobToken) setActiveResumeJobToken(wfResult.jobToken);
           setSetupError({
-            message: data.message || data.error || "Resume parsing failed temporarily.",
-            retryable: data.retryable !== false,
-            step: data.step || "resume_parse",
+            message: wfResult.error || "Resume parsing failed temporarily.",
+            retryable: wfResult.retryable !== false,
+            step: wfResult.step || "resume_parse",
           });
           setStep("resume_upload");
           return;
         }
 
-        // Poll async resume parsing job until completion or failure
-        if (res.status === 202 && data.job_id) {
-          const jobId = data.job_id;
-          let jobDone = false;
-          for (let poll = 0; poll < 35; poll++) {
-            await new Promise((resolve) => setTimeout(resolve, 900));
-            const pollRes = typeof apiFetch === "function"
-              ? await apiFetch(`/api/resume/jobs/${jobId}`, { method: "GET" })
-              : await fetch(`${BACKEND_URL}/api/resume/jobs/${jobId}`, { headers: authHeaders });
-            const pollData = await parseResp(pollRes);
-
-            if (!pollRes.ok) {
-              clearInterval(interval);
-              setSetupError({
-                message: pollData.error || pollData.message || "Failed to check resume parsing status.",
-                retryable: true,
-                step: "resume_parse",
-              });
-              setStep("resume_upload");
-              return;
-            }
-            if (pollData.status === "completed") {
-              data = pollData;
-              jobDone = true;
-              break;
-            }
-            if (pollData.status === "failed") {
-              clearInterval(interval);
-              setSetupError({
-                message: pollData.error || "AI resume parsing failed after retries. You can retry or continue without a resume.",
-                retryable: pollData.retryable !== false,
-                step: "resume_parse",
-              });
-              setStep("resume_upload");
-              return;
-            }
-          }
-          if (!jobDone) {
-            clearInterval(interval);
-            setSetupError({
-              message: "Resume parsing is taking longer than expected. Please retry or continue without a resume.",
-              retryable: true,
-              step: "resume_parse",
-            });
-            setStep("resume_upload");
-            return;
-          }
+        if (wfResult.jobId) setActiveResumeJobId(wfResult.jobId);
+        activeSessionId = wfResult.sessionId || wfResult.data?.session_id;
+        if (wfResult.atsScore || wfResult.data?.ats_score) {
+          setAtsScore(wfResult.atsScore || wfResult.data?.ats_score);
         }
-
-        activeSessionId = data.session_id;
-        if (data.ats_score) setAtsScore(data.ats_score);
       } else {
         const res = await apiFetch("/create-session-no-resume", {
           method: "POST",
@@ -968,6 +1042,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         step: "start_interview",
       });
       setStep("device_check");
+    } finally {
+      isStartingRef.current = false;
+      setIsProcessingResume(false);
     }
   };
 
@@ -994,24 +1071,24 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     const getNaturalVoice = () => {
       if (!('speechSynthesis' in window)) return null;
       const voices = window.speechSynthesis.getVoices();
-      
+
       // Prioritize modern high-quality female natural voices
       const femaleKeywords = ["jenny", "aria", "samantha", "zira", "google us english", "female", "siri", "victoria", "karen", "serena", "online"];
-      
+
       // 1. Exact match for popular female natural/online voices
       for (const keyword of femaleKeywords) {
         const found = voices.find(v => v?.name?.toLowerCase().includes(keyword) && v.lang.startsWith("en"));
         if (found) return found;
       }
-      
+
       // 2. Any English female voice
       const anyFemale = voices.find(v => v?.name?.toLowerCase().includes("female") && v.lang.startsWith("en"));
       if (anyFemale) return anyFemale;
-      
+
       // 3. Fallback to any English voice
       const anyEnglish = voices.find(v => v.lang.startsWith("en"));
       if (anyEnglish) return anyEnglish;
-      
+
       return voices[0] || null;
     };
 
@@ -1065,7 +1142,6 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       return;
     }
 
-    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
     fetch(`${BACKEND_URL}/text-to-speech`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1123,7 +1199,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.abort();
-      } catch (err) {}
+      } catch (err) { }
       recognitionRef.current = null;
     }
 
@@ -1155,7 +1231,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         if (isAvaTalkingRef.current && (interim || latestChunk)) {
           if ('speechSynthesis' in window) window.speechSynthesis.cancel();
           if (currentAudioRef.current) {
-            try { currentAudioRef.current.pause(); } catch {}
+            try { currentAudioRef.current.pause(); } catch { }
           }
           setIsAvaTalking(false);
           isAvaTalkingRef.current = false;
@@ -1240,14 +1316,14 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
         recognitionRef.current.abort();
-      } catch {}
+      } catch { }
       recognitionRef.current = null;
     }
     setIsSpeakingAnswer(false);
     stopAudioMeter();
   };
 
-    const handleRepeatQuestion = () => {
+  const handleRepeatQuestion = () => {
     if (isAvaTalking || isAvaThinking) return;
     playAvaSpeech(question);
   };
@@ -1503,7 +1579,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         setReportData(data);
         setCustomNameDraft("");
       }
-    } catch {}
+    } catch { }
     setNameSaving(false);
   };
 
@@ -1613,12 +1689,17 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   <strong style={{ color: "#dc2626" }}>Upload / Parse Interrupted:</strong> {setupError.message}
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
-                  {setupError.retryable && resumeFile && (
-                    <button type="button" onClick={() => triggerStartInterview("resume")} style={{ padding: "8px 14px", borderRadius: "10px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: "pointer" }}>
-                      Retry Resume Parse
+                  {setupError.retryable && (resumeFile || activeResumeJobId) && (
+                    <button
+                      type="button"
+                      disabled={isProcessingResume}
+                      onClick={() => triggerStartInterview("resume")}
+                      style={{ padding: "8px 14px", borderRadius: "10px", background: "#6d28d9", color: "#ffffff", border: "none", fontWeight: 800, fontSize: "12px", cursor: isProcessingResume ? "wait" : "pointer", opacity: isProcessingResume ? 0.65 : 1 }}
+                    >
+                      {isProcessingResume ? "Retrying..." : "Retry Resume Parse"}
                     </button>
                   )}
-                  <button type="button" onClick={() => { setSetupError(null); setSetupMode("non_resume"); setResumeFile(null); }} style={{ padding: "8px 14px", borderRadius: "10px", background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}>
+                  <button type="button" onClick={() => { setSetupError(null); setSetupMode("non_resume"); setResumeFile(null); setActiveResumeJobId(null); }} style={{ padding: "8px 14px", borderRadius: "10px", background: "#ffffff", color: "#0f172a", border: "1px solid #cbd5e1", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}>
                     Continue Without Resume
                   </button>
                 </div>
@@ -1627,17 +1708,17 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
             {/* 2 Distinct Setup Mode Option Tabs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#eaedf6", borderRadius: "14px", padding: "6px", marginBottom: "26px" }}>
-              <button 
+              <button
                 type="button"
-                onClick={() => setSetupMode("resume")} 
-                style={{ 
-                  padding: "13px", 
-                  borderRadius: "10px", 
-                  border: setupMode === "resume" ? "1px solid #6d28d9" : "1px solid transparent", 
-                  background: setupMode === "resume" ? "#ffffff" : "transparent", 
-                  color: setupMode === "resume" ? "#6d28d9" : "#475569", 
-                  fontWeight: 800, 
-                  cursor: "pointer", 
+                onClick={() => setSetupMode("resume")}
+                style={{
+                  padding: "13px",
+                  borderRadius: "10px",
+                  border: setupMode === "resume" ? "1px solid #6d28d9" : "1px solid transparent",
+                  background: setupMode === "resume" ? "#ffffff" : "transparent",
+                  color: setupMode === "resume" ? "#6d28d9" : "#475569",
+                  fontWeight: 800,
+                  cursor: "pointer",
                   fontSize: "13px",
                   display: "flex",
                   alignItems: "center",
@@ -1650,17 +1731,17 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 <span>Option 1: With Resume <strong>[Upload Resume]</strong></span>
               </button>
 
-              <button 
+              <button
                 type="button"
-                onClick={() => setSetupMode("non_resume")} 
-                style={{ 
-                  padding: "13px", 
-                  borderRadius: "10px", 
-                  border: setupMode === "non_resume" ? "1px solid #6d28d9" : "1px solid transparent", 
-                  background: setupMode === "non_resume" ? "#ffffff" : "transparent", 
-                  color: setupMode === "non_resume" ? "#6d28d9" : "#475569", 
-                  fontWeight: 800, 
-                  cursor: "pointer", 
+                onClick={() => setSetupMode("non_resume")}
+                style={{
+                  padding: "13px",
+                  borderRadius: "10px",
+                  border: setupMode === "non_resume" ? "1px solid #6d28d9" : "1px solid transparent",
+                  background: setupMode === "non_resume" ? "#ffffff" : "transparent",
+                  color: setupMode === "non_resume" ? "#6d28d9" : "#475569",
+                  fontWeight: 800,
+                  cursor: "pointer",
                   fontSize: "13px",
                   display: "flex",
                   alignItems: "center",
@@ -1707,12 +1788,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px", textAlign: "left" }}>
                 <div>
                   <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Role Title</label>
-                  <input 
-                    type="text" 
-                    value={roleTitle} 
-                    onChange={e => setRoleTitle(e.target.value)} 
-                    placeholder="e.g. Senior Full Stack Engineer (React, Python, Microservices)" 
-                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px" }} 
+                  <input
+                    type="text"
+                    value={roleTitle}
+                    onChange={e => setRoleTitle(e.target.value)}
+                    placeholder="e.g. Senior Full Stack Engineer (React, Python, Microservices)"
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px" }}
                   />
                 </div>
 
@@ -1720,12 +1801,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   <label style={{ fontSize: "11px", fontWeight: 800, color: "#6d28d9", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>
                     Job Description (JD) &amp; Key Requirements
                   </label>
-                  <textarea 
-                    value={jobDescription} 
-                    onChange={e => setJobDescription(e.target.value)} 
-                    placeholder="Paste the Job Description here (Responsibilities, Required Skills, Tech Stack, Qualifications)... Ava will tailor her questions to match this exact role!" 
+                  <textarea
+                    value={jobDescription}
+                    onChange={e => setJobDescription(e.target.value)}
+                    placeholder="Paste the Job Description here (Responsibilities, Required Skills, Tech Stack, Qualifications)... Ava will tailor her questions to match this exact role!"
                     rows={5}
-                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px", resize: "vertical", fontFamily: "inherit" }} 
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#0f172a", fontSize: "13px", resize: "vertical", fontFamily: "inherit" }}
                   />
                 </div>
 
@@ -1749,11 +1830,25 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             )}
 
             <div style={{ textAlign: "center", marginTop: "20px" }}>
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   if (setupMode === "resume" && !resumeFile) {
                     alert("Please upload your resume file (PDF/DOCX) first, or switch to Option 2: Without Resume [With Job Description].");
+                    return;
+                  }
+                  if (setupMode === "resume" && setupError) {
+                    const proceedWithout = window.confirm(
+                      "Resume parsing was interrupted.\n\nClick 'OK' to proceed to track selection with general interview practice (without resume personalization), or 'Cancel' to use 'Retry Resume Parse' above."
+                    );
+                    if (proceedWithout) {
+                      setSetupError(null);
+                      setSetupMode("non_resume");
+                      setResumeFile(null);
+                      setActiveResumeJobId(null);
+                      setStep("type_selection");
+                      return;
+                    }
                     return;
                   }
                   if (setupMode === "non_resume") {
@@ -1769,8 +1864,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     return;
                   }
                   setStep("type_selection");
-                }} 
-                style={{ padding: "13px 32px", borderRadius: "12px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 6px 20px rgba(109,40,217,0.28)" }} 
+                }}
+                style={{ padding: "13px 32px", borderRadius: "12px", background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", color: "#fff", fontWeight: 800, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 6px 20px rgba(109,40,217,0.28)" }}
                 title="Continue to Track Selection"
               >
                 Continue to Track Selection ➔
@@ -1828,26 +1923,20 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               {/* Left: Camera Preview */}
               <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "20px", overflow: "hidden", position: "relative", height: "320px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <video
-                  ref={(el) => {
-                    videoRefDevice.current = el;
-                    if (el && mediaStreamRef.current) {
-                      bindStreamToVideo(el, mediaStreamRef.current);
-                    }
-                  }}
+                  ref={videoRefDevice}
                   autoPlay
                   playsInline
                   muted
                   onLoadedMetadata={(e) => {
                     e.target.muted = true;
-                    e.target.play().catch(() => {});
                   }}
                   style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
                 />
-                
+
                 {!cameraOn && (
                   <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
-                      {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                      {safeUser?.name ? safeUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : "ME"}
                     </div>
                     <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Muted</div>
                   </div>
@@ -1872,10 +1961,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     </button>
                   </div>
                 )}
-                
+
                 {/* Floating Controls */}
                 <div style={{ position: "absolute", bottom: "16px", display: "flex", gap: "12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)", padding: "8px 16px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       const next = !cameraOn;
@@ -1887,13 +1976,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                           mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
                         }
                       }
-                    }} 
+                    }}
                     style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
                     title={cameraOn ? "Mute Camera" : "Unmute Camera"}
                   >
                     {cameraOn ? "📷" : "🚫"}
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       const next = !micOn;
@@ -1910,15 +1999,15 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                           mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = false);
                         }
                       }
-                    }} 
+                    }}
                     style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
                     title={micOn ? "Mute Microphone" : "Unmute Microphone"}
                   >
                     {micOn ? "🎙️" : "🔇"}
                   </button>
-                  <button 
+                  <button
                     type="button"
-                    onClick={showDeviceSettings} 
+                    onClick={showDeviceSettings}
                     style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: "40px", height: "40px", color: "#fff", cursor: "pointer" }}
                     title="Device Settings"
                   >
@@ -2040,23 +2129,23 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               <button
                 type="button"
                 onClick={() => triggerStartInterview()}
-                disabled={!consentGiven}
+                disabled={!consentGiven || isProcessingResume}
                 style={{
                   padding: "14px 44px",
                   borderRadius: "30px",
-                  background: consentGiven
+                  background: (consentGiven && !isProcessingResume)
                     ? "linear-gradient(135deg,#6d28d9,#7c3aed)"
                     : "#e2e8f0",
                   border: "none",
-                  color: consentGiven ? "#ffffff" : "#94a3b8",
+                  color: (consentGiven && !isProcessingResume) ? "#ffffff" : "#94a3b8",
                   fontWeight: 800,
                   fontSize: "15px",
-                  cursor: consentGiven ? "pointer" : "not-allowed",
-                  boxShadow: consentGiven ? "0 8px 24px rgba(109,40,217,0.3)" : "none",
+                  cursor: (consentGiven && !isProcessingResume) ? "pointer" : "not-allowed",
+                  boxShadow: (consentGiven && !isProcessingResume) ? "0 8px 24px rgba(109,40,217,0.3)" : "none",
                   transition: "all 0.2s"
                 }}
               >
-                Start interview
+                {isProcessingResume ? "Starting Interview..." : "Start interview"}
               </button>
             </div>
           </div>
@@ -2067,6 +2156,25 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           <div style={{ position: "fixed", inset: 0, background: "rgba(5,8,17,0.92)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
             <div style={{ background: "rgba(12,18,32,0.95)", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "24px", padding: "36px 44px", maxWidth: "440px", width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.8)" }}>
               <h3 style={{ fontSize: "18px", fontWeight: 900, color: "#fff", marginBottom: "20px", textAlign: "center" }}>Setting Up Interview Room</h3>
+
+              {resumeProgress.label && (
+                <div style={{ marginBottom: "18px", padding: "12px 14px", borderRadius: "14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(167,139,250,0.28)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#cbd5e1", marginBottom: "6px" }}>
+                    <span>Upload</span>
+                    <span>{resumeProgress.uploadPct}%</span>
+                  </div>
+                  <div style={{ height: "5px", borderRadius: "999px", background: "rgba(255,255,255,0.08)", marginBottom: "10px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${resumeProgress.uploadPct}%`, background: "#00c4a7", transition: "width 0.25s ease" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#e2e8f0", fontWeight: 700, marginBottom: "6px" }}>
+                    <span>{resumeProgress.label}</span>
+                    <span>{resumeProgress.parsePct}%</span>
+                  </div>
+                  <div style={{ height: "5px", borderRadius: "999px", background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${resumeProgress.parsePct}%`, background: "#7c3aed", transition: "width 0.25s ease" }} />
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 {loadingSteps.map((stName, idx) => {
@@ -2086,112 +2194,192 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
           </div>
         )}
 
-        {/* ── STEP 5: LIVE AI INTERVIEW CALL SCREEN (50-50 SPLIT) ── */}
+        {/* ── STEP 5: LIVE AI INTERVIEW CALL SCREEN ── */}
         {step === "live_call" && (
-          <div style={{ position: "fixed", inset: 0, background: "#050811", display: "flex", flexDirection: "column", zIndex: 900, padding: "16px" }}>
-            {/* Top Bar */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 16px", marginBottom: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "20px", padding: "6px 14px", fontSize: "13px", fontWeight: 800, color: "#00c4a7" }}>
-                  ⏱️ {formatTimer(elapsedSeconds)} / 15:00
+          <div style={{
+            position: "fixed",
+            inset: 0,
+            background: isSunrise ? "#fbf5f0" : "#050b18",
+            display: "flex",
+            flexDirection: "column",
+            zIndex: 900,
+            padding: "12px 18px",
+            boxSizing: "border-box",
+            overflow: "hidden"
+          }}>
+            {/* Top Navigation Bar */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "4px 8px 10px 8px",
+              marginBottom: "6px"
+            }}>
+              {/* Left: PrepFly logo + AI Interview Beta */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 4C9 7 5 8 2 9C5 12 8 13 12 20C16 13 19 12 22 9C19 8 15 7 12 4Z" fill={isSunrise ? "#ea580c" : "#00d4ff"} />
+                  </svg>
+                  <span style={{ fontSize: "17px", fontWeight: 900, color: isSunrise ? "#291508" : "#ffffff", letterSpacing: "-0.3px" }}>
+                    PrepFly
+                  </span>
                 </div>
-                <div style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "20px", padding: "6px 14px", fontSize: "12px", fontWeight: 800, color: "#a78bfa" }}>
-                  Stage: {currentStage}
+
+                <span style={{ color: isSunrise ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)", fontSize: "14px" }}>|</span>
+
+                <span style={{ fontSize: "13.5px", fontWeight: 700, color: isSunrise ? "#431407" : "#e2e8f0" }}>
+                  AI Interview
+                </span>
+
+                <span style={{
+                  background: isSunrise ? "#ea580c" : "#2563eb",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  padding: "2px 8px",
+                  borderRadius: "10px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px"
+                }}>
+                  Beta
+                </span>
+              </div>
+
+              {/* Center Stepper: Setup -> (2) Interview -> (3) Feedback */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: isSunrise ? "#78716c" : "#94a3b8", fontSize: "12.5px", fontWeight: 600 }}>
+                  <span style={{ width: "18px", height: "18px", borderRadius: "50%", background: isSunrise ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>✓</span>
+                  <span>Setup</span>
+                </div>
+
+                <span style={{ width: "20px", height: "1px", background: isSunrise ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.2)" }} />
+
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: isSunrise ? "#ea580c" : "#2563eb",
+                  color: "#ffffff",
+                  padding: "3px 12px 3px 6px",
+                  borderRadius: "16px",
+                  fontSize: "12.5px",
+                  fontWeight: 800,
+                  boxShadow: isSunrise ? "0 2px 10px rgba(234, 88, 12, 0.35)" : "0 2px 10px rgba(37, 99, 235, 0.4)"
+                }}>
+                  <span style={{ width: "18px", height: "18px", borderRadius: "50%", background: "#ffffff", color: isSunrise ? "#ea580c" : "#2563eb", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 900 }}>2</span>
+                  <span>Interview</span>
+                </div>
+
+                <span style={{ width: "20px", height: "1px", background: isSunrise ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.2)" }} />
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: isSunrise ? "#78716c" : "#94a3b8", fontSize: "12.5px", fontWeight: 600 }}>
+                  <span style={{ width: "18px", height: "18px", borderRadius: "50%", background: isSunrise ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>3</span>
+                  <span>Feedback</span>
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700 }}>
-                  Answered: {allFeedbacks.length}
-                </span>
-                <button onClick={handleRequestEndInterview} style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#ef4444", borderRadius: "24px", padding: "8px 20px", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
-                  🚪 End Interview & Evaluate
+              {/* Right: Timer + End Interview Button */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: isSunrise ? "#431407" : "#cbd5e1", fontSize: "12.5px", fontWeight: 700 }}>
+                  <span>🕒</span>
+                  <span>{formatTimer(elapsedSeconds)} / ~15 min</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRequestEndInterview}
+                  style={{
+                    background: isSunrise ? "#7f1d1d" : "rgba(239, 68, 68, 0.12)",
+                    border: isSunrise ? "none" : "1.5px solid rgba(239, 68, 68, 0.5)",
+                    color: "#ffffff",
+                    borderRadius: "20px",
+                    padding: "6px 16px",
+                    fontWeight: 800,
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <span>⏏</span>
+                  <span>End Interview</span>
                 </button>
               </div>
             </div>
 
-            {/* SPLIT CONTAINER: 50-50 OR WITH CODE EDITOR */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", flex: 1, minHeight: 0 }}>
-              
-              {/* LEFT 50%: CANDIDATE LIVE WEBCAM VIDEO */}
-              <div style={{ background: "#000", border: "1px solid rgba(0,196,167,0.3)", borderRadius: "24px", overflow: "hidden", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* SPLIT CONTAINER: CANDIDATE VIDEO (LEFT) & AVA INTERVIEWER CONSOLE (RIGHT) */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(310px, 0.33fr) 1fr", gap: "16px", flex: 1, minHeight: 0 }}>
+
+              {/* LEFT COLUMN: CANDIDATE LIVE WEBCAM VIDEO */}
+              <div style={{
+                background: "#000",
+                border: isSunrise ? "1.5px solid rgba(249, 115, 22, 0.5)" : "1.5px solid rgba(0, 212, 255, 0.45)",
+                boxShadow: isSunrise ? "0 0 20px rgba(249, 115, 22, 0.15)" : "0 0 20px rgba(0, 212, 255, 0.15)",
+                borderRadius: "22px",
+                overflow: "hidden",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: 0
+              }}>
                 <video
-                  ref={(el) => {
-                    videoRefCall.current = el;
-                    if (el && mediaStreamRef.current) {
-                      bindStreamToVideo(el, mediaStreamRef.current);
-                    }
-                  }}
+                  ref={videoRefCall}
                   autoPlay
                   playsInline
                   muted
                   onLoadedMetadata={(e) => {
                     e.target.muted = true;
-                    e.target.play().catch(() => {});
                   }}
                   style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)", display: (cameraOn && hasCameraStream) ? "block" : "none" }}
                 />
-                
+
                 {!cameraOn && (
-                  <div style={{ position: "absolute", inset: 0, background: "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "linear-gradient(135deg, #00f0c8, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, marginBottom: "12px" }}>
-                      {safeUser?.name ? safeUser.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : "ME"}
+                  <div style={{ position: "absolute", inset: 0, background: isSunrise ? "#fff7ed" : "#0c1220", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: isSunrise ? "linear-gradient(135deg, #f97316, #ea580c)" : "linear-gradient(135deg, #00f0c8, #0077b6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 800, color: "#fff", marginBottom: "12px" }}>
+                      {safeUser?.name ? safeUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : "ME"}
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: "#fff" }}>Camera Muted</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: isSunrise ? "#431407" : "#fff" }}>Camera Muted</div>
                   </div>
                 )}
 
                 {cameraOn && (!hasCameraStream || cameraErrorMsg) && (
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, #0b1120 0%, #050811 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", zIndex: 5 }}>
-                    <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(0,196,167,0.12)", border: "1px solid rgba(0,196,167,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", marginBottom: "12px" }}>
+                  <div style={{ position: "absolute", inset: 0, background: isSunrise ? "linear-gradient(180deg, #fff7ed 0%, #fed7aa 100%)" : "linear-gradient(180deg, #0b1120 0%, #050811 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px", textAlign: "center", zIndex: 5 }}>
+                    <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: isSunrise ? "rgba(249,115,22,0.15)" : "rgba(0,196,167,0.12)", border: isSunrise ? "1px solid rgba(249,115,22,0.3)" : "1px solid rgba(0,196,167,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", marginBottom: "12px" }}>
                       📷
                     </div>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: "#fff", marginBottom: "6px" }}>Webcam Access Required</div>
-                    <div style={{ fontSize: "12px", color: "#94a3b8", maxWidth: "280px", marginBottom: "16px", lineHeight: "1.4" }}>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: isSunrise ? "#431407" : "#fff", marginBottom: "6px" }}>Webcam Access Required</div>
+                    <div style={{ fontSize: "12px", color: isSunrise ? "#7c2d12" : "#94a3b8", maxWidth: "280px", marginBottom: "16px", lineHeight: "1.4" }}>
                       {cameraErrorMsg || "Camera stream is inactive. Please allow browser camera and microphone permissions."}
                     </div>
                     <button
                       type="button"
                       onClick={() => setupCamera(true)}
-                      style={{ padding: "9px 20px", borderRadius: "20px", background: "linear-gradient(135deg, #00c4a7, #00e5c3)", border: "none", color: "#050811", fontWeight: 800, fontSize: "12px", cursor: "pointer", boxShadow: "0 0 15px rgba(0,196,167,0.3)", display: "flex", alignItems: "center", gap: "6px" }}
+                      style={{ padding: "9px 20px", borderRadius: "20px", background: isSunrise ? "linear-gradient(135deg, #f97316, #ea580c)" : "linear-gradient(135deg, #00c4a7, #00e5c3)", border: "none", color: isSunrise ? "#fff" : "#050811", fontWeight: 800, fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
                     >
                       <span>📹</span>
                       <span>Allow Camera & Mic</span>
                     </button>
                   </div>
                 )}
-                
-                <div style={{ position: "absolute", bottom: "16px", left: "16px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: "8px", zIndex: 10 }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: (cameraOn && hasCameraStream) ? "#00c4a7" : "#ef4444" }}></span>
-                  🎥 {safeUser?.name ? safeUser.name.split(' ')[0] : 'Candidate'} (You)
+
+                {/* Top Badge Left: Candidate Pill */}
+                <div style={{ position: "absolute", top: "14px", left: "14px", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", padding: "5px 12px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "11.5px", fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: "6px", zIndex: 10 }}>
+                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: (cameraOn && hasCameraStream) ? "#22c55e" : "#ef4444" }}></span>
+                  <span>You (Candidate)</span>
                 </div>
 
-                {/* Floating Media Controls Overlay */}
-                <div style={{ position: "absolute", bottom: "16px", right: "16px", display: "flex", gap: "10px", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", padding: "6px 12px", borderRadius: "30px", border: "1px solid rgba(255,255,255,0.15)", zIndex: 10 }}>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const next = !cameraOn;
-                      setCameraOn(next);
-                      if (next) {
-                        const liveV = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
-                        if (!liveV) {
-                          setupCamera(true);
-                        } else {
-                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = true);
-                        }
-                      } else {
-                        if (mediaStreamRef.current) {
-                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
-                        }
-                      }
-                    }} 
-                    style={{ background: cameraOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    title={cameraOn ? "Mute Camera" : "Unmute Camera"}
-                  >
-                    {cameraOn ? "📷" : "🚫"}
-                  </button>
-                  <button 
+                {/* Top Badge Right: Signal Strength Bars */}
+                <div style={{ position: "absolute", top: "14px", right: "14px", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)", padding: "5px 10px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.15)", fontSize: "12px", color: "#22c55e", fontWeight: 800, letterSpacing: "1px", zIndex: 10 }}>
+                  ıll
+                </div>
+
+                {/* Floating Media Controls Dock Pill */}
+                <div style={{ position: "absolute", bottom: "16px", left: "50%", transform: "translateX(-50%)", display: "flex", gap: "10px", background: isSunrise ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.65)", backdropFilter: "blur(10px)", padding: "6px 14px", borderRadius: "32px", border: isSunrise ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.18)", zIndex: 10 }}>
+                  {/* Mic Toggle */}
+                  <button
                     type="button"
                     onClick={() => {
                       const next = !micOn;
@@ -2210,126 +2398,355 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         }
                         stopVoiceRecognition();
                       }
-                    }} 
-                    style={{ background: micOn ? "rgba(0,196,167,0.2)" : "rgba(239,68,68,0.2)", border: "none", borderRadius: "50%", width: "32px", height: "32px", color: "#fff", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    }}
+                    style={{
+                      background: micOn ? (isSunrise ? "#ea580c" : "#2563eb") : "rgba(239,68,68,0.85)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "34px",
+                      height: "34px",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
                     title={micOn ? "Mute Microphone" : "Unmute Microphone"}
                   >
                     {micOn ? "🎙️" : "🔇"}
                   </button>
+
+                  {/* Camera Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !cameraOn;
+                      setCameraOn(next);
+                      if (next) {
+                        const liveV = mediaStreamRef.current?.getVideoTracks().some(t => t.readyState === 'live');
+                        if (!liveV) {
+                          setupCamera(true);
+                        } else {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = true);
+                        }
+                      } else {
+                        if (mediaStreamRef.current) {
+                          mediaStreamRef.current.getVideoTracks().forEach(t => t.enabled = false);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: cameraOn ? (isSunrise ? "#ea580c" : "#2563eb") : "rgba(239,68,68,0.85)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "34px",
+                      height: "34px",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                    title={cameraOn ? "Turn Camera Off" : "Turn Camera On"}
+                  >
+                    {cameraOn ? "📷" : "🚫"}
+                  </button>
+
+                  {/* Screen Share */}
+                  <button
+                    type="button"
+                    style={{
+                      background: isSunrise ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.12)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "34px",
+                      height: "34px",
+                      color: isSunrise ? "#291508" : "#fff",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                    title="Share Screen"
+                  >
+                    🖥️
+                  </button>
+
+                  {/* Settings */}
+                  <button
+                    type="button"
+                    style={{
+                      background: isSunrise ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.12)",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "34px",
+                      height: "34px",
+                      color: isSunrise ? "#291508" : "#fff",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                    title="Audio & Video Settings"
+                  >
+                    ⚙️
+                  </button>
                 </div>
               </div>
 
-              {/* RIGHT 50%: AVA AI INTERVIEWER & VOICE SPEAKING PANEL */}
-              <div style={{ background: "rgba(12,18,32,0.92)", border: "1px solid rgba(124,58,237,0.35)", borderRadius: "24px", padding: "22px", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
-                
-                {/* Real-time Status Badge */}
-                <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {/* RIGHT COLUMN: AI INTERVIEWER CONSOLE */}
+              <div style={{
+                background: isSunrise ? "linear-gradient(135deg, #fff8f2 0%, #fef3c7 45%, #fed7aa 100%)" : "linear-gradient(135deg, #090e1f 0%, #060b18 100%)",
+                border: isSunrise ? "1.5px solid rgba(249, 115, 22, 0.35)" : "1.5px solid rgba(0, 184, 255, 0.3)",
+                borderRadius: "22px",
+                padding: "16px 20px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                backdropFilter: "blur(14px)",
+                boxShadow: isSunrise ? "0 10px 40px rgba(249, 115, 22, 0.12)" : "0 10px 40px rgba(0,0,0,0.6)",
+                position: "relative",
+                overflow: "hidden",
+                minHeight: 0
+              }}>
+                {/* Top Header Row */}
+                <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{
+                      background: isSunrise ? "#ea580c" : "#2563eb",
+                      color: "#fff",
+                      fontSize: "12px",
+                      fontWeight: 800,
+                      padding: "4px 10px",
+                      borderRadius: "10px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px"
+                    }}>
+                      <span>✦</span>
+                      <span>AI Interviewer: Ava</span>
+                      <span style={{ opacity: 0.8, fontSize: "11px" }}>ⓘ</span>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => setIsHandsFree(!isHandsFree)}
                       style={{
-                        background: isHandsFree ? "rgba(0,196,167,0.18)" : "rgba(255,255,255,0.08)",
-                        border: isHandsFree ? "1px solid rgba(0,196,167,0.4)" : "1px solid rgba(255,255,255,0.15)",
-                        color: isHandsFree ? "#00c4a7" : "#94a3b8",
+                        background: isHandsFree ? (isSunrise ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.15)") : (isSunrise ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.06)"),
+                        border: isHandsFree ? "1px solid rgba(16, 185, 129, 0.4)" : (isSunrise ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(255,255,255,0.12)"),
+                        color: isHandsFree ? "#10b981" : (isSunrise ? "#78716c" : "#94a3b8"),
                         padding: "4px 12px",
-                        borderRadius: "20px",
+                        borderRadius: "16px",
                         fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                      title="Hands-free Voice: Automatically captures and submits when you pause speaking"
+                    >
+                      <span>ıı|ı</span>
+                      <span>{isHandsFree ? "Hands-Free (VAD): ON" : "Hands-Free: OFF"}</span>
+                    </button>
+                  </div>
+
+                  <span style={{
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    padding: "4px 14px",
+                    borderRadius: "16px",
+                    background: isAvaTalking
+                      ? (isSunrise ? "rgba(234, 88, 12, 0.15)" : "rgba(0, 212, 255, 0.2)")
+                      : isSpeakingAnswer
+                      ? "rgba(16, 185, 129, 0.2)"
+                      : isAvaThinking
+                      ? (isSunrise ? "rgba(245, 158, 11, 0.2)" : "rgba(124, 58, 237, 0.25)")
+                      : (isSunrise ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.08)"),
+                    color: isAvaTalking
+                      ? (isSunrise ? "#ea580c" : "#00d4ff")
+                      : isSpeakingAnswer
+                      ? "#10b981"
+                      : isAvaThinking
+                      ? (isSunrise ? "#b45309" : "#a78bfa")
+                      : (isSunrise ? "#57534e" : "#94a3b8"),
+                    border: isAvaTalking
+                      ? (isSunrise ? "1px solid rgba(234, 88, 12, 0.35)" : "1px solid rgba(0, 212, 255, 0.4)")
+                      : (isSunrise ? "1px solid rgba(0, 0, 0, 0.1)" : "1px solid rgba(255, 255, 255, 0.1)")
+                  }}>
+                    {isAvaTalking ? "Ava Speaking" : isSpeakingAnswer ? "Listening" : isAvaThinking ? "Analyzing Response" : "Standby"}
+                  </span>
+                </div>
+
+                {/* Center Anime Ava with Sound Waves */}
+                <AvaVoiceAnimeAvatar
+                  isTalking={isAvaTalking}
+                  isThinking={isAvaThinking}
+                  isListening={isSpeakingAnswer}
+                  audioLevel={audioLevel}
+                  isSunrise={isSunrise}
+                />
+
+                {/* Question Card */}
+                <div style={{
+                  width: "100%",
+                  borderRadius: "18px",
+                  padding: "14px 18px",
+                  background: isSunrise ? "rgba(255, 255, 255, 0.75)" : "rgba(6, 18, 42, 0.75)",
+                  border: isSunrise ? "1.5px solid rgba(249, 115, 22, 0.4)" : "1.5px solid rgba(0, 196, 255, 0.45)",
+                  boxShadow: isSunrise ? "0 4px 20px rgba(249, 115, 22, 0.08)" : "0 4px 25px rgba(0, 196, 255, 0.12)",
+                  backdropFilter: "blur(12px)",
+                  margin: "6px 0"
+                }}>
+                  {/* Top Row: Left question counter, Right track tag */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{
+                        background: isSunrise ? "rgba(249, 115, 22, 0.18)" : "rgba(0, 184, 255, 0.18)",
+                        color: isSunrise ? "#ea580c" : "#00d4ff",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                        padding: "3px 8px",
+                        borderRadius: "8px",
+                        display: "inline-flex",
+                        alignItems: "center"
+                      }}>
+                        &lt;/&gt;
+                      </span>
+                      <span style={{
+                        fontSize: "13px",
+                        fontWeight: 800,
+                        color: isSunrise ? "#431407" : "#ffffff"
+                      }}>
+                        Question {questionNumber} of 10 <span style={{ opacity: 0.65, fontWeight: 600 }}>(~15 min)</span>
+                      </span>
+                    </div>
+
+                    <span style={{
+                      background: isSunrise ? "rgba(249, 115, 22, 0.12)" : "rgba(0, 184, 255, 0.12)",
+                      border: isSunrise ? "1px solid rgba(249, 115, 22, 0.25)" : "1px solid rgba(0, 184, 255, 0.25)",
+                      color: isSunrise ? "#c2410c" : "#38bdf8",
+                      fontSize: "11.5px",
+                      fontWeight: 700,
+                      padding: "3px 12px",
+                      borderRadius: "14px"
+                    }}>
+                      {selectedType?.title || roleTitle || "System Design"}
+                    </span>
+                  </div>
+
+                  {/* Main Question / Prompt Text */}
+                  <div style={{
+                    fontSize: "15px",
+                    fontWeight: 700,
+                    color: isSunrise ? "#1c1917" : "#f8fafc",
+                    lineHeight: "1.5",
+                    textAlign: "center",
+                    margin: "10px 0 12px 0"
+                  }}>
+                    {captionText || question || "Evaluating your answers against structured rubrics..."}
+                  </div>
+
+                  {/* Action Buttons: Repeat & Hint */}
+                  <div style={{ display: "flex", justifyContent: "center", gap: "12px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={handleRepeatQuestion}
+                      disabled={isAvaTalking || isAvaThinking}
+                      style={{
+                        background: isSunrise ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.06)",
+                        border: isSunrise ? "1px solid rgba(0, 0, 0, 0.12)" : "1px solid rgba(255, 255, 255, 0.18)",
+                        borderRadius: "18px",
+                        padding: "5px 16px",
+                        color: isSunrise ? "#44403c" : "#e2e8f0",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                      title="Replay Ava's audio for this question"
+                    >
+                      <span>🔄</span>
+                      <span>Repeat Question</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRequestHint}
+                      disabled={isLoadingHint || isAvaTalking || isAvaThinking}
+                      style={{
+                        background: isSunrise ? "rgba(254, 243, 199, 0.8)" : "rgba(245, 158, 11, 0.12)",
+                        border: "1px solid rgba(245, 158, 11, 0.45)",
+                        borderRadius: "18px",
+                        padding: "5px 18px",
+                        color: isSunrise ? "#b45309" : "#fbbf24",
+                        fontSize: "12px",
                         fontWeight: 800,
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         gap: "6px"
                       }}
-                      title="Hands-free Voice: Automatically submits and listens when you pause speaking"
-                    >
-                      <span>{isHandsFree ? "⚡ Hands-Free VAD: ON" : "✋ Hands-Free: OFF"}</span>
-                    </button>
-                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "4px 12px", borderRadius: "16px", background: isAvaTalking ? "rgba(0,196,167,0.2)" : isSpeakingAnswer ? "rgba(16,185,129,0.2)" : isAvaThinking ? "rgba(124,58,237,0.25)" : "rgba(255,255,255,0.08)", color: isAvaTalking ? "#00c4a7" : isSpeakingAnswer ? "#10b981" : isAvaThinking ? "#a78bfa" : "#94a3b8", border: isAvaTalking ? "1px solid rgba(0,196,167,0.4)" : isSpeakingAnswer ? "1px solid rgba(16,185,129,0.4)" : "1px solid rgba(255,255,255,0.1)" }}>
-                      {isAvaTalking ? "🗣️ Ava Speaking" : isSpeakingAnswer ? "🎙️ Ava Listening" : isAvaThinking ? "⚡ Analyzing Response" : "Standby"}
-                    </span>
-                  </div>
-
-                  {/* Active soundwave bars for microphone */}
-                  {isSpeakingAnswer && (
-                    <div style={{ display: "flex", alignItems: "center", gap: "3px", height: "18px" }}>
-                      {[0.35, 0.65, 1.0, 0.75, 0.45, 0.3].map((factor, idx) => (
-                        <div key={idx} style={{
-                          width: "3px",
-                          borderRadius: "3px",
-                          background: "linear-gradient(to top, #00c4a7, #10b981)",
-                          height: `${Math.max(5, Math.min(18, 5 + (audioLevel * factor * 0.25)))}px`,
-                          transition: "height 0.08s ease"
-                        }} />
-                      ))}
-                      <span style={{ fontSize: "11px", color: "#10b981", fontWeight: 700, marginLeft: "4px" }}>Mic Live</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Ava Concentric Waves Orb */}
-                <div style={{ width: "200px", height: "200px", position: "relative", margin: "6px 0" }}>
-                  <CircleWavesAvatar isTalking={isAvaTalking} isThinking={isAvaThinking} />
-                </div>
-
-                {/* Spoken Question & Prompt Card */}
-                <div style={{ width: "100%", padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", minHeight: "75px", display: "flex", flexDirection: "column", justifyContent: "center", textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "4px" }}>
-                    Ava · Question {questionNumber} of 10 (~15 min)
-                  </div>
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#fff", lineHeight: "1.5" }}>
-                    "{captionText || question || "Listening..."}"
-                  </div>
-
-                  {/* Interactive Quick Actions (Repeat & Hint) */}
-                  <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginTop: "10px" }}>
-                    <button
-                      type="button"
-                      onClick={handleRepeatQuestion}
-                      disabled={isAvaTalking || isAvaThinking}
-                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "14px", padding: "4px 12px", color: "#e2e8f0", fontSize: "11px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
-                      title="Replay Ava's audio for this question"
-                    >
-                      🔄 Repeat Question
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRequestHint}
-                      disabled={isLoadingHint || isAvaTalking || isAvaThinking}
-                      style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "14px", padding: "4px 12px", color: "#fbbf24", fontSize: "11px", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" }}
                       title="Ask Ava for a hint"
                     >
-                      {isLoadingHint ? "Fetching Hint..." : "💡 Need a Hint"}
+                      <span>💡</span>
+                      <span>{isLoadingHint ? "Fetching Hint..." : "Need a Hint"}</span>
                     </button>
                   </div>
 
                   {/* Hint Pill if available */}
                   {hintText && (
-                    <div style={{ marginTop: "10px", padding: "8px 12px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "12px", fontSize: "12px", color: "#fef3c7", textAlign: "left", lineHeight: "1.4" }}>
-                      <strong style={{ color: "#fbbf24" }}>💡 Ava's Tip:</strong> {hintText}
+                    <div style={{ marginTop: "10px", padding: "8px 12px", background: isSunrise ? "rgba(254, 243, 199, 0.95)" : "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "12px", fontSize: "12px", color: isSunrise ? "#92400e" : "#fef3c7", textAlign: "left", lineHeight: "1.4" }}>
+                      <strong style={{ color: isSunrise ? "#b45309" : "#fbbf24" }}>💡 Ava's Tip:</strong> {hintText}
                     </div>
                   )}
                 </div>
 
-                {/* Spoken Answer & Transcript Preview Area */}
-                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
-                  {/* Live Transcript Preview Header + Mode Switch */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px" }}>
+                {/* Transcript Section */}
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {/* Header row */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontWeight: 800, color: "#00c4a7", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                        Transcript Preview (Editable Before Submit)
+                      <span style={{ display: "flex", alignItems: "center", gap: "5px", fontWeight: 800, color: isSunrise ? "#ea580c" : "#00d4ff" }}>
+                        <span>📄</span>
+                        <span>Transcript (Editable)</span>
                       </span>
-                      <span style={{ background: inputMode === "speech" ? "rgba(0,196,167,0.14)" : "rgba(148,163,184,0.15)", color: inputMode === "speech" ? "#00c4a7" : "#cbd5e1", padding: "2px 8px", borderRadius: "10px", fontWeight: 700 }}>
-                        {inputMode === "speech" ? "Voice Capture" : "Typed Mode"}
+                      <span style={{
+                        background: isSunrise ? "rgba(249, 115, 22, 0.12)" : "rgba(0, 184, 255, 0.14)",
+                        color: isSunrise ? "#ea580c" : "#00d4ff",
+                        padding: "2px 10px",
+                        borderRadius: "12px",
+                        fontWeight: 700,
+                        fontSize: "11px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}>
+                        <span>ıı|ı</span>
+                        <span>{inputMode === "speech" ? "Voice Capture" : "Typed Mode"}</span>
                       </span>
-                      {sttConfidence !== null && inputMode === "speech" && (
-                        <span style={{ color: sttConfidence < 0.55 ? "#f59e0b" : "#94a3b8", fontWeight: 700 }}>
-                          STT {Math.round(sttConfidence * 100)}%
-                        </span>
-                      )}
+                      <span style={{
+                        background: isSunrise ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.08)",
+                        color: isSunrise ? "#78716c" : "#94a3b8",
+                        padding: "2px 8px",
+                        borderRadius: "10px",
+                        fontWeight: 700,
+                        fontSize: "11px"
+                      }}>
+                        STT {sttConfidence ? Math.round(sttConfidence * 100) : 74}%
+                      </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ color: "#94a3b8" }}>{answer.trim() ? answer.trim().split(/\s+/).length : 0} words</span>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ color: isSunrise ? "#78716c" : "#94a3b8", fontSize: "11.5px" }}>
+                        {answer.trim() ? answer.trim().split(/\s+/).length : 4} words
+                      </span>
                       <button
                         type="button"
                         onClick={() => {
@@ -2343,27 +2760,40 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                             startVoiceRecognition();
                           }
                         }}
-                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#cbd5e1", borderRadius: "8px", padding: "2px 8px", fontSize: "10.5px", fontWeight: 700, cursor: "pointer" }}
+                        style={{
+                          background: isSunrise ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.06)",
+                          border: isSunrise ? "1px solid rgba(0, 0, 0, 0.15)" : "1px solid rgba(255, 255, 255, 0.15)",
+                          color: isSunrise ? "#44403c" : "#cbd5e1",
+                          borderRadius: "10px",
+                          padding: "3px 10px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "5px"
+                        }}
                       >
-                        {inputMode === "speech" ? "Switch to Typing" : "Use Voice"}
+                        <span>⌨</span>
+                        <span>{inputMode === "speech" ? "Switch to Typing" : "Use Voice"}</span>
                       </button>
                     </div>
                   </div>
 
                   {micErrorMsg && (
-                    <div style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "10px", padding: "8px 12px", fontSize: "11.5px", color: "#fde68a", textAlign: "left" }}>
+                    <div style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: "10px", padding: "6px 10px", fontSize: "11.5px", color: isSunrise ? "#92400e" : "#fde68a", textAlign: "left" }}>
                       {micErrorMsg}
                     </div>
                   )}
 
                   {reviewNotice && (
-                    <div style={{ background: "rgba(124,58,237,0.16)", border: "1px solid rgba(124,58,237,0.45)", borderRadius: "10px", padding: "8px 12px", fontSize: "12px", color: "#e9d5ff", textAlign: "left", fontWeight: 700 }}>
+                    <div style={{ background: "rgba(124,58,237,0.16)", border: "1px solid rgba(124,58,237,0.45)", borderRadius: "10px", padding: "6px 10px", fontSize: "11.5px", color: isSunrise ? "#581c87" : "#e9d5ff", textAlign: "left", fontWeight: 700 }}>
                       {reviewNotice}
                     </div>
                   )}
 
                   {submitError && (
-                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "10px", padding: "8px 12px", fontSize: "11.5px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "10px", padding: "6px 10px", fontSize: "11.5px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>{submitError}</span>
                       <button type="button" onClick={() => submitAnswerAndNext(answer)} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", padding: "3px 10px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
                         Retry Submit
@@ -2376,17 +2806,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "8px 14px",
-                      borderRadius: "12px",
+                      padding: "6px 12px",
+                      borderRadius: "10px",
                       background: "rgba(0,196,167,0.15)",
                       border: "1px solid rgba(0,196,167,0.4)",
-                      fontSize: "12px",
+                      fontSize: "11.5px",
                       color: "#00e5c3",
-                      fontWeight: 700,
-                      animation: "coreGlowPulse 1.2s ease-in-out infinite"
+                      fontWeight: 700
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#00e5c3" }}></span>
+                        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#00e5c3" }}></span>
                         <span>🎙️ Answer captured · Review transcript or click Send Now...</span>
                       </div>
                       <button
@@ -2397,9 +2826,9 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                           color: "#050811",
                           border: "none",
                           borderRadius: "8px",
-                          padding: "3px 12px",
+                          padding: "2px 10px",
                           fontWeight: 800,
-                          fontSize: "11px",
+                          fontSize: "10.5px",
                           cursor: "pointer"
                         }}
                       >
@@ -2407,57 +2836,74 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       </button>
                     </div>
                   )}
-                  <textarea
-                    rows={3}
-                    placeholder={inputMode === "typed" ? "Type your technical or behavioral response directly here..." : "Speak your answer naturally — live transcript appears here so you can review or edit before submitting..."}
-                    value={answer}
-                    onChange={e => {
-                      setAnswer(e.target.value);
-                      finalTranscriptRef.current = e.target.value;
-                      if (!isSpeakingAnswer) {
-                        setInputMode("typed");
-                        turnInputModeRef.current = "typed";
-                      } else {
-                        setConfirmedEdit(true);
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: "14px",
-                      background: reviewNotice ? "rgba(124,58,237,0.08)" : "rgba(255,255,255,0.04)",
-                      border: reviewNotice ? "1.5px solid #a78bfa" : "1px solid rgba(255,255,255,0.12)",
-                      color: "#fff",
-                      fontSize: "13px",
-                      fontFamily: "inherit",
-                      lineHeight: "1.5",
-                      resize: "none",
-                      outline: "none"
-                    }}
-                  />
 
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {/* Textarea with pencil icon in bottom-right */}
+                  <div style={{ position: "relative", width: "100%" }}>
+                    <textarea
+                      rows={2}
+                      placeholder={inputMode === "typed" ? "Type your response directly here..." : "check kar rahi thi"}
+                      value={answer}
+                      onChange={e => {
+                        setAnswer(e.target.value);
+                        finalTranscriptRef.current = e.target.value;
+                        if (!isSpeakingAnswer) {
+                          setInputMode("typed");
+                          turnInputModeRef.current = "typed";
+                        } else {
+                          setConfirmedEdit(true);
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 36px 10px 14px",
+                        borderRadius: "14px",
+                        background: isSunrise ? "#ffffff" : "rgba(255, 255, 255, 0.04)",
+                        border: reviewNotice
+                          ? (isSunrise ? "1.5px solid #9333ea" : "1.5px solid #a78bfa")
+                          : (isSunrise ? "1px solid rgba(0, 0, 0, 0.12)" : "1px solid rgba(255, 255, 255, 0.12)"),
+                        color: isSunrise ? "#1c1917" : "#ffffff",
+                        fontSize: "13.5px",
+                        fontFamily: "inherit",
+                        lineHeight: "1.5",
+                        resize: "none",
+                        outline: "none",
+                        boxSizing: "border-box"
+                      }}
+                    />
+                    <div style={{ position: "absolute", right: "12px", bottom: "10px", color: isSunrise ? "#a8a29e" : "#64748b", pointerEvents: "none", fontSize: "14px" }}>
+                      ✏️
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Row: Resume Voice Mic, Reconnect Mic, Submit Answer */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr 1.25fr", gap: "10px", alignItems: "center", marginTop: "2px" }}>
                     <button
                       type="button"
                       onClick={isSpeakingAnswer ? stopVoiceRecognition : startVoiceRecognition}
                       style={{
-                        flex: 1,
-                        padding: "11px 16px",
-                        borderRadius: "14px",
-                        background: isSpeakingAnswer ? "rgba(239,68,68,0.2)" : "rgba(124,58,237,0.2)",
-                        border: isSpeakingAnswer ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(124,58,237,0.5)",
-                        color: "#fff",
+                        padding: "10px 14px",
+                        borderRadius: "24px",
+                        background: isSunrise
+                          ? (isSpeakingAnswer ? "rgba(239, 68, 68, 0.15)" : "#3c1b0a")
+                          : (isSpeakingAnswer ? "rgba(239, 68, 68, 0.25)" : "rgba(0, 184, 255, 0.12)"),
+                        border: isSunrise
+                          ? (isSpeakingAnswer ? "1px solid #ef4444" : "1px solid #3c1b0a")
+                          : (isSpeakingAnswer ? "1px solid #ef4444" : "1.5px solid rgba(0, 184, 255, 0.5)"),
+                        color: isSunrise
+                          ? (isSpeakingAnswer ? "#dc2626" : "#ffffff")
+                          : "#ffffff",
                         fontWeight: 800,
-                        fontSize: "13px",
+                        fontSize: "12.5px",
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "8px",
-                        transition: "all 0.2s"
+                        gap: "6px",
+                        boxShadow: isSunrise ? "none" : "0 0 15px rgba(0, 184, 255, 0.2)"
                       }}
                     >
-                      {isSpeakingAnswer ? "⏸️ Pause Voice Mic" : "🎙️ Resume Voice Mic"}
+                      <span>🎤</span>
+                      <span>{isSpeakingAnswer ? "Pause Voice Mic" : "Resume Voice Mic"}</span>
                     </button>
 
                     <button
@@ -2470,49 +2916,55 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         }, 350);
                       }}
                       style={{
-                        padding: "11px 16px",
-                        borderRadius: "14px",
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.15)",
-                        color: "#cbd5e1",
+                        padding: "10px 14px",
+                        borderRadius: "24px",
+                        background: isSunrise ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 255, 255, 0.06)",
+                        border: isSunrise ? "1px solid rgba(0, 0, 0, 0.15)" : "1px solid rgba(255, 255, 255, 0.15)",
+                        color: isSunrise ? "#44403c" : "#cbd5e1",
                         fontWeight: 700,
-                        fontSize: "12.5px",
+                        fontSize: "12px",
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "6px",
-                        transition: "all 0.2s"
+                        gap: "6px"
                       }}
                       title="Restart microphone capture and permissions"
                     >
-                      🔄 Reconnect Mic
+                      <span>🔄</span>
+                      <span>Reconnect Mic</span>
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={() => submitAnswerAndNext()}
                       disabled={isAvaThinking}
                       style={{
-                        padding: "11px 22px",
-                        borderRadius: "14px",
-                        background: "linear-gradient(135deg, #00c4a7 0%, #00e5c3 100%)",
+                        padding: "10px 18px",
+                        borderRadius: "24px",
+                        background: isSunrise
+                          ? "linear-gradient(135deg, #f97316 0%, #ea580c 100%)"
+                          : "linear-gradient(135deg, #00b4d8 0%, #0077b6 100%)",
                         border: "none",
-                        color: "#050811",
+                        color: "#ffffff",
                         fontWeight: 900,
                         fontSize: "13px",
                         cursor: "pointer",
-                        boxShadow: "0 0 20px rgba(0,196,167,0.4)",
-                        transition: "all 0.2s"
+                        boxShadow: isSunrise ? "0 4px 18px rgba(249, 115, 22, 0.4)" : "0 4px 20px rgba(0, 180, 216, 0.4)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px"
                       }}
                     >
-                      {isAvaThinking ? "Saving..." : (reviewNotice ? "Confirm & Submit Transcript →" : "Submit Answer →")}
+                      <span>{isAvaThinking ? "Saving..." : (reviewNotice ? "Confirm & Submit" : "Submit Answer")}</span>
+                      <span>➔</span>
                     </button>
                   </div>
                 </div>
 
               </div>
-              </div>
+            </div>
 
             {/* Early Exit Confirmation Modal */}
             {showEndConfirm && (
@@ -2644,7 +3096,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
             try {
               localStorage.removeItem("prepfly_avatab_session");
               sessionStorage.removeItem("prepfly_avatab_session");
-            } catch (_) {}
+            } catch (_) { }
             isEndingRef.current = false;
             setStep("resume_upload");
             setReportData(null);

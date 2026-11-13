@@ -654,26 +654,42 @@ class SQLiteSupabaseMock:
             CREATE TABLE IF NOT EXISTS activity_logs (
                 id TEXT PRIMARY KEY,
                 actor_id TEXT,
+                user_id TEXT,
                 actor_type TEXT,
                 action TEXT,
+                entity_type TEXT,
+                entity_id TEXT,
                 ip_address TEXT,
                 details TEXT,
                 created_at TEXT
             )
         """)
+        for col_def in ("user_id TEXT", "entity_type TEXT", "entity_id TEXT"):
+            try:
+                cursor.execute(f"ALTER TABLE activity_logs ADD COLUMN {col_def}")
+            except Exception:
+                pass
 
         # 27b. parsed_resumes
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS parsed_resumes (
                 id TEXT PRIMARY KEY,
+                user_id TEXT,
                 hash TEXT UNIQUE,
                 raw_text TEXT,
+                parsed_json TEXT,
                 structured_data TEXT,
                 ats_score INTEGER DEFAULT 70,
                 missing_info TEXT,
+                uploaded_at TEXT,
                 created_at TEXT
             )
         """)
+        for col_def in ("user_id TEXT", "parsed_json TEXT", "uploaded_at TEXT"):
+            try:
+                cursor.execute(f"ALTER TABLE parsed_resumes ADD COLUMN {col_def}")
+            except Exception:
+                pass
 
         # 28. support_tickets
         cursor.execute("""

@@ -1,7 +1,6 @@
 import { downloadInvoice } from '../../services/adminAPI';
 import React, { useState } from 'react';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function PaymentTable({ payments = [] }) {
   const [statusFilter, setStatusFilter] = useState("All");

@@ -288,16 +288,6 @@ def verify_razorpay_payment(org_id, razorpay_order_id, razorpay_payment_id, razo
                 "created_at": now.isoformat()
             }).execute()
 
-            supabase.table("activity_logs").insert({
-                "id": f"log_{uuid.uuid4().hex[:6]}",
-                "actor_id": org_id,
-                "actor_type": "ORGANIZATION_ADMIN",
-                "action": f"Subscription Purchase Successful ({plan['name']} - ₹{amount_inr} / {duration_days} Days)",
-                "ip_address": "127.0.0.1",
-                "details": f"Razorpay Payment ID: {razorpay_payment_id} | Invoice: {invoice_number} | Plan: {plan['id']}",
-                "created_at": now.isoformat()
-            }).execute()
-
             try:
                 supabase.table("orders").update({"status": "PAID"}).eq("order_id", razorpay_order_id).execute()
             except Exception:
@@ -310,6 +300,22 @@ def verify_razorpay_payment(org_id, razorpay_order_id, razorpay_payment_id, razo
     finally:
         with _ORDER_VERIFY_LOCK:
             _IN_FLIGHT_ORDERS.discard(razorpay_order_id)
+
+    # Non-fatal activity telemetry — must NEVER abort or fail an already-activated payment
+    try:
+        from services.identity_service import parse_valid_uuid
+        supabase.table("activity_logs").insert({
+            "id": f"log_{uuid.uuid4().hex[:6]}",
+            "actor_id": parse_valid_uuid(org_id),
+            "user_id": str(org_id) if org_id else None,
+            "actor_type": "ORGANIZATION_ADMIN",
+            "action": f"Subscription Purchase Successful ({plan['name']} - ₹{amount_inr} / {duration_days} Days)",
+            "ip_address": "127.0.0.1",
+            "details": f"Razorpay Payment ID: {razorpay_payment_id} | Invoice: {invoice_number} | Plan: {plan['id']}",
+            "created_at": now.isoformat()
+        }).execute()
+    except Exception as log_err:
+        print(f"Payment activity log notice (non-fatal): {type(log_err).__name__}")
 
     # 5. Dispatch Email Confirmation
     try:
@@ -364,9 +370,11 @@ def record_failed_payment(org_id, razorpay_order_id, razorpay_payment_id=None, r
             "created_at": now.isoformat()
         }).execute()
 
+        from services.identity_service import parse_valid_uuid
         supabase.table("activity_logs").insert({
             "id": f"log_{uuid.uuid4().hex[:6]}",
-            "actor_id": org_id,
+            "actor_id": parse_valid_uuid(org_id),
+            "user_id": str(org_id) if org_id else None,
             "actor_type": "ORGANIZATION_ADMIN",
             "action": f"Subscription Payment Failed: {reason}",
             "ip_address": "127.0.0.1",

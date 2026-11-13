@@ -5,8 +5,7 @@ import {
   updateSuperAdminFeedback,
   deleteSuperAdminFeedback
 } from '../../services/feedbackAPI';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function FeedbackManagement() {
   const [data, setData] = useState({ feedback: [], summary: {}, analytics: {} });

@@ -177,8 +177,8 @@ REPORT_STATUS_FAILED = "EVALUATION_FAILED"
 
 # ── Phase 7: Reliability, Speed & Cost Configuration ─────────────────────────
 FAST_GRADER_MODEL = "gemini-3.8-flash"
-STRONG_GRADER_MODEL = "gemini-2.5-pro"
-FALLBACK_GRADER_MODEL = "gemini-3.5-flash"
+STRONG_GRADER_MODEL = "gemini-3.8-flash"
+FALLBACK_GRADER_MODEL = "gemini-3.5-flash-lite"
 GEMINI_REQUEST_TIMEOUT_S = 15.0
 MAX_EVAL_CONCURRENCY = 4
 GRADER_MAX_OUTPUT_TOKENS = 650

@@ -3,8 +3,10 @@ import axios from "axios";
 import "./Login.css";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggleButton } from "./components/ui/ThemeContext";
+import { validateOAuthPostMessage } from "./utils/mediaPlayback";
+import { BACKEND_URL } from "./config/apiConfig";
 
-const API = import.meta.env.VITE_BACKEND_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:5000" : "https://prepfly.up.railway.app");
+const API = BACKEND_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 
@@ -152,6 +154,7 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
+    if (googleLoading) return;
     if (!window.google) { msg("Google SDK not loaded yet."); return; }
     if (!GOOGLE_CLIENT_ID) { msg("Google Client ID not configured."); return; }
     try {
@@ -160,7 +163,8 @@ export default function Login() {
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleCallback,
           auto_select: false,
-          cancel_on_tap_outside: true
+          cancel_on_tap_outside: true,
+          ux_mode: "popup",
         });
         googleInitRef.current = true;
       }
@@ -179,6 +183,19 @@ export default function Login() {
       try { window.google.accounts.id.prompt(); } catch (_) {}
     }
   };
+
+  // Origin-validated OAuth popup message listener
+  useEffect(() => {
+    const onOAuthMessage = (event) => {
+      const check = validateOAuthPostMessage(event, [window.location.origin]);
+      if (!check.valid || !check.data || typeof check.data !== "object") return;
+      if (check.data.type === "prepfly-oauth-credential" && check.data.credential) {
+        handleGoogleCallback({ credential: check.data.credential });
+      }
+    };
+    window.addEventListener("message", onOAuthMessage);
+    return () => window.removeEventListener("message", onOAuthMessage);
+  }, []);
 
   /* ══════════════════════════════════════════════════════════════════
    *  SIGNUP FLOW: submit form → get OTP → verify OTP → account created

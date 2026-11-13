@@ -639,7 +639,7 @@ def generate_and_persist_report(
     supabase_client.table("interview_reports").upsert(report_row, on_conflict="session_id").execute()
 
     # Sync back to `sessions` cleanly (preserving real display_name & report_status)
-    supabase_client.table("sessions").update({
+    session_update_payload = {
         "display_name": display_name,
         "display_name_source": display_name_source,
         "report_status": scoring["report_status"],
@@ -650,7 +650,27 @@ def generate_and_persist_report(
         "final_report": json.dumps(full_report),
         "report_json": json.dumps(full_report),
         "updated_at": now_iso,
-    }).eq("session_id", session_id).execute()
+    }
+    try:
+        supabase_client.table("sessions").update(session_update_payload).eq("session_id", session_id).execute()
+    except Exception as e_sess:
+        logger.warning(
+            "Initial sessions table update in report generation encountered schema issue: %s. Attempting fallback.",
+            e_sess,
+        )
+        # Fallback to core columns if live schema cache lacks hiring_recommendation or other optional columns
+        core_payload = {
+            "report_status": scoring["report_status"],
+            "final_score": scoring["overall_score_100"],
+            "final_score_100": scoring["overall_score_100"],
+            "final_grade": scoring["grade"],
+            "report_json": json.dumps(full_report),
+            "updated_at": now_iso,
+        }
+        try:
+            supabase_client.table("sessions").update(core_payload).eq("session_id", session_id).execute()
+        except Exception as e_sess_core:
+            logger.error("Failed even core sessions table update during report generation: %s", e_sess_core)
 
     record_report_audit_log(
         supabase_client=supabase_client,

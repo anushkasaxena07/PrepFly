@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import StudentTable from '../../components/Admin/StudentTable';
 import StudentModal from '../../components/Admin/StudentModal';
 import { getAdminStudents, createAdminStudent, updateAdminStudent, deleteAdminStudent, importAdminStudents } from '../../services/adminAPI';
+import { BACKEND_URL } from '../../config/apiConfig';
 
 export default function Students() {
   const [students, setStudents] = useState([]);
@@ -80,7 +81,7 @@ export default function Students() {
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5000"}/api/admin/students/bulk-renew`, {
+      const res = await fetch(`${BACKEND_URL}/api/admin/students/bulk-renew`, {
         method: "POST",
         headers,
         body: JSON.stringify({ student_ids: ids })
@@ -131,7 +132,7 @@ export default function Students() {
       {loading ? (
         <div style={{ color: "var(--cyan)", padding: "40px", textAlign: "center" }}>⚡ Loading student roster...</div>
       ) : (
-        <StudentTable 
+        <StudentTable
           students={students}
           onView={handleOpenEdit}
           onEdit={handleOpenEdit}
@@ -142,7 +143,7 @@ export default function Students() {
         />
       )}
 
-      <StudentModal 
+      <StudentModal
         isOpen={modalOpen}
         student={selectedStudent}
         onClose={() => setModalOpen(false)}

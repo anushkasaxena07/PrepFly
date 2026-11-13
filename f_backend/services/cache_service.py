@@ -149,9 +149,57 @@ def mask_redis_url(redis_url: Optional[str]) -> str:
     return str(redis_url)
 
 
+def _sanitize_redis_error(err: Exception) -> str:
+    """Strips embedded Redis credentials/passwords from exception strings before logging."""
+    import re
+    msg = str(err or "")
+    msg = re.sub(r"(rediss?://)([^@\s/]+)@", r"\1***@", msg, flags=re.IGNORECASE)
+    return msg
+
+
+def _classify_redis_error(err: Exception) -> str:
+    if isinstance(err, TimeoutError):
+        return "timeout"
+    s = str(err or "").lower()
+    if _is_dns_resolution_error(err):
+        return "dns_error"
+    if any(tok in s for tok in ("timeout", "timed out")):
+        return "timeout"
+    if any(tok in s for tok in ("ssl", "tls", "certificate")):
+        return "tls_error"
+    if any(tok in s for tok in ("wrongpass", "noauth", "invalid password", "authentication", "acl")):
+        return "auth_error"
+    return "connection_error"
+
+
+def validate_redis_config(redis_url: Optional[str]) -> Dict[str, Any]:
+    """Validates Redis configuration without exposing credentials or secret values."""
+    if not redis_url or not isinstance(redis_url, str) or not redis_url.strip():
+        return {"configured": False, "valid": False, "scheme": None, "tls_enabled": False, "error_type": "unconfigured"}
+    normalized = normalize_redis_url(redis_url)
+    if normalized.startswith("memory://"):
+        return {"configured": False, "valid": True, "scheme": "memory", "tls_enabled": False, "error_type": None}
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(normalized)
+        valid_scheme = parsed.scheme in ("redis", "rediss")
+        has_host = bool(parsed.hostname)
+        tls_enabled = parsed.scheme == "rediss"
+        return {
+            "configured": True,
+            "valid": valid_scheme and has_host,
+            "scheme": parsed.scheme,
+            "tls_enabled": tls_enabled,
+            "target": mask_redis_url(normalized),
+            "error_type": None if (valid_scheme and has_host) else "invalid_url",
+        }
+    except Exception:
+        return {"configured": True, "valid": False, "scheme": None, "tls_enabled": False, "error_type": "invalid_url"}
+
+
 def _is_dns_resolution_error(err: Exception) -> bool:
     s = str(err).lower()
-    return any(tok in s for tok in ("getaddrinfo", "nameresolutionerror", "name or service not known", "nodename nor servname", "error 11001"))
+    return any(tok in s for tok in ("getaddrinfo", "nameresolutionerror", "name or service not known", "nodename nor servname", "error 11001", "error -2"))
 
 
 class RedisCacheBackend:
@@ -163,6 +211,7 @@ class RedisCacheBackend:
         self.cooldown_seconds = cooldown_seconds
         self.client = None
         self.is_connected = False
+        self.last_error_type: Optional[str] = None
         self._retry_after = 0.0
         self._consecutive_failures = 0
         self.hits = 0
@@ -172,35 +221,61 @@ class RedisCacheBackend:
         self._init_connection()
 
     def _init_connection(self):
+        cfg = validate_redis_config(self.redis_url)
+        if not cfg.get("valid"):
+            self.is_connected = False
+            self.client = None
+            self.last_error_type = cfg.get("error_type") or "invalid_url"
+            self._retry_after = time.monotonic() + self.cooldown_seconds
+            logger.warning("[REDIS CACHE] Invalid or unconfigured Redis target (%s). Using L1 Memory.", self.last_error_type)
+            return
+
         last_err = None
+        connect_timeout = float(os.getenv("REDIS_CONNECT_TIMEOUT_S", "2.0"))
+        socket_timeout = float(os.getenv("REDIS_SOCKET_TIMEOUT_S", "2.0"))
         for attempt in range(self.max_connect_retries):
             try:
                 import redis
-                self.client = redis.from_url(
-                    self.redis_url,
-                    socket_timeout=1.5,
-                    socket_connect_timeout=1.5,
-                    retry_on_timeout=True,
-                    health_check_interval=30,
-                    decode_responses=True,
-                )
+                kwargs: Dict[str, Any] = {
+                    "socket_timeout": socket_timeout,
+                    "socket_connect_timeout": connect_timeout,
+                    "retry_on_timeout": True,
+                    "health_check_interval": 30,
+                    "decode_responses": True,
+                }
+                if str(self.redis_url).startswith("rediss://"):
+                    kwargs["ssl_cert_reqs"] = os.getenv("REDIS_SSL_CERT_REQS", "required")
+                try:
+                    self.client = redis.from_url(self.redis_url, **kwargs)
+                except TypeError:
+                    # Fallback if mocked or older redis client doesn't accept ssl_cert_reqs
+                    kwargs.pop("ssl_cert_reqs", None)
+                    self.client = redis.from_url(self.redis_url, **kwargs)
+
                 self.client.ping()
                 self.is_connected = True
+                self.last_error_type = None
                 self._consecutive_failures = 0
                 self._retry_after = 0.0
-                logger.info("[REDIS CACHE] Successfully connected to distributed cache.")
+                logger.info("[REDIS CACHE] Successfully connected to distributed cache (%s).", mask_redis_url(self.redis_url))
                 return
             except Exception as e:
                 last_err = e
+                self.last_error_type = _classify_redis_error(e)
                 self.is_connected = False
                 self.client = None
-                if _is_dns_resolution_error(e):
+                if _is_dns_resolution_error(e) or self.last_error_type in ("tls_error", "auth_error"):
                     break
                 if attempt < self.max_connect_retries - 1:
                     time.sleep(0.15 * (2 ** attempt))
 
         self._retry_after = time.monotonic() + self.cooldown_seconds
-        logger.warning(f"[REDIS CACHE] Connection failed or unreachable: {last_err}. Will fallback to L1 Memory.")
+        logger.warning(
+            "[REDIS CACHE] Connection failed (%s) on %s: %s. Will fallback to L1 Memory.",
+            self.last_error_type or "error",
+            mask_redis_url(self.redis_url),
+            _sanitize_redis_error(last_err) if last_err else "unknown",
+        )
 
     def _ensure_ready(self) -> bool:
         if self.is_connected and self.client:
@@ -213,12 +288,16 @@ class RedisCacheBackend:
     def _record_runtime_error(self, op: str, err: Exception) -> None:
         self.errors += 1
         self._consecutive_failures += 1
-        logger.debug(f"Redis {op} error: {err}")
-        if self._consecutive_failures >= 2 or _is_dns_resolution_error(err):
+        self.last_error_type = _classify_redis_error(err)
+        logger.debug("Redis %s error (%s): %s", op, self.last_error_type, _sanitize_redis_error(err))
+        if self._consecutive_failures >= 2 or _is_dns_resolution_error(err) or self.last_error_type in ("tls_error", "auth_error"):
             self.is_connected = False
             self.client = None
             self._retry_after = time.monotonic() + self.cooldown_seconds
-            logger.warning(f"[REDIS CACHE] Circuit open for {int(self.cooldown_seconds)}s after Redis {op} failure ({err}); serving from L1 Memory.")
+            logger.warning(
+                "[REDIS CACHE] Circuit open for %ds after Redis %s failure (%s); serving from L1 Memory.",
+                int(self.cooldown_seconds), op, self.last_error_type,
+            )
 
     def get(self, key: str) -> Optional[Any]:
         if not self._ensure_ready():
