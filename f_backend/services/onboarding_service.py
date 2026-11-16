@@ -574,6 +574,24 @@ class OnboardingService:
                     ]
                 },
                 {
+                    "id": "sk_concurrency",
+                    "name": "Concurrency & Distributed Primitives",
+                    "pillarId": "p3",
+                    "tier": "PREFERRED",
+                    "interviewImportance": 4,
+                    "source": "MODEL_INFERRED",
+                    "subskills": [
+                        {
+                            "id": "sub_locks_consensus",
+                            "name": "Mutex Locks & Consensus Basics",
+                            "rubricCriteria": [
+                                {"id": "c11", "criterion": "Contrasts optimistic and pessimistic locking", "points": 50},
+                                {"id": "c12", "criterion": "Formulates deadlock avoidance strategies", "points": 50}
+                            ]
+                        }
+                    ]
+                },
+                {
                     "id": "sk_tradeoffs",
                     "name": "Technical Trade-off Articulation",
                     "pillarId": "p4",
