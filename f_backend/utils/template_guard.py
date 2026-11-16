@@ -70,3 +70,4 @@ def validate_dict_no_template_leaks(data: Union[Dict, List, Any], path: str = ""
             elif isinstance(item, (dict, list)):
                 errors.extend(validate_dict_no_template_leaks(item, curr_path))
     return errors
+

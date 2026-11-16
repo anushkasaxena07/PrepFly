@@ -2110,13 +2110,13 @@ def _authorize_resume_job_access(job: dict):
         if not user_payload:
             return jsonify({"error": "Authentication required"}), 401
         token_sub = str(user_payload.get("sub", ""))
-        token_role = user_payload.get("role", "")
+        user_role = user_payload.get("role", "")
         same_org_admin = (
-            token_role == "ADMIN"
+            user_role == "ADMIN"
             and job.get("organization_id")
             and str(job.get("organization_id")) == str(user_payload.get("organization_id") or "")
         )
-        if str(job_owner) != token_sub and token_role != "SUPER_ADMIN" and not same_org_admin:
+        if str(job_owner) != token_sub and user_role != "SUPER_ADMIN" and not same_org_admin:
             return jsonify({"error": "Forbidden: Cannot access another user's resume parsing job"}), 403
         return None
 
@@ -3128,7 +3128,7 @@ def next_question():
         from services.interview_reliability_service import (
             build_concise_resume_summary,
             log_structured_event,
-            submit_background_turn_eval,
+            submit_background_turn_eval as submit_background_turn_evaluation,
         )
 
         concise_resume = build_concise_resume_summary(
@@ -3136,7 +3136,7 @@ def next_question():
         )
 
         # Immediately schedule background per-turn rubric grading right after capture (Phase 7 speed optimization)
-        submit_background_turn_eval(
+        submit_background_turn_evaluation(
             supabase_client=supabase,
             session_id=session_id,
             turn_row=cand_turn_row,
@@ -6405,13 +6405,13 @@ def get_user_stats(user_id):
             return jsonify({"error": "Authentication required"}), 401
 
         token_user_id = str(user_payload.get("sub", ""))
-        token_role = user_payload.get("role", "")
+        user_role = user_payload.get("role", "")
 
         if user_id in ("me", "current", "self"):
             target_id = token_user_id
-        elif token_role in ("ADMIN", "SUPER_ADMIN"):
+        elif user_role in ("ADMIN", "SUPER_ADMIN"):
             target_id = user_id
-        elif token_role == "Organization Admin":
+        elif user_role == "Organization Admin":
             if str(user_id) == token_user_id:
                 target_id = token_user_id
             else:

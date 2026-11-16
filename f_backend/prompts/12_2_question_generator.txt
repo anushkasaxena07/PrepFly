@@ -1,3 +1,4 @@
 Generate one interview question for skill {skill}, subskill {subskill}, difficulty {difficulty}, type {type}, level {level}, role {role}.
 Return JSON: prompt, rubric[] (3-5 items, each with id, criterion, points summing to 100), modelAnswer, timeLimitSec, and options/correctOptions for MCQ.
 Requirements: one clear focus, no trick wording, unambiguous correct answer, not a copy of well-known memorised questions, do NOT claim it was asked at {company}. For CODE include 4+ test cases with at least 1 edge case.
+

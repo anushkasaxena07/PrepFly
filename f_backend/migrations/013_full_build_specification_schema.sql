@@ -243,3 +243,4 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages(user_id, crea
 
 -- 12. Schema cache reload for PostgREST
 NOTIFY pgrst, 'reload schema';
+

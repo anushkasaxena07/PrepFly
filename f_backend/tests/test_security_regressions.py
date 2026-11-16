@@ -490,6 +490,31 @@ class TestSecurityRegressions(unittest.TestCase):
         finally:
             app.is_production = orig_prod
 
+    def test_22_bandit_clean_scan_and_no_eval_in_app(self):
+        """22. Verifies app.py contains zero eval() calls and Bandit static security scan passes."""
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        app_path = os.path.join(backend_dir, "app.py")
+        with open(app_path, "r", encoding="utf-8") as f:
+            code_text = f.read()
+
+        # Must not contain Python eval( or exec( or os.system(
+        self.assertNotIn("eval(", code_text)
+        self.assertNotIn("exec(", code_text)
+        self.assertNotIn("os.system(", code_text)
+
+        # Run bandit scan directly on backend
+        import subprocess
+        venv_py = os.path.join(backend_dir, "venv", "Scripts", "python.exe") if os.name == "nt" else os.path.join(backend_dir, "venv", "bin", "python")
+        py_exe = venv_py if os.path.exists(venv_py) else sys.executable
+
+        res = subprocess.run(
+            [py_exe, "-m", "bandit", "-r", ".", "-x", "./venv,./tests", "-t", "B105,B106"],
+            cwd=backend_dir,
+            capture_output=True,
+            text=True
+        )
+        self.assertEqual(res.returncode, 0, f"Bandit security scan failed with findings:\n{res.stdout}")
+
 if __name__ == "__main__":
     unittest.main()
 

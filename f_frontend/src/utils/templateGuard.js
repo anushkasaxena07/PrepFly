@@ -44,3 +44,4 @@ export function formatScore(num, digits = 1) {
   }
   return Number(num).toFixed(digits);
 }
+

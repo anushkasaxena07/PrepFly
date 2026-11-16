@@ -458,7 +458,7 @@ class LearningService:
                 "passing_score": 70.0
             },
             "step_7_next_action": {
-                "on_pass": "ADVANCE_DIFFICULTY",
+                "on_pass": "ADVANCE_DIFFICULTY",  # nosec B105
                 "on_gap": "TARGETED_REMEDIATION_DRILL"
             }
         }

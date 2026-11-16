@@ -291,7 +291,7 @@ class TestSandboxWorkerAPI(unittest.TestCase):
         py_exe = venv_py if os.path.exists(venv_py) else sys.executable
 
         res = subprocess.run(
-            [py_exe, "-m", "ruff", "check", worker_dir, "--select", "F821,E9,F811"],
+            [py_exe, "-m", "ruff", "check", worker_dir, "--no-cache", "--select", "F821,E9,F811"],
             capture_output=True,
             text=True
         )

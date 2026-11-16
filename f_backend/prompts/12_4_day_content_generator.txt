@@ -7,3 +7,4 @@ Given an already-decided preparation block list (skill, topic, minutes, difficul
 Rules:
 - The LLM must NOT change durations, dates or the number of blocks.
 - Output JSON strictly matching the provided schema.
+
