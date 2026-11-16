@@ -57,6 +57,51 @@ export const resolveUserId = (explicitId) => {
 };
 
 export const intelligenceAPI = {
+  // ── Section 11 Specification Canonical APIs ─────────────────────────────────
+  async createOnboardingProfile(profileData) {
+    const res = await fetch(`${BACKEND_URL}/api/onboarding/profile`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(profileData)
+    });
+    return handleResponse(res);
+  },
+
+  async updateProfileSkills(skills) {
+    const res = await fetch(`${BACKEND_URL}/api/profile/skills`, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ skills })
+    });
+    return handleResponse(res);
+  },
+
+  async getFeasibility() {
+    const res = await fetch(`${BACKEND_URL}/api/feasibility`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getCanonicalReadiness(targetRole = "AI/ML Engineer") {
+    const roleParam = encodeURIComponent(targetRole);
+    const res = await fetch(`${BACKEND_URL}/api/readiness?role=${roleParam}`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getCanonicalSkillsMap(targetRole = "AI/ML Engineer") {
+    const roleParam = encodeURIComponent(targetRole);
+    const res = await fetch(`${BACKEND_URL}/api/skills/map?role=${roleParam}`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
   // 1. Preparation Profile & Goals
   async initializeProfile(profileData) {
     const res = await fetch(`${BACKEND_URL}/api/preparation/initialize`, {

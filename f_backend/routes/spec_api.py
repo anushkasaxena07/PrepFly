@@ -124,3 +124,97 @@ def get_canonical_skills_map():
             "message": "Failed to fetch skills map",
             "error": str(ex)
         }), 500
+
+
+# -----------------------------------------------------------------------------
+# PHASE 3: ONBOARDING, SKILLS PROFILE & FEASIBILITY ENDPOINTS (Section 2, 3, 8.1, 11)
+# -----------------------------------------------------------------------------
+
+@spec_api_bp.route("/api/onboarding/profile", methods=["POST"])
+def create_onboarding_profile():
+    """
+    POST /api/onboarding/profile
+    Saves multi-step onboarding constraints, generates the skill requirement profile,
+    and runs the Section 8.1 feasibility check.
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        from services.onboarding_service import OnboardingService
+        profile_res = OnboardingService.save_onboarding_target_profile(
+            user_id=user_id,
+            data=payload
+        )
+        return jsonify({
+            "status": "success",
+            "message": "Onboarding profile created and skill requirements generated",
+            "profile": profile_res
+        }), 201
+    except Exception as ex:
+        logger.error(f"Failed to create onboarding profile for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate onboarding profile",
+            "error": str(ex)
+        }), 400
+
+
+@spec_api_bp.route("/api/profile/skills", methods=["PUT"])
+def update_candidate_profile_skills():
+    """
+    PUT /api/profile/skills
+    Allows candidate to edit skills/tiers during Step 4 review (Section 2.1).
+    Re-runs feasibility check and returns updated state.
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+    skills_list = payload.get("skills") if isinstance(payload.get("skills"), list) else payload
+
+    if not isinstance(skills_list, list):
+        return jsonify({
+            "status": "error",
+            "message": "Body must contain 'skills' list"
+        }), 400
+
+    try:
+        from services.onboarding_service import OnboardingService
+        update_res = OnboardingService.update_profile_skills(
+            user_id=user_id,
+            updated_skills=skills_list
+        )
+        return jsonify(update_res), 200
+    except Exception as ex:
+        logger.error(f"Failed to update profile skills for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update profile skills",
+            "error": str(ex)
+        }), 400
+
+
+@spec_api_bp.route("/api/feasibility", methods=["GET"])
+def get_feasibility_check_endpoint():
+    """
+    GET /api/feasibility
+    Returns real-time Section 8.1 Feasibility Check.
+    """
+    user_id = _extract_request_user_id()
+
+    try:
+        from services.onboarding_service import OnboardingService
+        feasibility = OnboardingService.get_feasibility_check(user_id=user_id)
+        return jsonify({
+            "status": "success",
+            "user_id": user_id,
+            "feasibility": feasibility
+        }), 200
+    except Exception as ex:
+        logger.error(f"Failed to compute feasibility for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to compute feasibility check",
+            "error": str(ex)
+        }), 500
+
+
