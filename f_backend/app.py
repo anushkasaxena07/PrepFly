@@ -191,6 +191,9 @@ app.register_blueprint(career_intelligence_bp)
 from routes.mentor import mentor_bp
 app.register_blueprint(mentor_bp)
 
+from routes.spec_api import spec_api_bp
+app.register_blueprint(spec_api_bp)
+
 # Production strictly restricts origins to Vercel production domains and optional FRONTEND_URL.
 # Local development ports are only permitted in non-production environments.
 if is_production:
