@@ -1124,8 +1124,10 @@ class MentorService:
             mentor_reply = None
 
         if not mentor_reply:
+            c_role = int_ctx.get("target_role") or "Software Development Engineer"
+            c_company = int_ctx.get("target_company") or "Tech Firm"
             mentor_reply = (
-                f"**Targeted Coaching for {int_ctx.get('target_role')} ({int_ctx.get('target_company')}):**\n\n"
+                f"**Targeted Coaching for {c_role} ({c_company}):**\n\n"
                 f"• **Core Invariant:** State the exact data structure or mathematical invariant before optimizing.\n"
                 f"• **Complexity & Trade-offs:** Specify time/space bounds (`O(N)` vs `O(log N)`) and memory limits.\n"
                 f"• **Edge Cases:** Validate empty, zero, duplicate, and skewed boundary inputs.\n\n"

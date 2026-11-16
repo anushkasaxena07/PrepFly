@@ -472,8 +472,9 @@ class AdaptivePlannerService:
             curr_day = 1
             curr_spent = 0
             for act in pending_activities:
-                dur = act.get("estimated_minutes", 30)
-                if curr_spent + dur > max_budget:
+                dur = min(int(act.get("estimated_minutes", 30)), new_daily_mins)
+                act["estimated_minutes"] = dur
+                if curr_spent > 0 and (curr_spent + dur > max_budget):
                     curr_day = min(days_left, curr_day + 1)
                     curr_spent = 0
                 if act.get("day_number") != curr_day:

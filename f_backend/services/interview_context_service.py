@@ -59,8 +59,22 @@ class InterviewContextService:
             if res and res.data:
                 goal = res.data[0]
 
-        target_role = goal.get("target_role") if goal else "Software Development Engineer (General)"
-        target_company = goal.get("target_company") if goal else "Tech Firm"
+        target_role = (goal.get("target_role") if goal and goal.get("target_role") else None)
+        target_company = (goal.get("target_company") if goal and goal.get("target_company") else None)
+
+        if not target_role or not target_company:
+            try:
+                prof_res = supabase.table("candidate_profiles").select("*").eq("user_id", user_id).limit(1).execute()
+                prof_data = prof_res.data[0] if (prof_res and prof_res.data) else {}
+                if not target_role:
+                    target_role = prof_data.get("target_role")
+                if not target_company:
+                    target_company = prof_data.get("target_company")
+            except Exception:
+                pass
+
+        target_role = target_role or "Software Development Engineer (General)"
+        target_company = target_company or "Tech Firm"
         norm_role = SkillTaxonomyService.normalize_role(target_role)
 
         # 2. Calculate Days Left to Interview

@@ -11,7 +11,7 @@ export default function RoadmapTab({ onNavigateTab }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
-  const [readinessScore, setReadinessScore] = useState(74.5);
+  const [readinessScore, setReadinessScore] = useState(0);
   const [dueRevisions, setDueRevisions] = useState([]);
   const [error, setError] = useState("");
 
@@ -69,8 +69,9 @@ export default function RoadmapTab({ onNavigateTab }) {
       // 4. Fetch readiness score from Prompt 1 engine if available
       try {
         const progRes = await intelligenceAPI.getProgressDashboard();
-        if (progRes?.role_readiness?.readiness_score) {
-          setReadinessScore(progRes.role_readiness.readiness_score);
+        const score = progRes?.dashboard?.overall_readiness ?? progRes?.overall_readiness ?? progRes?.dashboard?.measured_proficiency ?? progRes?.measured_proficiency;
+        if (score !== undefined && score !== null && !isNaN(score)) {
+          setReadinessScore(Number(score));
         }
       } catch {
         // Fallback default
