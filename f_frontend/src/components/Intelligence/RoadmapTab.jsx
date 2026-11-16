@@ -26,6 +26,8 @@ export default function RoadmapTab({ onNavigateTab }) {
 
   // Recalculating state & Versioning
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [selectedDayFilter, setSelectedDayFilter] = useState("ALL");
   const [selectedVersion, setSelectedVersion] = useState("v3");
   const [showVersionDiff, setShowVersionDiff] = useState(false);
@@ -91,6 +93,23 @@ export default function RoadmapTab({ onNavigateTab }) {
       setError(err.message || "Failed to recalculate roadmap.");
     } finally {
       setIsRecalculating(false);
+    }
+  };
+
+  const handleResetRoadmap = async () => {
+    setIsResetting(true);
+    setError("");
+    try {
+      await intelligenceAPI.resetRoadmapAndGoals();
+      setRoadmap(null);
+      setProfile(null);
+      setDueRevisions([]);
+      setShowResetConfirm(false);
+      setShowOnboarding(true);
+    } catch (err) {
+      setError(err.message || "Failed to reset preparation roadmap.");
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -211,6 +230,51 @@ export default function RoadmapTab({ onNavigateTab }) {
   return (
     <div id="page-roadmap" className="page active" role="tabpanel">
       <div className="container intelligence-root space-y-6 text-slate-100 pb-16">
+        {/* Reset Confirmation Modal */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-red-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 text-left">
+              <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 text-2xl mx-auto">
+                ↺
+              </div>
+              <div className="text-center space-y-1">
+                <h3 className="text-lg font-bold text-white">Reset Prep Roadmap & Goals?</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  This will completely clear your current roadmap schedule, learning milestones, and career goals so you can start fresh or configure a new target role.
+                </p>
+              </div>
+
+              <div className="bg-red-950/30 border border-red-900/40 rounded-xl p-3 text-xs text-red-300 space-y-1.5">
+                <div className="font-semibold text-red-200">⚠️ What will be reset:</div>
+                <ul className="list-disc list-inside space-y-0.5 text-red-300/90 text-[11.5px]">
+                  <li>Active roadmap and all daily scheduled activities</li>
+                  <li>Configured career goals and target role preferences</li>
+                  <li>Preparation timeline and daily study hour budget</li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(false)}
+                  disabled={isResetting}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetRoadmap}
+                  disabled={isResetting}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 transition-all shadow-lg shadow-red-600/30 flex items-center gap-1.5"
+                >
+                  <span>{isResetting ? "Resetting..." : "Yes, Reset Everything"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modals & Drawers */}
         {showOnboarding && (
           <PreparationOnboarding
@@ -337,11 +401,21 @@ export default function RoadmapTab({ onNavigateTab }) {
 
               <button
                 type="button"
-                disabled={isRecalculating}
+                disabled={isRecalculating || isResetting}
                 onClick={handleRecalculate}
                 className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold px-4 py-3 rounded-xl transition-all flex items-center space-x-1.5"
               >
                 <span>{isRecalculating ? "Recalculating..." : "↻ Rebalance Plan"}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isResetting || isRecalculating}
+                onClick={() => setShowResetConfirm(true)}
+                className="bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 hover:border-red-500/60 text-red-300 text-xs font-semibold px-3.5 py-3 rounded-xl transition-all flex items-center space-x-1.5 shadow-sm"
+                title="Reset your preparation roadmap, study milestones, and career goals to start fresh"
+              >
+                <span>{isResetting ? "Resetting..." : "↺ Reset Prep Roadmap"}</span>
               </button>
             </div>
           </div>
@@ -521,6 +595,29 @@ export default function RoadmapTab({ onNavigateTab }) {
 
         {/* ── 4. TIMELINE OF ACTIVITIES WITH WHY-THIS-IS-HERE & REAL EVIDENCE IDS ── */}
         <div className="space-y-5">
+          {dayNumbers.length === 0 && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-10 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-cyan-950/60 border border-cyan-800/40 flex items-center justify-center text-cyan-400 text-3xl mx-auto">
+                📋
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white">No Active Preparation Roadmap Found</h3>
+                <p className="text-sm text-slate-400 max-w-md mx-auto">
+                  Configure your career goal and take the diagnostic assessment to generate your personalized daily plan.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOnboarding(true)}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs transition-all shadow-lg shadow-cyan-500/20"
+                >
+                  Configure Goals & Plan &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
           {dayNumbers.filter((d) => selectedDayFilter === "ALL" || selectedDayFilter === d).map((dayNum) => {
             const acts = schedule[dayNum] || [];
             const dayMinutes = acts.reduce((acc, a) => acc + (a.estimated_minutes || 30), 0);

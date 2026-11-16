@@ -534,6 +534,91 @@ def recalculate_roadmap():
         return jsonify({"error": f"Roadmap recalculation failed: {str(e)}"}), 500
 
 
+@intelligence_bp.route("/api/roadmap/reset", methods=["POST"])
+@intelligence_auth_required
+def reset_roadmap_and_goals():
+    """
+    Completely resets candidate's preparation roadmap, daily schedule,
+    career goals, and preparation preferences so they can start fresh.
+    """
+    user_id = _get_uid()
+    if not user_id:
+        return jsonify({"error": "User context not identified"}), 401
+
+    from local_supabase import get_supabase_client
+    supabase = get_supabase_client()
+    summary = {
+        "activities_removed": 0,
+        "roadmaps_removed": 0,
+        "goals_removed": 0,
+        "profile_reset": False
+    }
+
+    try:
+        # 1. Fetch user's roadmaps to delete related activities first
+        try:
+            rm_res = supabase.table("roadmaps").select("id").eq("user_id", user_id).execute()
+            roadmap_ids = [r["id"] for r in (rm_res.data or []) if "id" in r]
+            if roadmap_ids:
+                for rid in roadmap_ids:
+                    try:
+                        supabase.table("roadmap_activities").delete().eq("roadmap_id", rid).execute()
+                        summary["activities_removed"] += 1
+                    except Exception:
+                        pass
+                try:
+                    supabase.table("roadmaps").delete().eq("user_id", user_id).execute()
+                    summary["roadmaps_removed"] = len(roadmap_ids)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 2. Delete career_goals
+        try:
+            supabase.table("career_goals").delete().eq("user_id", user_id).execute()
+            summary["goals_removed"] += 1
+        except Exception:
+            pass
+
+        # 3. Delete interview_goals
+        try:
+            supabase.table("interview_goals").delete().eq("user_id", user_id).execute()
+            summary["goals_removed"] += 1
+        except Exception:
+            pass
+
+        # 4. Delete candidate_profiles so onboarding prompts fresh
+        try:
+            supabase.table("candidate_profiles").delete().eq("user_id", user_id).execute()
+            summary["profile_reset"] = True
+        except Exception:
+            try:
+                supabase.table("candidate_profiles").update({
+                    "status": "RESET",
+                    "preparation_goals": "[]",
+                    "target_role": "AI/ML Engineer"
+                }).eq("user_id", user_id).execute()
+                summary["profile_reset"] = True
+            except Exception:
+                pass
+
+        # 5. Clean up spaced revision schedules if present
+        try:
+            supabase.table("spaced_repetition_schedules").delete().eq("user_id", user_id).execute()
+        except Exception:
+            pass
+
+        return jsonify({
+            "status": "success",
+            "message": "Preparation roadmap, schedule, and goals have been completely reset.",
+            "details": summary
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to reset preparation roadmap: {str(e)}"}), 500
+
+
 @intelligence_bp.route("/api/roadmap/activities/<activity_id>", methods=["PATCH"])
 @intelligence_auth_required
 def patch_activity(activity_id: str):

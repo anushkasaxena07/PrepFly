@@ -216,6 +216,15 @@ export const intelligenceAPI = {
     return handleResponse(res);
   },
 
+  async resetRoadmapAndGoals() {
+    const res = await fetch(`${BACKEND_URL}/api/roadmap/reset`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({})
+    });
+    return handleResponse(res);
+  },
+
   async patchActivity(activityId, data) {
     const res = await fetch(`${BACKEND_URL}/api/roadmap/activities/${activityId}`, {
       method: "PATCH",

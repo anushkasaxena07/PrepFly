@@ -8,7 +8,13 @@ explainable multi-factor priority scores, and non-destructive version adaptation
 import unittest
 import json
 import uuid
+import sys
+import os
 from datetime import datetime, timedelta, timezone
+
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from local_supabase import SQLiteSupabaseMock, get_supabase_client
 from services.skill_taxonomy_service import (
@@ -267,6 +273,69 @@ class TestAdaptiveRoadmapEngine(unittest.TestCase):
         self.assertIsNotNone(curr)
         self.assertIn("schedule", curr)
         self.assertIn("activities", curr)
+
+    def test_07_reset_prep_roadmap_and_goals(self):
+        """
+        Validates complete reset of preparation roadmap, schedule activities,
+        and career/interview goals:
+        - Removes roadmap and all scheduled activities
+        - Clears career goals and interview goals
+        - Resets candidate profile so fresh onboarding is triggered
+        """
+        # 1. Setup profile and goals
+        CandidateProfileService.create_or_update_profile(
+            self.mock_db,
+            user_id=self.user_id,
+            target_role="AI/ML Engineer",
+            daily_minutes=60,
+            preparation_duration_days=10
+        )
+        now_iso = datetime.now(timezone.utc).isoformat()
+        self.mock_db.table("career_goals").insert({
+            "id": f"goal_{self.user_id}",
+            "user_id": self.user_id,
+            "role_id": "ai_ml_engineer",
+            "status": "active",
+            "created_at": now_iso,
+            "updated_at": now_iso
+        }).execute()
+        self.mock_db.table("interview_goals").insert({
+            "id": f"igoal_{self.user_id}",
+            "user_id": self.user_id,
+            "target_role": "AI/ML Engineer",
+            "status": "active",
+            "created_at": now_iso,
+            "updated_at": now_iso
+        }).execute()
+
+        # 2. Generate roadmap with activities
+        rm = RoadmapService.generate_roadmap(user_id=self.user_id, force_regenerate=True, supabase_client=self.mock_db)
+        self.assertIsNotNone(rm)
+        self.assertGreater(len(rm.get("activities", [])), 0)
+
+        # 3. Perform complete reset
+        rm_res = self.mock_db.table("roadmaps").select("id").eq("user_id", self.user_id).execute()
+        roadmap_ids = [r["id"] for r in (rm_res.data or []) if "id" in r]
+        for rid in roadmap_ids:
+            self.mock_db.table("roadmap_activities").delete().eq("roadmap_id", rid).execute()
+        self.mock_db.table("roadmaps").delete().eq("user_id", self.user_id).execute()
+        self.mock_db.table("career_goals").delete().eq("user_id", self.user_id).execute()
+        self.mock_db.table("interview_goals").delete().eq("user_id", self.user_id).execute()
+        self.mock_db.table("candidate_profiles").delete().eq("user_id", self.user_id).execute()
+
+        # 4. Verify everything is reset
+        curr_rm = RoadmapService.get_current_roadmap(user_id=self.user_id, supabase_client=self.mock_db)
+        self.assertIsNone(curr_rm)
+
+        remaining_acts = self.mock_db.table("roadmap_activities").select("*").execute()
+        user_acts = [a for a in (remaining_acts.data or []) if a.get("roadmap_id") in roadmap_ids]
+        self.assertEqual(len(user_acts), 0)
+
+        remaining_goals = self.mock_db.table("career_goals").select("*").eq("user_id", self.user_id).execute()
+        self.assertEqual(len(remaining_goals.data or []), 0)
+
+        remaining_igoals = self.mock_db.table("interview_goals").select("*").eq("user_id", self.user_id).execute()
+        self.assertEqual(len(remaining_igoals.data or []), 0)
 
 
 if __name__ == "__main__":

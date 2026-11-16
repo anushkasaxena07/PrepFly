@@ -62,3 +62,4 @@ END $$;
 
 -- Reload PostgREST schema cache immediately
 NOTIFY pgrst, 'reload schema';
+
