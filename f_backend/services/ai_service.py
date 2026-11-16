@@ -409,21 +409,33 @@ def generate_dynamic_question(
         (resume_text and ("No Resume Provided" in resume_text or "JOB DESCRIPTION" in resume_text or "JOB PROFILE" in resume_text))
         or (job_description and not resume_text)
     )
-    effective_role = role or (category if category and "Software" in category else "Software Engineer")
+    if role and role.strip():
+        effective_role = role.strip()
+    elif category and any(ml in category.upper() for ml in ["AI", "ML", "MACHINE LEARNING", "DATA SCIENCE"]):
+        effective_role = "AI/ML Engineer"
+    elif category and "Software" in category:
+        effective_role = category
+    else:
+        effective_role = "Software Engineer"
+
     effective_jd = job_description or (resume_text if is_no_resume else "")
     is_hr = is_hr_or_non_technical_role(effective_role, effective_jd) or (
         category and "HR" in category.upper() and "DSA" not in category.upper()
     )
 
-    # 1. Turn 1 GUARANTEE: Warm greeting and casual, low-stakes icebreaker (No technical jargon on Turn 1)
+    # 1. Turn 1 GUARANTEE: Warm professional greeting combined directly with First Real Technical Question
     if question_index == 1:
         first_name = candidate_name.strip().split()[0] if candidate_name and candidate_name.strip() and candidate_name.lower() != "candidate" else ""
         name_str = f" {first_name}" if first_name else ""
-        if is_hr:
-            greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's really wonderful to meet you! Before we dive into questions for the {effective_role} role, how are you feeling today and how is your day going so far?"
-        else:
-            greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's really wonderful to meet you! Before we dive into questions for the {effective_role} role, how are you feeling today and how is your day going so far?"
-        return greeting, "Phase 1: Greeting & Icebreaker", False
+        first_q = get_curated_fallback_question(
+            category=category or ("AI_ML" if ("AI" in effective_role.upper() or "ML" in effective_role.upper()) else "DSA"),
+            role=effective_role,
+            job_description=effective_jd,
+            question_index=1,
+            previous_questions=[]
+        )
+        greeting = f"Hi{name_str}! I'm Ava, your AI interviewer today. It's wonderful to meet you, and welcome to your {effective_role} interview. Let's begin with our first question: {first_q}"
+        return greeting, "Phase 1: Foundations", False
 
     # 2. Handle Voice / Text Commands (Repeat)
     if last_answer and last_answer.strip().lower() in ["repeat", "can you repeat the question", "pardon"]:
@@ -466,6 +478,12 @@ DO NOT ask high-level system design, computer networks, database ACID, or behavi
             phase_guidance = f"PHASE: DSA CODING PROBLEM 2. Previous Candidate Answer: '{last_answer}'. Present a problem on Trees, Graphs, or Dynamic Programming/Recursion."
         else:
             phase_guidance = f"PHASE: DSA TRADEOFFS & COMPLEXITY (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. Probe worst-case time/space complexity and algorithmic trade-offs."
+    elif "AIML" in cat_clean or "AI/ML" in cat_clean or "MACHINE LEARNING" in cat_clean or "DATA SCIENCE" in cat_clean or ("AI" in effective_role.upper() and "ENGINEER" in effective_role.upper()):
+        track_instruction = f"""TRACK: AI & MACHINE LEARNING ENGINEERING (FRESHER / ENTRY-LEVEL) FOR {effective_role}
+STRICT MANDATE: Ask EXCLUSIVELY on foundational machine learning, model evaluation metrics (precision, recall, F1, ROC-AUC), feature engineering, data preprocessing, gradient descent, loss functions, supervised/unsupervised learning, and Python ML libraries (NumPy, Pandas, Scikit-Learn, PyTorch).
+Calibrate strictly for a Fresher (0 years professional experience): test conceptual clarity, fundamental intuition, and practical application.
+DO NOT ask senior distributed MLOps architecture, multi-million dollar GPU cluster scaling, or pure LeetCode hard graph puzzles."""
+        phase_guidance = f"PHASE: AI/ML FOUNDATIONS & EVALUATION (Turn {question_index}). Previous Candidate Answer: '{last_answer}'. React briefly (1 sentence), then ask a targeted question testing ML fundamentals, feature engineering, or model validation."
     elif "SYSTEM" in cat_clean or "DESIGN" in cat_clean:
         track_instruction = """TRACK: SYSTEM DESIGN & ARCHITECTURE
 STRICT MANDATE: Ask EXCLUSIVELY on distributed systems, microservices, load balancers, database sharding/indexing, caching (Redis), message queues (Kafka), and high availability.
@@ -590,8 +608,9 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
             is_valid, detected_topic, reason = validate_topic_question(q_text, topics_to_check)
             if not is_valid:
                 print(f"[REJECTED OFF-TOPIC QUESTION] {reason}. Regenerating from curated bank.")
+                default_cat = "HR_JOB_DESCRIPTION" if is_hr else ("AI_ML" if ("AI" in effective_role.upper() or "ML" in effective_role.upper()) else "DSA")
                 q_text = get_curated_fallback_question(
-                    category=category or "DSA",
+                    category=category or default_cat,
                     role=effective_role,
                     job_description=effective_jd,
                     question_index=question_index,
@@ -601,9 +620,10 @@ Return ONLY valid JSON with no markdown codeblock wrapping:
         return q_text, stage_name, needs_followup
 
     except Exception as e:
+        default_cat = "HR_JOB_DESCRIPTION" if is_hr else ("AI_ML" if ("AI" in effective_role.upper() or "ML" in effective_role.upper()) else "DSA")
         print(f"Dynamic question generation fallback notice ({e}), selecting strictly validated topic question:")
         fallback_choice = get_curated_fallback_question(
-            category=category or ("HR_JOB_DESCRIPTION" if is_hr else "DSA"),
+            category=category or default_cat,
             role=effective_role,
             job_description=effective_jd,
             question_index=question_index,

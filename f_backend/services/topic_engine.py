@@ -10,11 +10,13 @@ TOPIC_DSA = "DSA"
 TOPIC_SYSTEM_DESIGN = "SYSTEM_DESIGN"
 TOPIC_CS_FUNDAMENTALS = "CS_FUNDAMENTALS"
 TOPIC_HR_BEHAVIORAL = "HR_BEHAVIORAL"
+TOPIC_AIML = "AI_ML"
 
 TOPIC_NAME_DSA = "DSA & Algorithms"
 TOPIC_NAME_SYSTEM_DESIGN = "System Design"
 TOPIC_NAME_CS_FUNDAMENTALS = "Computer Science Fundamentals"
 TOPIC_NAME_HR_BEHAVIORAL = "HR & Behavioral"
+TOPIC_NAME_AIML = "AI & Machine Learning"
 
 # ── 1. SUPPORTED TOPIC IDENTIFIERS & METADATA ────────────────────────────────
 SUPPORTED_TOPICS = {
@@ -86,6 +88,24 @@ SUPPORTED_TOPICS = {
             "binary search", "big-o", "time complexity", "dynamic programming",
             "tcp/ip", "mutex", "b-tree", "database sharding", "microservice architecture"
         ]
+    },
+    "AI_ML": {
+        "id": "AI_ML",
+        "name": "AI & Machine Learning",
+        "aliases": ["ai", "ml", "aiml", "machine learning", "artificial intelligence", "data science"],
+        "keywords": [
+            "machine learning", "supervised", "unsupervised", "overfitting", "underfitting",
+            "bias variance", "gradient descent", "loss function", "cost function",
+            "precision", "recall", "f1", "roc-auc", "confusion matrix", "cross validation",
+            "numpy", "pandas", "scikit-learn", "feature engineering", "normalization",
+            "standardization", "data leakage", "regularization", "l1", "l2", "lasso", "ridge",
+            "decision tree", "random forest", "logistic regression", "linear regression",
+            "neural network", "activation function", "learning rate", "hyperparameter"
+        ],
+        "disallowed_keywords": [
+            "acid", "tcp/ip", "deadlock", "context switch", "binary search tree",
+            "virtual memory", "posh compliance", "payroll", "microservices sharding"
+        ]
     }
 }
 
@@ -98,6 +118,8 @@ def normalize_topic_identifier(topic_str: Optional[str]) -> str:
     t = topic_str.strip().upper().replace("&", "AND").replace("-", "_").replace(" ", "_")
     if "DSA" in t or "ALGORITHM" in t or "DATA_STRUCTURE" in t:
         return "DSA"
+    if "AI" in t or "ML" in t or "MACHINE_LEARNING" in t or "DATA_SCIENCE" in t:
+        return "AI_ML"
     if "SYSTEM" in t or "DESIGN" in t or "ARCHITECTURE" in t:
         return "SYSTEM_DESIGN"
     if "FUNDAMENTAL" in t or "CS" in t or "CORE" in t:
@@ -312,6 +334,15 @@ TOPIC_QUESTION_BANKS = {
         "Describe your approach to designing automated unit and integration test suites in Python (using pytest/unittest) for critical business logic and API endpoints.",
         "How do you handle asynchronous background processing and task scheduling in a Python architecture using tools like Celery or asyncio?",
         "What strategies do you use in PostgreSQL to manage concurrent write operations, database transactions, and database migration versioning?"
+    ],
+    "AI_ML": [
+        "In Python data processing for ML, what are the primary memory and performance advantages of using NumPy vectorized arrays over native Python lists for matrix operations?",
+        "Explain the bias-variance tradeoff in machine learning. How can you detect if an ML model is overfitting during training, and what concrete techniques (such as regularization or data augmentation) mitigate it?",
+        "What is the difference between supervised and unsupervised learning? Can you give a real-world example for each and describe how the training data differs?",
+        "When evaluating a classification model on an imbalanced dataset (such as fraud detection or rare medical diagnosis), why is Accuracy misleading, and how do Precision, Recall, and the F1-score provide better insight?",
+        "Explain how Gradient Descent optimizes model parameters. What are the key differences between Batch Gradient Descent, Stochastic Gradient Descent (SGD), and Mini-batch Gradient Descent?",
+        "How do you handle categorical variables in a dataset before feeding them into an ML algorithm? Compare One-Hot Encoding versus Label/Ordinal Encoding and explain when to use each.",
+        "Why is it essential to split data into Train, Validation, and Test sets? What is data leakage, and how can feature preprocessing accidentally cause it?"
     ]
 }
 
@@ -319,7 +350,7 @@ TOPIC_QUESTION_BANKS = {
 def get_curated_fallback_question(*args, **kwargs) -> str:
     """
     Selects a deterministic, non-repeating, topic-compliant question from the curated banks.
-    Guarantees that HR roles receive HR questions, DSA receives DSA, etc.
+    Guarantees that HR roles receive HR questions, AI/ML receives AI/ML questions, DSA receives DSA, etc.
     """
     question_index = kwargs.get("question_index", 2)
     category = kwargs.get("category", "")
@@ -352,12 +383,16 @@ def get_curated_fallback_question(*args, **kwargs) -> str:
     # Select target bank
     if is_hr_or_non_technical_role(role, job_description):
         bank = TOPIC_QUESTION_BANKS["HR_JOB_DESCRIPTION"]
+    elif role and ("ai" in role.lower() or "machine learning" in role.lower() or "data science" in role.lower() or "ml" in role.lower()):
+        bank = TOPIC_QUESTION_BANKS["AI_ML"]
     elif role and "python" in role.lower() and "backend" in role.lower():
         bank = TOPIC_QUESTION_BANKS["PYTHON_BACKEND_JD"]
     else:
         norm_topic = normalize_topic_identifier(category)
         if norm_topic in TOPIC_QUESTION_BANKS:
             bank = TOPIC_QUESTION_BANKS[norm_topic]
+        elif norm_topic == "AI_ML":
+            bank = TOPIC_QUESTION_BANKS["AI_ML"]
         elif "HR" in norm_topic or "BEHAVIORAL" in norm_topic:
             bank = TOPIC_QUESTION_BANKS["HR_BEHAVIORAL"]
         elif "DESIGN" in norm_topic:
@@ -373,4 +408,4 @@ def get_curated_fallback_question(*args, **kwargs) -> str:
             return q
 
     # Fallback to indexed wrap
-    return bank[(question_index - 2) % len(bank)]
+    return bank[(question_index - 1) % len(bank)]

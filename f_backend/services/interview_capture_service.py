@@ -152,18 +152,58 @@ def classify_turn_status(
 def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
     try:
         supabase_client.table("interview_turns").upsert(row, on_conflict="id").execute()
+        return
     except Exception as e:
-        err_msg = str(e).lower()
-        if "pgrst204" in err_msg or "column" in err_msg or "schema cache" in err_msg:
-            # Fallback by dropping optional drift columns
+        err_msg = str(e)
+        err_lower = err_msg.lower()
+        if "pgrst204" in err_lower or "column" in err_lower or "schema cache" in err_lower:
             fallback_row = dict(row)
-            for opt_col in ("stage", "question_type", "turn_status", "intent", "decision", "candidate_response", "audio_ref", "stt_engine", "stt_confidence", "word_count"):
-                fallback_row.pop(opt_col, None)
+            # 1. Dynamically detect missing column mentioned in PostgREST error
+            col_match = re.search(r"'([^']+)'\s+column", err_msg, re.IGNORECASE) or re.search(r"column\s+'([^']+)'", err_msg, re.IGNORECASE) or re.search(r"column\s+([a-zA-Z0-9_]+)", err_msg, re.IGNORECASE)
+            if col_match:
+                missing_col = col_match.group(1).strip().strip("'")
+                logger.warning("PGRST204 schema drift detected for column '%s' on interview_turns; removing from payload and retrying.", missing_col)
+                fallback_row.pop(missing_col, None)
+                try:
+                    supabase_client.table("interview_turns").upsert(fallback_row, on_conflict="id").execute()
+                    return
+                except Exception as e_step1:
+                    logger.warning("interview_turns single-column fallback failed (%s); trying minimal schema fallback.", e_step1)
+
+            # 2. Broader fallback: remove all extended/drift columns including skill_id
+            extended_cols = (
+                "skill_id", "turn_index", "speaker", "question_id", "text", "input_mode",
+                "stt_engine", "stt_confidence", "audio_ref", "audio_duration_s",
+                "started_at", "ended_at", "word_count", "turn_status", "stage",
+                "question_type", "intent", "decision", "candidate_response"
+            )
+            for c in extended_cols:
+                fallback_row.pop(c, None)
+            if "candidate_response" not in fallback_row and row.get("text"):
+                fallback_row["candidate_response"] = row["text"]
+            if "question_text" not in fallback_row and row.get("question_text"):
+                fallback_row["question_text"] = row["question_text"]
+
             try:
                 supabase_client.table("interview_turns").upsert(fallback_row, on_conflict="id").execute()
                 return
-            except Exception as e_fallback:
-                logger.warning("interview_turns fallback upsert also failed: %s", e_fallback)
+            except Exception as e_step2:
+                logger.warning("interview_turns extended-columns fallback failed (%s); attempting minimal base 002 upsert.", e_step2)
+
+            # 3. Minimal base 002 schema: only id, session_id, turn_number, question_text, candidate_response, created_at
+            minimal_row = {
+                "id": row.get("id"),
+                "session_id": row.get("session_id"),
+                "turn_number": row.get("turn_number") or (row.get("turn_index", 0) + 1),
+                "question_text": row.get("question_text") or "Question",
+                "candidate_response": row.get("text") or row.get("candidate_response") or "",
+                "created_at": row.get("created_at") or _utc_now_iso(),
+            }
+            try:
+                supabase_client.table("interview_turns").upsert(minimal_row, on_conflict="id").execute()
+                return
+            except Exception as e_min:
+                logger.error("interview_turns minimal base upsert failed: %s", e_min)
         raise e
 
 

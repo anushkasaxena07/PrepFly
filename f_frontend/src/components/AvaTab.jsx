@@ -356,6 +356,18 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
     }
   }
 
+  // Responsive viewport hook for mobile layout
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Steps: "resume_upload" -> "type_selection" -> "device_check" -> "loading" -> "live_call" -> "report"
   const [step, setStep] = useState("resume_upload");
   const [setupMode, setSetupMode] = useState("resume"); // "resume" or "non_resume"
@@ -364,10 +376,11 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const [selectedPersonality, setSelectedPersonality] = useState("professional");
   const [useTextInput, setUseTextInput] = useState(false);
 
-  // Non-Resume Form State
-  const [roleTitle, setRoleTitle] = useState("Software Engineer");
-  const [roleTools, setRoleTools] = useState("Python, React, SQL, Algorithms");
-  const [category, setCategory] = useState("Core CS");
+  // Non-Resume Form State - respect candidate's target role (AI/ML Engineer)
+  const candidateTargetRole = safeUser?.target_role || safeUser?.targetRole || safeUser?.role || "AI/ML Engineer";
+  const [roleTitle, setRoleTitle] = useState(candidateTargetRole);
+  const [roleTools, setRoleTools] = useState("Python, PyTorch, Scikit-Learn, NumPy, SQL");
+  const [category, setCategory] = useState("AI / Machine Learning");
   const [difficulty, setDifficulty] = useState("Medium");
 
   const [resumeFile, setResumeFile] = useState(null);
@@ -989,8 +1002,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
       setSessionId(activeSessionId);
 
-      const chosenCategory = (activeMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
-      const chosenRole = (activeMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
+      const chosenCategory = (activeMode === "non_resume") ? (category || "AI / Machine Learning") : (selectedType?.id || "Resume");
+      const chosenRole = (activeMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || candidateTargetRole || "AI/ML Engineer");
 
       let startRes = await apiFetch("/start-interview", {
         method: "POST",
@@ -1377,8 +1390,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       : null;
 
     try {
-      const chosenCategory = (setupMode === "non_resume") ? (category || "Job Description") : (selectedType?.id || "Resume");
-      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || "Software Engineer");
+      const chosenCategory = (setupMode === "non_resume") ? (category || "AI / Machine Learning") : (selectedType?.id || "Resume");
+      const chosenRole = (setupMode === "non_resume" && roleTitle.trim()) ? roleTitle.trim() : (selectedType?.name || candidateTargetRole || "AI/ML Engineer");
       if (!turnIdemKeyRef.current) {
         turnIdemKeyRef.current = `turn_${sessionId}_${questionNumber}_${Date.now()}`;
       }
@@ -1652,6 +1665,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   };
 
   const interviewTypes = [
+    { id: "AIML", name: "AI / Machine Learning", duration: "25–45 min", desc: "Foundational ML, evaluation metrics, feature engineering, loss functions, and practical AI models." },
     { id: "MAANG", name: "MAANG / Big Tech", duration: "45 min", desc: "A big-tech screen: your resume, technical architecture, and deep algorithmic trade-offs." },
     { id: "DSA", name: "DSA & Algorithms", duration: "20–45 min", desc: "Data structures, algorithms, complexity analysis, and live problem-solving reasoning." },
     { id: "Resume", name: "Resume Deep-Dive", duration: "20 min", desc: "Every question comes directly from your uploaded resume, past projects, and tech stack." },
@@ -2309,8 +2323,15 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
             </div>
 
-            {/* SPLIT CONTAINER: CANDIDATE VIDEO (LEFT) & AVA INTERVIEWER CONSOLE (RIGHT) */}
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(310px, 0.33fr) 1fr", gap: "16px", flex: 1, minHeight: 0 }}>
+            {/* SPLIT CONTAINER: CANDIDATE VIDEO (LEFT/TOP) & AVA INTERVIEWER CONSOLE (RIGHT/BOTTOM) */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "minmax(310px, 0.33fr) 1fr",
+              gap: isMobile ? "12px" : "16px",
+              flex: 1,
+              minHeight: 0,
+              overflowY: isMobile ? "auto" : "visible"
+            }}>
 
               {/* LEFT COLUMN: CANDIDATE LIVE WEBCAM VIDEO */}
               <div style={{
@@ -2323,7 +2344,8 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minHeight: 0
+                height: isMobile ? "150px" : "100%",
+                minHeight: isMobile ? "150px" : 0
               }}>
                 <video
                   ref={videoRefCall}
@@ -2635,7 +2657,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                       padding: "3px 12px",
                       borderRadius: "14px"
                     }}>
-                      {selectedType?.title || roleTitle || "System Design"}
+                      {selectedType?.name || selectedType?.title || roleTitle || "AI / Machine Learning"}
                     </span>
                   </div>
 
@@ -2648,7 +2670,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                     textAlign: "center",
                     margin: "10px 0 12px 0"
                   }}>
-                    {captionText || question || "Evaluating your answers against structured rubrics..."}
+                    {isAvaThinking ? (captionText || "Saving your response and preparing next question...") : (question || "Ready for your next question...")}
                   </div>
 
                   {/* Action Buttons: Repeat & Hint */}
@@ -2739,13 +2761,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                         fontWeight: 700,
                         fontSize: "11px"
                       }}>
-                        STT {sttConfidence ? Math.round(sttConfidence * 100) : 74}%
+                        {inputMode === "speech" ? (sttConfidence ? `STT ${Math.round(sttConfidence * 100)}%` : "Live STT") : "Typed"}
                       </span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <span style={{ color: isSunrise ? "#78716c" : "#94a3b8", fontSize: "11.5px" }}>
-                        {answer.trim() ? answer.trim().split(/\s+/).length : 4} words
+                        {answer.trim() ? answer.trim().split(/\s+/).filter(Boolean).length : 0} words
                       </span>
                       <button
                         type="button"
@@ -2841,7 +2863,13 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   <div style={{ position: "relative", width: "100%" }}>
                     <textarea
                       rows={2}
-                      placeholder={inputMode === "typed" ? "Type your response directly here..." : "check kar rahi thi"}
+                      placeholder={
+                        inputMode === "typed"
+                          ? "Type your response directly here..."
+                          : (isSpeakingAnswer
+                              ? "Listening... Speak your answer now (words will appear here)..."
+                              : "Voice mic paused. Click 'Resume Voice Mic' to speak, or switch to typing...")
+                      }
                       value={answer}
                       onChange={e => {
                         setAnswer(e.target.value);
