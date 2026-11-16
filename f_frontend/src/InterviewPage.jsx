@@ -4,10 +4,9 @@ import AI_INTERVIEWER from "./config/aiInterviewerConfig";
 import { getGradeInfo, computeSectionGrades, getBadges } from "./utils/gradingSystem";
 import { safePlayMedia } from "./utils/mediaPlayback";
 import { BACKEND_URL } from "./config/apiConfig";
+import { AVA_AVATAR_DARK } from "./assets/avaAvatarAssets";
 
-
-// ── futur21 Circle Waves Avatar for Ava AI ──────────────────────────────────
-// ── futur21 Circle Waves Avatar for Ava AI (GIF only) ───────────────────────
+// ── Ava AI Interviewer Circular Avatar with Live Glow & Pulse ────────────────
 const CircleWavesAvatar = ({ isTalking, isThinking }) => {
   return (
     <div
@@ -26,24 +25,33 @@ const CircleWavesAvatar = ({ isTalking, isThinking }) => {
           height: "180px",
           borderRadius: "50%",
           overflow: "hidden",
-          transform: isTalking ? "scale(1.05)" : "scale(1)",
-          transition: "transform 0.3s ease",
+          transform: isTalking ? "scale(1.04)" : "scale(1)",
+          transition: "transform 0.3s ease, box-shadow 0.3s ease",
           boxShadow: isTalking
-            ? "0 0 30px rgba(0, 229, 195, 0.6)"
+            ? "0 0 35px rgba(249, 115, 22, 0.75), 0 0 50px rgba(251, 146, 60, 0.45)"
             : isThinking
-              ? "0 0 20px rgba(139, 92, 246, 0.5)"
-              : "0 0 15px rgba(0, 229, 195, 0.3)",
+              ? "0 0 25px rgba(167, 139, 250, 0.7), 0 0 40px rgba(139, 92, 246, 0.4)"
+              : "0 0 22px rgba(249, 115, 22, 0.4)",
+          border: isThinking ? "2.5px solid #a78bfa" : "2.5px solid #f97316",
+          background: "#000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
         }}
       >
         <img
-          src="/ava-circle-waves.gif"
-          alt="Ava AI"
-          onError={(e) => (e.target.style.display = "none")}
+          src={AVA_AVATAR_DARK}
+          alt="Ava AI Interviewer"
+          onError={(e) => {
+            e.target.src = "/ava_interviewer_circle.png";
+          }}
           style={{
             width: "100%",
             height: "100%",
             objectFit: "cover",
             borderRadius: "50%",
+            display: "block",
           }}
         />
       </div>
