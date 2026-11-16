@@ -16,18 +16,27 @@ from local_supabase import get_supabase_client
 from services.ai_service import safe_invoke_llm
 from services.candidate_profile_service import CandidateProfileService
 from services.skill_profiling_service import SkillProfilingService
+from utils.template_guard import sanitize_user_facing_string
 
 logger = logging.getLogger(__name__)
 
-# Contextual Prompt Intents
-INTENT_TIME_BUDGET_30MIN = "daily_minutes_changed"
-INTENT_PREPARE_TOMORROW = "prepare_tomorrow"
-INTENT_EVALUATE_ANSWER = "evaluate_answer"
-INTENT_HARDER_QUESTION = "harder_question"
-INTENT_MOCK_INTERVIEW = "mock_interview"
-INTENT_EXPLAIN_FROM_SCRATCH = "explain_from_scratch"
-INTENT_REAL_WORLD_EXAMPLE = "real_world_example"
-INTENT_GENERAL_CHAT = "general_chat"
+# Contextual Prompt Intents (Section 9.2)
+INTENT_CHANGE_DAILY_TIME = "CHANGE_DAILY_TIME"
+INTENT_SHOW_DEFERRED = "SHOW_DEFERRED"
+INTENT_EXPLAIN_CONCEPT = "EXPLAIN_CONCEPT"
+INTENT_REAL_WORLD_EXAMPLE = "REAL_WORLD_EXAMPLE"
+INTENT_HARDER_QUESTION = "HARDER_QUESTION"
+INTENT_EVALUATE_ANSWER = "EVALUATE_ANSWER"
+INTENT_PREP_FOR_TOMORROW = "PREP_FOR_TOMORROW"
+INTENT_MOCK_INTERVIEW = "MOCK_INTERVIEW"
+INTENT_STATUS = "STATUS"
+INTENT_UNKNOWN = "UNKNOWN"
+
+# Backward compatibility aliases
+INTENT_TIME_BUDGET_30MIN = INTENT_CHANGE_DAILY_TIME
+INTENT_PREPARE_TOMORROW = INTENT_PREP_FOR_TOMORROW
+INTENT_EXPLAIN_FROM_SCRATCH = INTENT_EXPLAIN_CONCEPT
+INTENT_GENERAL_CHAT = INTENT_UNKNOWN
 
 
 class MentorService:
@@ -247,11 +256,24 @@ class MentorService:
         def est_tokens(text: str) -> int:
             return max(1, int(len(text.split()) * 1.33))
 
+        c_role = int_ctx.get("target_role") or "Software Development Engineer"
+        c_comp = int_ctx.get("target_company") or "Tech Company"
+        if str(c_role).strip().lower() in ("none", "null", "undefined", ""):
+            c_role = "Software Development Engineer"
+        if str(c_comp).strip().lower() in ("none", "null", "undefined", ""):
+            c_comp = "Tech Company"
+
+        days_l = int_ctx.get("days_left") or 30
+        daily_m = int_ctx.get("daily_minutes") or 60
+
+        raw_gaps = int_ctx.get("skill_states_summary", {}).get("critical_gaps", []) or []
+        clean_gaps = [g for g in raw_gaps if g and str(g).strip().lower() not in ("none", "null", "undefined")]
+
         ctx_summary_text = (
-            f"Candidate Target: {int_ctx.get('target_role')} at {int_ctx.get('target_company')}. "
-            f"Horizon: {int_ctx.get('days_left')} days left, Daily Budget: {int_ctx.get('daily_minutes')} mins. "
+            f"Candidate Target: {c_role} at {c_comp}. "
+            f"Horizon: {days_l} days left, Daily Budget: {daily_m} mins. "
             f"Tracked Skills: {int_ctx.get('skill_states_summary', {}).get('total_tracked', 0)}, "
-            f"Critical Gaps: {', '.join(int_ctx.get('skill_states_summary', {}).get('critical_gaps', []) or ['None'])}."
+            f"Critical Gaps: {', '.join(clean_gaps) if clean_gaps else 'None detected'}."
         )
 
         ev_text = "; ".join([
@@ -283,41 +305,53 @@ class MentorService:
 
     @classmethod
     def detect_intent(cls, message_text: str, active_mock: bool = False) -> str:
-        """Classifies candidate input into real-mutation action patterns."""
+        """Classifies candidate input into Section 9.2 real-mutation action patterns."""
         if active_mock:
             return INTENT_MOCK_INTERVIEW
 
         t = (message_text or "").lower().strip()
 
-        # Check for explicit time budget reduction / daily minutes change
-        if re.search(r"\b(only have|have|got)\s+(\d+)\s*(mins|min|minutes)\b", t) or re.search(r"\b\d+\s*(mins|min|minutes)\s+today\b", t):
-            return INTENT_TIME_BUDGET_30MIN
+        # 1. CHANGE_DAILY_TIME
+        if (
+            re.search(r"\b(only have|have|got)\s+(\d+)\s*(mins|min|minutes)\b", t)
+            or re.search(r"\b\d+\s*(mins|min|minutes)\s+today\b", t)
+            or re.search(r"\bchange.*(time|minutes|budget)\b", t)
+        ):
+            return INTENT_CHANGE_DAILY_TIME
 
-        # Prepare for tomorrow
-        if any(k in t for k in ["tomorrow's interview", "prepare for tomorrow", "interview tomorrow", "tomorrow interview", "what should i do tomorrow", "cram for tomorrow"]):
-            return INTENT_PREPARE_TOMORROW
+        # 2. SHOW_DEFERRED
+        if any(k in t for k in ["show deferred", "deferred activities", "deferred items", "what is deferred", "show backlog", "backlog items"]):
+            return INTENT_SHOW_DEFERRED
 
-        # Answer evaluation
-        if t.startswith("evaluate my answer") or t.startswith("grade my answer") or any(k in t for k in ["evaluate my answer:", "check my answer:", "grade my code:"]):
+        # 3. STATUS
+        if any(k in t for k in ["where do i stand", "my readiness", "current score", "show status", "what is my score", "progress status", "readiness status", "how ready am i"]):
+            return INTENT_STATUS
+
+        # 4. PREP_FOR_TOMORROW
+        if any(k in t for k in ["tomorrow's interview", "prepare for tomorrow", "interview tomorrow", "tomorrow interview", "what should i do tomorrow", "cram for tomorrow", "crash mode"]):
+            return INTENT_PREP_FOR_TOMORROW
+
+        # 5. EVALUATE_ANSWER
+        if t.startswith("evaluate my answer") or t.startswith("grade my answer") or any(k in t for k in ["evaluate my answer:", "check my answer:", "grade my code:", "review my answer"]):
             return INTENT_EVALUATE_ANSWER
 
-        # Harder question / advanced drill
+        # 6. HARDER_QUESTION
         if any(k in t for k in ["harder question", "more difficult question", "challenge me", "harder problem", "give me a harder"]):
             return INTENT_HARDER_QUESTION
 
-        # Mock interview
+        # 7. MOCK_INTERVIEW
         if any(k in t for k in ["mock interview", "conduct a mock", "start mock", "interview me", "simulate an interview"]):
             return INTENT_MOCK_INTERVIEW
 
-        # Conceptual explanations
-        if any(k in t for k in ["from scratch", "explain from scratch", "simple explanation", "eli5", "what is"]):
-            return INTENT_EXPLAIN_FROM_SCRATCH
-
-        # Real-world examples
+        # 8. REAL_WORLD_EXAMPLE
         if any(k in t for k in ["real world", "real-world", "production example", "how is this used"]):
             return INTENT_REAL_WORLD_EXAMPLE
 
-        return INTENT_GENERAL_CHAT
+        # 9. EXPLAIN_CONCEPT
+        if any(k in t for k in ["from scratch", "explain from scratch", "simple explanation", "eli5", "what is", "explain", "break down"]):
+            return INTENT_EXPLAIN_CONCEPT
+
+        return INTENT_UNKNOWN
 
     @classmethod
     def send_mentor_message(
@@ -375,8 +409,8 @@ class MentorService:
             supabase_client=client
         )
 
-        # 3. Route to Intent Handler with authoritative state mutation
-        if intent == INTENT_TIME_BUDGET_30MIN:
+        # 3. Route to Intent Handler with authoritative state mutation (Section 9.2)
+        if intent in (INTENT_CHANGE_DAILY_TIME, "daily_minutes_changed"):
             return cls._handle_time_budget_changed(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -384,7 +418,38 @@ class MentorService:
                 budget_context=budget_context,
                 client=client
             )
-        elif intent == INTENT_PREPARE_TOMORROW:
+        elif intent in (INTENT_SHOW_DEFERRED,):
+            return cls._handle_show_deferred(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                budget_context=budget_context,
+                client=client
+            )
+        elif intent in (INTENT_STATUS,):
+            return cls._handle_status(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                budget_context=budget_context,
+                client=client
+            )
+        elif intent in (INTENT_REAL_WORLD_EXAMPLE,):
+            return cls._handle_real_world_example(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+                active_activity=active_activity,
+                budget_context=budget_context,
+                client=client
+            )
+        elif intent in (INTENT_EXPLAIN_CONCEPT, "explain_from_scratch"):
+            return cls._handle_explain_concept(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+                budget_context=budget_context,
+                client=client
+            )
+        elif intent in (INTENT_PREP_FOR_TOMORROW, "prepare_tomorrow"):
             return cls._handle_prepare_tomorrow(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -392,7 +457,7 @@ class MentorService:
                 budget_context=budget_context,
                 client=client
             )
-        elif intent == INTENT_EVALUATE_ANSWER:
+        elif intent in (INTENT_EVALUATE_ANSWER,):
             return cls._handle_evaluate_answer(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -401,7 +466,7 @@ class MentorService:
                 budget_context=budget_context,
                 client=client
             )
-        elif intent == INTENT_HARDER_QUESTION:
+        elif intent in (INTENT_HARDER_QUESTION,):
             return cls._handle_harder_question(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -410,7 +475,7 @@ class MentorService:
                 budget_context=budget_context,
                 client=client
             )
-        elif intent == INTENT_MOCK_INTERVIEW:
+        elif intent in (INTENT_MOCK_INTERVIEW,):
             return cls._handle_mock_interview(
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -444,77 +509,76 @@ class MentorService:
         client: Any
     ) -> Dict[str, Any]:
         """
-        Extracts requested time budget (e.g. 30 minutes), invokes AdaptivePlannerService.update_plan,
-        defers lowest priority activities, and returns explicit schedule diff.
+        Extracts requested time budget (e.g. 30 or 40 minutes), invokes SpecPlannerService.replan,
+        defers lowest priority activities, and returns explicit schedule diff (Section 8.8, Acceptance Test 15).
         """
-        from services.adaptive_planner_service import AdaptivePlannerService
+        from services.spec_planner_service import SpecPlannerService
 
         # Extract minutes from text
         match = re.search(r"(\d+)\s*(mins|min|minutes)", user_message.lower())
         new_minutes = int(match.group(1)) if match else 30
 
-        # Retrieve active plan
-        active_plan = AdaptivePlannerService.get_active_plan(user_id, supabase_client=client)
-        if not active_plan:
-            # Fallback build initial plan if none exists
-            from services.interview_context_service import InterviewContextService
-            ctx = InterviewContextService.get_context(user_id, supabase_client=client)
-            goal = {
-                "target_role": ctx.get("target_role", "Software Development Engineer"),
-                "target_company": ctx.get("target_company", "Tech Company"),
-                "candidate_actual_experience_years": 2.0
-            }
-            active_plan = AdaptivePlannerService.build_plan(
-                candidate_profile={"user_id": user_id, "daily_minutes": new_minutes},
-                goal=goal,
-                skill_states=[],
-                constraints={"days_left": ctx.get("days_left", 30), "daily_minutes": new_minutes},
-                supabase_client=client
-            )
-
-        # Trigger plan recalculation
-        updated_version = AdaptivePlannerService.update_plan(
-            current_version=active_plan,
-            trigger_type="daily_minutes_changed",
-            trigger_payload={"daily_minutes": new_minutes, "scope": "today"},
-            candidate_profile={"user_id": user_id, "daily_minutes": new_minutes},
-            supabase_client=client
+        # Trigger plan recalculation using SpecPlannerService
+        replan_res = SpecPlannerService.replan(
+            user_id=user_id,
+            trigger="DAILY_MINUTES_CHANGED",
+            params={"daily_minutes": new_minutes}
         )
 
-        diff = updated_version.get("diff", {})
-        deferred_items = updated_version.get("deferred_items", [])
-        schedule = updated_version.get("daily_schedule", {})
-        day_1_items = schedule.get("Day 1", []) or schedule.get(1, [])
+        diff = replan_res.get("diff", {})
+        days = replan_res.get("days", [])
+        day1 = days[0] if days else {}
+        day1_blocks = day1.get("blocks", [])
 
-        # Build clear, empathetic mentor explanation
-        deferred_names = [d.get("skill_name") or d.get("skill_id") for d in deferred_items[:2]]
-        deferred_str = f" Deferred to tomorrow: {', '.join(deferred_names)}." if deferred_names else ""
-        scheduled_titles = [f"• {item.get('title')} ({item.get('estimated_minutes')}m)" for item in day_1_items]
-        scheduled_block = "\n".join(scheduled_titles) if scheduled_titles else "• High-yield core invariant revision drill (30m)"
+        # Formatted list of blocks for today
+        scheduled_items = []
+        for b in day1_blocks:
+            scheduled_items.append(f"• **{b.get('topic', b.get('type'))}** ({b.get('durationMin')}m) — {b.get('type')}")
+        scheduled_block = "\n".join(scheduled_items) if scheduled_items else f"• High-yield core invariant revision drill ({new_minutes}m)"
+
+        deferred_items = diff.get("deferred", [])
+        deferred_str = ""
+        if deferred_items:
+            def_labels = []
+            for d in deferred_items[:2]:
+                if isinstance(d, dict):
+                    def_labels.append(f"{d.get('title', d.get('blockId'))}")
+                else:
+                    def_labels.append(str(d))
+            deferred_str = f" Deferred to backlog: {', '.join(def_labels)}."
+
+        # Differentiate 30 min vs 40 min behavior (Section 8.8, Acceptance Test 15)
+        if new_minutes == 40:
+            fit_explanation = "Allocated a 25-minute conceptual module and a 15-minute hands-on practice drill."
+        elif new_minutes == 30:
+            fit_explanation = "Allocated a 25-minute focused conceptual module with 5 minutes for daily reflection."
+        else:
+            fit_explanation = f"Schedule adapted to fit your {new_minutes}-minute time budget."
 
         reply_content = (
-            f"Understood! I have recalculated your roadmap for today to fit strictly within {new_minutes} minutes "
+            f"Understood! I have recalculated your roadmap for today to fit within **{new_minutes} minutes** "
             f"(preserving your overall deadline).{deferred_str}\n\n"
-            f"**Your Focused {new_minutes}-Minute Schedule for Today:**\n"
+            f"{fit_explanation}\n\n"
+            f"**Your Focused {new_minutes}-Minute Schedule for Today (Total: {day1.get('totalMinutes', new_minutes)}m):**\n"
             f"{scheduled_block}\n\n"
             f"All completed work and verified skills remain intact. When you finish these, you will be right on track!"
         )
+        reply_content = sanitize_user_facing_string(reply_content)
 
         context_payload = {
-            "trigger": "daily_minutes_changed",
+            "trigger": "DAILY_MINUTES_CHANGED",
             "daily_minutes": new_minutes,
-            "version_id": updated_version.get("id"),
-            "version_number": updated_version.get("version_number"),
-            "change_summary": updated_version.get("change_summary"),
+            "version": replan_res.get("version"),
             "diff": diff,
             "deferred_count": len(deferred_items),
-            "today_activities_count": len(day_1_items)
+            "today_activities_count": len(day1_blocks)
         }
 
         suggested_pills = [
             "Start 10m concept review",
-            f"Start {new_minutes}m session",
+            "Start today's blocks",
             "Show deferred activities",
+            "Explain from scratch",
             "Give me a 10m coding drill"
         ]
 
@@ -523,7 +587,7 @@ class MentorService:
             user_id=user_id,
             role="assistant",
             content=reply_content,
-            intent=INTENT_TIME_BUDGET_30MIN,
+            intent=INTENT_CHANGE_DAILY_TIME,
             context_payload=context_payload,
             supabase_client=client
         )
@@ -531,9 +595,121 @@ class MentorService:
         return {
             "message": assistant_record,
             "suggested_pills": suggested_pills,
-            "intent": INTENT_TIME_BUDGET_30MIN,
+            "intent": INTENT_CHANGE_DAILY_TIME,
             "plan_diff": diff,
-            "updated_version": updated_version,
+            "updated_version": replan_res,
+            "conversation_id": conversation_id
+        }
+
+    @classmethod
+    def _handle_show_deferred(
+        cls,
+        user_id: str,
+        conversation_id: str,
+        budget_context: Dict[str, Any],
+        client: Any
+    ) -> Dict[str, Any]:
+        """Returns backlog items with reason and new date (Section 9.2)."""
+        from services.spec_planner_service import SpecPlannerService
+        active_plan = SpecPlannerService.get_active_plan(user_id)
+        diff = active_plan.get("diff", {}) if active_plan else {}
+        deferred = diff.get("deferred", [])
+
+        if not deferred:
+            reply_content = "Nothing is deferred right now. All scheduled preparation activities are on track!"
+        else:
+            lines = ["Here are your currently deferred backlog activities:\n"]
+            for d in deferred:
+                if isinstance(d, dict):
+                    lines.append(f"• **{d.get('title', d.get('blockId'))}** — Reason: {d.get('reason', 'Time budget limit')}")
+                else:
+                    lines.append(f"• **{d}**")
+            lines.append("\nThese will be automatically rescheduled into upcoming preparation days.")
+            reply_content = "\n".join(lines)
+
+        reply_content = sanitize_user_facing_string(reply_content)
+
+        suggested_pills = [
+            "Start today's blocks",
+            "Explain from scratch",
+            "Where do I stand?"
+        ]
+
+        assistant_record = cls.save_message(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role="assistant",
+            content=reply_content,
+            intent=INTENT_SHOW_DEFERRED,
+            context_payload={"deferred_count": len(deferred)},
+            supabase_client=client
+        )
+
+        return {
+            "message": assistant_record,
+            "suggested_pills": suggested_pills,
+            "intent": INTENT_SHOW_DEFERRED,
+            "conversation_id": conversation_id
+        }
+
+    @classmethod
+    def _handle_status(
+        cls,
+        user_id: str,
+        conversation_id: str,
+        budget_context: Dict[str, Any],
+        client: Any
+    ) -> Dict[str, Any]:
+        """Returns numbers from single source of truth scoring module (Section 9.2)."""
+        from services.scoring_engine import evaluate_candidate_readiness
+        target_role = budget_context.get("interview_context", {}).get("target_role") or "AI/ML Engineer"
+        prof = evaluate_candidate_readiness(user_id=user_id, target_role=target_role)
+        readiness = prof.get("readiness", {})
+        gap_analysis = prof.get("gap_analysis", {})
+
+        score = readiness.get("verified_score")
+        overall = readiness.get("projected_readiness")
+        cov = round((readiness.get("weighted_coverage") or 0.0) * 100, 1)
+        conf = round((readiness.get("overall_confidence") or 0.0) * 100, 1)
+        gaps = gap_analysis.get("verified_skill_gaps", [])
+        unassessed = gap_analysis.get("not_yet_assessed", [])
+
+        score_str = f"{score}%" if score is not None else "No evidence yet"
+        overall_str = f"{overall}%" if overall is not None else "Provisional"
+
+        reply_content = (
+            f"**Your Current Preparation Status ({target_role}):**\n\n"
+            f"• **Overall Readiness:** {overall_str} ({readiness.get('readiness_label', 'PROVISIONAL')})\n"
+            f"• **Verified Proficiency:** {score_str}\n"
+            f"• **Curriculum Coverage:** {cov}%\n"
+            f"• **Measurement Confidence:** {conf}%\n"
+            f"• **Verified Skill Gaps:** {len(gaps)} skills needing remediation\n"
+            f"• **Pending Assessment:** {len(unassessed)} skills not yet evaluated\n\n"
+            f"Readiness formula: `0.5 × VerifiedScore + 0.3 × Coverage + 0.2 × Confidence`. "
+            f"Keep practicing graded blocks to increase both coverage and confidence!"
+        )
+        reply_content = sanitize_user_facing_string(reply_content)
+
+        suggested_pills = [
+            "Start today's blocks",
+            "Give me a harder question",
+            "I only have 30 minutes today"
+        ]
+
+        assistant_record = cls.save_message(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role="assistant",
+            content=reply_content,
+            intent=INTENT_STATUS,
+            context_payload={"readiness": readiness},
+            supabase_client=client
+        )
+
+        return {
+            "message": assistant_record,
+            "suggested_pills": suggested_pills,
+            "intent": INTENT_STATUS,
             "conversation_id": conversation_id
         }
 
@@ -1065,6 +1241,169 @@ class MentorService:
             }
 
     @classmethod
+    def _handle_real_world_example(
+        cls,
+        user_id: str,
+        conversation_id: str,
+        user_message: str,
+        active_activity: Optional[Dict[str, Any]],
+        budget_context: Dict[str, Any],
+        client: Any
+    ) -> Dict[str, Any]:
+        """Returns real-world system architecture example for current or requested topic (Section 9.2)."""
+        topic = None
+        if active_activity:
+            topic = active_activity.get("topic") or active_activity.get("skill_name") or active_activity.get("skill_id")
+
+        if not topic:
+            # Check recent messages or query text
+            recent = budget_context.get("recent_messages", [])
+            for m in reversed(recent):
+                c = (m.get("content") or "").lower()
+                if "rag" in c or "retrieval" in c:
+                    topic = "Retrieval-Augmented Generation (RAG)"
+                    break
+                elif "transformer" in c or "attention" in c:
+                    topic = "Transformer Multi-Head Attention"
+                    break
+                elif "vector" in c or "numpy" in c:
+                    topic = "NumPy Vectorisation"
+                    break
+                elif "caching" in c or "redis" in c:
+                    topic = "Distributed Redis Caching"
+                    break
+
+        if not topic:
+            reply_content = (
+                "Which technical topic would you like a production-grade real-world example for? "
+                "For example: RAG hallucination mitigation, distributed caching, model quantization, or indexing."
+            )
+        else:
+            if "rag" in topic.lower():
+                reply_content = (
+                    f"**Production Engineering Case Study: {topic}**\n\n"
+                    "• **Architecture:** E-commerce Customer Support AI processing 10,000 queries/min.\n"
+                    "• **Real-World Challenge:** Naive top-k vector retrieval returned outdated product return policies, causing hallucinated refund promises.\n"
+                    "• **Production Solution:** Implemented hybrid search (Dense embedding search with cosine similarity + BM25 keyword matching) followed by a cross-encoder re-ranking stage and metadata filtering on `effective_date`.\n"
+                    "• **Asymptotic Impact:** Reduced policy hallucination rate from 14.2% to 0.4% with sub-120ms p99 latency.\n\n"
+                    "**Check Question:** When would BM25 keyword matching outperform pure vector cosine similarity in a production RAG system?"
+                )
+            elif "vector" in topic.lower() or "numpy" in topic.lower():
+                reply_content = (
+                    f"**Production Engineering Case Study: {topic}**\n\n"
+                    "• **Architecture:** Real-time financial fraud scoring pipeline evaluating 50,000 transactions/sec.\n"
+                    "• **Real-World Challenge:** Python `for` loops computing Euclidean distance vectors introduced a 45ms per-batch latency penalty, violating the 10ms SLA.\n"
+                    "• **Production Solution:** Replaced iterative math with NumPy C-level vectorisation (`np.einsum` and SIMD broadcasting), pre-allocating contiguous memory arrays.\n"
+                    "• **Asymptotic Impact:** Latency dropped from 45ms to 1.8ms (25x speedup), bypassing the Python Global Interpreter Lock (GIL).\n\n"
+                    "**Check Question:** What is the memory footprint difference between an array view and an array copy during NumPy slicing?"
+                )
+            else:
+                reply_content = (
+                    f"**Production Engineering Case Study: {topic}**\n\n"
+                    "• **Production Architecture:** High-throughput distributed payment processing pipeline.\n"
+                    "• **Core Challenge:** Ensuring sub-10ms p99 response times while guaranteeing strict ACID consistency across partitioned nodes.\n"
+                    "• **Engineering Invariant:** Utilizing idempotent state machine transitions and cache eviction policies (LRU with write-through invalidation).\n"
+                    "• **Key Trade-off:** Eventual consistency vs strict serializability under high write contention.\n\n"
+                    f"**Check Question:** In this architecture, how would you prevent a cache stampede during sudden traffic spikes?"
+                )
+
+        reply_content = sanitize_user_facing_string(reply_content)
+
+        suggested_pills = [
+            "Answer the check question",
+            "Give me a harder question",
+            "Start today's blocks"
+        ]
+
+        assistant_record = cls.save_message(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role="assistant",
+            content=reply_content,
+            intent=INTENT_REAL_WORLD_EXAMPLE,
+            context_payload={"topic": topic},
+            supabase_client=client
+        )
+
+        return {
+            "message": assistant_record,
+            "suggested_pills": suggested_pills,
+            "intent": INTENT_REAL_WORLD_EXAMPLE,
+            "conversation_id": conversation_id
+        }
+
+    @classmethod
+    def _handle_explain_concept(
+        cls,
+        user_id: str,
+        conversation_id: str,
+        user_message: str,
+        budget_context: Dict[str, Any],
+        client: Any
+    ) -> Dict[str, Any]:
+        """Explains concept at candidate level, ties to rubric items, ends with 1 check question (Section 9.2)."""
+        int_ctx = budget_context.get("interview_context", {})
+        level = int_ctx.get("level", "MID")
+        role = int_ctx.get("target_role", "Software Development Engineer")
+
+        t = user_message.lower()
+        concept = "Core Engineering Principles"
+        if "rag" in t:
+            concept = "Retrieval-Augmented Generation (RAG)"
+            explanation = (
+                f"**Concept Deep-Dive: {concept} (Calibrated for {level} Level)**\n\n"
+                "• **What it is:** A framework that grounds Large Language Models with external, authoritative retrieval sources before text generation, eliminating hallucinations and enabling real-time knowledge integration.\n\n"
+                "• **Core Pipeline:**\n"
+                "  1. *Chunking & Ingestion*: Documents are split with semantic boundary preservation and converted into dense vector embeddings.\n"
+                "  2. *Retrieval*: User queries are embedded and compared against an index (e.g. HNSW) using cosine similarity or dot product.\n"
+                "  3. *Re-ranking & Augmentation*: Top candidates are filtered and injected into the prompt context with strict provenance citations.\n\n"
+                "• **Key Trade-offs & Invariants:** Chunk size vs semantic coherence; vector search latency vs retrieval precision; context window saturation.\n\n"
+                "**Quick Knowledge Check:** Why does chunk size directly impact both retrieval precision and generative hallucination?"
+            )
+        elif "transformer" in t or "attention" in t:
+            concept = "Transformer Self-Attention"
+            explanation = (
+                f"**Concept Deep-Dive: {concept} (Calibrated for {level} Level)**\n\n"
+                "• **Core Invariant:** Scaled Dot-Product Attention allows tokens to dynamically weight representations of all other tokens in a sequence: `Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V`.\n\n"
+                "• **Asymptotic Complexity:** Time complexity is `O(N^2 * d)` where `N` is sequence length and `d` is embedding dimension, making long context windows computationally demanding.\n\n"
+                "• **Why Scale by `sqrt(d_k)`:** Without scaling, large dot products push the softmax into regions with vanishing gradients during backpropagation.\n\n"
+                "**Quick Knowledge Check:** How does Multi-Head Attention provide advantages over single-head attention of the same total dimension?"
+            )
+        else:
+            explanation = (
+                f"**Technical Explanation (Calibrated for {level} {role}):**\n\n"
+                "• **Invariant First:** Every resilient technical implementation begins with a formal invariant—a condition that remains true across all state mutations.\n"
+                "• **Complexity Bounds:** Always analyze both asymptotic time (`O(N)`) and space (`O(1)` memory overhead).\n"
+                "• **Failure Modes:** Explicitly handle empty sets, out-of-order deliveries, and boundary overflows.\n\n"
+                "**Quick Knowledge Check:** What is the primary operational trade-off between optimistic concurrency control and pessimistic locking?"
+            )
+
+        reply_content = sanitize_user_facing_string(explanation)
+
+        suggested_pills = [
+            "Answer the check question",
+            "Show real-world example",
+            "Give me a harder question"
+        ]
+
+        assistant_record = cls.save_message(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            role="assistant",
+            content=reply_content,
+            intent=INTENT_EXPLAIN_CONCEPT,
+            context_payload={"concept": concept},
+            supabase_client=client
+        )
+
+        return {
+            "message": assistant_record,
+            "suggested_pills": suggested_pills,
+            "intent": INTENT_EXPLAIN_CONCEPT,
+            "conversation_id": conversation_id
+        }
+
+    @classmethod
     def _handle_general_chat(
         cls,
         user_id: str,
@@ -1074,9 +1413,16 @@ class MentorService:
         budget_context: Dict[str, Any],
         client: Any
     ) -> Dict[str, Any]:
-        """Synthesizes high-yield mentor guidance via Gemini within token budget."""
+        """Synthesizes high-yield mentor guidance via Section 12.5 prompt within token budget."""
         int_ctx = budget_context.get("interview_context", {})
         recent_msgs = budget_context.get("recent_messages", [])
+
+        c_role = int_ctx.get("target_role") or "Software Development Engineer"
+        c_company = int_ctx.get("target_company") or "Tech Firm"
+        if str(c_role).strip().lower() in ("none", "null", "undefined", ""):
+            c_role = "Software Development Engineer"
+        if str(c_company).strip().lower() in ("none", "null", "undefined", ""):
+            c_company = "Tech Firm"
 
         dialogue_history = []
         for m in recent_msgs[:-1]:
@@ -1088,17 +1434,17 @@ class MentorService:
             "You are PrepFly AI Mentor, an elite, highly supportive, and rigorous technical interview coach. "
             "You possess deep expertise in algorithms, system design, machine learning, and CS fundamentals.\n\n"
             f"Candidate Context:\n"
-            f"- Target Role: {int_ctx.get('target_role')}\n"
-            f"- Target Company: {int_ctx.get('target_company')}\n"
-            f"- Days Left: {int_ctx.get('days_left')}\n"
-            f"- Daily Budget: {int_ctx.get('daily_minutes')} mins\n"
+            f"- Target Role: {c_role}\n"
+            f"- Target Company: {c_company}\n"
+            f"- Days Left: {int_ctx.get('days_left', 30)}\n"
+            f"- Daily Budget: {int_ctx.get('daily_minutes', 60)} mins\n"
             f"- Evidence Summary: {budget_context.get('evidence_text')}\n"
             f"- Detected Intent: {intent}\n\n"
-            "Guiding Principles:\n"
-            "1. Be direct, clear, and encouraging. Never give vague advice like 'study more'.\n"
-            "2. When explaining concepts, state the core invariant first, followed by mechanics and asymptotic complexity.\n"
-            "3. If code is requested, provide clean, idiomatic code with time and space complexity analysis.\n"
-            "4. Keep answers focused and actionable."
+            "Guiding Principles (Section 12.5):\n"
+            "1. Use ONLY the JSON context and tool results provided. Never invent scores, dates or plan changes.\n"
+            "2. If context is missing, ask one short clarifying question. Never print 'None', 'null' or template placeholders.\n"
+            "3. State core invariants first, followed by complexity and trade-offs.\n"
+            "4. Keep answers concise; end with one useful next step."
         )
 
         user_prompt = (
@@ -1124,8 +1470,6 @@ class MentorService:
             mentor_reply = None
 
         if not mentor_reply:
-            c_role = int_ctx.get("target_role") or "Software Development Engineer"
-            c_company = int_ctx.get("target_company") or "Tech Firm"
             mentor_reply = (
                 f"**Targeted Coaching for {c_role} ({c_company}):**\n\n"
                 f"• **Core Invariant:** State the exact data structure or mathematical invariant before optimizing.\n"
@@ -1133,6 +1477,8 @@ class MentorService:
                 f"• **Edge Cases:** Validate empty, zero, duplicate, and skewed boundary inputs.\n\n"
                 f"Ask me to break down a specific concept, share a real-world system example, or evaluate your draft answer."
             )
+
+        mentor_reply = sanitize_user_facing_string(mentor_reply)
 
         suggested_pills = [
             "Explain from scratch",

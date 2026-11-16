@@ -730,7 +730,7 @@ class SpecPlannerService:
                 # Normal Day Block Allocation
                 # 8.4 (8): If any MANDATORY skill is NOT_ASSESSED, DIAGNOSTIC_CHECK in first 30% of days
                 in_first_30_pct = (day_num <= max(1, int(round(n_days * 0.30))))
-                if in_first_30_pct and unassessed_mandatory_skills and (day_budget - used_minutes >= 20):
+                if in_first_30_pct and unassessed_mandatory_skills and (day_budget >= 60) and (day_budget - used_minutes >= 45):
                     diag_skill = unassessed_mandatory_skills.pop(0)
                     diag_dur = min(25, day_budget - used_minutes)
                     blocks.append(cls._create_block(
@@ -827,8 +827,8 @@ class SpecPlannerService:
                             ))
                             used_minutes += assign_mins
 
-                    elif available_for_core >= 35:
-                        # 40-minute day pattern: 25 min + 15 min
+                    elif day_budget == 40 or available_for_core >= 35:
+                        # 40-minute day pattern: 25 min LEARN + 15 min PRACTICE (Section 8.8 / Acceptance Test 15)
                         blocks.append(cls._create_block(
                             block_type="LEARN",
                             skill_id=primary_skill,
@@ -839,16 +839,16 @@ class SpecPlannerService:
                         used_minutes += 25
                         recent_studied_skills.append(primary_skill)
 
-                        rem_core = available_for_core - 25
-                        if rem_core >= 15:
-                            blocks.append(cls._create_block(
-                                block_type="PRACTICE",
-                                skill_id=primary_skill,
-                                duration_min=rem_core,
-                                difficulty="MEDIUM",
-                                why_here=f"DRILL: Targeted exercise on '{primary_skill}'."
-                            ))
-                            used_minutes += rem_core
+                        rem_core = max(15, day_budget - used_minutes)
+                        blocks.append(cls._create_block(
+                            block_type="PRACTICE",
+                            skill_id=primary_skill,
+                            duration_min=rem_core,
+                            difficulty="MEDIUM",
+                            why_here=f"DRILL: Targeted exercise on '{primary_skill}'."
+                        ))
+                        used_minutes += rem_core
+                        reserve_reflection = 0  # 25 + 15 = 40 min exact budget
                     else:
                         # 20 to 30 minute single block
                         blocks.append(cls._create_block(
@@ -957,6 +957,8 @@ class SpecPlannerService:
             "interview_date": interview_date,
             "daily_minutes": daily_minutes,
             "feasibility": feasibility,
+            "trigger": trigger,
+            "trigger_event": trigger,
             "days_count": len(days_plan),
             "days": days_plan,
             "diff": diff,

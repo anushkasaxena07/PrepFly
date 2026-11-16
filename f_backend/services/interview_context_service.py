@@ -140,6 +140,11 @@ class InterviewContextService:
         context_obj: Dict[str, Any] = {
             "context_version": context_version,
             "cached_at": now.isoformat(),
+            "target_role": target_role or "Software Development Engineer (General)",
+            "target_company": target_company or "Tech Firm",
+            "days_left": days_left,
+            "daily_minutes": daily_minutes,
+            "level": (goal.get("level") if goal and goal.get("level") else "MID"),
             "goal": {
                 "goal_id": goal.get("id") if goal else None,
                 "target_role": target_role,

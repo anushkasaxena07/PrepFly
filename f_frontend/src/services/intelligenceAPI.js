@@ -704,6 +704,18 @@ export const intelligenceAPI = {
     return handleResponse(res);
   },
 
+  async postMentorMessage(message, activeActivity = null) {
+    const res = await fetch(`${BACKEND_URL}/api/mentor/message`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        message,
+        active_activity: activeActivity
+      })
+    });
+    return handleResponse(res);
+  },
+
   async getLearningWorkspace(activityId, { skillId, targetRole, targetCompany } = {}) {
     const params = new URLSearchParams();
     if (skillId) params.append("skill_id", skillId);

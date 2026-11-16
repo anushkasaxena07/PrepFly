@@ -37,6 +37,44 @@ def start_or_resume_conversation():
     return jsonify({"conversation": conv}), 200
 
 
+@mentor_bp.route("/api/mentor/message", methods=["POST"])
+def send_mentor_message_canonical():
+    """
+    POST /api/mentor/message (Section 11)
+    Body: {"message": str, "active_activity": Optional[dict], "conversation_id": Optional[str]}
+    Returns: {"status": "success", "intent": str, "reply": str, "uiActions": list, "conversation_id": str, "context_payload": dict}
+    """
+    user_id = _extract_user_id()
+    data = request.get_json(silent=True) or {}
+    message_text = data.get("message", "").strip()
+    active_activity = data.get("active_activity")
+    conv_id = data.get("conversation_id")
+
+    if not message_text:
+        return jsonify({"status": "error", "message": "Message content cannot be empty"}), 400
+
+    if not conv_id:
+        conv = MentorService.start_or_resume_conversation(user_id=user_id)
+        conv_id = conv["id"]
+
+    result = MentorService.send_mentor_message(
+        user_id=user_id,
+        conversation_id=conv_id,
+        user_message=message_text,
+        active_activity=active_activity
+    )
+
+    msg_obj = result.get("message", {})
+    return jsonify({
+        "status": "success",
+        "intent": result.get("intent"),
+        "reply": msg_obj.get("content", ""),
+        "uiActions": result.get("suggested_pills", []),
+        "conversation_id": conv_id,
+        "context_payload": msg_obj.get("context_payload", {})
+    }), 200
+
+
 @mentor_bp.route("/api/mentor/conversations/<conv_id>/messages", methods=["GET", "POST"])
 def handle_conversation_messages(conv_id):
     if request.method == "GET":

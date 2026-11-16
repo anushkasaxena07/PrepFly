@@ -208,20 +208,20 @@ export default function MentorChatDrawer({
           </button>
         </div>
 
-        {/* ── CONTEXT CHIPS BAR ── */}
-        <div className="px-4 py-2.5 bg-slate-950/80 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto text-[11px]">
-          <span className="px-2 py-0.5 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/50 font-semibold whitespace-nowrap">
-            🎯 {targetCompany} • {targetRole}
+        {/* ── CONTEXT CHIPS BAR (Section 13: scrollable without cutting off text) ── */}
+        <div className="px-4 py-2.5 bg-slate-950/80 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto min-w-0 flex-nowrap text-[11px]">
+          <span className="px-2.5 py-1 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-800/50 font-semibold whitespace-nowrap shrink-0">
+            🎯 {targetCompany || "Target Tech"} • {targetRole || "Software Engineer"}
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-amber-950 text-amber-300 border border-amber-800/50 font-semibold whitespace-nowrap">
-            ⏳ {daysLeft} Days Left
+          <span className="px-2.5 py-1 rounded-md bg-amber-950 text-amber-300 border border-amber-800/50 font-semibold whitespace-nowrap shrink-0">
+            ⏳ {daysLeft ?? 30} Days Left
           </span>
-          <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-semibold whitespace-nowrap">
-            ⚡ {dailyBudget}m Budget
+          <span className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-semibold whitespace-nowrap shrink-0">
+            ⚡ {dailyBudget ?? 60}m Daily Budget
           </span>
           {activeActivity && (
-            <span className="px-2 py-0.5 rounded-md bg-purple-950 text-purple-300 border border-purple-800/50 font-semibold whitespace-nowrap">
-              Active: {activeActivity.skill_name || activeActivity.skill_id}
+            <span className="px-2.5 py-1 rounded-md bg-purple-950 text-purple-300 border border-purple-800/50 font-semibold whitespace-nowrap shrink-0">
+              Active: {activeActivity.skill_name || activeActivity.skill_id || activeActivity.title}
             </span>
           )}
         </div>
@@ -258,15 +258,41 @@ export default function MentorChatDrawer({
                 >
                   <FormattedMentorMessage content={m.content} />
 
-                  {/* Machine Diff Alert Box */}
+                  {/* Machine Diff Alert Box rendered as readable list (Section 8.7, Section 13) */}
                   {parsedPayload?.diff && (
-                    <div className="mt-2 p-2.5 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] space-y-1">
-                      <div className="text-cyan-400 font-bold">Plan Diff (Trigger: {parsedPayload.trigger || "mutation"}):</div>
-                      {parsedPayload.diff.added && parsedPayload.diff.added.length > 0 && (
-                        <div className="text-emerald-400">+ Added: {parsedPayload.diff.added.join(", ")}</div>
+                    <div className="mt-2.5 p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] space-y-1.5 font-sans">
+                      <div className="text-cyan-400 font-bold font-mono">
+                        Plan Re-balanced (Trigger: {parsedPayload.trigger || "DAILY_MINUTES_CHANGED"}):
+                      </div>
+                      {Array.isArray(parsedPayload.diff.added) && parsedPayload.diff.added.length > 0 && (
+                        <div className="space-y-0.5">
+                          <span className="text-emerald-400 font-semibold block">+ Added Activities:</span>
+                          {parsedPayload.diff.added.map((item, i) => (
+                            <div key={i} className="text-slate-300 pl-2">
+                              • {typeof item === "string" ? item : `${item.title || item.blockId}${item.minutes ? ` (${item.minutes}m)` : ""}`}
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      {parsedPayload.diff.deferred && parsedPayload.diff.deferred.length > 0 && (
-                        <div className="text-amber-400">⏸ Deferred: {parsedPayload.diff.deferred.join(", ")}</div>
+                      {Array.isArray(parsedPayload.diff.deferred) && parsedPayload.diff.deferred.length > 0 && (
+                        <div className="space-y-0.5">
+                          <span className="text-amber-400 font-semibold block">⏸ Deferred to Backlog:</span>
+                          {parsedPayload.diff.deferred.map((item, i) => (
+                            <div key={i} className="text-slate-300 pl-2">
+                              • {typeof item === "string" ? item : `${item.title || item.blockId}${item.reason ? ` — ${item.reason}` : ""}`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {Array.isArray(parsedPayload.diff.moved) && parsedPayload.diff.moved.length > 0 && (
+                        <div className="space-y-0.5">
+                          <span className="text-cyan-300 font-semibold block">↷ Rescheduled:</span>
+                          {parsedPayload.diff.moved.map((item, i) => (
+                            <div key={i} className="text-slate-300 pl-2">
+                              • {typeof item === "string" ? item : `${item.title || item.blockId}: moved to ${item.toDay || "future day"}`}
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
