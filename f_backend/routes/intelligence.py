@@ -238,6 +238,15 @@ def start_diagnostic_assessment():
         exp = prof.get("experience_level", "Mid-Level (2-5 years)")
 
     try:
+        if data.get("kind") or "skillIds" in data:
+            from services.diagnostic_engine import DiagnosticEngine
+            session_res = DiagnosticEngine.start_diagnostic_session(
+                user_id=user_id,
+                kind=data.get("kind", "DIAGNOSTIC"),
+                target_role=role
+            )
+            return jsonify(session_res), 200
+
         assessment = AssessmentService.generate_diagnostic_assessment(
             user_id=user_id,
             target_role=role,

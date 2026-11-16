@@ -102,6 +102,34 @@ export const intelligenceAPI = {
     return handleResponse(res);
   },
 
+  // ── Phase 4 Assessment APIs (Section 4, 11) ─────────────────────────────────
+  async startSpecAssessment(params = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/start`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params)
+    });
+    return handleResponse(res);
+  },
+
+  async submitSpecAnswer(answerPayload) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/answer`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(answerPayload)
+    });
+    return handleResponse(res);
+  },
+
+  async finishSpecAssessment(sessionId) {
+    const res = await fetch(`${BACKEND_URL}/api/assessment/finish`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sessionId })
+    });
+    return handleResponse(res);
+  },
+
   // 1. Preparation Profile & Goals
   async initializeProfile(profileData) {
     const res = await fetch(`${BACKEND_URL}/api/preparation/initialize`, {

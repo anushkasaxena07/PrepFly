@@ -218,3 +218,78 @@ def get_feasibility_check_endpoint():
         }), 500
 
 
+# -----------------------------------------------------------------------------
+# PHASE 4: DIAGNOSTIC & ASSESSMENT ENDPOINTS (Section 4, 11)
+# -----------------------------------------------------------------------------
+# Note: POST /api/assessment/start is routed through intelligence.py:start_diagnostic_assessment
+# to prevent URL map collision while cleanly servicing both spec and legacy callers.
+
+@spec_api_bp.route("/api/assessment/answer", methods=["POST"])
+def submit_assessment_answer_endpoint():
+    """
+    POST /api/assessment/answer
+    Accepts: { sessionId, questionId, answer, selectedOptions? }
+    Returns: { score, grade_result, next_question, is_completed }
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+    session_id = payload.get("sessionId") or payload.get("session_id")
+    question_id = payload.get("questionId") or payload.get("question_id")
+    answer = payload.get("answer") or ""
+    selected_options = payload.get("selectedOptions") or payload.get("selected_options")
+
+    if not session_id or not question_id:
+        return jsonify({
+            "status": "error",
+            "message": "Both sessionId and questionId are required"
+        }), 400
+
+    try:
+        from services.diagnostic_engine import DiagnosticEngine
+        ans_res = DiagnosticEngine.submit_diagnostic_answer(
+            session_id=session_id,
+            question_id=question_id,
+            answer_text=answer,
+            selected_options=selected_options
+        )
+        return jsonify(ans_res), 200
+    except Exception as ex:
+        logger.error(f"Failed to submit assessment answer for session {session_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to submit assessment answer",
+            "error": str(ex)
+        }), 400
+
+
+@spec_api_bp.route("/api/assessment/finish", methods=["POST"])
+def finish_assessment_endpoint():
+    """
+    POST /api/assessment/finish
+    Accepts: { sessionId }
+    Returns: Section 4.4 Result Screen payload ("Calibrated Competency & Readiness Profile")
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+    session_id = payload.get("sessionId") or payload.get("session_id")
+
+    if not session_id:
+        return jsonify({
+            "status": "error",
+            "message": "sessionId is required"
+        }), 400
+
+    try:
+        from services.diagnostic_engine import DiagnosticEngine
+        finish_res = DiagnosticEngine.finish_diagnostic_session(session_id=session_id)
+        return jsonify(finish_res), 200
+    except Exception as ex:
+        logger.error(f"Failed to finish assessment session {session_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to finalize assessment session",
+            "error": str(ex)
+        }), 400
+
+
+
