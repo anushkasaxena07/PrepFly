@@ -2323,10 +2323,10 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
               </div>
             </div>
 
-            {/* SPLIT CONTAINER: CANDIDATE VIDEO (LEFT/TOP) & AVA INTERVIEWER CONSOLE (RIGHT/BOTTOM) */}
+            {/* SPLIT CONTAINER: CANDIDATE VIDEO (LEFT/TOP 60%) & AVA INTERVIEWER CONSOLE (RIGHT/BOTTOM 40%) - 60:40 (me:ai) */}
             <div style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "minmax(310px, 0.33fr) 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "6fr 4fr",
               gap: isMobile ? "12px" : "16px",
               flex: 1,
               minHeight: 0,

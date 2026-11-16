@@ -781,8 +781,8 @@ const InterviewPage = () => {
         }
 
         .iv-grid {
-          display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
-          max-width: 1060px; margin: 0 auto 20px;
+          display: grid; grid-template-columns: 4fr 6fr; gap: 20px;
+          max-width: 1140px; margin: 0 auto 20px;
         }
         @media (max-width: 740px) { .iv-grid { grid-template-columns: 1fr; } }
 
