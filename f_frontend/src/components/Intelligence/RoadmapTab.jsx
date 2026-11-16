@@ -5,13 +5,17 @@ import DiagnosticAssessmentModal from "./DiagnosticAssessmentModal";
 import RetrievalDrillModal from "./RetrievalDrillModal";
 import LearningWorkspaceModal from "./LearningWorkspaceModal";
 import MentorChatDrawer from "./MentorChatDrawer";
+import { sanitizeUIString } from "../../utils/templateGuard";
 import "./intelligence.css";
 
 export default function RoadmapTab({ onNavigateTab }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
-  const [readinessScore, setReadinessScore] = useState(0);
+  const [unifiedReadiness, setUnifiedReadiness] = useState(null);
+  const [activePlan, setActivePlan] = useState(null);
+  const [planVersions, setPlanVersions] = useState([]);
+  const [readinessScore, setReadinessScore] = useState(null);
   const [dueRevisions, setDueRevisions] = useState([]);
   const [error, setError] = useState("");
 
@@ -29,7 +33,7 @@ export default function RoadmapTab({ onNavigateTab }) {
   const [isResetting, setIsResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [selectedDayFilter, setSelectedDayFilter] = useState("ALL");
-  const [selectedVersion, setSelectedVersion] = useState("v3");
+  const [selectedVersionNum, setSelectedVersionNum] = useState(1);
   const [showVersionDiff, setShowVersionDiff] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState(null);
 
@@ -42,39 +46,64 @@ export default function RoadmapTab({ onNavigateTab }) {
     setError("");
     try {
       // 1. Fetch profile
-      const profRes = await intelligenceAPI.getProfile();
-      if (!profRes.profile) {
-        setShowOnboarding(true);
-        setLoading(false);
-        return;
-      }
-      setProfile(profRes.profile);
-
-      // 2. Fetch current roadmap
-      const rmRes = await intelligenceAPI.getCurrentRoadmap();
-      if (!rmRes.roadmap) {
-        setShowDiagnostic(true);
-      } else {
-        setRoadmap(rmRes.roadmap);
+      let userProf = null;
+      try {
+        const profRes = await intelligenceAPI.getProfile();
+        if (profRes && profRes.profile) {
+          userProf = profRes.profile;
+          setProfile(userProf);
+        }
+      } catch (pErr) {
+        console.warn("Could not fetch profile:", pErr);
       }
 
-      // 3. Fetch due spaced revisions
+      // 2. Fetch single-source readiness (Golden Rule 2)
+      try {
+        const readRes = await intelligenceAPI.getReadiness(userProf?.target_role);
+        if (readRes && readRes.readiness) {
+          setUnifiedReadiness(readRes);
+          const rScore = readRes.readiness.overall_readiness;
+          if (rScore !== null && rScore !== undefined && !isNaN(Number(rScore))) {
+            setReadinessScore(Math.round(Number(rScore)));
+          } else {
+            setReadinessScore(null);
+          }
+        }
+      } catch (rErr) {
+        console.warn("Could not fetch unified readiness:", rErr);
+      }
+
+      // 3. Fetch active spec plan & version history (Section 8)
+      try {
+        const planRes = await intelligenceAPI.getActiveSpecPlan();
+        if (planRes && planRes.plan) {
+          setActivePlan(planRes.plan);
+          setSelectedVersionNum(planRes.plan.version || 1);
+        }
+        const versRes = await intelligenceAPI.getSpecPlanVersions();
+        if (versRes && Array.isArray(versRes.versions) && versRes.versions.length > 0) {
+          setPlanVersions(versRes.versions);
+        }
+      } catch (planErr) {
+        console.warn("Could not fetch spec plan:", planErr);
+      }
+
+      // 4. Fetch legacy roadmap as fallback if no spec plan yet
+      try {
+        const rmRes = await intelligenceAPI.getCurrentRoadmap();
+        if (rmRes && rmRes.roadmap) {
+          setRoadmap(rmRes.roadmap);
+        }
+      } catch (rmErr) {
+        console.warn("Could not fetch legacy roadmap:", rmErr);
+      }
+
+      // 5. Fetch due spaced revisions
       try {
         const revRes = await intelligenceAPI.getDueRevisions();
         setDueRevisions(revRes.due_revisions || []);
       } catch (revErr) {
         console.warn("Could not fetch due revisions:", revErr);
-      }
-
-      // 4. Fetch readiness score from Prompt 1 engine if available
-      try {
-        const progRes = await intelligenceAPI.getProgressDashboard();
-        const score = progRes?.dashboard?.overall_readiness ?? progRes?.overall_readiness ?? progRes?.dashboard?.measured_proficiency ?? progRes?.measured_proficiency;
-        if (score !== undefined && score !== null && !isNaN(score)) {
-          setReadinessScore(Number(score));
-        }
-      } catch {
-        // Fallback default
       }
     } catch (err) {
       setError(err.message || "Failed to load preparation roadmap.");
@@ -87,9 +116,11 @@ export default function RoadmapTab({ onNavigateTab }) {
     setIsRecalculating(true);
     setError("");
     try {
-      await intelligenceAPI.recalculateRoadmap("Candidate requested plan rebalancing");
-      const updated = await intelligenceAPI.getCurrentRoadmap();
-      setRoadmap(updated.roadmap);
+      await intelligenceAPI.replanSpecPlan({
+        trigger: "DAILY_MINUTES_CHANGED",
+        daily_minutes: profile?.daily_minutes || 90
+      });
+      await loadAllData();
     } catch (err) {
       setError(err.message || "Failed to recalculate roadmap.");
     } finally {
@@ -103,11 +134,38 @@ export default function RoadmapTab({ onNavigateTab }) {
     try {
       await intelligenceAPI.resetRoadmapAndGoals();
       setRoadmap(null);
+      setActivePlan(null);
       setProfile(null);
       setDueRevisions([]);
       setShowResetConfirm(false);
       setShowOnboarding(true);
     } catch (err) {
+      setError(err.message || "Failed to reset preparation roadmap.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleBlockStart = async (blockId) => {
+    try {
+      await intelligenceAPI.startSpecBlock(blockId);
+    } catch (e) {
+      console.warn("Could not record block start:", e);
+    }
+  };
+
+  const handleBlockComplete = async (blockId) => {
+    try {
+      await intelligenceAPI.completeSpecBlock(blockId);
+      // Refresh active plan state without faking mastery (Rule R5 & Acceptance Test 4)
+      const updated = await intelligenceAPI.getActiveSpecPlan();
+      if (updated && updated.plan) {
+        setActivePlan(updated.plan);
+      }
+    } catch (e) {
+      console.warn("Could not complete block:", e);
+    }
+  };
       setError(err.message || "Failed to reset preparation roadmap.");
     } finally {
       setIsResetting(false);
@@ -177,56 +235,51 @@ export default function RoadmapTab({ onNavigateTab }) {
   }
 
   const schedule = roadmap?.schedule || {};
-  const dayNumbers = Object.keys(schedule).map(Number).sort((a, b) => a - b);
-  const totalActivities = roadmap?.total_activities || 24;
-  const completedActivities = roadmap?.completed_activities || 12;
+  const activeDays = activePlan?.days || [];
+  const dayNumbers = activeDays.length > 0 
+    ? activeDays.map(d => d.dayNumber) 
+    : Object.keys(schedule).map(Number).sort((a, b) => a - b);
 
-  // Distinct separated progress metrics (never conflated)
-  const assignmentsPassed = 5;
-  const totalAssignments = 8;
-  const skillsDemonstrated = 4;
-  const totalSkills = 10;
-  const skillsMastered = 2;
+  const totalActivities = activeDays.length > 0
+    ? activeDays.reduce((acc, d) => acc + (d.blocks?.length || 0), 0)
+    : (roadmap?.total_activities || 24);
+  const completedActivities = activeDays.length > 0
+    ? activeDays.reduce((acc, d) => acc + (d.blocks?.filter(b => b.status === "COMPLETED")?.length || 0), 0)
+    : (roadmap?.completed_activities || 0);
 
-  const scheduledTodayMinutes = 45;
-  const dailyBudgetMinutes = profile?.daily_minutes || 60;
-  const daysLeft = 18;
+  // Distinct separated progress metrics (Golden Rule 3 & Acceptance Test 3)
+  const totalAssignments = activeDays.length > 0
+    ? Math.max(1, activeDays.reduce((acc, d) => acc + (d.blocks?.filter(b => b.type === "ASSIGNMENT")?.length || 0), 0))
+    : 8;
+  const assignmentsPassed = activeDays.length > 0
+    ? activeDays.reduce((acc, d) => acc + (d.blocks?.filter(b => b.type === "ASSIGNMENT" && b.status === "COMPLETED")?.length || 0), 0)
+    : 0;
 
-  // Version history mock for diff viewer demonstration
-  const versionHistory = [
+  const totalSkills = unifiedReadiness?.skills_map?.length || unifiedReadiness?.readiness?.total_skills_count || 10;
+  const skillsDemonstrated = unifiedReadiness?.skills_map?.filter(s => (s.evidence_count || 0) > 0)?.length || unifiedReadiness?.readiness?.assessed_skills_count || 0;
+  // Rule Acceptance Test 3: "Skills Mastered" cannot exceed the number of VERIFIED_STRONG skills
+  const skillsMastered = unifiedReadiness?.gap_analysis?.verified_strong_skills?.length || unifiedReadiness?.gap_analysis?.summary?.strong_count || 0;
+
+  const scheduledTodayMinutes = activeDays.length > 0 ? (activeDays[0]?.totalMinutes || 45) : 45;
+  const dailyBudgetMinutes = activePlan?.daily_minutes || profile?.daily_minutes || 90;
+  const daysLeft = activePlan?.days_count || (activeDays.length > 0 ? activeDays.length : 18);
+
+  // Version history with real structured diffs (Section 8.7 & 8.8)
+  const displayVersions = planVersions.length > 0 ? planVersions : (activePlan ? [activePlan] : [
     {
-      version: "v3",
-      summary: "Added 1 remediation drill, deferred 2 low-priority items because you missed yesterday.",
+      version: 1,
+      trigger: "INITIAL_CURRICULUM",
       diff: {
-        added: ["Targeted Blindspot Drill: Imbalanced PR-AUC"],
-        removed: [],
-        moved: ["Diagnostic Assessment -> Day 2"],
-        deferred: ["PEP8 Styling & Formatting", "Basic Git Workflows"]
-      }
-    },
-    {
-      version: "v2",
-      summary: "Adjusted daily capacity to 45 mins upon candidate request.",
-      diff: {
-        added: [],
-        removed: [],
-        moved: [],
-        deferred: ["Advanced Graph Cycle Detection"]
-      }
-    },
-    {
-      version: "v1",
-      summary: "Initial deterministic roadmap build from diagnostic assessment.",
-      diff: {
-        added: ["18 initial activities across ML & DSA"],
+        added: [{ title: "Initial deterministic curriculum build", minutes: 90, reason: "Baseline generated" }],
         removed: [],
         moved: [],
         deferred: []
       }
     }
-  ];
+  ]);
 
-  const currentVersionMeta = versionHistory.find(v => v.version === selectedVersion) || versionHistory[0];
+  const currentVersionObj = displayVersions.find(v => (v.version || 1) === selectedVersionNum) || displayVersions[0];
+  const currentDiff = currentVersionObj?.diff || { added: [], removed: [], moved: [], deferred: [] };
 
   return (
     <div id="page-roadmap" className="page active" role="tabpanel">
@@ -351,17 +404,17 @@ export default function RoadmapTab({ onNavigateTab }) {
                   Adaptive AI Roadmap
                 </span>
                 <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800">
-                  {selectedVersion}
+                  v{selectedVersionNum}
                 </span>
                 <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Evidence Synced
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Single Source Synced
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                {profile?.target_role || "Machine Learning Engineer"}
+                {sanitizeUIString(profile?.target_role || "Machine Learning Engineer")}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-1 flex flex-wrap items-center gap-3">
-                <span>Target: <strong className="text-white">{profile?.target_company || "Google"}</strong></span>
+                <span>Target: <strong className="text-white">{sanitizeUIString(profile?.target_company || "Google")}</strong></span>
                 <span>•</span>
                 <span className="text-amber-400 font-bold">⏳ {daysLeft} Days to Interview</span>
                 <span>•</span>
@@ -371,16 +424,20 @@ export default function RoadmapTab({ onNavigateTab }) {
 
             {/* Quick Metrics & CTA Buttons */}
             <div className="flex flex-wrap items-center gap-3">
-              {/* Prompt 1 Verified Readiness Score Badge */}
+              {/* Single Source Readiness Score Badge (Acceptance Test 1) */}
               <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl px-4 py-2.5 text-center shadow-lg">
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Role Readiness</div>
                 <div className="text-xl font-black text-emerald-400 flex items-center justify-center gap-1">
-                  {readinessScore}%
-                  <span className="text-xs font-normal text-emerald-300/70">Verified</span>
+                  {readinessScore !== null ? `${readinessScore}%` : "No evidence yet"}
+                  {unifiedReadiness?.readiness?.is_provisional && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-bold">
+                      PROVISIONAL
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Daily Capacity Meter */}
+              {/* Daily Capacity Meter (Acceptance Test 5) */}
               <div className="bg-slate-950/80 border border-slate-700/60 rounded-xl px-4 py-2.5 text-center shadow-lg">
                 <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Today's Load</div>
                 <div className="text-sm font-bold text-white">
@@ -421,14 +478,14 @@ export default function RoadmapTab({ onNavigateTab }) {
             </div>
           </div>
 
-          {/* ── 2. DISTINCTLY SEPARATED PROGRESS METRICS ── */}
+          {/* ── 2. DISTINCTLY SEPARATED PROGRESS METRICS WITH WORKING PROGRESS BARS (Acceptance Test 3 & 4) ── */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 space-y-3">
             <div className="flex justify-between items-center text-xs">
               <span className="text-slate-300 font-bold uppercase tracking-wider">
                 Verifiable Competency Progression (Separated Dimensions)
               </span>
               <span className="text-slate-400 text-[11px]">
-                Rule R5: Mark Done never fakes mastery. Verified evaluations only.
+                Rule R3: Marking a block DONE never changes proficiency. Only graded evidence counts.
               </span>
             </div>
 
@@ -440,7 +497,7 @@ export default function RoadmapTab({ onNavigateTab }) {
                   <span className="text-xs font-bold text-blue-400">{completedActivities}/{totalActivities}</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${(completedActivities / totalActivities) * 100}%` }} />
+                  <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((completedActivities / Math.max(1, totalActivities)) * 100)}%` }} />
                 </div>
               </div>
 
@@ -451,7 +508,7 @@ export default function RoadmapTab({ onNavigateTab }) {
                   <span className="text-xs font-bold text-violet-400">{assignmentsPassed}/{totalAssignments}</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-violet-500 h-full rounded-full transition-all duration-500" style={{ width: `${(assignmentsPassed / totalAssignments) * 100}%` }} />
+                  <div className="bg-violet-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((assignmentsPassed / Math.max(1, totalAssignments)) * 100)}%` }} />
                 </div>
               </div>
 
@@ -462,39 +519,41 @@ export default function RoadmapTab({ onNavigateTab }) {
                   <span className="text-xs font-bold text-cyan-400">{skillsDemonstrated}/{totalSkills}</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-cyan-400 h-full rounded-full transition-all duration-500" style={{ width: `${(skillsDemonstrated / totalSkills) * 100}%` }} />
+                  <div className="bg-cyan-400 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((skillsDemonstrated / Math.max(1, totalSkills)) * 100)}%` }} />
                 </div>
               </div>
 
-              {/* Dimension 4: Skills Mastered */}
+              {/* Dimension 4: Skills Mastered (Strictly VERIFIED_STRONG count, Acceptance Test 3) */}
               <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-[11px] text-slate-400 font-semibold">Skills Mastered (85%+)</span>
                   <span className="text-xs font-bold text-emerald-400">{skillsMastered}/{totalSkills}</span>
                 </div>
                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-400 h-full rounded-full transition-all duration-500" style={{ width: `${(skillsMastered / totalSkills) * 100}%` }} />
+                  <div className="bg-emerald-400 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((skillsMastered / Math.max(1, totalSkills)) * 100)}%` }} />
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── 3. VERSION HISTORY DROPDOWN & DIFF VIEWER ── */}
+        {/* ── 3. VERSION HISTORY DROPDOWN & MACHINE-READABLE DIFF VIEWER (Section 8.7) ── */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Plan Version:</span>
             <select
-              value={selectedVersion}
-              onChange={(e) => setSelectedVersion(e.target.value)}
+              value={selectedVersionNum}
+              onChange={(e) => setSelectedVersionNum(Number(e.target.value))}
               className="bg-slate-950 border border-slate-700 text-xs font-bold text-cyan-400 rounded-lg px-3 py-1.5 focus:outline-none"
             >
-              {versionHistory.map(v => (
-                <option key={v.version} value={v.version}>{v.version}: {v.summary.slice(0, 40)}...</option>
+              {displayVersions.map((v, idx) => (
+                <option key={idx} value={v.version || (idx + 1)}>
+                  Version {v.version || (idx + 1)}: {v.trigger || "Curriculum"}
+                </option>
               ))}
             </select>
             <p className="text-xs text-slate-300 italic hidden sm:block">
-              "{currentVersionMeta.summary}"
+              "Trigger: {currentVersionObj?.trigger || 'INITIAL_CURRICULUM'}"
             </p>
           </div>
 
@@ -511,31 +570,31 @@ export default function RoadmapTab({ onNavigateTab }) {
         {showVersionDiff && (
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
             <div className="bg-slate-900/80 p-3 rounded-lg border border-emerald-900/40">
-              <span className="font-bold text-emerald-400 block mb-1">+ Added ({currentVersionMeta.diff.added.length})</span>
+              <span className="font-bold text-emerald-400 block mb-1">+ Added ({currentDiff.added?.length || 0})</span>
               <ul className="text-slate-300 space-y-0.5 text-[11px]">
-                {currentVersionMeta.diff.added.map((a, i) => <li key={i}>• {a}</li>)}
-                {currentVersionMeta.diff.added.length === 0 && <li className="text-slate-500">None</li>}
+                {currentDiff.added?.map((a, i) => <li key={i}>• {typeof a === 'string' ? a : (a.title || a.blockId)}</li>)}
+                {(!currentDiff.added || currentDiff.added.length === 0) && <li className="text-slate-500">None</li>}
               </ul>
             </div>
             <div className="bg-slate-900/80 p-3 rounded-lg border border-red-900/40">
-              <span className="font-bold text-red-400 block mb-1">- Removed ({currentVersionMeta.diff.removed.length})</span>
+              <span className="font-bold text-red-400 block mb-1">- Removed ({currentDiff.removed?.length || 0})</span>
               <ul className="text-slate-300 space-y-0.5 text-[11px]">
-                {currentVersionMeta.diff.removed.map((r, i) => <li key={i}>• {r}</li>)}
-                {currentVersionMeta.diff.removed.length === 0 && <li className="text-slate-500">None</li>}
+                {currentDiff.removed?.map((r, i) => <li key={i}>• {typeof r === 'string' ? r : (r.title || r.blockId)}</li>)}
+                {(!currentDiff.removed || currentDiff.removed.length === 0) && <li className="text-slate-500">None</li>}
               </ul>
             </div>
             <div className="bg-slate-900/80 p-3 rounded-lg border border-cyan-900/40">
-              <span className="font-bold text-cyan-400 block mb-1">⇄ Moved ({currentVersionMeta.diff.moved.length})</span>
+              <span className="font-bold text-cyan-400 block mb-1">⇄ Moved ({currentDiff.moved?.length || 0})</span>
               <ul className="text-slate-300 space-y-0.5 text-[11px]">
-                {currentVersionMeta.diff.moved.map((m, i) => <li key={i}>• {m}</li>)}
-                {currentVersionMeta.diff.moved.length === 0 && <li className="text-slate-500">None</li>}
+                {currentDiff.moved?.map((m, i) => <li key={i}>• {typeof m === 'string' ? m : m.title}</li>)}
+                {(!currentDiff.moved || currentDiff.moved.length === 0) && <li className="text-slate-500">None</li>}
               </ul>
             </div>
             <div className="bg-slate-900/80 p-3 rounded-lg border border-amber-900/40">
-              <span className="font-bold text-amber-400 block mb-1">⏸ Deferred ({currentVersionMeta.diff.deferred.length})</span>
+              <span className="font-bold text-amber-400 block mb-1">⏸ Deferred ({currentDiff.deferred?.length || 0})</span>
               <ul className="text-slate-300 space-y-0.5 text-[11px]">
-                {currentVersionMeta.diff.deferred.map((d, i) => <li key={i}>• {d}</li>)}
-                {currentVersionMeta.diff.deferred.length === 0 && <li className="text-slate-500">None</li>}
+                {currentDiff.deferred?.map((d, i) => <li key={i}>• {typeof d === 'string' ? d : d.title}</li>)}
+                {(!currentDiff.deferred || currentDiff.deferred.length === 0) && <li className="text-slate-500">None</li>}
               </ul>
             </div>
           </div>
@@ -619,118 +678,254 @@ export default function RoadmapTab({ onNavigateTab }) {
             </div>
           )}
 
-          {dayNumbers.filter((d) => selectedDayFilter === "ALL" || selectedDayFilter === d).map((dayNum) => {
-            const acts = schedule[dayNum] || [];
-            const dayMinutes = acts.reduce((acc, a) => acc + (a.estimated_minutes || 30), 0);
-            const dayCompleted = acts.filter((a) => a.status === "completed" || a.status === "COMPLETED").length;
+          {activeDays.length > 0 ? (
+            activeDays.filter(d => selectedDayFilter === "ALL" || selectedDayFilter === d.dayNumber).map((dayItem) => {
+              const blocks = dayItem.blocks || [];
+              const dayCompleted = blocks.filter(b => b.status === "COMPLETED").length;
 
-            return (
-              <div key={dayNum} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
-                {/* Day Header */}
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center font-bold text-cyan-400 text-sm">
-                      {dayNum}
+              return (
+                <div key={dayItem.dayNumber} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+                  {/* Day Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center font-bold text-cyan-400 text-sm">
+                        {dayItem.dayNumber}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-white">Day {dayItem.dayNumber}</h3>
+                          <span className="text-[11px] font-semibold text-cyan-400 bg-cyan-950/80 border border-cyan-800/50 px-2 py-0.5 rounded">
+                            {dayItem.date}
+                          </span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                            {dayItem.phase}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          <strong>Goal:</strong> {dayItem.dailyGoal}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-base font-bold text-white">Day {dayNum}</h3>
-                      <span className="text-[11px] text-slate-400">
-                        {acts[0]?.due_date ? `Scheduled for ${acts[0].due_date}` : "Targeted preparation milestones"}
+
+                    <div className="flex items-center space-x-3 text-xs self-start sm:self-auto">
+                      <span className="text-slate-400">{dayItem.totalMinutes} / {dayItem.budgetMinutes}m scheduled</span>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300">
+                        {dayCompleted} / {blocks.length} Complete
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3 text-xs">
-                    <span className="text-slate-400">{dayMinutes} min total</span>
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300">
-                      {dayCompleted} / {acts.length} Complete
-                    </span>
-                  </div>
-                </div>
+                  {/* Block Cards List */}
+                  <div className="grid grid-cols-1 gap-3">
+                    {blocks.map((blk) => {
+                      const cfg = getActivityTypeConfig(blk.type);
+                      const isDone = blk.status === "COMPLETED";
 
-                {/* Activity Cards List */}
-                <div className="grid grid-cols-1 gap-3">
-                  {acts.map((act) => {
-                    const cfg = getActivityTypeConfig(act.activity_type || "LESSON");
-                    const isDone = act.status === "completed" || act.status === "COMPLETED";
-                    const isNeedsRevision = act.status === "NEEDS_REVISION" || act.status === "needs_revision";
-                    const actionBtn = getActionBtnConfig(act.status);
-                    const evidenceRef = act.evidence_ids ? act.evidence_ids[0] : "ev_6ad6d9";
-                    const hasPrereq = act.prerequisites && act.prerequisites.length > 0;
+                      return (
+                        <div
+                          key={blk.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isDone
+                              ? "bg-slate-950/40 border-slate-800/80 opacity-75"
+                              : "bg-slate-800/50 border-slate-700/60 hover:border-slate-600"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1.5 flex-1">
+                              {/* Badges Bar */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${cfg.bg}`}>
+                                  <span>{cfg.icon}</span>
+                                  <span>{cfg.label}</span>
+                                </span>
+                                <span className="text-xs font-semibold text-slate-300">
+                                  {blk.skillId}
+                                </span>
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                                  {blk.difficulty || "MEDIUM"}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  • {blk.durationMin} min
+                                </span>
+                              </div>
 
-                    return (
-                      <div
-                        key={act.activity_id || act.id}
-                        className={`p-4 rounded-xl border transition-all ${
-                          isDone
-                            ? "bg-slate-950/40 border-slate-800/80 opacity-75"
-                            : isNeedsRevision
-                            ? "bg-amber-950/20 border-amber-800/60"
-                            : "bg-slate-800/50 border-slate-700/60 hover:border-slate-600"
-                        }`}
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="space-y-1.5 flex-1">
-                            {/* Badges Bar */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${cfg.bg}`}>
-                                <span>{cfg.icon}</span>
-                                <span>{cfg.label}</span>
-                              </span>
-                              <span className="text-xs font-semibold text-slate-300">
-                                {act.skill_name || act.skill_id}
-                              </span>
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                                {act.difficulty || "Intermediate"}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                • {act.estimated_minutes || 30} min
-                              </span>
-                              {hasPrereq && (
+                              {/* Block Topic & Why Here */}
+                              <h4 className={`text-sm sm:text-base font-bold ${isDone ? "line-through text-slate-400" : "text-white"}`}>
+                                {blk.topic}
+                              </h4>
+
+                              {blk.keyPoints && blk.keyPoints.length > 0 && (
+                                <ul className="text-xs text-slate-300 space-y-0.5 list-disc list-inside pt-1">
+                                  {blk.keyPoints.slice(0, 3).map((kp, kidx) => (
+                                    <li key={kidx}>{kp}</li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {/* Why-Here Provenance */}
+                              <div className="pt-1 flex items-center gap-2">
+                                <span className="text-[11px] font-semibold text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded flex items-center gap-1">
+                                  ℹ️ Why this is here: {blk.whyHere}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleBlockStart(blk.id);
+                                  setActiveWorkspaceActivity({
+                                    id: blk.id,
+                                    title: blk.topic,
+                                    activity_type: blk.type,
+                                    skill_id: blk.skillId,
+                                    estimated_minutes: blk.durationMin,
+                                    learning_objective: blk.whyHere
+                                  });
+                                }}
+                                className={`text-xs px-4 py-2 rounded-xl transition-all font-bold shadow ${
+                                  isDone
+                                    ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                                    : "bg-gradient-to-r from-cyan-500 to-emerald-500 hover:brightness-110 text-slate-950 shadow-cyan-500/20"
+                                }`}
+                              >
+                                {isDone ? "Review" : "Start"} &rarr;
+                              </button>
+                              {!isDone && (
                                 <button
                                   type="button"
-                                  onClick={() => alert(`Prerequisite: ${act.prerequisites.join(", ")} must reach DEVELOPING before unlocking.`)}
-                                  className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 flex items-center gap-1 hover:bg-amber-900"
+                                  onClick={() => handleBlockComplete(blk.id)}
+                                  className="text-xs px-3 py-2 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition"
+                                  title="Mark Done records study time in logs without altering skill proficiency"
                                 >
-                                  ⚠️ Requires: {act.prerequisites[0]}
+                                  ✓ Done
                                 </button>
                               )}
                             </div>
-
-                            {/* Activity Title & Objective */}
-                            <h4 className={`text-sm sm:text-base font-bold ${isDone ? "line-through text-slate-400" : "text-white"}`}>
-                              {act.title}
-                            </h4>
-                            <p className="text-xs text-slate-300 leading-relaxed">
-                              {act.learning_objective || act.description || "Master core production mechanics and asymptotic bounds."}
-                            </p>
-
-                            {/* "Why this is here" Real Evidence Provenance Tooltip */}
-                            <div className="pt-1 flex items-center gap-2">
-                              <span className="text-[11px] font-semibold text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded flex items-center gap-1">
-                                ℹ️ Why this is here: {act.reason_code || "VERIFIED_GAP"} (Evidence #{evidenceRef})
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Contextual Action Button Per State */}
-                          <div className="flex items-center gap-2 self-start sm:self-auto">
-                            <button
-                              type="button"
-                              onClick={() => setActiveWorkspaceActivity(act)}
-                              className={`text-xs px-4 py-2.5 rounded-xl transition-all shadow ${actionBtn.style}`}
-                            >
-                              {actionBtn.label} &rarr;
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            dayNumbers.filter((d) => selectedDayFilter === "ALL" || selectedDayFilter === d).map((dayNum) => {
+              const acts = schedule[dayNum] || [];
+              const dayMinutes = acts.reduce((acc, a) => acc + (a.estimated_minutes || 30), 0);
+              const dayCompleted = acts.filter((a) => a.status === "completed" || a.status === "COMPLETED").length;
+
+              return (
+                <div key={dayNum} className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+                  {/* Day Header */}
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center font-bold text-cyan-400 text-sm">
+                        {dayNum}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white">Day {dayNum}</h3>
+                        <span className="text-[11px] text-slate-400">
+                          {acts[0]?.due_date ? `Scheduled for ${acts[0].due_date}` : "Targeted preparation milestones"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 text-xs">
+                      <span className="text-slate-400">{dayMinutes} min total</span>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-300">
+                        {dayCompleted} / {acts.length} Complete
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Activity Cards List */}
+                  <div className="grid grid-cols-1 gap-3">
+                    {acts.map((act) => {
+                      const cfg = getActivityTypeConfig(act.activity_type || "LESSON");
+                      const isDone = act.status === "completed" || act.status === "COMPLETED";
+                      const isNeedsRevision = act.status === "NEEDS_REVISION" || act.status === "needs_revision";
+                      const actionBtn = getActionBtnConfig(act.status);
+                      const evidenceRef = act.evidence_ids ? act.evidence_ids[0] : "ev_6ad6d9";
+                      const hasPrereq = act.prerequisites && act.prerequisites.length > 0;
+
+                      return (
+                        <div
+                          key={act.activity_id || act.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            isDone
+                              ? "bg-slate-950/40 border-slate-800/80 opacity-75"
+                              : isNeedsRevision
+                              ? "bg-amber-950/20 border-amber-800/60"
+                              : "bg-slate-800/50 border-slate-700/60 hover:border-slate-600"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1.5 flex-1">
+                              {/* Badges Bar */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 ${cfg.bg}`}>
+                                  <span>{cfg.icon}</span>
+                                  <span>{cfg.label}</span>
+                                </span>
+                                <span className="text-xs font-semibold text-slate-300">
+                                  {act.skill_name || act.skill_id}
+                                </span>
+                                <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                                  {act.difficulty || "Intermediate"}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  • {act.estimated_minutes || 30} min
+                                </span>
+                                {hasPrereq && (
+                                  <button
+                                    type="button"
+                                    onClick={() => alert(`Prerequisite: ${act.prerequisites.join(", ")} must reach DEVELOPING before unlocking.`)}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 flex items-center gap-1 hover:bg-amber-900"
+                                  >
+                                    ⚠️ Requires: {act.prerequisites[0]}
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Activity Title & Objective */}
+                              <h4 className={`text-sm sm:text-base font-bold ${isDone ? "line-through text-slate-400" : "text-white"}`}>
+                                {act.title}
+                              </h4>
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                {act.learning_objective || act.description || "Master core production mechanics and asymptotic bounds."}
+                              </p>
+
+                              {/* "Why this is here" Real Evidence Provenance Tooltip */}
+                              <div className="pt-1 flex items-center gap-2">
+                                <span className="text-[11px] font-semibold text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded flex items-center gap-1">
+                                  ℹ️ Why this is here: {act.reason_code || "VERIFIED_GAP"} (Evidence #{evidenceRef})
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Contextual Action Button Per State */}
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => setActiveWorkspaceActivity(act)}
+                                className={`text-xs px-4 py-2.5 rounded-xl transition-all shadow ${actionBtn.style}`}
+                              >
+                                {actionBtn.label} &rarr;
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

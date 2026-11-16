@@ -623,6 +623,7 @@ class SQLiteSupabaseMock:
                 sender_type TEXT,
                 sender_name TEXT,
                 organization_id TEXT,
+                user_id TEXT,
                 target_group TEXT,
                 title TEXT,
                 message TEXT,
@@ -632,6 +633,11 @@ class SQLiteSupabaseMock:
                 read INTEGER DEFAULT 0
             )
         """)
+        for col_def in ("user_id TEXT",):
+            try:
+                cursor.execute(f"ALTER TABLE notifications ADD COLUMN {col_def}")
+            except Exception:
+                pass
 
         # 28. student_feedbacks
         cursor.execute("""

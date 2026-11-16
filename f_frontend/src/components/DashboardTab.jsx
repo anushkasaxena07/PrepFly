@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getGradeInfo } from '../utils/gradingSystem';
 import { usePrepFlyTheme } from './ui/ThemeContext';
 import { NavIcon } from './ui/PrepFlyTheme';
 import journeyHikerImg from '../assets/journey-hiker.jpg';
+import { intelligenceAPI } from '../services/intelligenceAPI';
+import { sanitizeUIString } from '../utils/templateGuard';
 
 export default function DashboardTab({ setActiveTab, user = {}, history = [], userStats = null }) {
   const { isSunrise } = usePrepFlyTheme();
-  const userName = user?.full_name || user?.name || "Anushka";
+  const userName = sanitizeUIString(user?.full_name || user?.name || "Anushka", "Candidate");
+
+  const [unifiedReadiness, setUnifiedReadiness] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    intelligenceAPI.getReadiness()
+      .then(res => {
+        if (isMounted && res && res.readiness) {
+          setUnifiedReadiness(res.readiness);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [user?._id, history.length]);
 
   const isValidSession = (s) => {
     if (!s) return false;
@@ -33,10 +49,17 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
         ? (completedSessions.reduce((acc, s) => acc + (s.final_score || 0), 0) / completedSessions.length).toFixed(1)
         : "0.0");
 
-  // 3. Interview readiness
-  const displayReadiness = userStats?.interviews
-    ? (userStats.interviews.readiness ?? 0)
-    : (hasData && completedSessions.length > 0 ? Math.min(100, Math.round(parseFloat(displayAvgScore || "0") * 10)) : 0);
+  // 3. Interview readiness (Single source of truth from /api/readiness)
+  const specReadiness = unifiedReadiness?.overall_readiness;
+  const isReadinessProvisional = unifiedReadiness?.is_provisional;
+  const displayReadiness = specReadiness !== null && specReadiness !== undefined
+    ? Math.round(Number(specReadiness))
+    : (userStats?.interviews?.readiness !== undefined && userStats?.interviews?.readiness !== null && hasData
+        ? Math.round(userStats.interviews.readiness)
+        : null);
+  const displayReadinessText = displayReadiness !== null
+    ? `${displayReadiness}%`
+    : "No evidence yet";
 
   // 4. Dynamic stats (strictly from student records, never mock values)
   const codingAccuracy = userStats?.coding?.has_data
@@ -533,10 +556,13 @@ export default function DashboardTab({ setActiveTab, user = {}, history = [], us
                   <div className="continue-thumb" style={{background:"#f5f3ff",border:"1px solid #ddd6fe"}}>🤖</div>
                   <div className="continue-info">
                     <div className="continue-title">Ava AI Interview Coach</div>
-                    <div className="continue-meta">Adaptive voice mock interview sessions</div>
-                    <div className="progress-bar"><div className="progress-fill" style={{width:`${displayReadiness}%`, "--p-start":"#7c3aed", "--p-end":"#a78bfa"}}></div></div>
+                    <div className="continue-meta" style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                      <span>Adaptive voice mock interview sessions</span>
+                      {isReadinessProvisional && <span style={{fontSize: "9px", padding: "1px 6px", borderRadius: "6px", background: "#fef3c7", color: "#92400e", fontWeight: 800}}>PROVISIONAL</span>}
+                    </div>
+                    <div className="progress-bar"><div className="progress-fill" style={{width:`${displayReadiness || 0}%`, "--p-start":"#7c3aed", "--p-end":"#a78bfa"}}></div></div>
                   </div>
-                  <div className="continue-pct" style={{color:"var(--purple)"}}>{displayReadiness}%</div>
+                  <div className="continue-pct" style={{color:"var(--purple)", fontSize: displayReadiness === null ? "11px" : "13px"}}>{displayReadinessText}</div>
                   <div className="continue-arrow">›</div>
                 </div>
                 <div className="continue-card" onClick={() => setActiveTab('resume')} tabIndex="0" role="button">

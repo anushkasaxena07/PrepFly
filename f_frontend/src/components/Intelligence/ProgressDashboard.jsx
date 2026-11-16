@@ -23,6 +23,8 @@ export default function ProgressDashboard({ onNavigateTab }) {
   const [defenseResults, setDefenseResults] = useState([]);
   const [error, setError] = useState("");
 
+  const [specReadinessData, setSpecReadinessData] = useState(null);
+
   useEffect(() => {
     loadProgressData();
   }, []);
@@ -31,13 +33,14 @@ export default function ProgressDashboard({ onNavigateTab }) {
     setLoading(true);
     setError("");
     try {
-      const [dashRes, skillRes, insightRes, weakRes, improveRes, provRes] = await Promise.allSettled([
+      const [dashRes, skillRes, insightRes, weakRes, improveRes, provRes, readRes] = await Promise.allSettled([
         intelligenceAPI.getProgressDashboard(),
         intelligenceAPI.getSkillProfile(),
         intelligenceAPI.getCoachingInsights(),
         intelligenceAPI.getVerifiedWeaknesses(),
         intelligenceAPI.getImprovementAnalytics(),
-        intelligenceAPI.getReadinessProvenance()
+        intelligenceAPI.getReadinessProvenance(),
+        intelligenceAPI.getReadiness()
       ]);
 
       if (dashRes.status === "fulfilled") {
@@ -57,6 +60,9 @@ export default function ProgressDashboard({ onNavigateTab }) {
       }
       if (provRes.status === "fulfilled") {
         setReadinessProvenance(provRes.value);
+      }
+      if (readRes.status === "fulfilled" && readRes.value?.readiness) {
+        setSpecReadinessData(readRes.value);
       }
     } catch (err) {
       setError(err.message || "Failed to load progress analytics.");
@@ -129,16 +135,24 @@ export default function ProgressDashboard({ onNavigateTab }) {
     );
   }
 
-  // Derive evidence-based values
+  // Derive unified evidence-based values (Golden Rule 2 & Section 13)
+  const specRead = specReadinessData?.readiness;
   const provReadiness = readinessProvenance?.readiness;
   const pillars = readinessProvenance?.pillars || {};
   const evidenceHistory = readinessProvenance?.evidence_history || [];
 
-  const overallReadinessScore = provReadiness?.overall_score ?? dashboard?.overall_readiness ?? 0;
-  const readinessStatus = provReadiness?.readiness_status || (overallReadinessScore >= 75 ? "ESTABLISHED" : "PROVISIONAL");
-  const formulaExplanation = provReadiness?.formula_breakdown || "Calibrated across verified assessment scores, coding accuracy, and task complexity.";
+  const overallReadinessScore = specRead?.overall_readiness !== undefined && specRead?.overall_readiness !== null
+    ? Math.round(Number(specRead.overall_readiness))
+    : (provReadiness?.overall_score ?? (dashboard?.overall_readiness !== undefined ? Math.round(dashboard.overall_readiness) : null));
+  const verifiedScore = specRead?.verified_score !== undefined && specRead?.verified_score !== null
+    ? Math.round(Number(specRead.verified_score))
+    : null;
+  const readinessStatus = specRead
+    ? (specRead.is_provisional ? "PROVISIONAL" : "ESTABLISHED")
+    : (provReadiness?.readiness_status || (overallReadinessScore && overallReadinessScore >= 75 ? "ESTABLISHED" : "PROVISIONAL"));
+  const formulaExplanation = "Readiness = 0.5 × VerifiedScore + 0.3 × Coverage + 0.2 × Confidence (calculated strictly by deterministic scoring engine).";
   const unassessedMandatory = provReadiness?.unassessed_mandatory_skills || [];
-  const coverageRatio = provReadiness?.coverage_ratio || 0.5;
+  const coverageRatio = specRead?.coverage_pct ? (specRead.coverage_pct / 100) : (provReadiness?.coverage_ratio || 0.5);
 
   const metrics = dashboard?.study_metrics || {};
   const baseline = dashboard?.baseline_comparison || {};
@@ -201,44 +215,78 @@ export default function ProgressDashboard({ onNavigateTab }) {
           </div>
         )}
 
-        {/* Statistical Trend Detection Banner */}
-        {improvementReport?.trend && (
-          <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-            improvementReport.trend.status === "Improving"
-              ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-200"
-              : improvementReport.trend.status === "Declining"
-              ? "bg-rose-950/40 border-rose-800/80 text-rose-200"
-              : "bg-slate-900 border-slate-800 text-slate-300"
-          }`}>
-            <div className="flex items-center space-x-3">
-              <span className="text-xl">
-                {improvementReport.trend.status === "Improving" ? "📈" : improvementReport.trend.status === "Declining" ? "📉" : "📊"}
-              </span>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-sm uppercase tracking-wide">
-                    Statistical Trend: {improvementReport.trend.status}
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
-                    {improvementReport.trend.confidence} CONFIDENCE
-                  </span>
+        {/* Statistical Trend Detection Banner (Section 13, Acceptance Test 7) */}
+        {(() => {
+          const trend = specReadinessData?.trend || improvementReport?.trend;
+          if (!trend) return null;
+          const hasEnough = trend.has_enough_data === true || (trend.sessions_evaluated >= 3 && trend.status !== "Not enough data yet" && trend.status !== "Insufficient Evidence");
+
+          if (!hasEnough) {
+            return (
+              <div className="p-4 rounded-2xl border bg-slate-900 border-slate-800 text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">📊</span>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-sm uppercase tracking-wide text-slate-300">
+                        Statistical Trend: Not enough data yet
+                      </span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                        INSUFFICIENT CHECKPOINTS
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Minimum 3 distinct evaluation checkpoints required to calculate velocity and learning trajectory.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs opacity-80 mt-0.5">
-                  {improvementReport.trend.status === "Improving" && `Statistically significant gain of +${improvementReport.trend.delta_points} points above your verified baseline.`}
-                  {improvementReport.trend.status === "Stable" && "Performance variance is within normal margins (+/- 5%). Progress is holding stable."}
-                  {improvementReport.trend.status === "Declining" && `Recent evaluations indicate a ${improvementReport.trend.delta_points} point decline. Focused drills recommended.`}
-                  {improvementReport.trend.status === "Insufficient Evidence" && "Gathering evaluation checkpoints across coding, Ava mock, and diagnostic assessments."}
-                </p>
+                <div className="text-xs text-slate-400 font-mono">
+                  {trend.sessions_evaluated !== undefined ? `${trend.sessions_evaluated}/3 evaluations recorded` : "Awaiting evaluations"}
+                </div>
+              </div>
+            );
+          }
+
+          const isImproving = trend.status === "Improving";
+          const isDeclining = trend.status === "Declining";
+
+          return (
+            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isImproving
+                ? "bg-emerald-950/40 border-emerald-800/80 text-emerald-200"
+                : isDeclining
+                ? "bg-rose-950/40 border-rose-800/80 text-rose-200"
+                : "bg-slate-900 border-slate-800 text-slate-300"
+            }`}>
+              <div className="flex items-center space-x-3">
+                <span className="text-xl">
+                  {isImproving ? "📈" : isDeclining ? "📉" : "📊"}
+                </span>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-sm uppercase tracking-wide">
+                      Statistical Trend: {trend.status}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                      {trend.confidence || "MEDIUM"} CONFIDENCE
+                    </span>
+                  </div>
+                  <p className="text-xs opacity-80 mt-0.5">
+                    {isImproving && `Statistically significant gain of +${trend.delta_points ?? 0} points above your verified baseline.`}
+                    {trend.status === "Stable" && "Performance variance is within normal margins (±5%). Progress is holding stable."}
+                    {isDeclining && `Recent evaluations indicate a ${trend.delta_points ?? 0} point decline. Focused drills recommended.`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right whitespace-nowrap self-start sm:self-auto">
+                <span className="text-xs font-mono font-bold">
+                  Slope: {trend.slope !== null && trend.slope !== undefined ? (trend.slope > 0 ? `+${trend.slope}` : trend.slope) : "N/A"}
+                </span>
               </div>
             </div>
-
-            <div className="text-right whitespace-nowrap self-start sm:self-auto">
-              <span className="text-xs font-mono font-bold">
-                Slope: {improvementReport.trend.slope > 0 ? `+${improvementReport.trend.slope}` : improvementReport.trend.slope}
-              </span>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Top Readiness & Provenance Hero Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -492,98 +540,199 @@ export default function ProgressDashboard({ onNavigateTab }) {
           </div>
         </div>
 
-        {/* Strictly Verified Weaknesses Section */}
-        {weaknesses.length > 0 ? (
-          <div className="bg-red-950/30 border border-red-900/60 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
-              <h4 className="text-sm font-bold text-red-300 uppercase tracking-wider">
-                Strictly Verified Skill Gaps ({weaknesses.length})
-              </h4>
-            </div>
-            <p className="text-xs text-slate-300">
-              Only skills with verified assessment scores below 60% are shown. Unassessed claims are never labeled as weaknesses.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
-              {weaknesses.map((w, idx) => (
-                <div key={idx} className="bg-slate-900/90 border border-red-900/40 rounded-xl p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-white">{w.skill_name}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                      w.severity === "VERIFIED_GAP"
-                        ? "bg-red-950 text-red-400 border-red-800"
-                        : "bg-amber-950 text-amber-400 border-amber-800"
-                    }`}>
-                      {w.severity} ({w.proficiency}%)
-                    </span>
-                  </div>
+        {/* Strictly Verified Skill Gaps Section (Section 6, Acceptance Test 2) */}
+        {(() => {
+          const specGaps = specReadinessData?.gap_analysis?.verified_skill_gaps || [];
+          const activeGaps = specGaps.length > 0
+            ? specGaps
+            : weaknesses.filter(w => (w.proficiency !== null && w.proficiency !== undefined && w.proficiency < 60));
 
-                  {w.failed_criteria && w.failed_criteria.length > 0 && (
-                    <div className="text-xs text-slate-400">
-                      <span className="font-semibold text-slate-300">Failed Rubrics: </span>
-                      {w.failed_criteria.join(", ")}
+          return activeGaps.length > 0 ? (
+            <div className="bg-red-950/30 border border-red-900/60 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+                <h4 className="text-sm font-bold text-red-300 uppercase tracking-wider">
+                  Strictly Verified Skill Gaps ({activeGaps.length})
+                </h4>
+              </div>
+              <p className="text-xs text-slate-300">
+                Only skills with verified assessment scores below 60% are shown. Unassessed skills are strictly excluded and never labeled as weaknesses.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                {activeGaps.map((w, idx) => (
+                  <div key={idx} className="bg-slate-900/90 border border-red-900/40 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm text-white">{w.name || w.skill_name}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-red-950 text-red-400 border-red-800">
+                        VERIFIED GAP ({Math.round(w.proficiency || 0)}%)
+                      </span>
                     </div>
-                  )}
 
-                  <div className="text-xs text-cyan-300 pt-1 flex items-center justify-between">
-                    <span>💡 {w.remedial_action}</span>
+                    <div className="flex items-center space-x-2 text-[11px] text-slate-400">
+                      <span>{w.pillar}</span>
+                      <span>•</span>
+                      <span className="text-amber-400 font-semibold">{w.tier || "PREFERRED"}</span>
+                    </div>
+
+                    {(w.failed_rubrics || w.failed_criteria) && (w.failed_rubrics?.length > 0 || w.failed_criteria?.length > 0) && (
+                      <div className="text-xs text-slate-400">
+                        <span className="font-semibold text-slate-300">Failed Rubrics: </span>
+                        {(w.failed_rubrics || w.failed_criteria).join(", ")}
+                      </div>
+                    )}
+
+                    <div className="text-xs text-cyan-300 pt-1 flex items-center justify-between">
+                      <span>💡 {w.remedial_action || "Targeted revision & coding practice recommended"}</span>
+                      {onNavigateTab && (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateTab("roadmap")}
+                          className="px-2 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 text-[11px] font-semibold rounded border border-cyan-800 transition-colors"
+                        >
+                          Review in Roadmap →
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center text-xs text-slate-400">
-            <span className="text-emerald-400 font-bold">✓ Zero Verified Technical Gaps Detected.</span> All assessed skills currently meet the &gt;60% competency threshold.
-          </div>
-        )}
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center text-xs text-slate-400">
+              <span className="text-emerald-400 font-bold">✓ Zero Verified Technical Gaps Detected.</span> All assessed skills currently meet the &ge;60% competency threshold.
+            </div>
+          );
+        })()}
+
+        {/* Not Yet Assessed Skills Section (Section 6, Acceptance Test 2) */}
+        {(() => {
+          const specUnassessed = specReadinessData?.gap_analysis?.not_yet_assessed || [];
+          if (specUnassessed.length === 0) return null;
+
+          return (
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-base">📋</span>
+                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
+                    Skills Not Yet Assessed ({specUnassessed.length})
+                  </h4>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                  STATUS: NOT_ASSESSED
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                These skills have no verified evidence yet. They are strictly excluded from gaps and do not penalize your proficiency score.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                {specUnassessed.map((u, idx) => (
+                  <div key={idx} className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 flex flex-col justify-between space-y-2">
+                    <div>
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="font-semibold text-xs text-slate-200">{u.name}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                          u.tier === "MANDATORY"
+                            ? "bg-amber-950/60 text-amber-300 border-amber-800/60"
+                            : "bg-slate-800 text-slate-400 border-slate-700"
+                        }`}>
+                          {u.tier}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">{u.pillar}</span>
+                    </div>
+
+                    <div className="pt-1">
+                      {onNavigateTab ? (
+                        <button
+                          type="button"
+                          onClick={() => onNavigateTab("roadmap")}
+                          className="w-full py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-semibold rounded border border-slate-700 transition-colors"
+                        >
+                          Take Quick Assessment →
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">No evidence recorded</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Grounded AI Coaching Recommendations Section */}
-        {insights.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-base font-bold text-white flex items-center space-x-2">
-              <span>⚡ Grounded AI Coaching Recommendations</span>
-            </h3>
+        {(() => {
+          const assessedCount = specReadinessData?.readiness?.assessed_skills_count ?? 0;
+          const activeInsights = insights.filter(ins => {
+            if (assessedCount > 0) {
+              const text = `${ins.title || ""} ${ins.message || ""}`.toLowerCase();
+              if (text.includes("diagnostic") || text.includes("baseline") || text.includes("initial assessment")) {
+                return false;
+              }
+            }
+            return true;
+          });
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {insights.map((ins, idx) => (
-                <div
-                  key={idx}
-                  className="bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 space-y-2.5 transition-all shadow-md"
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                        ins.priority === "HIGH"
-                          ? "bg-red-950/70 text-red-400 border-red-800"
-                          : ins.priority === "MEDIUM"
-                          ? "bg-amber-950/70 text-amber-400 border-amber-800"
-                          : "bg-emerald-950/70 text-emerald-400 border-emerald-800"
-                      }`}
-                    >
-                      {ins.priority} Priority
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-400">
-                      {ins.type.replace(/_/g, " ")}
-                    </span>
+          return activeInsights.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                <span>⚡ Grounded AI Coaching Recommendations</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeInsights.map((ins, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 space-y-2.5 transition-all shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                          ins.priority === "HIGH"
+                            ? "bg-red-950/70 text-red-400 border-red-800"
+                            : ins.priority === "MEDIUM"
+                            ? "bg-amber-950/70 text-amber-400 border-amber-800"
+                            : "bg-emerald-950/70 text-emerald-400 border-emerald-800"
+                        }`}
+                      >
+                        {ins.priority} Priority
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400">
+                        {ins.type.replace(/_/g, " ")}
+                      </span>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-white">{ins.title}</h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">{ins.message}</p>
+
+                    {ins.action_type && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (ins.action_type === "START_REVISION" && onNavigateTab) {
+                              onNavigateTab("roadmap");
+                            } else if (ins.action_type === "MOCK_INTERVIEW" && onNavigateTab) {
+                              onNavigateTab("ava");
+                            } else if (onNavigateTab) {
+                              onNavigateTab("coding");
+                            }
+                          }}
+                          className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+                        >
+                          Take Action →
+                        </button>
+                      </div>
+                    )}
                   </div>
-
-                  <h4 className="text-sm font-bold text-white">{ins.title}</h4>
-                  <p className="text-xs text-slate-300 leading-relaxed">{ins.message}</p>
-
-                  {ins.action_type && (
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (ins.action_type === "START_REVISION" && onNavigateTab) {
-                            onNavigateTab("roadmap");
-                          } else if (ins.action_type === "MOCK_INTERVIEW" && onNavigateTab) {
-                            onNavigateTab("ava");
-                          } else if (onNavigateTab) {
-                            onNavigateTab("coding");
-                          }
-                        }}
+                ))}
+              </div>
+            </div>
+          ) : null;
+        })()}
                         className="text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
                       >
                         Take Action: {ins.action_type.replace(/_/g, " ")} &rarr;

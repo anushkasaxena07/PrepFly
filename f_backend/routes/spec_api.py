@@ -85,7 +85,8 @@ def get_canonical_readiness():
             "target_role": target_role,
             "readiness": readiness,
             "pillars": profile_data.get("pillars", []),
-            "trend": profile_data.get("trend", {})
+            "trend": profile_data.get("trend", {}),
+            "gap_analysis": profile_data.get("gap_analysis", {})
         }
         return jsonify(response_payload), 200
     except Exception as ex:
