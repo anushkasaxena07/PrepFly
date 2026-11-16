@@ -1809,6 +1809,230 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 80. Section 10 Spec Tables (Migration 013)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS target_profiles (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                company TEXT NOT NULL,
+                role TEXT NOT NULL,
+                level TEXT NOT NULL,
+                years_total REAL DEFAULT 0,
+                years_domain REAL DEFAULT 0,
+                jd_text TEXT,
+                user_rules_text TEXT,
+                interview_date TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS availability (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                weekday TEXT NOT NULL,
+                minutes INTEGER NOT NULL DEFAULT 90,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, weekday)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS blackout_dates (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                reason TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, date)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pillars (
+                id TEXT PRIMARY KEY,
+                profile_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                "order" INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skills (
+                id TEXT PRIMARY KEY,
+                profile_id TEXT NOT NULL,
+                pillar_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                tier TEXT NOT NULL,
+                importance INTEGER NOT NULL DEFAULT 3,
+                source TEXT NOT NULL,
+                source_url TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subskills (
+                id TEXT PRIMARY KEY,
+                skill_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                rubric_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS questions (
+                id TEXT PRIMARY KEY,
+                skill_id TEXT NOT NULL,
+                subskill_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                rubric_json TEXT NOT NULL DEFAULT '[]',
+                model_answer TEXT,
+                options_json TEXT,
+                tests_json TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS assessment_sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'in_progress',
+                started_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS answers (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                question_id TEXT NOT NULL,
+                answer_text TEXT,
+                attempted INTEGER NOT NULL DEFAULT 1,
+                time_spent_sec INTEGER DEFAULT 0,
+                submitted_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS evidence (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                subskill_id TEXT,
+                answer_id TEXT,
+                score REAL NOT NULL,
+                difficulty TEXT NOT NULL,
+                type TEXT NOT NULL,
+                rubric_results_json TEXT NOT NULL DEFAULT '[]',
+                grader_runs_json TEXT DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_snapshots (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                session_id TEXT,
+                skill_id TEXT NOT NULL,
+                proficiency REAL,
+                confidence REAL NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS readiness_snapshots (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                session_id TEXT,
+                verified_score REAL,
+                projected_readiness REAL,
+                weighted_coverage REAL NOT NULL,
+                mandatory_coverage REAL NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plans (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
+                trigger TEXT NOT NULL,
+                diff_json TEXT NOT NULL DEFAULT '{}',
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plan_days (
+                id TEXT PRIMARY KEY,
+                plan_id TEXT NOT NULL,
+                date TEXT NOT NULL,
+                day_number INTEGER NOT NULL,
+                phase TEXT NOT NULL,
+                theme TEXT NOT NULL,
+                daily_goal TEXT NOT NULL,
+                budget_min INTEGER NOT NULL,
+                total_min INTEGER NOT NULL,
+                notes_json TEXT DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS plan_blocks (
+                id TEXT PRIMARY KEY,
+                plan_day_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                duration_min INTEGER NOT NULL,
+                difficulty TEXT NOT NULL,
+                content_json TEXT NOT NULL DEFAULT '{}',
+                why_here TEXT NOT NULL,
+                evidence_id TEXT,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS study_logs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                block_id TEXT,
+                minutes INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                ended_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                intent TEXT,
+                tool_calls_json TEXT DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
         # Seed Default Achievements
         cursor.execute("SELECT COUNT(*) FROM achievement_definitions")
         if cursor.fetchone()[0] == 0:
