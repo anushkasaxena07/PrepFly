@@ -733,17 +733,6 @@ export default function ProgressDashboard({ onNavigateTab }) {
             </div>
           ) : null;
         })()}
-                        className="text-xs font-bold text-cyan-400 hover:text-cyan-300 underline"
-                      >
-                        Take Action: {ins.action_type.replace(/_/g, " ")} &rarr;
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Granular Skill Profiles Grid */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">

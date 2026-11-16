@@ -1268,50 +1268,63 @@ def get_owned_session(session_id):
     if not p:
         return None, (jsonify({"error": "Authentication required"}), 401)
     
-    clean_session_id = str(session_id or "").strip()
-    if "_" in clean_session_id:
-        clean_session_id = clean_session_id.split("_")[0]
-
-    if not clean_session_id or not UUID_RE.match(clean_session_id):
+    raw_session_id = str(session_id or "").strip()
+    if not raw_session_id:
         return None, (jsonify({"error": "Session not found"}), 404)
-        
+
+    # Candidate session IDs to check in order: exact raw ID, clean UUID part if present
+    candidates = [raw_session_id]
+    if "_" in raw_session_id:
+        prefix_cand = raw_session_id.split("_")[0]
+        if prefix_cand not in candidates:
+            candidates.append(prefix_cand)
+    uuid_match = re.search(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", raw_session_id)
+    if uuid_match and uuid_match.group(0) not in candidates:
+        candidates.append(uuid_match.group(0))
+
     db_err = None
     s = None
-    try:
-        res = supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
-        s = res.data[0] if res and res.data else None
-        if not s and clean_session_id != str(session_id).strip():
-            res = supabase.table("sessions").select("*").eq("session_id", str(session_id).strip()).execute()
-            s = res.data[0] if res and res.data else None
-    except Exception as exc:
-        db_err = exc
+    for cand in candidates:
+        try:
+            res = supabase.table("sessions").select("*").eq("session_id", cand).execute()
+            if res and res.data:
+                s = res.data[0]
+                break
+        except Exception as exc:
+            db_err = exc
 
     # Also check id column if primary key is named id
     if not s and not db_err:
-        try:
-            res_id = supabase.table("sessions").select("*").eq("id", clean_session_id).execute()
-            if res_id and res_id.data:
-                s = res_id.data[0]
-                if "session_id" not in s or not s["session_id"]:
-                    s["session_id"] = s.get("id")
-        except Exception:
-            pass
+        for cand in candidates:
+            try:
+                res_id = supabase.table("sessions").select("*").eq("id", cand).execute()
+                if res_id and res_id.data:
+                    s = res_id.data[0]
+                    if "session_id" not in s or not s["session_id"]:
+                        s["session_id"] = s.get("id")
+                    break
+            except Exception:
+                pass
 
     if not s:
         loc_client = getattr(supabase, "_local_client", None) or getattr(supabase, "local_client", None)
         if loc_client:
-            try:
-                lres = loc_client.table("sessions").select("*").eq("session_id", clean_session_id).execute()
-                if lres and lres.data:
-                    s = lres.data[0]
-            except Exception:
-                pass
+            for cand in candidates:
+                try:
+                    lres = loc_client.table("sessions").select("*").eq("session_id", cand).execute()
+                    if lres and lres.data:
+                        s = lres.data[0]
+                        break
+                except Exception:
+                    pass
         if not s:
             try:
                 from local_supabase import local_supabase
-                lres = local_supabase.table("sessions").select("*").eq("session_id", clean_session_id).execute()
-                if lres and lres.data:
-                    s = lres.data[0]
+                for cand in candidates:
+                    lres = local_supabase.table("sessions").select("*").eq("session_id", cand).execute()
+                    if lres and lres.data:
+                        s = lres.data[0]
+                        break
             except Exception:
                 pass
 
@@ -1321,6 +1334,8 @@ def get_owned_session(session_id):
             if "timed out" in err_text.lower() or "connection" in err_text.lower():
                 return None, (jsonify({"error": "Database service unavailable. Please retry shortly.", "details": err_text}), 503)
         return None, (jsonify({"error": "Session not found"}), 404)
+
+    clean_session_id = str(s.get("session_id") or raw_session_id).strip()
 
     # Claim session if currently unowned or unassigned
     caller_sub = str(p.get("sub") or "").strip()
@@ -2671,20 +2686,15 @@ def start_interview():
 
         # Persist initial interviewer turn (turn_index=0) into interview_turns ledger
         try:
-            turn_id = f"turn_{session_id}_0_interviewer"
-            supabase.table("interview_turns").upsert({
-                "id": turn_id,
-                "session_id": session_id,
-                "turn_number": 1,
-                "turn_index": 0,
-                "speaker": "interviewer",
-                "question_text": first_q,
-                "text": first_q,
-                "stage": stage,
-                "word_count": len(first_q.split()),
-                "started_at": now_iso,
-                "created_at": now_iso,
-            }, on_conflict="id").execute()
+            from services.interview_capture_service import persist_interviewer_turn
+            persist_interviewer_turn(
+                supabase_client=supabase,
+                session_id=session_id,
+                turn_index=0,
+                question_text=first_q,
+                stage=stage,
+                started_at=now_iso,
+            )
         except Exception as turn_err:
             import logging
             logging.warning("Initial interviewer turn persistence notice: %s", turn_err)
@@ -2753,8 +2763,42 @@ def next_question():
         _SESSION_IN_FLIGHT.add(session_id)
 
     try:
-        if not session.get("active", True) or session.get("status") == "completed":
-            return jsonify({"error": "Session not found or already completed"}), 404
+        sess_status = str(session.get("status") or "").strip().lower()
+        interview_st = str(session.get("interview_state") or "").strip().upper()
+
+        # 1. Distinguish completed sessions: HTTP 409
+        if sess_status == "completed" or interview_st == "ENDED":
+            return jsonify({
+                "error": "Interview session already completed",
+                "message": "This interview session has already ended. Please review your feedback report.",
+                "status": "completed",
+                "done": True,
+                "question_number": int(session.get("question_index") or 10),
+                "total_questions": int(session.get("total_questions") or 10),
+            }), 409
+
+        # 2. Distinguish expired sessions: HTTP 410
+        if sess_status == "expired":
+            return jsonify({
+                "error": "Interview session has expired",
+                "message": "This interview session has expired. Please start a new interview session.",
+                "status": "expired",
+                "done": True,
+            }), 410
+
+        # 3. Auto-reactivate inactive or abandoned session when candidate submits a turn
+        if session.get("active") in (False, 0, "0", "false", "False") or sess_status == "abandoned":
+            try:
+                supabase.table("sessions").update({
+                    "active": True,
+                    "status": "in_progress",
+                    "updated_at": datetime.utcnow().isoformat(),
+                }).eq("session_id", session_id).execute()
+                session["active"] = True
+                session["status"] = "in_progress"
+            except Exception as reactivate_err:
+                import logging
+                logging.warning("Session auto-reactivation notice: %s", reactivate_err)
         resume_text    = session.get("resume_text", "")
         questions      = session.get("questions") or []
         responses      = session.get("responses") or []

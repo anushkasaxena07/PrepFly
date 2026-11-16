@@ -570,6 +570,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
   const speechConfsRef = useRef([]);
   const turnInputModeRef = useRef("speech");
   const turnIdemKeyRef = useRef(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     isHandsFreeRef.current = isHandsFree;
@@ -1362,6 +1363,12 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
 
   // Submit Answer & Fetch Next Question (hands-free auto submit compatible + capture telemetry)
   const submitAnswerAndNext = async (overrideAnswer = null) => {
+    if (isSubmittingRef.current) {
+      console.warn("Submission already in flight; ignoring concurrent trigger");
+      return;
+    }
+    isSubmittingRef.current = true;
+
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -1374,6 +1381,7 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
       if (!overrideAnswer) {
         setSubmitError("Please speak or type your answer before submitting.");
       }
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -1415,12 +1423,25 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.degraded_message || data.error || "Failed to process answer");
+      if (!res.ok) {
+        // If session was completed or already wrapped up
+        if (res.status === 409 || data.status === "completed") {
+          isEndingRef.current = true;
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+          }
+          setIsAvaTalking(false);
+          endInterviewSession(true);
+          return;
+        }
+        throw new Error(data.degraded_message || data.error || data.message || "Failed to process answer");
+      }
 
       if (data.requires_review) {
         setIsAvaThinking(false);
         setReviewNotice(data.message || "Low speech confidence detected. Review or edit your transcript below before submitting.");
         setConfirmedEdit(true);
+        setAnswer(textToSubmit);
         return;
       }
 
@@ -1466,8 +1487,35 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
         playAvaSpeech(data.next_question);
       }
     } catch (err) {
+      // PRESERVE candidate transcript and response draft on error
+      setAnswer(textToSubmit);
+      finalTranscriptRef.current = textToSubmit;
       setSubmitError(err.message || "Could not submit your response. Your draft is preserved below.");
       setIsAvaThinking(false);
+    } finally {
+      isSubmittingRef.current = false;
+    }
+  };
+
+  const handleRefreshSessionState = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await apiFetch(`/interview/${sessionId}/state`);
+      if (!res.ok) throw new Error("Could not refresh session state.");
+      const data = await res.json();
+      if (data.status === "completed") {
+        endInterviewSession(true);
+        return;
+      }
+      if (data.current_question) {
+        setQuestion(data.current_question);
+      }
+      if (data.question_index) {
+        setQuestionNumber(data.question_index);
+      }
+      setSubmitError(null);
+    } catch (e) {
+      console.warn("Failed to refresh session state:", e);
     }
   };
 
@@ -2815,11 +2863,16 @@ export default function AvaTab({ apiFetch, isLoggedIn, user = {} }) {
                   )}
 
                   {submitError && (
-                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "10px", padding: "6px 10px", fontSize: "11.5px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "10px", padding: "8px 12px", fontSize: "11.5px", color: "#fca5a5", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                       <span>{submitError}</span>
-                      <button type="button" onClick={() => submitAnswerAndNext(answer)} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", padding: "3px 10px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
-                        Retry Submit
-                      </button>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button type="button" onClick={() => handleRefreshSessionState()} style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", padding: "3px 9px", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
+                          🔄 Refresh State
+                        </button>
+                        <button type="button" onClick={() => submitAnswerAndNext(answer)} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "8px", padding: "3px 10px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                          Retry Submit
+                        </button>
+                      </div>
                     </div>
                   )}
 

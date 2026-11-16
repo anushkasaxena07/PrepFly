@@ -30,8 +30,8 @@ REQUIRED_SCHEMA: Dict[str, List[str]] = {
         "id", "name", "status"
     ],
     "interview_turns": [
-        "id", "session_id", "turn_index", "speaker", "question_id", "skill_id",
-        "text", "input_mode", "stt_engine", "stt_confidence", "audio_ref",
+        "id", "session_id", "turn_index", "speaker", "role", "content", "transcript", "question_id", "skill_id",
+        "text", "candidate_response", "question_text", "turn_number", "input_mode", "stt_engine", "stt_confidence", "audio_ref",
         "audio_duration_s", "started_at", "ended_at", "word_count", "turn_status", "created_at"
     ],
     "interview_speech_metrics": [

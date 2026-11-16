@@ -1073,6 +1073,9 @@ class SQLiteSupabaseMock:
                 turn_number INTEGER,
                 turn_index INTEGER,
                 speaker TEXT,
+                role TEXT,
+                content TEXT DEFAULT '',
+                transcript TEXT,
                 question_id TEXT,
                 skill_id TEXT,
                 question_text TEXT,
@@ -1098,6 +1101,9 @@ class SQLiteSupabaseMock:
             )
         """)
         for col_name, col_type in [
+            ("content", "TEXT"),
+            ("transcript", "TEXT"),
+            ("role", "TEXT"),
             ("turn_index", "INTEGER"),
             ("speaker", "TEXT"),
             ("question_id", "TEXT"),

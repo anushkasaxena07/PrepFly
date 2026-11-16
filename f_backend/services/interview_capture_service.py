@@ -150,12 +150,56 @@ def classify_turn_status(
 
 
 def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
+    # Ensure canonical NOT NULL constraints and compatibility columns are guaranteed upfront
+    if not row.get("content"):
+        row["content"] = (
+            row.get("text")
+            or row.get("candidate_response")
+            or row.get("transcript")
+            or row.get("question_text")
+            or "[Recorded turn]"
+        )
+    if "transcript" not in row or row["transcript"] is None:
+        row["transcript"] = (
+            row.get("text")
+            or row.get("candidate_response")
+            or row.get("content")
+            or ""
+        )
+    if "role" not in row or not row["role"]:
+        row["role"] = row.get("speaker") or "candidate"
+    if "speaker" not in row or not row["speaker"]:
+        row["speaker"] = row.get("role") or "candidate"
+
     try:
         supabase_client.table("interview_turns").upsert(row, on_conflict="id").execute()
         return
     except Exception as e:
         err_msg = str(e)
         err_lower = err_msg.lower()
+
+        # Handle Postgres 23502 (null value in column violates not-null constraint)
+        if "23502" in err_msg or ("null value in column" in err_lower and "not-null constraint" in err_lower):
+            col_match = re.search(r'column\s+"([^"]+)"', err_msg, re.IGNORECASE) or re.search(r"column\s+'([^']+)'", err_msg, re.IGNORECASE)
+            if col_match:
+                missing_col = col_match.group(1).strip()
+                logger.warning("Postgres 23502 not-null violation for '%s' on interview_turns; synthesizing value and retrying.", missing_col)
+                repair_row = dict(row)
+                if missing_col in ("content", "text", "candidate_response", "question_text"):
+                    synth_val = row.get("content") or row.get("text") or row.get("candidate_response") or row.get("transcript") or "[Recorded turn]"
+                    repair_row[missing_col] = synth_val
+                elif missing_col in ("transcript",):
+                    repair_row[missing_col] = row.get("text") or row.get("candidate_response") or row.get("content") or ""
+                elif missing_col in ("role", "speaker"):
+                    repair_row[missing_col] = row.get("speaker") or row.get("role") or "candidate"
+                elif missing_col in ("turn_number",):
+                    repair_row[missing_col] = row.get("turn_number") or (row.get("turn_index", 0) + 1)
+                try:
+                    supabase_client.table("interview_turns").upsert(repair_row, on_conflict="id").execute()
+                    return
+                except Exception as e_repair:
+                    logger.warning("interview_turns 23502 repair failed (%s); trying schema fallback.", e_repair)
+
         if "pgrst204" in err_lower or "column" in err_lower or "schema cache" in err_lower:
             fallback_row = dict(row)
             # 1. Dynamically detect missing column mentioned in PostgREST error
@@ -170,7 +214,7 @@ def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
                 except Exception as e_step1:
                     logger.warning("interview_turns single-column fallback failed (%s); trying minimal schema fallback.", e_step1)
 
-            # 2. Broader fallback: remove all extended/drift columns including skill_id
+            # 2. Broader fallback: remove all extended/drift columns including skill_id, but preserve content & role
             extended_cols = (
                 "skill_id", "turn_index", "speaker", "question_id", "text", "input_mode",
                 "stt_engine", "stt_confidence", "audio_ref", "audio_duration_s",
@@ -179,6 +223,10 @@ def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
             )
             for c in extended_cols:
                 fallback_row.pop(c, None)
+            if "content" not in fallback_row:
+                fallback_row["content"] = row.get("content") or row.get("text") or row.get("candidate_response") or "[Recorded turn]"
+            if "role" not in fallback_row:
+                fallback_row["role"] = row.get("role") or row.get("speaker") or "candidate"
             if "candidate_response" not in fallback_row and row.get("text"):
                 fallback_row["candidate_response"] = row["text"]
             if "question_text" not in fallback_row and row.get("question_text"):
@@ -190,11 +238,14 @@ def _safe_upsert_turn(supabase_client: Any, row: Dict[str, Any]) -> None:
             except Exception as e_step2:
                 logger.warning("interview_turns extended-columns fallback failed (%s); attempting minimal base 002 upsert.", e_step2)
 
-            # 3. Minimal base 002 schema: only id, session_id, turn_number, question_text, candidate_response, created_at
+            # 3. Minimal base 002 schema: includes canonical content, role, turn_number, question_text, candidate_response
             minimal_row = {
                 "id": row.get("id"),
                 "session_id": row.get("session_id"),
                 "turn_number": row.get("turn_number") or (row.get("turn_index", 0) + 1),
+                "content": row.get("content") or row.get("text") or row.get("candidate_response") or row.get("question_text") or "[Recorded turn]",
+                "role": row.get("role") or row.get("speaker") or "candidate",
+                "transcript": row.get("transcript") or row.get("text") or row.get("candidate_response") or "",
                 "question_text": row.get("question_text") or "Question",
                 "candidate_response": row.get("text") or row.get("candidate_response") or "",
                 "created_at": row.get("created_at") or _utc_now_iso(),
@@ -221,19 +272,23 @@ def persist_interviewer_turn(
     """Immediately persists an interviewer question turn into `interview_turns`."""
     now_iso = started_at or _utc_now_iso()
     turn_id = f"turn_{session_id}_{turn_index}_interviewer"
+    clean_q = question_text or "[Interviewer question]"
     row = {
         "id": turn_id,
         "session_id": session_id,
         "turn_number": turn_index + 1,
         "turn_index": int(turn_index),
         "speaker": "interviewer",
+        "role": "interviewer",
+        "content": clean_q,
+        "transcript": clean_q,
         "question_id": question_id or f"q_{session_id[:8]}_{turn_index}",
         "skill_id": skill_id,
-        "question_text": question_text,
-        "text": question_text,
+        "question_text": clean_q,
+        "text": clean_q,
         "question_type": question_type or "technical",
         "stage": stage or "Technical",
-        "word_count": count_words(question_text),
+        "word_count": count_words(clean_q),
         "started_at": now_iso,
         "ended_at": now_iso,
         "turn_status": "small_talk" if (stage or "").lower() == "small_talk" else "answered",
@@ -286,6 +341,19 @@ def persist_candidate_turn(
         is_small_talk_turn=is_small_talk_turn,
     )
 
+    # For speech input: finalized transcript. For typing input: submitted text.
+    # Fallback guarantees column 'content' is NEVER null.
+    if clean_text:
+        canonical_content = clean_text
+    elif edge_case:
+        canonical_content = f"[{edge_case}]"
+    elif sub_reason:
+        canonical_content = f"[{sub_reason}]"
+    elif mode == "speech":
+        canonical_content = "[Empty speech transcript]"
+    else:
+        canonical_content = "[Empty response]"
+
     wc = count_words(clean_text)
     turn_id = f"turn_{session_id}_{turn_index}_candidate"
     turn_row = {
@@ -294,12 +362,15 @@ def persist_candidate_turn(
         "turn_number": turn_index + 1,
         "turn_index": int(turn_index),
         "speaker": "candidate",
+        "role": "candidate",
+        "content": canonical_content,
+        "transcript": clean_text,
+        "text": clean_text,
+        "candidate_response": clean_text,
         "question_id": question_id,
         "skill_id": skill_id,
         "question_text": question_text or "",
-        "text": clean_text,
         "stage": stage,
-        "candidate_response": clean_text,
         "input_mode": mode,
         "stt_engine": stt_engine if mode == "speech" else None,
         "stt_confidence": float(stt_confidence) if (mode == "speech" and stt_confidence is not None) else None,

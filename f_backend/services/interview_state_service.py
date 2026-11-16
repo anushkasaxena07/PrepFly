@@ -184,14 +184,19 @@ class InterviewStateService:
             if request_id
             else f"turn_{session_id}_{turn_number}_{int(datetime.now(timezone.utc).timestamp())}"
         )
+        clean_resp = candidate_response or "[Recorded turn]"
         turn_record = {
             "id": turn_id,
             "session_id": session_id,
             "turn_number": turn_number,
+            "turn_index": max(0, turn_number - 1),
+            "content": clean_resp,
+            "transcript": candidate_response or "",
+            "text": candidate_response or "",
             "question_text": question_text,
             "question_type": evaluation.get("question_type", "Technical"),
             "stage": stage,
-            "candidate_response": candidate_response,
+            "candidate_response": candidate_response or "",
             "intent": intent,
             "decision": decision,
             "score": float(score),
@@ -200,7 +205,7 @@ class InterviewStateService:
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         try:
-            supabase_client.table("interview_turns").insert(turn_record).execute()
+            supabase_client.table("interview_turns").upsert(turn_record, on_conflict="id").execute()
             # Increment turn_count and save idempotency key
             supabase_client.table("sessions").update({
                 "turn_count": turn_number,

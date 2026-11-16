@@ -166,11 +166,6 @@ export default function RoadmapTab({ onNavigateTab }) {
       console.warn("Could not complete block:", e);
     }
   };
-      setError(err.message || "Failed to reset preparation roadmap.");
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   const getActivityTypeConfig = (type) => {
     const map = {
