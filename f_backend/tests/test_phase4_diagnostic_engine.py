@@ -366,3 +366,4 @@ class TestPhase4DiagnosticEngine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -130,6 +130,58 @@ export const intelligenceAPI = {
     return handleResponse(res);
   },
 
+  // ── Phase 5 Planner APIs (Section 8, 11) ────────────────────────────────────
+  async generateSpecPlan(params = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/plan/generate`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params)
+    });
+    return handleResponse(res);
+  },
+
+  async replanSpecPlan(trigger, params = {}) {
+    const res = await fetch(`${BACKEND_URL}/api/plan/replan`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ trigger, params })
+    });
+    return handleResponse(res);
+  },
+
+  async getActiveSpecPlan() {
+    const res = await fetch(`${BACKEND_URL}/api/plan/active`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async getSpecPlanVersions() {
+    const res = await fetch(`${BACKEND_URL}/api/plan/versions`, {
+      method: "GET",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async startSpecBlock(blockId) {
+    const res = await fetch(`${BACKEND_URL}/api/block/${encodeURIComponent(blockId)}/start`, {
+      method: "POST",
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+
+  async completeSpecBlock(blockId, minutesSpent = 30) {
+    const res = await fetch(`${BACKEND_URL}/api/block/${encodeURIComponent(blockId)}/complete`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ minutes_spent: minutesSpent })
+    });
+    return handleResponse(res);
+  },
+
   // 1. Preparation Profile & Goals
   async initializeProfile(profileData) {
     const res = await fetch(`${BACKEND_URL}/api/preparation/initialize`, {

@@ -7,6 +7,7 @@ Exposes canonical endpoints required by the Full Build Specification:
 """
 
 from flask import Blueprint, request, jsonify, Response
+from datetime import datetime, timezone
 import functools
 import logging
 
@@ -290,6 +291,177 @@ def finish_assessment_endpoint():
             "message": "Failed to finalize assessment session",
             "error": str(ex)
         }), 400
+
+
+# -----------------------------------------------------------------------------
+# PHASE 5: PREPARATION PLANNER & RE-PLANNING ENDPOINTS (Section 8, 11)
+# -----------------------------------------------------------------------------
+
+@spec_api_bp.route("/api/plan/generate", methods=["POST"])
+def generate_preparation_plan_endpoint():
+    """
+    POST /api/plan/generate
+    Generates initial deterministic, phased preparation plan.
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        from services.spec_planner_service import SpecPlannerService
+        plan_res = SpecPlannerService.generate_plan(
+            user_id=user_id,
+            target_role=payload.get("target_role", "AI/ML Engineer"),
+            target_company=payload.get("target_company", "Target Tech"),
+            interview_date=payload.get("interview_date"),
+            daily_minutes=payload.get("daily_minutes", 90),
+            start_date=payload.get("start_date"),
+            blackout_dates=payload.get("blackout_dates"),
+            availability_grid=payload.get("availability_grid"),
+            trigger="INITIAL"
+        )
+        return jsonify({
+            "status": "success",
+            "plan": plan_res
+        }), 201
+    except Exception as ex:
+        logger.error(f"Failed to generate plan for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate preparation plan",
+            "error": str(ex)
+        }), 400
+
+
+@spec_api_bp.route("/api/plan/replan", methods=["POST"])
+def replan_preparation_endpoint():
+    """
+    POST /api/plan/replan
+    Body: { trigger, params }
+    Returns: new plan version + structured diff
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+    trigger = payload.get("trigger", "MANUAL_REBALANCE")
+    params = payload.get("params", {})
+
+    try:
+        from services.spec_planner_service import SpecPlannerService
+        new_plan = SpecPlannerService.replan(
+            user_id=user_id,
+            trigger=trigger,
+            params=params
+        )
+        return jsonify({
+            "status": "success",
+            "plan": new_plan,
+            "diff": new_plan.get("diff", {})
+        }), 200
+    except Exception as ex:
+        logger.error(f"Failed to replan for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to recalculate preparation plan",
+            "error": str(ex)
+        }), 400
+
+
+@spec_api_bp.route("/api/plan/active", methods=["GET"])
+def get_active_plan_endpoint():
+    """
+    GET /api/plan/active
+    Returns the active preparation plan with days and blocks.
+    """
+    user_id = _extract_request_user_id()
+
+    try:
+        from services.spec_planner_service import SpecPlannerService
+        active = SpecPlannerService.get_active_plan(user_id=user_id)
+        if not active:
+            # Auto-generate initial plan
+            active = SpecPlannerService.generate_plan(user_id=user_id)
+        return jsonify({
+            "status": "success",
+            "plan": active
+        }), 200
+    except Exception as ex:
+        logger.error(f"Failed to retrieve active plan for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to get active plan",
+            "error": str(ex)
+        }), 500
+
+
+@spec_api_bp.route("/api/plan/versions", methods=["GET"])
+def get_plan_versions_endpoint():
+    """
+    GET /api/plan/versions
+    Returns list of plan versions with historical diffs.
+    """
+    user_id = _extract_request_user_id()
+
+    try:
+        from services.spec_planner_service import SpecPlannerService
+        versions = SpecPlannerService.get_user_plan_history(user_id=user_id)
+        return jsonify({
+            "status": "success",
+            "versions": versions
+        }), 200
+    except Exception as ex:
+        logger.error(f"Failed to retrieve plan versions for {user_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to get plan versions",
+            "error": str(ex)
+        }), 500
+
+
+@spec_api_bp.route("/api/block/<block_id>/start", methods=["POST"])
+def start_block_activity(block_id: str):
+    """
+    POST /api/block/:id/start
+    Logs study session start.
+    """
+    user_id = _extract_request_user_id()
+    return jsonify({
+        "status": "success",
+        "block_id": block_id,
+        "user_id": user_id,
+        "started_at": datetime.now(timezone.utc).isoformat()
+    }), 200
+
+
+@spec_api_bp.route("/api/block/<block_id>/complete", methods=["POST"])
+def complete_block_activity(block_id: str):
+    """
+    POST /api/block/:id/complete
+    Logs completed study minutes. Note Golden Rule 3: Marking a block complete does not invent fake mastery.
+    """
+    user_id = _extract_request_user_id()
+    payload = request.get_json(silent=True) or {}
+    minutes_spent = payload.get("minutes_spent", 30)
+
+    try:
+        from services.spec_planner_service import SpecPlannerService
+        if user_id not in SpecPlannerService._COMPLETED_BLOCKS:
+            SpecPlannerService._COMPLETED_BLOCKS[user_id] = set()
+        SpecPlannerService._COMPLETED_BLOCKS[user_id].add(block_id)
+
+        return jsonify({
+            "status": "success",
+            "block_id": block_id,
+            "user_id": user_id,
+            "minutes_spent": minutes_spent,
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }), 200
+    except Exception as ex:
+        logger.error(f"Failed to complete block {block_id}: {ex}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "message": "Failed to record block completion",
+            "error": str(ex)
+        }), 400
+
 
 
 
