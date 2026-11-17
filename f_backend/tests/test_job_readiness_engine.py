@@ -21,6 +21,7 @@ Validates all 12 test scenarios from Section 14:
 import unittest
 from unittest.mock import MagicMock, patch
 import json
+import uuid
 from datetime import datetime, timezone
 
 from services.job_readiness_engine import (
@@ -401,7 +402,8 @@ class TestJobReadinessEngineComprehensive(unittest.TestCase):
     def test_scenario_14_export_to_prep_roadmap(self):
         """Verifies handover payload format for Prep tab RoadmapEngine."""
         # Setup mock session in local_supabase
-        sess_id = "test_handover_sess_001"
+        sess_id = f"test_handover_sess_{uuid.uuid4().hex[:8]}"
+        req_id = f"req_handover_{uuid.uuid4().hex[:8]}"
         self.supabase.table("job_assessment_sessions").insert({
             "id": sess_id,
             "user_id": self.user_id,
@@ -416,7 +418,7 @@ class TestJobReadinessEngineComprehensive(unittest.TestCase):
         }).execute()
 
         self.supabase.table("job_requirement_snapshots").insert({
-            "id": "req_handover_001",
+            "id": req_id,
             "session_id": sess_id,
             "job_id": sess_id,
             "canonical_skill_id": "dsa_arrays",

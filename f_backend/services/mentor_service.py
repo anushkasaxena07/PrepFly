@@ -1465,7 +1465,33 @@ class MentorService:
         mentor_reply = None
         try:
             full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            try:
+                from services.api_usage_service import ApiUsageService
+                allowed, limit_info = ApiUsageService.check_user_spending_limit(user_id, estimated_cost_usd=0.0003)
+                if not allowed:
+                    return {
+                        "reply": f"Your monthly AI budget limit of ${limit_info.get('budget_usd', 5.0):.2f} has been reached. Please contact support or upgrade your plan.",
+                        "intent": INTENT_UNKNOWN,
+                        "mutations": [],
+                        "suggested_pills": ["Review Past Feedback", "View Roadmap"],
+                    }
+            except Exception:
+                pass
+
             mentor_reply = safe_invoke_llm(chat_model, full_prompt)
+            if mentor_reply:
+                try:
+                    from services.api_usage_service import ApiUsageService
+                    m_name = getattr(chat_model, "model", None) or getattr(chat_model, "model_name", None) or "gemini-2.5-flash"
+                    ApiUsageService.record_api_usage(
+                        user_id=user_id,
+                        feature="mentor_chat",
+                        model=str(m_name),
+                        prompt_tokens=max(1, len(full_prompt) // 4),
+                        completion_tokens=max(1, len(mentor_reply) // 4),
+                    )
+                except Exception:
+                    pass
         except Exception:
             mentor_reply = None
 

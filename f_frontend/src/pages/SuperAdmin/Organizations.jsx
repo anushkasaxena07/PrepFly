@@ -58,10 +58,21 @@ export default function Organizations({ onNavigateCreate }) {
   const handleBulkImport = (e) => {
     e.preventDefault();
     if (!csvFile) return alert("Please select a valid CSV file first.");
-    alert(`📥 Bulk Importer processed "${csvFile.name}". 3 new college/company profiles successfully imported!`);
-    setShowBulkImportModal(false);
-    setCsvFile(null);
-    fetchOrgs();
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+        const rowCount = Math.max(0, lines.length - 1);
+        alert(`📥 Bulk Importer: Successfully parsed ${rowCount} organization row(s) from "${csvFile.name}".`);
+        setShowBulkImportModal(false);
+        setCsvFile(null);
+        fetchOrgs();
+      } catch (err) {
+        alert("Failed to parse CSV: " + err.message);
+      }
+    };
+    reader.readAsText(csvFile);
   };
 
   const handleSendBroadcast = async (e) => {
@@ -88,6 +99,17 @@ export default function Organizations({ onNavigateCreate }) {
     );
   }
 
+  const totalOrgs = orgs.length;
+  const activeOrgs = orgs.filter(o => o.status === 'Active').length;
+  const trialOrgs = orgs.filter(o => (o.subscription_plan || '').toUpperCase() === 'TRIAL' || (o.status || '').toUpperCase() === 'TRIAL').length;
+  const expiredOrgs = orgs.filter(o => o.status === 'Expired').length;
+  const suspendedOrgs = orgs.filter(o => o.status === 'Suspended').length;
+  const totalStudents = orgs.reduce((sum, o) => sum + (Number(o.student_count) || 0), 0);
+  const totalAdmins = orgs.reduce((sum, o) => sum + (Number(o.admin_count) || 0), 0);
+  const collegesCount = orgs.filter(o => (o.type || '').toLowerCase() === 'college').length;
+  const companiesCount = orgs.filter(o => (o.type || '').toLowerCase() === 'company').length;
+  const activeRateStr = totalOrgs > 0 ? `${((activeOrgs / totalOrgs) * 100).toFixed(1)}% Active Rate` : "0% Active Rate";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", fontFamily: "Inter, system-ui, sans-serif" }}>
       
@@ -98,7 +120,7 @@ export default function Organizations({ onNavigateCreate }) {
             🏢 Global Organization Management Center
           </h2>
           <p style={{ fontSize: "12px", color: "#94a3b8", margin: "4px 0 0 0" }}>
-            AWS & Salesforce-level command center to onboard, monitor, manage, and scale every College, University, and Recruiter Company.
+            AWS &amp; Salesforce-level command center to onboard, monitor, manage, and scale every College, University, and Recruiter Company.
           </p>
         </div>
 
@@ -108,7 +130,7 @@ export default function Organizations({ onNavigateCreate }) {
             onClick={onNavigateCreate}
             style={{ background: "linear-gradient(135deg, #6d28d9, #7c3aed)", border: "none", borderRadius: "8px", padding: "9px 16px", color: "#fff", fontSize: "12px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 12px rgba(109,40,217,0.3)" }}
           >
-            ➕ Create Organization & Admin
+            ➕ Create Organization &amp; Admin
           </button>
           
           <button
@@ -127,79 +149,55 @@ export default function Organizations({ onNavigateCreate }) {
         </div>
       </div>
 
-      {/* 2. 12 TOP KPI CARDS */}
+      {/* 2. TOP KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "14px" }}>
         
         <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>14 Institutions</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +12.5% MoM</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>{totalOrgs} {totalOrgs === 1 ? 'Institution' : 'Institutions'}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Registered Tenants</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>12 Active</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 85.7% Active Rate</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{activeOrgs} Active</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● {activeRateStr}</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TRIAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>2 Trial</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ 14-Day Free Access</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{trialOrgs} Trial</div>
+          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>Free Trial Accounts</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>EXPIRED / DUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>1 Expired</div>
-          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>⚠️ Renewal Pending</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>{expiredOrgs} Expired</div>
+          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Renewal Pending</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>SUSPENDED ORGS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>0 Suspended</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Clean Compliance</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{suspendedOrgs} Suspended</div>
+          <div style={{ fontSize: "10px", color: suspendedOrgs === 0 ? "#10b981" : "#ef4444", marginTop: "2px", fontWeight: 700 }}>{suspendedOrgs === 0 ? "Clean Compliance" : "Action Required"}</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL STUDENTS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>1,420</div>
-          <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "2px", fontWeight: 700 }}>▲ +24% YoY</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{totalStudents.toLocaleString()}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Across Registered Orgs</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ADMINS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>18 Admins</div>
-          <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>Directors & Placement</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{totalAdmins} {totalAdmins === 1 ? 'Admin' : 'Admins'}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Organization Staff</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL RECRUITERS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>14 Corporate</div>
-          <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>Hiring Drives Active</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MONTHLY REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>₹42,850.00</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +18.4% Growth</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVG HEALTH SCORE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>94.2% 🟢</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>High Engagement</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ADDED THIS MONTH</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>+3 Colleges</div>
-          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Onboarded Successfully</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RENEWALS DUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>2 Orgs Due</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>In Next 30 Days</div>
+          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>COLLEGES &amp; RECRUITERS</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>{collegesCount}C / {companiesCount}R</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Institutions vs Corporate</div>
         </div>
 
       </div>

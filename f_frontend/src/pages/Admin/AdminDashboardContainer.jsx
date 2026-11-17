@@ -40,8 +40,8 @@ export default function AdminDashboardContainer() {
       const o = JSON.parse(localStorage.getItem("admin_organization") || "{}");
       
       const adminObj = {
-        name: u.name || "Aditya",
-        email: u.email || "aditya20522113@gmail.com",
+        name: u.name || "College Administrator",
+        email: u.email || "admin@institution.edu",
         role: u.role || "Organization Admin"
       };
 
@@ -50,6 +50,17 @@ export default function AdminDashboardContainer() {
 
       const orgId = o?.id || u?.organization_id || localStorage.getItem("admin_org_id") || "org_default";
       
+      // Fetch live organization details including join_code
+      adminFetch("/admin/organization").then(async (res) => {
+        if (res.ok) {
+          const liveOrg = await res.json();
+          if (liveOrg && liveOrg.id) {
+            setOrganization(liveOrg);
+            localStorage.setItem("admin_organization", JSON.stringify(liveOrg));
+          }
+        }
+      }).catch(() => {/* fallback to stored org */});
+
       // Check Subscription & Trial Expiry from backend
       fetchSubscriptionStatus(adminFetch, orgId).then((subData) => {
         if (subData && (subData.is_blocked || subData.subscription_status === 'EXPIRED')) {
@@ -80,9 +91,9 @@ export default function AdminDashboardContainer() {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard organization={organization} />;
       case 'students':
-        return <Students />;
+        return <Students organization={organization} />;
       case 'add-student':
         return <AddStudent />;
       case 'interviews':

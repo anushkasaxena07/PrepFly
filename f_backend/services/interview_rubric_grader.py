@@ -242,6 +242,17 @@ def _invoke_gemini_temp0(
         raise ValueError("Empty response from Gemini grader")
 
     DailyTokenBudgetTracker.record_usage(user_id, len(prompt), len(str(content)))
+    try:
+        from services.api_usage_service import ApiUsageService
+        ApiUsageService.record_api_usage(
+            user_id=user_id,
+            feature="interview_rubric_grading",
+            model=str(model_used),
+            prompt_tokens=max(1, len(prompt) // 4),
+            completion_tokens=max(1, len(str(content)) // 4),
+        )
+    except Exception:
+        pass
     return str(content), str(model_used)
 
 
@@ -280,6 +291,13 @@ Return ONLY valid JSON:
     prompt_to_send = base_prompt
     last_err: Optional[Exception] = None
     last_code = "GRADING_ERROR"
+
+    try:
+        from services.api_usage_service import ApiUsageService
+        ApiUsageService.check_user_spending_limit(user_id, estimated_cost_usd=0.0003, raise_on_exceeded=True)
+    except Exception as budget_err:
+        if "spending limit reached" in str(budget_err).lower():
+            raise
 
     for attempt in range(max_attempts):
         t0 = time.perf_counter()

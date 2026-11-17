@@ -183,6 +183,12 @@ export default function Admins() {
 
   const uniqueOrgs = Array.from(new Set(admins.map(a => a.organization_name).filter(Boolean)));
   const uniqueRoles = Array.from(new Set(admins.map(a => a.role).filter(Boolean)));
+  const totalAdmins = admins.length;
+  const activeAdmins = admins.filter(a => a.status === 'Active').length;
+  const suspendedAdmins = admins.filter(a => a.status === 'Suspended').length;
+  const pendingAdmins = admins.filter(a => a.status === 'Pending').length;
+  const uniqueOrgsCount = uniqueOrgs.length;
+  const mfaEnabled = admins.filter(a => (a.mfa_status || '').toLowerCase() === 'enabled').length;
 
   if (loading) {
     return (
@@ -231,67 +237,43 @@ export default function Admins() {
         </div>
       </div>
 
-      {/* 2. 10 TOP KPI CARDS */}
+      {/* 2. DYNAMIC KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "14px" }}>
         
         <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ADMINS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{admins.length} Directors</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +12.5% MoM</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{totalAdmins} {totalAdmins === 1 ? 'Admin' : 'Admins'}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Registered Staff</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE ADMINS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>16 Active</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 88.8% Operational</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ONLINE NOW</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>6 Online 🟢</div>
-          <div style={{ fontSize: "10px", color: "#6d28d9", marginTop: "2px", fontWeight: 700 }}>Real-time Sessions</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{activeAdmins} Active</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● {totalAdmins > 0 ? `${((activeAdmins / totalAdmins) * 100).toFixed(1)}% Active` : '0%'}</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>SUSPENDED ADMINS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>1 Suspended</div>
-          <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>🔒 Policy Enforcement</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{suspendedAdmins} Suspended</div>
+          <div style={{ fontSize: "10px", color: suspendedAdmins === 0 ? "#10b981" : "#ef4444", marginTop: "2px", fontWeight: 700 }}>{suspendedAdmins === 0 ? "Clean Compliance" : "Policy Enforcement"}</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PENDING INVITATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>1 Pending</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>✉️ Awaiting Acceptance</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{pendingAdmins} Pending</div>
+          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>Awaiting Acceptance</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ORGS MANAGED</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>14 Institutions</div>
-          <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>10 Colleges | 4 Corp</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{uniqueOrgsCount} {uniqueOrgsCount === 1 ? 'Organization' : 'Organizations'}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Across Global Network</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>FAILED LOGINS TODAY</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>0 Failures</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>🛡️ 100% Security SLA</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>PASSWORD RESETS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>4 This Month</div>
-          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "2px", fontWeight: 700 }}>Self-service Dispatched</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>AVG ACTIVITY SCORE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>94.2 / 100</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>High Placement Growth</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RECENTLY ADDED</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>+2 This Week</div>
-          <div style={{ fontSize: "10px", color: "#c084fc", marginTop: "2px", fontWeight: 700 }}>Onboarded Successfully</div>
+          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MFA STATUS</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{mfaEnabled} / {totalAdmins}</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Multi-Factor Protected</div>
         </div>
 
       </div>

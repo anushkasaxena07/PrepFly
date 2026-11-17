@@ -17,6 +17,8 @@ import FeedbackManagement from './FeedbackManagement';
 import Support from './Support';
 import PlatformSettings from './PlatformSettings';
 import Profile from './Profile';
+import DataIntegrity from './DataIntegrity';
+import SuperAdminErrorBoundary from '../../components/SuperAdmin/SuperAdminErrorBoundary';
 
 export default function SuperAdminContainer() {
   const [activeTab, setActiveTabState] = useState(() => {
@@ -67,6 +69,8 @@ export default function SuperAdminContainer() {
         return <AIConfiguration />;
       case 'analytics':
         return <Analytics />;
+      case 'integrity':
+        return <DataIntegrity />;
       case 'activitylogs':
         return <ActivityLogs />;
       case 'notifications':
@@ -93,7 +97,9 @@ export default function SuperAdminContainer() {
         
         <main className="pf-body-surface" style={{ flex: 1, padding: "24px 28px 48px", overflowY: "auto", marginTop: "-14px" }}>
           <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-            {renderContent()}
+            <SuperAdminErrorBoundary key={activeTab}>
+              {renderContent()}
+            </SuperAdminErrorBoundary>
           </div>
         </main>
       </div>

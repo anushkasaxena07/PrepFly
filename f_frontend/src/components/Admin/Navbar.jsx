@@ -5,12 +5,7 @@ import { ThemeToggleButton, usePrepFlyTheme } from '../ui/ThemeContext';
 export default function Navbar({ activeTab, setActiveTab, admin = {}, organization = {} }) {
   const { isSunrise } = usePrepFlyTheme();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "AI Interview Completed", desc: "Ananya Patel completed SDE Mock Interview (Score: 9.2/10)", time: "10 min ago", unread: true },
-    { id: 2, title: "Subscription Status", desc: "Your organization is currently on a 10-Day Free Trial", time: "1 hour ago", unread: true },
-    { id: 3, title: "Coding Submission", desc: "Aarav Sharma submitted DSA & Algorithms Challenge", time: "3 hours ago", unread: true },
-    { id: 4, title: "Announcement Published", desc: "Placement readiness drive broadcasted to Computer Science dept", time: "1 day ago", unread: false }
-  ]);
+  const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -21,15 +16,17 @@ export default function Navbar({ activeTab, setActiveTab, admin = {}, organizati
         if (list && list.length > 0) {
           const mapped = list.map((item, idx) => ({
             id: item.id || idx + 10,
-            title: item.title,
-            desc: item.message,
-            time: item.created_at || "Recently",
+            title: item.title || "Announcement",
+            desc: item.message || item.description || "",
+            time: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Recently",
             unread: true
           }));
-          setNotifications(prev => [...mapped, ...prev]);
+          setNotifications(mapped);
+        } else {
+          setNotifications([]);
         }
       } catch (e) {
-        /* silent */
+        setNotifications([]);
       }
     };
     fetchLiveNotifs();
@@ -102,7 +99,7 @@ export default function Navbar({ activeTab, setActiveTab, admin = {}, organizati
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <ThemeToggleButton />
 
-        {/* MULTI-TENANT BADGE */}
+        {/* INSTITUTION ISOLATED WORKSPACE BADGE */}
         <div style={{
           background: isSunrise ? "#fdf0e7" : "rgba(124,58,237,0.18)",
           border: isSunrise ? "1px solid #f5cbb2" : "1px solid rgba(167,139,250,0.35)",
@@ -115,7 +112,7 @@ export default function Navbar({ activeTab, setActiveTab, admin = {}, organizati
           alignItems: "center",
           gap: "6px"
         }}>
-          <span>Multi-Tenant Encrypted</span>
+          <span>🏛️ {organization?.name || "College Portal"}</span>
         </div>
 
         {/* NOTIFICATION BELL WITH DROPDOWN */}
@@ -189,31 +186,37 @@ export default function Navbar({ activeTab, setActiveTab, admin = {}, organizati
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "280px", overflowY: "auto" }}>
-                {notifications.map(n => (
-                  <div 
-                    key={n.id} 
-                    onClick={() => {
-                      setShowNotifications(false);
-                      if (setActiveTab) setActiveTab('announcements');
-                    }}
-                    style={{
-                      padding: "10px 12px",
-                      borderRadius: "10px",
-                      background: n.unread ? "rgba(124, 79, 224, 0.12)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${n.unread ? "rgba(124, 79, 224, 0.3)" : "rgba(255,255,255,0.05)"}`,
-                      cursor: "pointer",
-                      transition: "transform 0.15s ease"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ color: "#fff", fontWeight: 800, fontSize: "12px" }}>{n.title}</div>
-                      <div style={{ color: "var(--text2)", fontSize: "10px" }}>{n.time}</div>
-                    </div>
-                    <div style={{ color: "var(--text2)", fontSize: "11px", marginTop: "4px" }}>
-                      {n.desc}
-                    </div>
+                {notifications.length === 0 ? (
+                  <div style={{ color: "var(--text2)", fontSize: "12px", textAlign: "center", padding: "24px 12px" }}>
+                    No new announcements or notifications
                   </div>
-                ))}
+                ) : (
+                  notifications.map(n => (
+                    <div 
+                      key={n.id} 
+                      onClick={() => {
+                        setShowNotifications(false);
+                        if (setActiveTab) setActiveTab('announcements');
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        background: n.unread ? "rgba(124, 79, 224, 0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${n.unread ? "rgba(124, 79, 224, 0.3)" : "rgba(255,255,255,0.05)"}`,
+                        cursor: "pointer",
+                        transition: "transform 0.15s ease"
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ color: "#fff", fontWeight: 800, fontSize: "12px" }}>{n.title}</div>
+                        <div style={{ color: "var(--text2)", fontSize: "10px" }}>{n.time}</div>
+                      </div>
+                      <div style={{ color: "var(--text2)", fontSize: "11px", marginTop: "4px" }}>
+                        {n.desc}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>

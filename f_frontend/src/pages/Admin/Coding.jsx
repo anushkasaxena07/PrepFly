@@ -199,22 +199,47 @@ export default function Coding() {
 
       {loading ? (
         <div style={{ color: "var(--cyan)", padding: "40px", textAlign: "center" }}>⚡ Loading coding tests...</div>
+      ) : tests.length === 0 ? (
+        <div style={{
+          background: "#ffffff",
+          border: "1px dashed #cbd5e1",
+          borderRadius: "16px",
+          padding: "60px 24px",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "14px"
+        }}>
+          <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>
+            💻
+          </div>
+          <div>
+            <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>No Coding Assessments Created Yet</h3>
+            <p style={{ fontSize: "13px", color: "#64748b", margin: 0, maxWidth: "460px" }}>
+              Create algorithmic challenges with custom test cases to evaluate your students' problem-solving proficiency across Python, JavaScript, C++, and Java.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800, marginTop: "8px" }}>
+            ➕ Create Your First Coding Challenge
+          </button>
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
           {tests.map((t) => (
             <div key={t.id} className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span className="pill pill-cyan" style={{ fontSize: "10px" }}>{t.difficulty}</span>
-                <span style={{ fontSize: "11px", color: "var(--cyan)", fontWeight: 700 }}>⏱ {t.duration} Mins</span>
+                <span style={{ fontSize: "11px", color: "#6d28d9", fontWeight: 700 }}>⏱ {t.duration} Mins</span>
               </div>
 
               <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>{t.title}</h3>
               <div style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "12px" }}>Supported Languages: <strong style={{ color: "#0f172a" }}>{t.language}</strong></div>
 
-              <div style={{ background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px", fontSize: "11px", display: "flex", justifyContent: "space-between", marginBottom: "14px" }}>
+              <div style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", fontSize: "11px", display: "flex", justifyContent: "space-between", marginBottom: "14px", border: "1px solid #e2e8f0" }}>
                 <div>Visible Tests: <strong>{t.visible_tests || (t.visible_test_cases ? t.visible_test_cases.length : 3)}</strong></div>
                 <div>Hidden Tests: <strong>{t.hidden_tests || (t.hidden_test_cases ? t.hidden_test_cases.length : 7)}</strong></div>
-                <div>Acceptance: <strong style={{ color: "#6d28d9" }}>{t.accepted_rate || "84%"}</strong></div>
+                <div>Acceptance: <strong style={{ color: "#6d28d9" }}>{t.accepted_rate != null ? t.accepted_rate : "—"}</strong></div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between" }}>

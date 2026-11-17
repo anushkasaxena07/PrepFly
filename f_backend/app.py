@@ -18,7 +18,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from docx import Document
-from flask import Flask, request, jsonify, send_file, Response, send_from_directory
+from flask import Flask, request, jsonify, send_file, Response, send_from_directory, g
 import requests
 
 from google.oauth2 import id_token
@@ -42,6 +42,17 @@ from services.interview_service import analyze_live_response
 from services.feedback_service import evaluate_response_comprehensive, generate_end_of_interview_report
 from services.pdf_service import generate_pdf_html_report
 from services.grading_service import calculate_grade_info
+import services.metrics_service as metrics_service
+from services.tenancy import (
+    build_tenant_context,
+    get_current_tenant_context,
+    tenant_not_found,
+    TenantContext,
+    get_org_seat_status,
+    parse_student_csv_data,
+    link_student_to_college,
+    unlink_student_from_college
+)
 
 
 load_dotenv()
@@ -440,9 +451,9 @@ class SupabaseFallbackClient:
                 raise RuntimeError(f"Production startup aborted: Failed to reach or initialize Supabase: {e}")
         else:
             self._local_client = SQLiteSupabaseMock()
-            if not url or not check_dns_resolves(url):
+            if os.getenv("USE_LOCAL_SUPABASE") == "1" or not url or not check_dns_resolves(url):
                 import logging
-                logging.warning(f"[WARNING] Supabase host '{url}' DNS resolution failed or host is unreachable. Falling back to local SQLite database.")
+                logging.warning(f"[WARNING] Using local SQLite database mock.")
                 self._use_local = True
             else:
                 try:
@@ -1249,7 +1260,7 @@ def require_admin(f):
     return decorated
 
 def require_org_admin(f):
-    """Route decorator: verifies Bearer JWT + Organization Admin, ADMIN, or SUPER_ADMIN role."""
+    """Route decorator: verifies Bearer JWT + Organization Admin, ADMIN, or SUPER_ADMIN role with TenantContext."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
         if request.method == "OPTIONS":
@@ -1260,6 +1271,10 @@ def require_org_admin(f):
         if user.get("role") not in ("Organization Admin", "ADMIN", "SUPER_ADMIN"):
             return jsonify({"error": "Forbidden: Organization Admin access required"}), 403
         request.current_user = user
+        t_ctx = build_tenant_context(user, db_client=supabase)
+        g.tenant_context = t_ctx
+        if not t_ctx.is_super_admin and not t_ctx.org_id:
+            return jsonify({"error": "Forbidden: Active organization membership required"}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -5771,8 +5786,8 @@ def superadmin_candidates_summary():
             active_students += 1
 
     return jsonify({
-        "total_students": max(total_students, 1),
-        "active_students": max(active_students, 1),
+        "total_students": total_students,
+        "active_students": active_students,
         "new_registrations_today": new_today,
         "premium_students": premium_students,
         "free_students": free_students,
@@ -6899,9 +6914,14 @@ def get_subscription():
 # ════════════════════════════════════════════════════════════════════
 
 def get_admin_org_id():
+    t_ctx = get_current_tenant_context()
+    if t_ctx and t_ctx.org_id:
+        return t_ctx.org_id
     p = _get_optional_user()
     if p and p.get("role") in ("Organization Admin", "ADMIN", "SUPER_ADMIN"):
-        return (p.get("organization_id") or request.args.get("organization_id")) if p["role"] == "SUPER_ADMIN" else p.get("organization_id")
+        ctx = build_tenant_context(p, db_client=supabase)
+        if ctx:
+            return ctx.org_id
     return None
 
 
@@ -6931,8 +6951,8 @@ def admin_login():
                 if u_row.get("role") in ["ADMIN", "Organization Admin"]:
                     admin_user = {
                         "id": u_row.get("id"),
-                        "organization_id": u_row.get("organization_id") or "d258e381-6a6e-4376-8bf2-2865731b1939",
-                        "name": u_row.get("name") or "Aditya",
+                        "organization_id": u_row.get("organization_id"),
+                        "name": u_row.get("name") or "Administrator",
                         "email": email,
                         "role": "Organization Admin",
                         "password_hash": u_row.get("password") or u_row.get("password_hash")
@@ -6957,12 +6977,23 @@ def admin_login():
         except Exception:
             pass
 
-    # Fetch Organization Details
-    org_id = admin_user.get("organization_id") or "d258e381-6a6e-4376-8bf2-2865731b1939"
-    org_info = {"id": org_id, "name": "Stanford Tech Institute", "type": "College"}
+    # Fetch Organization Details strictly from DB / memberships
+    org_id = admin_user.get("organization_id")
+    if not org_id and admin_user.get("id"):
+        try:
+            mem = supabase.table("org_memberships").select("organization_id").eq("user_id", admin_user["id"]).eq("status", "active").execute()
+            if mem and mem.data and len(mem.data) > 0:
+                org_id = mem.data[0].get("organization_id")
+        except Exception:
+            pass
+
+    if not org_id:
+        return jsonify({"error": "Administrator is not assigned to an organization"}), 403
+
+    org_info = {"id": org_id, "name": "Institutional Portal", "type": "College"}
     try:
         org_res = supabase.table("organization").select("*").eq("id", org_id).execute()
-        if org_res and org_res.data:
+        if org_res and org_res.data and len(org_res.data) > 0:
             org_info = org_res.data[0]
     except Exception:
         pass
@@ -7022,93 +7053,74 @@ def admin_dashboard_stats():
     except Exception as e:
         print("Admin dashboard students notice:", e)
 
-    # If students table is empty, query users table for candidates
+    # If legacy students table is empty, query org_memberships
     if not students:
         try:
-            u_res = supabase.table("users").select("*").neq("role", "ADMIN").neq("role", "SUPER_ADMIN").execute()
-            if u_res and u_res.data:
-                for u in u_res.data:
-                    students.append({
-                        "id": u.get("id"),
-                        "name": u.get("name") or "Student",
-                        "email": u.get("email"),
-                        "status": "Active",
-                        "interview_score": 8.5,
-                        "coding_score": 88.0
-                    })
+            m_res = supabase.table("org_memberships").select("*").eq("organization_id", org_id).eq("status", "active").execute()
+            if m_res and m_res.data:
+                u_ids = [m.get("user_id") for m in m_res.data if m.get("user_id")]
+                for uid in u_ids:
+                    u_row = supabase.table("users").select("id, name, email").eq("id", uid).execute()
+                    if u_row and u_row.data:
+                        u = u_row.data[0]
+                        students.append({
+                            "id": u.get("id"),
+                            "name": u.get("name") or "Student",
+                            "email": u.get("email"),
+                            "status": "Active",
+                            "interview_score": 0.0,
+                            "coding_score": 0.0
+                        })
         except Exception as e:
-            print("Admin dashboard users notice:", e)
+            print("Admin dashboard memberships notice:", e)
 
-    total_students = len(students) or 48
-    active_students = len([s for s in students if s.get("status") == "Active"]) or int(total_students * 0.85)
-    premium_students = len([s for s in students if s.get("subscription") == "PREMIUM"]) or int(total_students * 0.35)
+    total_students = len(students)
+    active_students = len([s for s in students if s.get("status") in ("Active", "active")])
+    premium_students = len([s for s in students if s.get("subscription") == "PREMIUM"])
 
     ai_interviews_cnt = 0
     try:
         sess_res = supabase.table("admin_interviews").select("id").eq("organization_id", org_id).execute()
         if sess_res and sess_res.data: ai_interviews_cnt = len(sess_res.data)
     except Exception:
-        ai_interviews_cnt = 124
+        ai_interviews_cnt = 0
 
     coding_tests_cnt = 0
     try:
         code_res = supabase.table("admin_coding").select("id").eq("organization_id", org_id).execute()
         if code_res and code_res.data: coding_tests_cnt = len(code_res.data)
     except Exception:
-        coding_tests_cnt = 86
+        coding_tests_cnt = 0
 
-    if ai_interviews_cnt == 0: ai_interviews_cnt = 124
-    if coding_tests_cnt == 0: coding_tests_cnt = 86
-
-    avg_interview = round(sum([float(s.get("interview_score") or 8.5) for s in students]) / max(1, total_students), 1) if students else 8.5
-    avg_coding = round(sum([float(s.get("coding_score") or 84.0) for s in students]) / max(1, total_students), 1) if students else 84.0
+    avg_interview = round(sum([float(s.get("interview_score") or 0.0) for s in students]) / len(students), 1) if students else 0.0
+    avg_coding = round(sum([float(s.get("coding_score") or 0.0) for s in students]) / len(students), 1) if students else 0.0
 
     sub_info = get_org_subscription_status(org_id)
-    plan_label = f"{sub_info.get('current_plan', 'ENTERPRISE')} ({sub_info.get('subscription_status', 'ACTIVE')})"
+    plan_label = f"{sub_info.get('current_plan', 'INSTITUTIONAL')} ({sub_info.get('subscription_status', 'ACTIVE')})"
 
-    # Cloud Storage dynamic calculation: Base 250MB + 12MB/interview + 4MB/coding + 6MB/student
-    storage_used_mb = 250 + (ai_interviews_cnt * 12) + (coding_tests_cnt * 4) + (total_students * 6)
+    storage_used_mb = 0 if total_students == 0 and ai_interviews_cnt == 0 else (ai_interviews_cnt * 12) + (coding_tests_cnt * 4) + (total_students * 6)
     storage_total_gb = 10
     storage_total_mb = storage_total_gb * 1024
-    storage_pct = round((storage_used_mb / storage_total_mb) * 100, 1)
+    storage_pct = round((storage_used_mb / storage_total_mb) * 100, 1) if storage_total_mb > 0 else 0.0
+
+    now = datetime.utcnow()
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    cur_m = now.month
+    past_6_labels = [month_names[(cur_m - 1 - i) % 12] for i in range(5, -1, -1)]
 
     monthly_activity = {
-        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-        "interviews": [
-            max(10, int(ai_interviews_cnt * 0.25)),
-            max(18, int(ai_interviews_cnt * 0.38)),
-            max(32, int(ai_interviews_cnt * 0.52)),
-            max(50, int(ai_interviews_cnt * 0.68)),
-            max(75, int(ai_interviews_cnt * 0.82)),
-            max(105, int(ai_interviews_cnt * 0.95)),
-            ai_interviews_cnt
-        ],
-        "coding": [
-            max(8, int(coding_tests_cnt * 0.22)),
-            max(15, int(coding_tests_cnt * 0.35)),
-            max(28, int(coding_tests_cnt * 0.50)),
-            max(45, int(coding_tests_cnt * 0.65)),
-            max(65, int(coding_tests_cnt * 0.80)),
-            max(80, int(coding_tests_cnt * 0.92)),
-            coding_tests_cnt
-        ]
+        "labels": past_6_labels,
+        "interviews": ([0] * 5 + [ai_interviews_cnt]) if ai_interviews_cnt > 0 else [0] * 6,
+        "coding": ([0] * 5 + [coding_tests_cnt]) if coding_tests_cnt > 0 else [0] * 6
     }
 
     dept_map = {}
     for s in students:
-        d = s.get("department") or "Computer Science"
+        d = s.get("department") or "General"
         if d not in dept_map:
             dept_map[d] = {"iv": [], "cd": []}
-        dept_map[d]["iv"].append(float(s.get("interview_score") or 8.0))
-        dept_map[d]["cd"].append(float(s.get("coding_score") or 80.0))
-
-    if not dept_map:
-        dept_map = {
-            "Computer Science": {"iv": [8.8, 9.0], "cd": [88.0, 92.0]},
-            "Information Tech": {"iv": [8.4, 8.6], "cd": [82.0, 85.0]},
-            "Electronics": {"iv": [7.8, 8.1], "cd": [76.0, 80.0]},
-            "Mechanical": {"iv": [7.0, 7.2], "cd": [68.0, 72.0]}
-        }
+        dept_map[d]["iv"].append(float(s.get("interview_score") or 0.0))
+        dept_map[d]["cd"].append(float(s.get("coding_score") or 0.0))
 
     dept_labels = []
     dept_interviews = []
@@ -7126,12 +7138,28 @@ def admin_dashboard_stats():
         "coding": dept_coding[:6]
     }
 
-    recent_activities = [
-        {"id": "act_1", "title": f"New AI Interview scheduled for {students[0]['name'] if students else 'Rahul Sharma'}", "time": "10 minutes ago", "type": "Assessment"},
-        {"id": "act_2", "title": f"Coding Assessment Leaderboard updated ({coding_tests_cnt} total entries)", "time": "1 hour ago", "type": "Evaluation"},
-        {"id": "act_3", "title": f"Organization Placement Readiness calculated at {min(100, round((avg_interview*5)+(avg_coding*0.5)))}%", "time": "3 hours ago", "type": "Analytics"},
-        {"id": "act_4", "title": f"Executive Institutional Dossier generated for Placement Officer", "time": "Yesterday at 17:30", "type": "Report"}
-    ]
+    recent_activities = []
+    if students:
+        recent_activities.append({
+            "id": "act_1",
+            "title": f"Active institutional cohort: {total_students} verified students",
+            "time": "Updated now",
+            "type": "Roster"
+        })
+    if ai_interviews_cnt > 0:
+        recent_activities.append({
+            "id": "act_2",
+            "title": f"AI Interview pipeline: {ai_interviews_cnt} scheduled sessions",
+            "time": "Active",
+            "type": "Assessment"
+        })
+    if coding_tests_cnt > 0:
+        recent_activities.append({
+            "id": "act_3",
+            "title": f"Technical evaluations: {coding_tests_cnt} active test challenges",
+            "time": "Active",
+            "type": "Evaluation"
+        })
 
     recent_login = datetime.utcnow().strftime("%b %d, %Y %H:%M UTC")
 
@@ -7144,7 +7172,7 @@ def admin_dashboard_stats():
         "coding_tests_completed": coding_tests_cnt,
         "avg_interview_score": avg_interview,
         "avg_coding_score": avg_coding,
-        "total_reports_generated": max(15, int(ai_interviews_cnt * 0.4)),
+        "total_reports_generated": ai_interviews_cnt,
         "storage_used_mb": storage_used_mb,
         "storage_total_gb": storage_total_gb,
         "storage_pct": storage_pct,
@@ -7264,27 +7292,36 @@ def admin_bulk_renew_students():
     }), 200
 
 
-@app.route("/api/admin/student/<student_id>", methods=["PUT", "DELETE"])
-@app.route("/admin/student/<student_id>", methods=["PUT", "DELETE"])
+@app.route("/api/admin/student/<student_id>", methods=["GET", "PUT", "DELETE"])
+@app.route("/admin/student/<student_id>", methods=["GET", "PUT", "DELETE"])
 @require_org_admin
 def admin_manage_student(student_id):
     org_id = get_admin_org_id()
 
     # Security check: verify student belongs to admin's organization
+    student_row = None
     try:
         check_res = supabase.table("students").select("*").eq("id", student_id).execute()
         if check_res and check_res.data and len(check_res.data) > 0:
-            if check_res.data[0].get("organization_id") != org_id:
-                return jsonify({"error": "Forbidden: Cannot access student from another organization"}), 403
+            student_row = check_res.data[0]
     except Exception:
         pass
 
-    if request.method == "DELETE":
+    if not student_row or student_row.get("organization_id") != org_id:
+        # Check org_memberships
         try:
-            supabase.table("students").delete().eq("id", student_id).eq("organization_id", org_id).execute()
-        except Exception as e:
-            print("Delete student notice:", e)
-        return jsonify({"message": "Student deleted successfully"}), 200
+            m_res = supabase.table("org_memberships").select("*").eq("organization_id", org_id).eq("user_id", student_id).execute()
+            if not m_res or not m_res.data:
+                return tenant_not_found("Student")
+        except Exception:
+            return tenant_not_found("Student")
+
+    if request.method == "GET":
+        return jsonify({"student": student_row}), 200
+
+    if request.method == "DELETE":
+        unlink_student_from_college(student_id, org_id, supabase)
+        return jsonify({"message": "Student successfully unlinked and roster status archived"}), 200
 
     ALLOWED_STUDENT = {"name", "department", "semester", "status", "phone", "email", "year", "gender"}
     data = {k: v for k, v in (request.get_json() or {}).items() if k in ALLOWED_STUDENT}
@@ -7301,9 +7338,288 @@ def admin_manage_student(student_id):
 @require_org_admin
 def admin_import_students():
     org_id = get_admin_org_id()
-    # Simulated Excel/CSV bulk parsing
-    imported_count = random.randint(5, 12)
-    return jsonify({"message": f"Successfully bulk imported {imported_count} students into your organization", "count": imported_count}), 200
+    data = request.get_json() or {}
+    
+    csv_text = ""
+    if "file" in request.files:
+        f = request.files["file"]
+        csv_text = f.read().decode("utf-8", errors="ignore")
+    elif data.get("csv_text"):
+        csv_text = str(data["csv_text"])
+    elif data.get("students") and isinstance(data["students"], list):
+        lines = ["name,email,roll_number,department,year"]
+        for s in data["students"]:
+            lines.append(f"{s.get('name', '')},{s.get('email', '')},{s.get('roll_number', '')},{s.get('department', '')},{s.get('year', '')}")
+        csv_text = "\n".join(lines)
+    else:
+        csv_text = "name,email,roll_number,department,year\n"
+
+    valid_rows, invalid_rows = parse_student_csv_data(csv_text)
+    seat_status = get_org_seat_status(org_id, supabase)
+    
+    is_preview = bool(data.get("preview") or request.args.get("preview") == "true")
+    if is_preview:
+        can_commit = (seat_status["current_seats"] + len(valid_rows)) <= seat_status["max_seats"]
+        return jsonify({
+            "preview": True,
+            "valid_count": len(valid_rows),
+            "invalid_count": len(invalid_rows),
+            "valid_rows": valid_rows[:100],
+            "invalid_rows": invalid_rows[:100],
+            "seat_limit": seat_status["max_seats"],
+            "current_seats": seat_status["current_seats"],
+            "remaining_seats": seat_status["remaining_seats"],
+            "can_commit": can_commit
+        }), 200
+
+    # Commit Mode - Enforce Seat Capacity Limit
+    if (seat_status["current_seats"] + len(valid_rows)) > seat_status["max_seats"]:
+        return jsonify({
+            "error": f"Seat limit reached ({seat_status['current_seats']}/{seat_status['max_seats']}). Cannot import {len(valid_rows)} additional students.",
+            "seat_limit": seat_status["max_seats"],
+            "current_seats": seat_status["current_seats"]
+        }), 409
+
+    invites_created = 0
+    memberships_created = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expires_iso = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+
+    for s in valid_rows:
+        email = s["email"]
+        name = s["name"]
+        roll = s.get("roll_number", "")
+        dept = s.get("department", "General")
+        year = s.get("year", "2026")
+
+        user_row = None
+        try:
+            u_res = supabase.table("users").select("*").eq("email", email).execute()
+            if u_res and u_res.data:
+                user_row = u_res.data[0]
+        except Exception:
+            pass
+
+        if user_row:
+            link_student_to_college(user_row["id"], org_id, supabase, roll_number=roll, department=dept)
+            memberships_created += 1
+            std_id = user_row["id"]
+        else:
+            std_id = f"std_{uuid.uuid4().hex[:8]}"
+            try:
+                invite_token = secrets.token_urlsafe(32)
+                supabase.table("org_invites").insert({
+                    "id": f"inv_{uuid.uuid4().hex[:8]}",
+                    "organization_id": org_id,
+                    "email": email,
+                    "role": "student",
+                    "token": invite_token,
+                    "status": "pending",
+                    "expires_at": expires_iso,
+                    "created_at": now_iso
+                }).execute()
+                invites_created += 1
+            except Exception:
+                pass
+
+        try:
+            supabase.table("students").upsert({
+                "id": std_id,
+                "organization_id": org_id,
+                "name": name,
+                "email": email,
+                "roll_number": roll,
+                "department": dept,
+                "semester": "Sem 1",
+                "year": year,
+                "status": "Active",
+                "interview_score": 0.0,
+                "coding_score": 0.0,
+                "overall_score": 0.0,
+                "created_at": now_iso
+            }).execute()
+        except Exception:
+            pass
+
+    return jsonify({
+        "success": True,
+        "message": f"Successfully imported {len(valid_rows)} students into your organization",
+        "count": len(valid_rows),
+        "imported_count": len(valid_rows),
+        "invites_created": invites_created,
+        "memberships_created": memberships_created,
+        "invalid_count": len(invalid_rows)
+    }), 200
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# STUDENT COLLEGE AFFILIATION & JOIN CODE ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/student/college-preview", methods=["GET"])
+@app.route("/student/college-preview", methods=["GET"])
+def student_college_preview():
+    code = (request.args.get("code") or "").strip().upper()
+    if not code:
+        return jsonify({"error": "Join code is required"}), 400
+
+    org = None
+    try:
+        res = supabase.table("organization").select("*").eq("join_code", code).execute()
+        if res and res.data and len(res.data) > 0:
+            org = res.data[0]
+    except Exception as e:
+        print("College preview lookup notice:", e)
+
+    if not org:
+        return jsonify({"error": "Invalid college join code"}), 404
+
+    seat_status = get_org_seat_status(org["id"], supabase)
+    return jsonify({
+        "college_id": org["id"],
+        "college_name": org.get("name", "Institution"),
+        "type": org.get("type", "College"),
+        "seats_available": seat_status["remaining_seats"] > 0,
+        "consent_notice": f"By joining {org.get('name', 'your college')}, your college administrators will be able to assign mock interviews and coding assessments to you, and view your scores for college-assigned tests. Your personal independent practice history remains strictly private."
+    }), 200
+
+
+@app.route("/api/student/join-college", methods=["POST"])
+@app.route("/student/join-college", methods=["POST"])
+def student_join_college():
+    user, err = _get_user_or_error()
+    if err:
+        return err
+
+    data = request.get_json() or {}
+    code = (data.get("join_code") or data.get("code") or "").strip().upper()
+    consent = bool(data.get("consent"))
+    roll = data.get("roll_number", "").strip()
+    dept = data.get("department", "").strip()
+
+    if not code:
+        return jsonify({"error": "Join code is required"}), 400
+
+    if not consent:
+        return jsonify({"error": "Consent is required to link your account to an educational institution"}), 400
+
+    org = None
+    try:
+        res = supabase.table("organization").select("*").eq("join_code", code).execute()
+        if res and res.data and len(res.data) > 0:
+            org = res.data[0]
+    except Exception:
+        pass
+
+    if not org:
+        return jsonify({"error": "Invalid college join code"}), 404
+
+    seat_status = get_org_seat_status(org["id"], supabase)
+    if seat_status["is_full"]:
+        return jsonify({"error": "Institutional seat capacity is full. Please contact your college administrator."}), 409
+
+    user_id = user.get("sub") or user.get("id")
+    if not user_id:
+        return jsonify({"error": "User identification missing in token"}), 401
+
+    success = link_student_to_college(user_id, org["id"], supabase, roll_number=roll, department=dept)
+    if not success:
+        return jsonify({"error": "Failed to link account to college"}), 500
+
+    return jsonify({
+        "success": True,
+        "message": f"Successfully joined {org.get('name')}",
+        "organization": {
+            "id": org["id"],
+            "name": org.get("name")
+        }
+    }), 200
+
+
+@app.route("/api/student/my-college", methods=["GET"])
+@app.route("/student/my-college", methods=["GET"])
+def student_my_college():
+    user = _get_optional_user()
+    if not user:
+        return jsonify({"college": None}), 200
+
+    user_id = user.get("sub") or user.get("id")
+    org_id = user.get("organization_id")
+    
+    membership = None
+    if user_id:
+        try:
+            m_res = supabase.table("org_memberships").select("*").eq("user_id", user_id).eq("status", "active").execute()
+            if m_res and m_res.data:
+                membership = m_res.data[0]
+                org_id = membership.get("organization_id")
+        except Exception:
+            pass
+
+    if not org_id:
+        return jsonify({"college": None}), 200
+
+    org = None
+    try:
+        o_res = supabase.table("organization").select("*").eq("id", org_id).execute()
+        if o_res and o_res.data:
+            org = o_res.data[0]
+    except Exception:
+        pass
+
+    if not org:
+        return jsonify({"college": None}), 200
+
+    return jsonify({
+        "college": {
+            "id": org["id"],
+            "name": org.get("name"),
+            "type": org.get("type", "College"),
+            "role": membership.get("role", "student") if membership else "student",
+            "roll_number": membership.get("roll_number", "") if membership else "",
+            "department": membership.get("department", "General") if membership else "General",
+            "joined_at": membership.get("joined_at", "") if membership else "",
+            "what_my_college_can_see": [
+                "Assigned AI mock interview results and feedback",
+                "College coding assessment test results and rank",
+                "Institutional placement readiness metrics"
+            ],
+            "what_my_college_cannot_see": [
+                "Independent practice interview sessions",
+                "Personal sandbox coding attempts",
+                "Private payment and subscription details"
+            ]
+        }
+    }), 200
+
+
+@app.route("/api/student/leave-college", methods=["POST"])
+@app.route("/student/leave-college", methods=["POST"])
+def student_leave_college():
+    user, err = _get_user_or_error()
+    if err:
+        return err
+
+    user_id = user.get("sub") or user.get("id")
+    if not user_id:
+        return jsonify({"error": "User identification missing in token"}), 401
+    org_id = user.get("organization_id")
+    if not org_id:
+        try:
+            m_res = supabase.table("org_memberships").select("organization_id").eq("user_id", user_id).eq("status", "active").execute()
+            if m_res and m_res.data:
+                org_id = m_res.data[0].get("organization_id")
+        except Exception:
+            pass
+
+    if not org_id:
+        return jsonify({"error": "Account is not linked to any college"}), 400
+
+    unlink_student_from_college(user_id, org_id, supabase)
+    return jsonify({
+        "success": True,
+        "message": "Successfully unlinked account from college. Your profile has reverted to independent candidate status."
+    }), 200
 
 
 @app.route("/api/admin/interviews", methods=["GET", "POST"])
@@ -7429,11 +7745,12 @@ def admin_interview_pdf(interview_id):
     except Exception:
         pass
 
-    # Verify cross-organization access barrier
-    if iv and org_id and iv.get("organization_id") and iv.get("organization_id") != org_id:
-        p = getattr(request, "current_user", {})
-        if p.get("role") != "SUPER_ADMIN":
-            return jsonify({"error": "Forbidden: Cannot access interview from another organization"}), 403
+    if not iv:
+        return tenant_not_found("Interview")
+
+    p = getattr(request, "current_user", {})
+    if p.get("role") != "SUPER_ADMIN" and iv.get("organization_id") != org_id:
+        return tenant_not_found("Interview")
 
     c_name = iv.get("student_name") if iv else "Candidate"
     c_email = f"{c_name.lower().replace(' ', '.')}@org.edu" if c_name else "student@org.edu"
@@ -7610,21 +7927,25 @@ def admin_coding_test_leaderboard(test_id):
     org_id = get_admin_org_id()
 
     # Verify cross-organization test access barrier
+    t = None
     try:
         t_res = supabase.table("admin_coding").select("*").eq("id", test_id).execute()
         if t_res and t_res.data and len(t_res.data) > 0:
             t = t_res.data[0]
-            if org_id and t.get("organization_id") and t.get("organization_id") != org_id:
-                p = getattr(request, "current_user", {})
-                if p.get("role") != "SUPER_ADMIN":
-                    return jsonify({"error": "Forbidden: Cannot access coding test from another organization"}), 403
     except Exception:
         pass
+
+    if not t:
+        return tenant_not_found("Coding test")
+
+    p = getattr(request, "current_user", {})
+    if p.get("role") != "SUPER_ADMIN" and t.get("organization_id") != org_id:
+        return tenant_not_found("Coding test")
     
     leaderboard = []
-    # 1. Try querying real coding submissions
+    # 1. Try querying real coding submissions strictly scoped to this organization
     try:
-        sub_res = supabase.table("coding_submissions").select("*").execute()
+        sub_res = supabase.table("coding_submissions").select("*").eq("organization_id", org_id).execute()
         raw_subs = sub_res.data if sub_res and hasattr(sub_res, "data") and sub_res.data else []
         
         # Get org students map & users map
@@ -7632,7 +7953,7 @@ def admin_coding_test_leaderboard(test_id):
         students = std_res.data if std_res and hasattr(std_res, "data") and std_res.data else []
         std_map = {s.get("id"): s for s in students}
 
-        users_res = supabase.table("users").select("*").execute()
+        users_res = supabase.table("users").select("*").eq("organization_id", org_id).execute()
         users_list = users_res.data if users_res and hasattr(users_res, "data") and users_res.data else []
         user_map = {u.get("id"): u for u in users_list}
         
@@ -7651,9 +7972,9 @@ def admin_coding_test_leaderboard(test_id):
             leaderboard.append({
                 "id": sub.get("id"),
                 "student_name": raw_name,
-                "roll_number": s_info.get("roll_number") or f"CS2026{random.randint(100,999)}",
-                "email": s_info.get("email") or u_info.get("email") or "candidate@student.edu",
-                "department": s_info.get("department") or "Computer Science",
+                "roll_number": s_info.get("roll_number") or "",
+                "email": s_info.get("email") or u_info.get("email") or "",
+                "department": s_info.get("department") or "General",
                 "score_pct": score_pct,
                 "passed": sub.get("passed", 0),
                 "total": sub.get("total", 10),
@@ -7944,19 +8265,9 @@ def admin_give_question(q_id):
 
 
 
-GLOBAL_QUESTION_BANK = [
-    {"id": "gqb_1", "organization_id": "global", "title": "Design a High-Throughput Distributed Rate Limiter.", "category": "System Design", "difficulty": "Hard", "solution": "Use Redis sliding window logs or Token Bucket algorithm with distributed locks."},
-    {"id": "gqb_2", "organization_id": "global", "title": "Explain garbage collection algorithms in V8 & JVM.", "category": "Technical", "difficulty": "Medium", "solution": "Generational GC (Young vs Old gen), Mark-Sweep-Compact, and Orinoco concurrent marking in V8."},
-    {"id": "gqb_3", "organization_id": "global", "title": "Describe a situation where you led a team under tight deadlines.", "category": "Behavioral", "difficulty": "Easy", "solution": "STARS framework: Situation, Task, Action, Result, Learnings."},
-    {"id": "gqb_4", "organization_id": "global", "title": "Implement Median of Two Sorted Arrays in O(log(m+n)).", "category": "Coding", "difficulty": "Hard", "solution": "Binary search on partition points of smaller array."}
-]
-
-
 @app.route("/api/superadmin/qbank", methods=["GET", "POST"])
 @app.route("/superadmin/qbank", methods=["GET", "POST"])
 def superadmin_question_bank():
-    global GLOBAL_QUESTION_BANK
-
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
@@ -7965,62 +8276,67 @@ def superadmin_question_bank():
         q_id = f"gqb_{uuid.uuid4().hex[:8]}"
         new_q = {
             "id": q_id,
-            "organization_id": "global",
+            "organization_id": data.get("organization_id") or "global",
             "title": data.get("title", "New Global Question"),
             "category": data.get("category", "Technical"),
             "difficulty": data.get("difficulty", "Medium"),
             "solution": data.get("solution", ""),
-            "is_global": True,
+            "description": data.get("description", ""),
             "created_at": datetime.utcnow().isoformat()
         }
-        GLOBAL_QUESTION_BANK.insert(0, new_q)
         try:
             supabase.table("question_bank").insert(new_q).execute()
         except Exception as e:
-            print("Insert global qbank notice:", e)
+            logging.error(f"Insert global qbank error: {e}")
+            return jsonify({"error": "Failed to create question in database"}), 500
         return jsonify({"message": "Global question added successfully", "question": new_q}), 201
 
-    db_questions = []
     try:
-        res = supabase.table("question_bank").select("*").eq("organization_id", "global").execute()
-        if res and hasattr(res, "data") and res.data:
-            db_questions = res.data
-    except Exception:
-        pass
-
-    if db_questions:
-        for dq in db_questions:
-            if not any(g["id"] == dq.get("id") for g in GLOBAL_QUESTION_BANK):
-                GLOBAL_QUESTION_BANK.append(dq)
-
-    return jsonify(GLOBAL_QUESTION_BANK), 200
+        res = supabase.table("question_bank").select("*").execute()
+        questions = res.data if (res and hasattr(res, "data") and res.data) else []
+        for q in questions:
+            if not q.get("category"):
+                q["category"] = "Technical"
+            if not q.get("difficulty"):
+                q["difficulty"] = "Medium"
+            if "tags" not in q or q["tags"] is None:
+                q["tags"] = []
+            elif isinstance(q["tags"], str):
+                try:
+                    q["tags"] = json.loads(q["tags"])
+                except Exception:
+                    q["tags"] = [q["tags"]] if q["tags"] else []
+            if "test_cases" in q and isinstance(q["test_cases"], str):
+                try:
+                    q["test_cases"] = json.loads(q["test_cases"])
+                except Exception:
+                    q["test_cases"] = []
+        return jsonify(questions), 200
+    except Exception as e:
+        logging.error(f"Fetch question bank error: {e}")
+        return jsonify([]), 200
 
 
 @app.route("/api/superadmin/qbank/<q_id>", methods=["PUT", "DELETE"])
 @app.route("/superadmin/qbank/<q_id>", methods=["PUT", "DELETE"])
 def superadmin_manage_question(q_id):
-    global GLOBAL_QUESTION_BANK
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
     if request.method == "DELETE":
-        GLOBAL_QUESTION_BANK = [q for q in GLOBAL_QUESTION_BANK if q.get("id") != q_id]
         try:
             supabase.table("question_bank").delete().eq("id", q_id).execute()
         except Exception as e:
-            print("Delete global question notice:", e)
+            logging.error(f"Delete question error: {e}")
+            return jsonify({"error": "Failed to delete question"}), 500
         return jsonify({"message": "Global question deleted successfully"}), 200
 
     data = request.get_json() or {}
-    for idx, q in enumerate(GLOBAL_QUESTION_BANK):
-        if q.get("id") == q_id:
-            GLOBAL_QUESTION_BANK[idx] = {**q, **data}
-            break
-
     try:
         supabase.table("question_bank").update(data).eq("id", q_id).execute()
     except Exception as e:
-        print("Update global question notice:", e)
+        logging.error(f"Update question error: {e}")
+        return jsonify({"error": "Failed to update question"}), 500
 
     return jsonify({"message": "Global question updated successfully"}), 200
 
@@ -8762,24 +9078,35 @@ def get_user_notifications():
 
     # 3. Fetch from announcements table in Supabase directly
     try:
-        ann_res = supabase.table("announcements").select("*").execute()
+        if org_id and org_id != "All":
+            ann_res = supabase.table("announcements").select("*").eq("organization_id", org_id).execute()
+        elif org_id == "All":
+            ann_res = supabase.table("announcements").select("*").execute()
+        else:
+            # Independent user without college affiliation: only receive global announcements
+            ann_res = supabase.table("announcements").select("*").or_("organization_id.is.null,organization_id.eq.GLOBAL").execute()
+
         if ann_res and ann_res.data:
             for ann in ann_res.data:
                 ann_org = ann.get("organization_id")
-                if not ann_org or ann_org == "All" or (org_id and ann_org == org_id) or (org_id == "All"):
-                    ann_title = ann.get("title") or "Campus Announcement"
-                    formatted_ann_title = ann_title if ann_title.startswith("📢") else f"📢 Campus Announcement: {ann_title}"
+                # Isolation guard: never leak college-specific announcements to independent users
+                if not org_id and ann_org and ann_org not in ("GLOBAL", "All", None):
+                    continue
+                if org_id and org_id != "All" and ann_org and ann_org != org_id:
+                    continue
+                ann_title = ann.get("title") or "Campus Announcement"
+                formatted_ann_title = ann_title if ann_title.startswith("📢") else f"📢 Campus Announcement: {ann_title}"
 
-                    add_item({
-                        "id": f"ann_notif_{ann.get('id')}",
-                        "title": formatted_ann_title,
-                        "desc": ann.get("message") or "",
-                        "time": ann.get("created_at") or "Recently",
-                        "type": "announcement",
-                        "sender": "Organization Admin",
-                        "read": False,
-                        "raw_message": ann.get("message") or ""
-                    })
+                add_item({
+                    "id": f"ann_notif_{ann.get('id')}",
+                    "title": formatted_ann_title,
+                    "desc": ann.get("message") or "",
+                    "time": ann.get("created_at") or "Recently",
+                    "type": "announcement",
+                    "sender": "Organization Admin",
+                    "read": False,
+                    "raw_message": ann.get("message") or ""
+                })
     except Exception as e:
         print("Fetch announcements notice:", e)
 
@@ -8944,12 +9271,6 @@ def get_superadmin_all_feedback():
     except Exception as e:
         print("Fetch SA admin announcements notice:", e)
 
-    if not all_feedback:
-        all_feedback = [
-            {"id": "sa_fb_1", "source_type": "ORG_ADMIN", "sender_name": "Stanford Admin (Dr. Vance)", "organization_id": "org_stanford_01", "rating": 5, "message": "Platform AI interviewer latency is sub-300ms. Students are satisfied.", "category": "Platform Review", "created_at": "2026-07-21 09:30"},
-            {"id": "sa_fb_2", "source_type": "STUDENT", "sender_name": "Rohan Verma", "organization_id": "org_mit_02", "rating": 5, "message": "Dynamic DSA questions matched Big Tech screening standard.", "category": "DSA Track", "created_at": "2026-07-20 18:10"}
-        ]
-
     return jsonify(all_feedback), 200
 
 
@@ -8979,16 +9300,17 @@ def admin_organization():
     if not org:
         org = {
             "id": org_id,
-            "name": "Stanford Tech Institute",
+            "name": "Educational Institution",
             "type": "College",
-            "logo": "https://lh3.googleusercontent.com/a/default_logo",
-            "email": "admin@stanford.edu",
-            "phone": "+1 (650) 723-2300",
-            "website": "https://stanford.edu",
-            "address": "450 Jane Stanford Way, Stanford, CA",
-            "subscription_plan": "ENTERPRISE",
-            "subscription_expiry": "2027-12-31",
-            "status": "Active"
+            "logo": "",
+            "email": "",
+            "phone": "",
+            "website": "",
+            "address": "",
+            "subscription_plan": "Standard",
+            "status": "Active",
+            "join_code": "",
+            "max_seats": 50
         }
 
     return jsonify(org), 200
@@ -9041,6 +9363,44 @@ def payment_record_failed():
         return Response("", status=200)
     data = request.get_json() or {}
     return jsonify({"status": "acknowledged", "received": data}), 200
+
+
+@app.route("/api/user/api-usage", methods=["GET", "OPTIONS"])
+def get_user_api_usage():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
+    user_payload = _get_optional_user()
+    user_id = (user_payload or {}).get("sub") or (user_payload or {}).get("id") or request.args.get("user_id", "anonymous")
+    from services.api_usage_service import ApiUsageService
+    spend_data = ApiUsageService.get_user_monthly_spend(user_id)
+    limit_data = ApiUsageService.get_or_create_spending_limit(user_id)
+    budget = float(limit_data.get("monthly_budget_usd") or 5.0)
+    current = spend_data["total_spend_usd"]
+    return jsonify({
+        "status": "success",
+        "data": {
+            **spend_data,
+            "monthly_budget_usd": budget,
+            "remaining_budget_usd": max(0.0, round(budget - current, 6)),
+            "pct_used": round((current / budget) * 100.0, 1) if budget > 0 else 100.0,
+            "is_hard_limit": limit_data.get("is_hard_limit", True),
+        }
+    }), 200
+
+
+@app.route("/api/admin/api-spending-limits", methods=["POST", "OPTIONS"])
+def update_user_spending_limit():
+    if request.method == "OPTIONS":
+        return Response("", status=200)
+    data = request.get_json() or {}
+    user_id = data.get("user_id")
+    if not user_id:
+        return jsonify({"status": "error", "message": "user_id is required"}), 400
+    budget = float(data.get("monthly_budget_usd", 5.0))
+    is_hard = bool(data.get("is_hard_limit", True))
+    from services.api_usage_service import ApiUsageService
+    res = ApiUsageService.set_user_spending_limit(user_id, monthly_budget_usd=budget, is_hard_limit=is_hard)
+    return jsonify({"status": "success", "data": res}), 200
 
 
 @app.route("/api/subscription/status", methods=["GET"])
@@ -9274,58 +9634,8 @@ def superadmin_get_organizations():
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    orgs = []
-    try:
-        res = supabase.table("organization").select("*").execute()
-        if res and res.data:
-            for idx, o in enumerate(res.data):
-                orgs.append({
-                    "id": o.get("id"),
-                    "name": o.get("name") or "Organization",
-                    "type": o.get("type") or ("College" if idx % 2 == 0 else "Company"),
-                    "industry": "Computer Science & Engineering" if "College" in str(o.get("type", "")) else "Corporate Tech Recruitment",
-                    "admin_name": o.get("admin_name") or "Prof. Marcus Vance",
-                    "email": o.get("email") or "admin@institution.edu",
-                    "phone": o.get("phone") or "+1 650-723-2300",
-                    "website": o.get("website") or f"https://{str(o.get('name', 'org')).lower().replace(' ', '')}.edu",
-                    "domain": f"{str(o.get('name', 'org')).lower().replace(' ', '')}.edu",
-                    "gst_number": f"27AAAAA00{idx+10}A1Z5",
-                    "city": "San Francisco" if idx % 2 == 0 else "Boston",
-                    "state": "California" if idx % 2 == 0 else "Massachusetts",
-                    "country": "USA",
-                    "student_count": o.get("student_count") or 420,
-                    "student_limit": "500",
-                    "recruiters_count": 14 if idx == 0 else 4 + idx,
-                    "admins_count": 4 if idx == 0 else 2,
-                    "active_drives": 6 if idx == 0 else 2,
-                    "subscription_plan": o.get("subscription_plan") or "ENTERPRISE",
-                    "subscription_expiry": str(o.get("subscription_expiry") or "2027-12-31")[:10],
-                    "monthly_revenue": 50000 if idx == 0 else 35000,
-                    "health_score": 96 if idx % 3 != 0 else 78,
-                    "health_badge": "🟢 Healthy" if idx % 3 != 0 else "🟡 Needs Attention",
-                    "status": o.get("status") or "Active",
-                    "ai_credits_remaining": "45,000 Credits",
-                    "storage_used": "142 GB",
-                    "resume_analyses": 1240,
-                    "mock_interviews": 4820,
-                    "coding_tests": 8940,
-                    "mfa_enabled": True,
-                    "trusted_domains": ["stanford.edu", "mit.edu", "google.com"],
-                    "last_login": "2026-07-21",
-                    "last_activity": "Just Now 🟢" if idx % 2 == 0 else "2 hours ago",
-                    "created_at": str(o.get("created_at") or "2026-07-01")[:10]
-                })
-    except Exception:
-        pass
-
-    if not orgs:
-        orgs = [
-            {"id": "org_stanford_01", "name": "Stanford Tech Institute", "type": "College", "industry": "Computer Science & Higher Ed", "admin_name": "Prof. Marcus Vance", "email": "admin@stanford.edu", "phone": "+1 650-723-2300", "website": "https://stanford.edu", "domain": "stanford.edu", "city": "San Francisco", "state": "California", "country": "USA", "student_count": 420, "student_limit": "500", "recruiters_count": 14, "admins_count": 4, "active_drives": 6, "subscription_plan": "ENTERPRISE SCALE", "subscription_expiry": "2027-12-31", "monthly_revenue": 50000, "health_score": 96, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "45,000 Credits", "storage_used": "142 GB", "mfa_enabled": True, "last_activity": "Just Now 🟢", "last_login": "2026-07-21"},
-            {"id": "org_mit_02", "name": "MIT School of Computing", "type": "College", "industry": "Artificial Intelligence & Robotics", "admin_name": "Dr. Sarah Jenkins", "email": "admin@mit.edu", "phone": "+1 617-253-1000", "website": "https://mit.edu", "domain": "mit.edu", "city": "Boston", "state": "Massachusetts", "country": "USA", "student_count": 680, "student_limit": "1000", "recruiters_count": 22, "admins_count": 6, "active_drives": 10, "subscription_plan": "ENTERPRISE SCALE", "subscription_expiry": "2027-10-15", "monthly_revenue": 75000, "health_score": 98, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "85,000 Credits", "storage_used": "320 GB", "mfa_enabled": True, "last_activity": "Just Now 🟢", "last_login": "2026-07-21"},
-            {"id": "org_google_03", "name": "Google Talent Acquisition Drive", "type": "Company", "industry": "Cloud Computing & Enterprise Software", "admin_name": "David Miller", "email": "recruiter@google.com", "phone": "+1 650-253-0000", "website": "https://google.com", "domain": "google.com", "city": "Mountain View", "state": "California", "country": "USA", "student_count": 320, "student_limit": "500", "recruiters_count": 8, "admins_count": 2, "active_drives": 4, "subscription_plan": "BUSINESS GROWTH", "subscription_expiry": "2026-11-20", "monthly_revenue": 35000, "health_score": 92, "health_badge": "🟢 Healthy", "status": "Active", "ai_credits_remaining": "25,000 Credits", "storage_used": "95 GB", "mfa_enabled": True, "last_activity": "3 hours ago", "last_login": "2026-07-20"}
-        ]
-
-    return jsonify(orgs), 200
+    org_metrics = metrics_service.get_organization_metrics()
+    return jsonify(org_metrics["organizations"]), 200
 
 
 @app.route("/api/superadmin/organization", methods=["POST"])
@@ -9426,11 +9736,20 @@ def superadmin_get_admins():
             "name": data.get("name", "New Admin"),
             "email": data.get("email"),
             "role": data.get("role", "ADMIN"),
-            "organization_id": data.get("organization_id", "org_stanford_01"),
+            "organization_id": data.get("organization_id"),
             "created_at": datetime.utcnow().isoformat()
         }
         try:
             supabase.table("users").insert(new_adm).execute()
+            metrics_service.record_audit_log(
+                actor_id=get_client_ip(),
+                actor_email=data.get("email"),
+                action="invite_admin",
+                target_type="user",
+                target_id=a_id,
+                details={"name": new_adm["name"], "role": new_adm["role"], "organization_id": new_adm["organization_id"]},
+                ip_address=get_client_ip()
+            )
         except Exception as e:
             print("Insert admin notice:", e)
         return jsonify({"message": "Organization admin invited successfully", "admin": new_adm}), 201
@@ -9448,45 +9767,42 @@ def superadmin_get_admins():
         res = supabase.table("users").select("*").or_("role.eq.ADMIN,role.eq.admin,role.eq.SUPER_ADMIN,role.eq.Organization Admin").execute()
         rows = res.data if res and hasattr(res, "data") and res.data else []
 
+        users_res = supabase.table("users").select("id, organization_id, role").execute()
+        all_users = users_res.data if users_res and hasattr(users_res, "data") and users_res.data else []
+        students_by_org = {}
+        total_students_count = 0
+        for u in all_users:
+            u_role = str(u.get("role", "")).upper()
+            if "ADMIN" not in u_role and u_role not in ("SUPERADMIN", "SUPER_ADMIN"):
+                total_students_count += 1
+                oid = u.get("organization_id")
+                if oid:
+                    students_by_org[oid] = students_by_org.get(oid, 0) + 1
+
         for idx, r in enumerate(rows):
             org_id = r.get("organization_id")
-            org_name = org_map.get(org_id) or ("Platform SuperAdmin" if r.get("role") == "SUPER_ADMIN" else "Stanford Tech Institute")
+            org_name = org_map.get(org_id) or ("Platform SuperAdmin" if r.get("role") == "SUPER_ADMIN" else "Independent Admin")
             org_type = org_type_map.get(org_id, "COLLEGE")
+            managed_count = total_students_count if r.get("role") == "SUPER_ADMIN" else students_by_org.get(org_id, 0)
 
             admins.append({
                 "id": r.get("id"),
                 "name": r.get("name") or "Org Admin",
-                "employee_id": f"EMP-2026-{100 + idx}",
-                "designation": "Director of Placement & Training" if idx % 2 == 0 else "VP of Campus Recruiting",
+                "employee_id": f"EMP-{str(r.get('id', ''))[:6].upper()}",
+                "designation": "Director of Placement & Training" if r.get("role") != "SUPER_ADMIN" else "Platform Super Administrator",
                 "organization_id": org_id,
                 "organization_name": org_name,
                 "organization_type": org_type,
                 "email": r.get("email"),
-                "phone": f"+1 (555) 019-80{idx + 1}",
+                "phone": r.get("phone") or "",
                 "role": r.get("role") or "Organization Admin",
                 "permission_level": "Super Administrator" if r.get("role") == "SUPER_ADMIN" else "Full Org Control",
-                "subscription_plan": "Enterprise Scale (1 Year)",
-                "students_managed": 1420 if idx == 0 else 350 + idx * 80,
-                "recruiters_managed": 14 if idx == 0 else 4 + idx,
-                "active_drives": 8 if idx == 0 else 2 + idx,
-                "status": "Active" if idx % 4 != 0 else "Online 🟢",
-                "mfa_status": "Enabled 🛡" if idx % 3 != 0 else "Optional",
-                "activity_score": 96 - idx * 2,
-                "last_login": str(r.get("created_at") or "")[:10] or "2026-07-20",
-                "last_active": "Just Now 🟢" if idx % 2 == 0 else "3 hours ago",
-                "ip_address": f"192.168.1.{100 + idx}",
-                "browser": "Chrome 126.0 (Windows 11)",
-                "location": "San Francisco, USA" if idx % 2 == 0 else "Frankfurt, Germany",
-                "permissions": {
-                    "student_management": True,
-                    "recruiter_management": True,
-                    "question_bank": True,
-                    "analytics": True,
-                    "payments": True,
-                    "billing": True,
-                    "interview_management": True,
-                    "reports": True
-                }
+                "subscription_plan": "Enterprise Scale",
+                "students_managed": managed_count,
+                "recruiters_managed": 0,
+                "active_drives": 0,
+                "status": r.get("status") or "Active",
+                "created_at": str(r.get("created_at") or "")[:10]
             })
     except Exception as e:
         print("Query admins notice:", e)
@@ -9530,11 +9846,10 @@ def superadmin_get_students():
         org_map = {o.get("id"): o.get("name") for o in (orgs_res.data if orgs_res and orgs_res.data else [])}
 
         # --- 2. Load ALL real users (candidates only, not admins) ---
-        users_res = supabase.table("users").select(
-            "id, name, email, phone, role, subscription, created_at, organization_id, department"
-        ).execute()
+        users_res = supabase.table("users").select("*").execute()
         all_users = users_res.data if users_res and users_res.data else []
-        candidates = [u for u in all_users if u.get("role") not in ("ADMIN", "SUPER_ADMIN", "admin")]
+        admin_roles = {"admin", "super_admin", "superadmin", "org_admin", "recruiter"}
+        candidates = [u for u in all_users if str(u.get("role") or "").strip().lower() not in admin_roles]
 
         # --- 3. Load sessions to compute per-user interview counts and last_active ---
         sessions_res = supabase.table("sessions").select(
@@ -9548,6 +9863,34 @@ def superadmin_get_students():
             uid = sess.get("user_id")
             if uid:
                 user_sessions[uid].append(sess)
+
+        # Load resume scores
+        resume_map = {}
+        try:
+            r_res = supabase.table("resume_scores").select("user_id, score, created_at").execute()
+            if r_res and r_res.data:
+                for r in r_res.data:
+                    ruid = r.get("user_id")
+                    if ruid and (ruid not in resume_map or (r.get("created_at") or "") > (resume_map[ruid].get("created_at") or "")):
+                        resume_map[ruid] = r
+        except Exception:
+            pass
+
+        # Load coding submissions
+        coding_map = {}
+        try:
+            c_res = supabase.table("coding_submissions").select("user_id, passed, total").execute()
+            if c_res and c_res.data:
+                c_counts = defaultdict(lambda: {"total": 0, "passed": 0})
+                for c in c_res.data:
+                    cuid = c.get("user_id")
+                    if cuid:
+                        c_counts[cuid]["total"] += 1
+                        if c.get("passed") is not None and c.get("total") is not None and c.get("passed") == c.get("total"):
+                            c_counts[cuid]["passed"] += 1
+                coding_map = c_counts
+        except Exception:
+            pass
 
         from services.subscription_service import parse_utc_datetime, utc_now
         now = utc_now()
@@ -9609,34 +9952,42 @@ def superadmin_get_students():
                 last_active_str = "Never"
 
             org_id = u.get("organization_id")
+            display_org = org_map.get(org_id) if org_id else "Direct / B2C Learner"
             sub = str(u.get("subscription", "")).upper() if u.get("subscription") else "FREE"
             if sub not in ("PREMIUM", "FREE", "TRIAL"): sub = "FREE"
+
+            resume_rec = resume_map.get(uid)
+            resume_score = round(float(resume_rec["score"]), 1) if (resume_rec and resume_rec.get("score") is not None) else None
+            resume_uploaded = bool(resume_rec)
+            coding_info = coding_map.get(uid, {"total": 0, "passed": 0})
+            total_coding = coding_info["total"]
+            coding_score = round((coding_info["passed"] / coding_info["total"]) * 100, 1) if coding_info["total"] > 0 else None
 
             students.append({
                 "id": uid,
                 "name": u.get("name") or "Unnamed User",
                 "email": u.get("email") or "",
                 "phone": u.get("phone") or "",
-                "roll_number": "",
+                "roll_number": u.get("roll_number") or "",
                 "organization_id": org_id,
-                "organization_name": org_map.get(org_id) or "",
-                "college": org_map.get(org_id) or "",
+                "organization_name": display_org,
+                "college": display_org,
                 "department": u.get("department") or "",
                 "year": "",
                 "cgpa": "",
                 "subscription": sub,
                 "status": status,
                 "overall_ai_score": ai_score,
-                "resume_score": None,
-                "ats_score": None,
-                "coding_score": None,
+                "resume_score": resume_score,
+                "ats_score": resume_score,
+                "coding_score": coding_score,
                 "technical_score": None,
                 "hr_score": None,
                 "communication_score": None,
-                "placement_readiness": None,
+                "placement_readiness": f"{int(round(ai_score))}%" if ai_score is not None else None,
                 "total_interviews": total_interviews,
-                "total_coding_tests": 0,
-                "resume_uploaded": False,
+                "total_coding_tests": total_coding,
+                "resume_uploaded": resume_uploaded,
                 "joined_at": str(u.get("created_at") or "")[:10],
                 "last_active": last_active_str,
                 "linkedin": "",
@@ -9737,8 +10088,8 @@ def superadmin_subscriptions():
                 "resume_analyses": "1,000 / mo",
                 "trial_days": 7,
                 "status": "Active",
-                "orgs_count": 3,
-                "updated_at": "2026-07-15"
+                "orgs_count": 0,
+                "updated_at": datetime.utcnow().strftime("%Y-%m-%d")
             },
             {
                 "id": "plan_pro",
@@ -9756,8 +10107,8 @@ def superadmin_subscriptions():
                 "resume_analyses": "Unlimited",
                 "trial_days": 14,
                 "status": "Active",
-                "orgs_count": 8,
-                "updated_at": "2026-07-20"
+                "orgs_count": 0,
+                "updated_at": datetime.utcnow().strftime("%Y-%m-%d")
             },
             {
                 "id": "plan_enterprise",
@@ -9775,10 +10126,16 @@ def superadmin_subscriptions():
                 "resume_analyses": "Unlimited",
                 "trial_days": 30,
                 "status": "Active",
-                "orgs_count": 3,
-                "updated_at": "2026-07-21"
+                "orgs_count": 0,
+                "updated_at": datetime.utcnow().strftime("%Y-%m-%d")
             }
         ]
+
+    org_metrics = metrics_service.get_organization_metrics()
+    plan_distribution = org_metrics.get("plan_distribution", {})
+    for p in plans:
+        p_badge = str(p.get("badge") or p.get("plan_name") or "").upper()
+        p["orgs_count"] = plan_distribution.get(p_badge, plan_distribution.get(p.get("plan_name", "").upper(), 0))
 
     return jsonify(plans), 200
 
@@ -9837,13 +10194,6 @@ def superadmin_coupons():
     except Exception:
         pass
 
-    if not coupons:
-        coupons = [
-            {"id": "coup_1", "code": "SUMMER25", "name": "Summer Institutional Launch", "discount_type": "Percentage", "value": 25, "max_uses": 100, "used_count": 18, "valid_until": "2026-08-31", "status": "Active"},
-            {"id": "coup_2", "code": "WELCOME500", "name": "First Institution Flat Discount", "discount_type": "Flat", "value": 500, "max_uses": 50, "used_count": 14, "valid_until": "2026-12-31", "status": "Active"},
-            {"id": "coup_3", "code": "EDUPARTNER", "name": "Academic Partner Grant", "discount_type": "Percentage", "value": 40, "max_uses": 200, "used_count": 35, "valid_until": "2026-11-30", "status": "Active"}
-        ]
-
     return jsonify(coupons), 200
 
 
@@ -9854,48 +10204,8 @@ def superadmin_payments():
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    db_payments = []
-    org_map = {}
-    try:
-        orgs_res = supabase.table("organization").select("id, name").execute()
-        if orgs_res and hasattr(orgs_res, "data") and orgs_res.data:
-            for o in orgs_res.data:
-                org_map[o["id"]] = o.get("name") or "Organization"
-
-        res = supabase.table("payment").select("*").execute()
-        rows = res.data if res and hasattr(res, "data") and res.data else []
-
-        for r in rows:
-            amount = float(r.get("amount") or 50000.0)
-            gst = round(amount * 0.18, 2)
-            org_id = r.get("organization_id")
-            org_name = org_map.get(org_id) or f"Organization ({str(org_id)[:6]})"
-
-            db_payments.append({
-                "id": r.get("id"),
-                "organization_id": org_id,
-                "organization_name": org_name,
-                "student_name": "N/A (Enterprise Subscription)",
-                "plan": r.get("plan") or "Enterprise Premium (1 Year)",
-                "amount": amount,
-                "gst": gst,
-                "payment_method": r.get("payment_method") or "Razorpay (UPI / NetBanking)",
-                "transaction_id": r.get("razorpay_payment_id") or r.get("id"),
-                "invoice_number": r.get("invoice_number") or f"INV-2026-{str(r.get('id'))[:6].upper()}",
-                "invoice_id": r.get("id"),
-                "status": r.get("status") or "Success",
-                "created_at": str(r.get("created_at"))[:10] if r.get("created_at") else "2026-07-20"
-            })
-    except Exception as e:
-        print("SuperAdmin payments DB query notice:", e)
-
-    if not db_payments:
-        db_payments = [
-            {"id": "pay_901", "organization_name": "Stanford Tech Institute", "student_name": "N/A (Enterprise)", "plan": "Enterprise Premium (1 Year)", "amount": 50000.0, "gst": 9000.0, "payment_method": "Razorpay (UPI / NetBanking)", "transaction_id": "txn_rzp_994827101", "invoice_number": "INV-2026-STF01", "invoice_id": "pay_901", "status": "Success", "created_at": "2026-07-01"},
-            {"id": "pay_902", "organization_name": "MIT School of Computing", "student_name": "N/A (Enterprise)", "plan": "Enterprise Scale (1 Year)", "amount": 75000.0, "gst": 13500.0, "payment_method": "Stripe Corporate Card", "transaction_id": "txn_strp_883719202", "invoice_number": "INV-2026-MIT02", "invoice_id": "pay_902", "status": "Success", "created_at": "2026-07-10"},
-            {"id": "pay_903", "organization_name": "Cambridge Institute of Technology", "student_name": "N/A (Enterprise)", "plan": "Standard Growth (1 Year)", "amount": 35000.0, "gst": 6300.0, "payment_method": "Razorpay (UPI)", "transaction_id": "txn_rzp_772618303", "invoice_number": "INV-2026-CAM03", "invoice_id": "pay_903", "status": "Success", "created_at": "2026-07-18"}
-        ]
-    return jsonify(db_payments), 200
+    pay_metrics = metrics_service.get_payment_metrics()
+    return jsonify(pay_metrics["payments"]), 200
 
 
 @app.route("/api/superadmin/invoice/download/<invoice_id>", methods=["GET"])
@@ -10009,187 +10319,43 @@ def superadmin_dashboard():
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-    month_str = datetime.utcnow().strftime("%Y-%m")
-    year_str = datetime.utcnow().strftime("%Y")
-
-    today_rev = 0.0
-    monthly_rev = 0.0
-    annual_rev = 0.0
-    total_orgs = 0
-    total_colleges = 0
-    total_companies = 0
-    total_admins = 0
-    total_students = 0
-    active_students = 0
-    premium_users = 0
-    active_subs = 0
-    expired_subs = 0
-    trial_orgs = 0
-    total_interviews = 0
-    total_coding_tests = 0
-    total_ai_api_calls = 0
-
-    recent_payments = []
-    recent_organizations = []
-
-    try:
-        orgs_res = supabase.table("organization").select("*").execute()
-        all_orgs = orgs_res.data if orgs_res and hasattr(orgs_res, "data") and orgs_res.data else []
-        total_orgs = len(all_orgs) or 14
-
-        for o in all_orgs:
-            o_type = str(o.get("type", "")).upper()
-            if "COLLEGE" in o_type or "ACADEMIC" in o_type: total_colleges += 1
-            elif "COMPANY" in o_type or "CORPORATE" in o_type: total_companies += 1
-            st = str(o.get("subscription_status", "")).upper()
-            if st == "ACTIVE": active_subs += 1
-            elif st == "EXPIRED": expired_subs += 1
-            else: trial_orgs += 1
-
-        if total_colleges == 0: total_colleges = int(total_orgs * 0.7) or 10
-        if total_companies == 0: total_companies = max(1, total_orgs - total_colleges) or 4
-
-        users_res = supabase.table("users").select("*").execute()
-        all_users = users_res.data if users_res and hasattr(users_res, "data") and users_res.data else []
-        for u in all_users:
-            u_role = str(u.get("role", "")).upper()
-            if "ADMIN" in u_role: total_admins += 1
-            else: total_students += 1
-
-        total_students = max(total_students, 1420)
-        total_admins = max(total_admins, 18)
-        active_students = max(1280, int(total_students * 0.88))
-        premium_users = max(480, int(total_students * 0.34))
-
-        try:
-            sess_res = supabase.table("sessions").select("session_id").execute()
-            total_interviews = len(sess_res.data) if sess_res and hasattr(sess_res, "data") and sess_res.data else 4820
-        except Exception:
-            total_interviews = 4820
-
-        try:
-            code_res = supabase.table("coding_submissions").select("id").execute()
-            total_coding_tests = len(code_res.data) if code_res and hasattr(code_res, "data") and code_res.data else 8940
-        except Exception:
-            total_coding_tests = 8940
-
-        if total_interviews == 0: total_interviews = 4820
-        if total_coding_tests == 0: total_coding_tests = 8940
-
-        total_ai_api_calls = (total_interviews * 8) + (total_coding_tests * 3) + 68420
-
-        # Invoices (Primary verified billing source)
-        try:
-            invs_res = supabase.table("invoice").select("*").execute()
-            invs = invs_res.data if invs_res and hasattr(invs_res, "data") and invs_res.data else []
-            for inv in invs:
-                amt = float(inv.get("amount") or 0.0)
-                dt = str(inv.get("created_at") or "")
-                if dt.startswith(today_str): today_rev += amt
-                if dt.startswith(month_str): monthly_rev += amt
-                if dt.startswith(year_str): annual_rev += amt
-        except Exception as e_inv:
-            print("Fetch invoices notice:", e_inv)
-
-        # Direct Payments
-        pays_res = supabase.table("payment").select("*").execute()
-        pays = pays_res.data if pays_res and hasattr(pays_res, "data") and pays_res.data else []
-        for p in pays:
-            amt = float(p.get("amount") or 500.0)
-            dt = str(p.get("created_at") or "")
-            if dt.startswith(today_str): today_rev += amt
-            if dt.startswith(month_str): monthly_rev += amt
-            if dt.startswith(year_str): annual_rev += amt
-
-            if len(recent_payments) < 5:
-                recent_payments.append({
-                    "id": p.get("id"),
-                    "organization_name": f"Org {str(p.get('organization_id'))[:6]}",
-                    "amount": amt,
-                    "status": p.get("status") or "Success",
-                    "created_at": str(p.get("created_at"))[:10]
-                })
-
-        for o in all_orgs[:5]:
-            recent_organizations.append({
-                "id": o.get("id"),
-                "name": o.get("name"),
-                "email": o.get("email"),
-                "type": o["type"] or "COLLEGE",
-                "subscription_plan": o["subscription_status"] or "ACTIVE",
-                "created_at": o["created_at"]
-            })
-
-        # conn.close() removed as SQLiteSupabaseMock manages connections per query
-    except Exception as e:
-        print("SuperAdmin dashboard query notice:", e)
-
-    if not recent_organizations:
-        recent_organizations = [
-            {"id": "org_1", "name": "Stanford Tech Institute", "email": "admin@stanford.edu", "type": "COLLEGE", "subscription_plan": "ACTIVE"},
-            {"id": "org_2", "name": "MIT School of Engineering", "email": "admin@mit.edu", "type": "COLLEGE", "subscription_plan": "ACTIVE"}
-        ]
-
-    # Dynamic 7-month revenue and activity trends leading to current month
-    month_labels = ["May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"]
-    rev_curve = [
-        round(monthly_rev * 0.45, 2),
-        round(monthly_rev * 0.56, 2),
-        round(monthly_rev * 0.68, 2),
-        round(monthly_rev * 0.79, 2),
-        round(monthly_rev * 0.88, 2),
-        round(monthly_rev * 0.95, 2),
-        round(monthly_rev, 2)
-    ]
-    growth_pct = round(((rev_curve[-1] - rev_curve[0]) / max(1, rev_curve[0])) * 100, 1)
-
-    revenue_trend = {
-        "labels": month_labels,
-        "revenue": rev_curve,
-        "growth_yoy": f"+{growth_pct}% YoY Growth"
-    }
-
-    colleges_companies_trend = {
-        "labels": month_labels,
-        "interviews": [68, 72, 76, 81, 84, 87, 89],
-        "coding": [62, 69, 74, 79, 83, 88, 92],
-        "label1": "College Avg",
-        "label2": "Company Avg"
-    }
-
+    overview = metrics_service.get_dashboard_overview()
     return jsonify({
-        "today_revenue": f"${today_rev:,.2f}",
-        "monthly_revenue": f"${monthly_rev:,.2f}",
-        "yearly_revenue": f"${annual_rev:,.2f}",
-        "annual_revenue": annual_rev,
-        "total_organizations": total_orgs,
-        "total_colleges": total_colleges,
-        "total_companies": total_companies,
-        "total_admins": total_admins,
-        "total_students": total_students,
-        "active_students": active_students,
-        "premium_users": premium_users,
-        "active_subscriptions": active_subs,
-        "expired_subscriptions": expired_subs,
-        "trial_organizations": trial_orgs,
-        "total_interviews": total_interviews,
-        "total_coding_tests": total_coding_tests,
-        "total_ai_api_calls": total_ai_api_calls,
-        "storage_used_gb": f"{max(1, round(total_interviews * 0.15 + total_students * 0.05, 1))} GB",
-        "recent_payments": recent_payments,
-        "recent_organizations": recent_organizations,
-        "revenue_trend": revenue_trend,
-        "colleges_companies_trend": colleges_companies_trend,
+        "today_revenue": f"₹{overview['today_revenue']:,.2f}",
+        "monthly_revenue": f"₹{overview['monthly_revenue']:,.2f}",
+        "yearly_revenue": f"₹{overview['annual_revenue']:,.2f}",
+        "annual_revenue": overview["annual_revenue"],
+        "today_revenue_paise": overview["today_revenue_paise"],
+        "monthly_revenue_paise": overview["monthly_revenue_paise"],
+        "annual_revenue_paise": overview["annual_revenue_paise"],
+        "total_revenue_paise": overview["total_revenue_paise"],
+        "mrr_paise": overview["mrr_paise"],
+        "arr_paise": overview["arr_paise"],
+        "total_organizations": overview["total_organizations"],
+        "total_colleges": overview["colleges_count"],
+        "total_companies": overview["companies_count"],
+        "total_admins": overview["total_admins"],
+        "total_students": overview["total_students"],
+        "org_students": overview["org_students"],
+        "b2c_students": overview["b2c_students"],
+        "active_students": overview["active_students"],
+        "active_subscriptions": overview["active_subscriptions"],
+        "expired_subscriptions": overview["expired_subscriptions"],
+        "trial_organizations": overview["trial_organizations"],
+        "total_interviews": overview["total_interviews"],
+        "total_coding_tests": overview["total_coding_tests"],
+        "total_ai_api_calls": overview["total_ai_api_calls"],
+        "storage_used_gb": f"{round(overview['total_interviews'] * 0.15 + overview['total_students'] * 0.05, 1)} GB",
+        "recent_payments": overview["recent_payments"],
+        "recent_organizations": overview["recent_organizations"],
+        "revenue_trend": overview["revenue_trend"],
+        "colleges_companies_trend": overview["activity_trend"],
+        "activity_trend": overview["activity_trend"],
+        "revenue_growth_badge": overview["revenue_growth_badge"],
         "system_health": {
             "server_status": "Online (Flask API Active)",
-            "database_status": "Connected (SQLite & Supabase Sync OK)",
-            "ai_engine": "Operational (Gemini 2.5 Flash Active)"
-        },
-        "pricing_plan": {
-            "name": "Enterprise Premium Plan",
-            "price": 500.0,
-            "duration": "1 Year (365 Days)"
+            "database_status": "Connected (Supabase PostgreSQL)",
+            "ai_engine": "Operational (Gemini Active)"
         }
     }), 200
 
@@ -10359,74 +10525,36 @@ def superadmin_analytics():
     if not verify_super_admin():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
-    timeframe = request.args.get("timeframe", "ytd")
+    overview = metrics_service.get_dashboard_overview()
+    org_metrics = metrics_service.get_organization_metrics()
 
-    orgs_data = []
-    try:
-        orgs_res = supabase.table("organization").select("*").execute()
-        all_orgs = orgs_res.data if orgs_res and hasattr(orgs_res, "data") and orgs_res.data else []
-        for o in all_orgs:
-            oid = o.get("id")
-            s_res = supabase.table("students").select("id").eq("organization_id", oid).execute()
-            s_cnt = len(s_res.data) if s_res and hasattr(s_res, "data") and s_res.data else 0
-            
-            iv_res = supabase.table("admin_interviews").select("id").eq("organization_id", oid).execute()
-            iv_cnt = len(iv_res.data) if iv_res and hasattr(iv_res, "data") and iv_res.data else 0
+    top_orgs = []
+    for o in org_metrics.get("organizations", []):
+        top_orgs.append({
+            "id": o.get("id"),
+            "name": o.get("name"),
+            "students": o.get("student_count", 0),
+            "interviews": o.get("active_students", 0),
+            "placement_status": o.get("status") or "Active",
+            "renewal_date": o.get("subscription_expiry") or ""
+        })
 
-            status = o.get("subscription_status") or "Active Enterprise"
-            name = o.get("name") or "Organization"
-            if name.startswith("Organization ") and "test" in name.lower():
-                continue # filter raw test orgs for clean view
-
-            orgs_data.append({
-                "id": oid,
-                "name": name,
-                "students": s_cnt or 120,
-                "interviews": iv_cnt or (s_cnt * 2 + 10),
-                "placement_status": status,
-                "renewal_date": "2026-12-31"
-            })
-    except Exception as e:
-        print("SuperAdmin analytics notice:", e)
-
-    if not orgs_data:
-        orgs_data = [
-            {"id": "org_stanford_01", "name": "Stanford Tech Institute", "students": 240, "interviews": 480, "placement_status": "Active Enterprise", "renewal_date": "2026-12-31"},
-            {"id": "org_mit_02", "name": "MIT School of Computing", "students": 180, "interviews": 360, "placement_status": "Active Pro", "renewal_date": "2026-11-15"},
-            {"id": "org_cambridge_03", "name": "Cambridge Institute of Tech", "students": 150, "interviews": 300, "placement_status": "Active Enterprise", "renewal_date": "2027-01-20"},
-            {"id": "org_oxford_04", "name": "Oxford University AI Labs", "students": 110, "interviews": 220, "placement_status": "Active Starter", "renewal_date": "2026-10-01"},
-            {"id": "org_harvard_05", "name": "Harvard Computer Science", "students": 95, "interviews": 190, "placement_status": "Active Enterprise", "renewal_date": "2026-09-30"}
-        ]
-
-    sess_res = supabase.table("sessions").select("session_id").execute()
-    total_sess = len(sess_res.data) if sess_res and hasattr(sess_res, "data") and sess_res.data else 0
-
-    gemini_calls = 330 + (total_sess * 4)
-    openai_calls = 120 + (total_sess * 2)
-    llm_tokens = round(4.85 + (total_sess * 0.05), 2)
-
-    revenue_trend = {
-        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-        "revenue": [18000, 24000, 31000, 29000, 38000, 41000, 48500]
-    }
-
-    activity_trend = {
-        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-        "interviews": [45, 60, 75, 82, 88, 91, 98],
-        "coding": [50, 65, 78, 85, 90, 93, 99]
-    }
+    api_usage_rows = metrics_service._fetch_api_usage()
+    total_tokens = sum(int(r.get("total_tokens") or 0) for r in api_usage_rows)
+    gemini_calls = sum(1 for r in api_usage_rows if "gemini" in str(r.get("model", "")).lower())
+    openai_calls = sum(1 for r in api_usage_rows if "gpt" in str(r.get("model", "")).lower() or "openai" in str(r.get("model", "")).lower())
 
     return jsonify({
-        "platform_growth": "+34% YoY",
-        "revenue_growth": "+42% YoY",
+        "platform_growth": overview["revenue_growth_badge"] or "—",
+        "revenue_growth": overview["revenue_growth_badge"] or "—",
         "ai_api_usage": {
             "gemini_calls": gemini_calls,
             "openai_calls": openai_calls,
-            "total_tokens_millions": llm_tokens
+            "total_tokens_millions": round(total_tokens / 1_000_000, 2)
         },
-        "revenue_trend": revenue_trend,
-        "activity_trend": activity_trend,
-        "top_organizations": orgs_data
+        "revenue_trend": overview["revenue_trend"],
+        "activity_trend": overview["activity_trend"],
+        "top_organizations": top_orgs
     }), 200
 
 
@@ -10505,198 +10633,37 @@ def superadmin_activity_logs():
     except Exception as e:
         print("Fetch activity logs notice:", e)
 
-    # Pre-populated rich SOC events covering Security, Payments, AI, Admin & Students
+    # Fetch audit logs recorded by superadmin operations
+    try:
+        real_audit = metrics_service.get_audit_logs(limit=200)
+        for a in real_audit:
+            db_logs.append({
+                "id": f"LOG-{str(a.get('id', ''))[:8].upper()}",
+                "created_at": a.get("created_at", ""),
+                "category": a.get("target_type", "Administrative").title(),
+                "severity": "Information",
+                "risk_score": "Low",
+                "action": a.get("action", "").replace("_", " ").title(),
+                "target": f"{a.get('target_type')}:{a.get('target_id') or ''}",
+                "performed_by_role": "Super Admin" if "admin" in str(a.get("actor_id", "")).lower() else "Admin",
+                "performed_by_name": a.get("actor_email") or a.get("actor_id"),
+                "performed_by_email": a.get("actor_email") or "",
+                "organization_id": "GLOBAL",
+                "organization_name": "Platform Administration",
+                "status": "Success",
+                "ip_address": a.get("ip_address") or "127.0.0.1",
+                "location": "Authorized Admin Session",
+                "investigation_status": "Resolved",
+                "investigation_notes": f"Automated audit record of {a.get('action')}"
+            })
+    except Exception as e_audit:
+        print("Fetch audit logs notice:", e_audit)
+
     now_dt = datetime.utcnow()
     t_today = now_dt.strftime("%Y-%m-%d")
     t_yesterday = (now_dt - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    rich_seed_logs = [
-        {
-            "id": "LOG-2026-000481",
-            "created_at": f"{t_today} 19:04:12",
-            "category": "Payments",
-            "severity": "Information",
-            "risk_score": "Low",
-            "action": "Subscription Purchased",
-            "target": "Enterprise Plan (1 Year)",
-            "performed_by_role": "Organization Admin",
-            "performed_by_name": "Rahul Sharma",
-            "performed_by_email": "rahul.sharma@stanford.edu",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "status": "Success",
-            "plan": "Enterprise Annual",
-            "amount": "₹50,000",
-            "payment_gateway": "Razorpay",
-            "transaction_id": "TXN_938421098",
-            "ip_address": "103.241.22.8",
-            "location": "San Francisco, USA",
-            "device": "Windows Laptop",
-            "browser": "Chrome 126",
-            "session_id": "SESS_893241",
-            "investigation_status": "Resolved",
-            "investigation_notes": "Payment verified by automated Razorpay webhook."
-        },
-        {
-            "id": "LOG-2026-000482",
-            "created_at": f"{t_today} 18:45:30",
-            "category": "Security",
-            "severity": "Critical",
-            "risk_score": "Critical",
-            "action": "SQL Injection Attempt Blocked",
-            "target": "/api/student/login",
-            "performed_by_role": "AI System",
-            "performed_by_name": "PrepFly WAF Engine",
-            "performed_by_email": "security@prepfly.io",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "status": "Failed",
-            "ip_address": "185.220.101.4",
-            "location": "Frankfurt, Germany",
-            "device": "Linux Server",
-            "browser": "Python-requests/2.31",
-            "session_id": "SESS_SECURITY_9901",
-            "investigation_status": "Flagged",
-            "investigation_notes": "Malicious payload 'SELECT * FROM users WHERE '1'='1' blocked by SQL sanitizer."
-        },
-        {
-            "id": "LOG-2026-000483",
-            "created_at": f"{t_today} 18:12:00",
-            "category": "AI Configuration",
-            "severity": "Information",
-            "risk_score": "Low",
-            "action": "Gemini API Key & Model Updated",
-            "target": "Gemini 1.5 Pro Flash Engine",
-            "performed_by_role": "Super Admin",
-            "performed_by_name": "Anushka Saxena",
-            "performed_by_email": "saxenaanushka9645@gmail.com",
-            "organization_id": "GLOBAL",
-            "organization_name": "PrepFly Global Platform",
-            "status": "Success",
-            "ip_address": "127.0.0.1",
-            "location": "Local Host",
-            "device": "MacBook Pro",
-            "browser": "Chrome 126",
-            "session_id": "SESS_SUPERADMIN_01",
-            "investigation_status": "Resolved",
-            "investigation_notes": "Switched default fallback model to gemini-3.5-flash."
-        },
-        {
-            "id": "LOG-2026-000484",
-            "created_at": f"{t_today} 17:30:15",
-            "category": "Authentication",
-            "severity": "Warning",
-            "risk_score": "High",
-            "action": "Multiple Failed Login Attempts (8x)",
-            "target": "Account admin@mit.edu",
-            "performed_by_role": "Organization Admin",
-            "performed_by_name": "Prof. David Miller",
-            "performed_by_email": "admin@mit.edu",
-            "organization_id": "org_mit_02",
-            "organization_name": "MIT School of Computing",
-            "status": "Failed",
-            "ip_address": "182.74.99.14",
-            "location": "Boston, USA",
-            "device": "Windows Laptop",
-            "browser": "Edge 124",
-            "session_id": "SESS_LOCK_4402",
-            "investigation_status": "Investigating",
-            "investigation_notes": "Account locked automatically for 15 minutes after 8 incorrect password attempts."
-        },
-        {
-            "id": "LOG-2026-000485",
-            "created_at": f"{t_today} 16:15:00",
-            "category": "Student Management",
-            "severity": "Information",
-            "risk_score": "Low",
-            "action": "Bulk Candidate Cohort Imported (45 Students)",
-            "target": "Batch CS 2026",
-            "performed_by_role": "Organization Admin",
-            "performed_by_name": "Priya Sharma",
-            "performed_by_email": "priya.sharma@stanford.edu",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "status": "Success",
-            "ip_address": "103.241.22.8",
-            "location": "San Francisco, USA",
-            "device": "Windows Laptop",
-            "browser": "Chrome 126",
-            "session_id": "SESS_893241",
-            "investigation_status": "Resolved",
-            "investigation_notes": "CSV import parsed successfully."
-        },
-        {
-            "id": "LOG-2026-000486",
-            "created_at": f"{t_today} 14:50:22",
-            "category": "Payments",
-            "severity": "Warning",
-            "risk_score": "Medium",
-            "action": "Subscription Payment Failed",
-            "target": "Pro Tier Plan",
-            "performed_by_role": "Payment Gateway",
-            "performed_by_name": "Stripe Gateway",
-            "performed_by_email": "billing@stripe.com",
-            "organization_id": "org_cambridge_03",
-            "organization_name": "Cambridge Institute of Tech",
-            "status": "Cancelled",
-            "amount": "₹15,000",
-            "payment_gateway": "Stripe",
-            "transaction_id": "TXN_FAIL_55219",
-            "ip_address": "127.0.0.1",
-            "location": "London, UK",
-            "device": "Cloud API",
-            "browser": "Stripe-Webhook/v2",
-            "session_id": "SESS_PAY_9011",
-            "investigation_status": "New",
-            "investigation_notes": "Card declined due to insufficient funds."
-        },
-        {
-            "id": "LOG-2026-000487",
-            "created_at": f"{t_yesterday} 21:10:00",
-            "category": "Question Bank",
-            "severity": "Information",
-            "risk_score": "Low",
-            "action": "Question Bank Bulk Upload Completed (25 Problems)",
-            "target": "Dynamic Programming Module",
-            "performed_by_role": "Super Admin",
-            "performed_by_name": "Anushka Saxena",
-            "performed_by_email": "saxenaanushka9645@gmail.com",
-            "organization_id": "GLOBAL",
-            "organization_name": "PrepFly Global Platform",
-            "status": "Success",
-            "ip_address": "127.0.0.1",
-            "location": "Local Host",
-            "device": "MacBook Pro",
-            "browser": "Chrome 126",
-            "session_id": "SESS_SUPERADMIN_01",
-            "investigation_status": "Resolved",
-            "investigation_notes": "25 new coding challenges verified."
-        },
-        {
-            "id": "LOG-2026-000488",
-            "created_at": f"{t_yesterday} 19:40:11",
-            "category": "Security",
-            "severity": "Critical",
-            "risk_score": "Critical",
-            "action": "XSS Script Injection Attack Blocked",
-            "target": "Support Ticket Comment Box",
-            "performed_by_role": "Student",
-            "performed_by_name": "Karan Malhotra",
-            "performed_by_email": "karan@student.edu",
-            "organization_id": "org_stanford_01",
-            "organization_name": "Stanford Tech Institute",
-            "status": "Failed",
-            "ip_address": "45.142.120.99",
-            "location": "Moscow, Russia",
-            "device": "Android Phone",
-            "browser": "Chrome Mobile 125",
-            "session_id": "SESS_STUDENT_302",
-            "investigation_status": "Flagged",
-            "investigation_notes": "Sanitized script tag `<script>alert('xss')</script>` in support text box."
-        }
-    ]
-
-    all_logs = db_logs + rich_seed_logs
+    all_logs = db_logs
 
     # Apply filters
     filtered = []
@@ -10952,37 +10919,6 @@ def handle_support_conversations():
     except Exception as e:
         print("Fetch support conversations notice:", e)
 
-    if not conversations:
-        seed_id = f"conv_seed_{org_id if org_id else 'default'}"
-        now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        seed_conv = {
-            "id": seed_id,
-            "organization_id": org_id or get_admin_org_id(),
-            "admin_id": "admin_01",
-            "status": "Open",
-            "priority": "High",
-            "category": "General",
-            "subject": "Direct Support Channel with PrepFly Super Admin",
-            "created_at": now_str,
-            "updated_at": now_str
-        }
-        seed_msg = {
-            "id": "msg_seed_01",
-            "conversation_id": seed_id,
-            "sender_role": "Super Admin",
-            "sender_id": "super_admin_01",
-            "message": "Welcome to PrepFly Enterprise Support! Type your message here to communicate directly with Super Admin.",
-            "attachment": None,
-            "is_read": 1,
-            "created_at": now_str
-        }
-        try:
-            supabase.table("support_conversations").insert(seed_conv).execute()
-            supabase.table("support_messages").insert(seed_msg).execute()
-            conversations = [seed_conv]
-        except Exception:
-            conversations = [seed_conv]
-
     orgs_map = {}
     try:
         org_res = supabase.table("organization").select("id, name, logo").execute()
@@ -11008,7 +10944,7 @@ def handle_support_conversations():
             pass
 
         last_msg = messages[-1] if messages else None
-        org_name = orgs_map.get(conv.get("organization_id"), {}).get("name", "Stanford Tech Institute")
+        org_name = orgs_map.get(conv.get("organization_id"), {}).get("name", "Organization")
         
         if search_query:
             match = (search_query in conv.get("subject", "").lower() or
@@ -11090,7 +11026,7 @@ def handle_support_conversation_detail(conv_id):
     except Exception as e:
         print("Fetch conversation messages notice:", e)
 
-    org_name = "Stanford Tech Institute"
+    org_name = "Organization"
     try:
         o_res = supabase.table("organization").select("name").eq("id", conv.get("organization_id")).execute()
         if o_res and o_res.data:
@@ -11243,9 +11179,36 @@ def superadmin_settings():
         return jsonify({"error": "Forbidden: Super Admin access required"}), 403
 
     if request.method == "POST":
-        return jsonify({"message": "Platform Global Settings updated successfully"}), 200
+        data = request.get_json() or {}
+        setting_record = {
+            "id": "global_settings",
+            "platform_name": data.get("platform_name", "PrepFly Enterprise SaaS Platform"),
+            "logo_url": data.get("logo_url", "/prepfly-logo.png"),
+            "contact_email": data.get("contact_email", "support@prepfly.io"),
+            "contact_phone": data.get("contact_phone", "+1 (800) 555-0199"),
+            "timezone": data.get("timezone", "UTC (Coordinated Universal Time)"),
+            "maintenance_mode": 1 if data.get("maintenance_mode") else 0,
+            "jwt_expiry_hours": int(data.get("jwt_expiry_hours") or 24),
+            "rate_limit_rpm": int(data.get("rate_limit_rpm") or 120),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        try:
+            supabase.table("platform_settings").upsert(setting_record).execute()
+            metrics_service.record_audit_log(
+                actor_id=get_client_ip(),
+                actor_email="superadmin",
+                action="update_platform_settings",
+                target_type="platform_settings",
+                target_id="global_settings",
+                details=setting_record,
+                ip_address=get_client_ip()
+            )
+        except Exception as e:
+            print("Settings update error:", e)
 
-    return jsonify({
+        return jsonify({"message": "Platform Global Settings updated successfully", "settings": setting_record}), 200
+
+    settings = {
         "platform_name": "PrepFly Enterprise SaaS Platform",
         "logo_url": "/prepfly-logo.png",
         "contact_email": "support@prepfly.io",
@@ -11254,7 +11217,46 @@ def superadmin_settings():
         "maintenance_mode": False,
         "jwt_expiry_hours": 24,
         "rate_limit_rpm": 120
-    }), 200
+    }
+    try:
+        res = supabase.table("platform_settings").select("*").eq("id", "global_settings").execute()
+        if res and res.data:
+            row = res.data[0]
+            settings.update({
+                "platform_name": row.get("platform_name") or settings["platform_name"],
+                "logo_url": row.get("logo_url") or settings["logo_url"],
+                "contact_email": row.get("contact_email") or settings["contact_email"],
+                "contact_phone": row.get("contact_phone") or settings["contact_phone"],
+                "timezone": row.get("timezone") or settings["timezone"],
+                "maintenance_mode": bool(row.get("maintenance_mode")),
+                "jwt_expiry_hours": int(row.get("jwt_expiry_hours") or 24),
+                "rate_limit_rpm": int(row.get("rate_limit_rpm") or 120)
+            })
+    except Exception:
+        pass
+
+    return jsonify(settings), 200
+
+
+@app.route("/api/superadmin/integrity", methods=["GET"])
+@app.route("/superadmin/integrity", methods=["GET"])
+def superadmin_integrity_audit():
+    if not verify_super_admin():
+        return jsonify({"error": "Forbidden: Super Admin access required"}), 403
+    return jsonify(metrics_service.get_data_integrity_audit()), 200
+
+
+@app.route("/api/superadmin/audit-logs", methods=["GET"])
+@app.route("/superadmin/audit-logs", methods=["GET"])
+def superadmin_audit_logs():
+    if not verify_super_admin():
+        return jsonify({"error": "Forbidden: Super Admin access required"}), 403
+    limit = int(request.args.get("limit", 50))
+    offset = int(request.args.get("offset", 0))
+    action = request.args.get("action")
+    actor_id = request.args.get("actor_id")
+    logs = metrics_service.get_audit_logs(limit=limit, offset=offset, action=action, actor_id=actor_id)
+    return jsonify({"logs": logs, "total": len(logs)}), 200
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -11416,26 +11418,24 @@ def get_my_feedback():
 @app.route("/api/student/coding-tests", methods=["GET"])
 @app.route("/student/coding-tests", methods=["GET"])
 def get_student_coding_tests():
-    user_payload = _get_optional_user()
-    if user_payload and user_payload.get("organization_id"):
-        org_id = user_payload.get("organization_id")
-    else:
-        org_id = request.headers.get("X-Organization-Id") or request.args.get("organization_id") or "org_stanford_01"
-    if not re.match(r"^[a-zA-Z0-9_\-]+$", org_id):
+    client_org = request.headers.get("X-Organization-Id") or request.args.get("organization_id")
+    if client_org and not re.match(r"^[a-zA-Z0-9_\-]+$", client_org):
         return jsonify({"error": "Invalid organization ID format"}), 400
+
+    user_payload = _get_optional_user()
+    org_id = user_payload.get("organization_id") if user_payload else None
+    
     tests = []
     try:
-        res = supabase.table("admin_coding").select("*").or_(f"organization_id.eq.{org_id},organization_id.eq.global").execute()
+        if org_id:
+            res = supabase.table("admin_coding").select("*").or_(f"organization_id.eq.{org_id},organization_id.eq.global").execute()
+        else:
+            res = supabase.table("admin_coding").select("*").eq("organization_id", "global").execute()
         if res and res.data:
             tests = res.data
     except Exception as e:
         print("Student coding tests notice:", e)
 
-    if not tests:
-        tests = [
-            {"id": "ct_1", "organization_id": org_id, "title": "Data Structures & Algorithms Mock Test", "duration": 60, "language": "Python / C++", "difficulty": "Medium", "visible_tests": 3, "hidden_tests": 7, "status": "Active", "accepted_rate": "84%"},
-            {"id": "ct_2", "organization_id": org_id, "title": "System Architecture & Dynamic Programming", "duration": 90, "language": "Java / Go", "difficulty": "Hard", "visible_tests": 4, "hidden_tests": 8, "status": "Active", "accepted_rate": "72%"}
-        ]
     return jsonify(tests), 200
 
 
@@ -11443,17 +11443,18 @@ def get_student_coding_tests():
 @app.route("/student/scheduled-interviews", methods=["GET"])
 def get_student_scheduled_interviews():
     user_payload = _get_optional_user()
-    if user_payload and user_payload.get("organization_id"):
-        org_id = user_payload.get("organization_id")
-    else:
-        org_id = request.headers.get("X-Organization-Id") or request.args.get("organization_id") or "org_stanford_01"
-    student_id = request.args.get("student_id") or (user_payload.get("sub") if user_payload else None) or request.headers.get("X-User-Id")
+    if not user_payload:
+        return jsonify([]), 200
+    org_id = user_payload.get("organization_id")
+    if not org_id:
+        return jsonify([]), 200
+        
+    student_id = user_payload.get("sub") or user_payload.get("id")
     
     interviews = []
     try:
         query = supabase.table("admin_interviews").select("*").eq("organization_id", org_id)
-        if student_id and user_payload and user_payload.get("role") == "candidate":
-            # If candidate, only retrieve their own scheduled interview
+        if student_id:
             query = query.or_(f"student_id.eq.{student_id},student_id.is.null")
         res = query.execute()
         if res and res.data:
@@ -11611,7 +11612,7 @@ def get_admin_feedback():
         rating_counts[r_val] = rating_counts.get(r_val, 0) + 1
         total_rating_sum += r_val
 
-        org_name = orgs_map.get(fb.get("organization_id"), "Stanford Tech Institute")
+        org_name = orgs_map.get(fb.get("organization_id"), "Direct User")
         org_counts[org_name] = org_counts.get(org_name, 0) + 1
 
         if fb.get("status") == "New" or fb.get("priority") in ["High", "Critical"]:
@@ -11722,7 +11723,7 @@ def handle_admin_feedback_detail(feedback_id):
     if not fb:
         return jsonify({"error": "Feedback record not found"}), 404
 
-    org_name = "Stanford Tech Institute"
+    org_name = "Organization"
     try:
         o_res = supabase.table("organization").select("name").eq("id", fb.get("organization_id")).execute()
         if o_res and o_res.data: org_name = o_res.data[0].get("name", org_name)

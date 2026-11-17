@@ -13,6 +13,7 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
     { id: 'qbank', label: 'Question Bank', icon: '📚' },
     { id: 'aiconfig', label: 'AI Configuration', icon: '🤖' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
+    { id: 'integrity', label: 'Data Integrity', icon: '⚖️' },
     { id: 'activitylogs', label: 'Activity Logs', icon: '📜' },
     { id: 'notifications', label: 'Notifications', icon: '📢' },
     { id: 'feedback', label: 'Feedback', icon: '💬' },

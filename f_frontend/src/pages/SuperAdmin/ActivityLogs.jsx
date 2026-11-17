@@ -309,42 +309,42 @@ export default function ActivityLogs() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>Total Events Today</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff', marginTop: '4px' }}>{summary.total_events_today || 18}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#fff', marginTop: '4px' }}>{summary.total_events_today ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 800, textTransform: 'uppercase' }}>Failed Logins</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#f59e0b', marginTop: '4px' }}>{summary.failed_login_attempts || 8}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#f59e0b', marginTop: '4px' }}>{summary.failed_login_attempts ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#10b981', fontWeight: 800, textTransform: 'uppercase' }}>Success Payments</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#10b981', marginTop: '4px' }}>{summary.successful_payments || 5}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#10b981', marginTop: '4px' }}>{summary.successful_payments ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#f87171', fontWeight: 800, textTransform: 'uppercase' }}>Failed Payments</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#f87171', marginTop: '4px' }}>{summary.failed_payments || 2}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#f87171', marginTop: '4px' }}>{summary.failed_payments ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: 900, textTransform: 'uppercase' }}>Critical Security</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#ef4444', marginTop: '4px' }}>{summary.critical_security_alerts || 3}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#ef4444', marginTop: '4px' }}>{summary.critical_security_alerts ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#38bdf8', fontWeight: 800, textTransform: 'uppercase' }}>Active Sessions</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>{summary.active_admin_sessions || 12}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#38bdf8', marginTop: '4px' }}>{summary.active_admin_sessions ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#c084fc', fontWeight: 800, textTransform: 'uppercase' }}>New Orgs</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>{summary.new_organizations || 4}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#c084fc', marginTop: '4px' }}>{summary.new_organizations ?? 0}</div>
         </div>
 
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(109,40,217,0.2)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '10px', color: '#6d28d9', fontWeight: 800, textTransform: 'uppercase' }}>AI Changes</div>
-          <div style={{ fontSize: '20px', fontWeight: 900, color: '#6d28d9', marginTop: '4px' }}>{summary.ai_config_changes || 2}</div>
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#6d28d9', marginTop: '4px' }}>{summary.ai_config_changes ?? 0}</div>
         </div>
       </div>
 

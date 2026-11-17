@@ -5,6 +5,7 @@ import threading
 import uuid
 import re
 from datetime import datetime, timedelta
+from werkzeug.security import generate_password_hash
 
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -15,12 +16,18 @@ def _validate_ident(name: str) -> str:
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_db.sqlite")
 
+_GLOBAL_DB_LOCK = threading.RLock()
+
 class SQLiteSupabaseMock:
     def __init__(self, db_path="local_db.sqlite"):
         if db_path in (":memory:", "file::memory:?cache=shared"):
             self.db_path = ":memory:"
             self._anchor_conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
             self._anchor_conn.row_factory = sqlite3.Row
+            try:
+                self._anchor_conn.execute("PRAGMA busy_timeout = 60000")
+            except Exception:
+                pass
         else:
             if (os.getenv("RENDER") or (os.path.isdir("/tmp") and os.name != "nt")) and db_path == "local_db.sqlite":
                 self.db_path = "/tmp/prepfly_local.sqlite"
@@ -28,7 +35,7 @@ class SQLiteSupabaseMock:
                 dir_path = os.path.dirname(os.path.abspath(__file__))
                 self.db_path = os.path.join(dir_path, db_path) if not os.path.isabs(db_path) else db_path
             self._anchor_conn = None
-        self._db_lock = threading.RLock()
+        self._db_lock = _GLOBAL_DB_LOCK
         self.storage = MockStorage()
         self._init_db()
 
@@ -36,6 +43,10 @@ class SQLiteSupabaseMock:
         if self.db_path == ":memory:":
             conn = sqlite3.connect("file:memdb_prepfly?mode=memory&cache=shared", uri=True, timeout=60, check_same_thread=False)
             conn.row_factory = sqlite3.Row
+            try:
+                conn.execute("PRAGMA busy_timeout = 60000")
+            except Exception:
+                pass
             return conn
         try:
             conn = sqlite3.connect(self.db_path, timeout=60, check_same_thread=False)
@@ -213,6 +224,7 @@ class SQLiteSupabaseMock:
             CREATE TABLE IF NOT EXISTS coding_submissions (
                 id TEXT PRIMARY KEY,
                 user_id TEXT,
+                organization_id TEXT,
                 problem_id TEXT,
                 language TEXT,
                 code TEXT,
@@ -224,6 +236,11 @@ class SQLiteSupabaseMock:
                 created_at TEXT
             )
         """)
+        try:
+            cursor.execute("ALTER TABLE coding_submissions ADD COLUMN organization_id TEXT")
+            conn.commit()
+        except Exception:
+            pass
 
         # 9. speech_analyses
         cursor.execute("""
@@ -459,7 +476,9 @@ class SQLiteSupabaseMock:
             ("current_plan", "TEXT"),
             ("status", "TEXT"),
             ("created_at", "TEXT"),
-            ("updated_at", "TEXT")
+            ("updated_at", "TEXT"),
+            ("join_code", "TEXT"),
+            ("max_seats", "INTEGER")
         ]
         for col_name, col_type in org_cols:
             try:
@@ -2045,6 +2064,111 @@ class SQLiteSupabaseMock:
             )
         """)
 
+        # 42. user_api_usage
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_api_usage (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                feature TEXT NOT NULL,
+                model TEXT NOT NULL,
+                prompt_tokens INTEGER NOT NULL DEFAULT 0,
+                completion_tokens INTEGER NOT NULL DEFAULT 0,
+                total_tokens INTEGER NOT NULL DEFAULT 0,
+                cost_usd REAL NOT NULL DEFAULT 0.0,
+                session_id TEXT,
+                metadata TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 43. user_api_spending_limits
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_api_spending_limits (
+                user_id TEXT PRIMARY KEY,
+                monthly_budget_usd REAL NOT NULL DEFAULT 5.0,
+                daily_token_limit INTEGER NOT NULL DEFAULT 120000,
+                is_hard_limit INTEGER NOT NULL DEFAULT 1,
+                alert_threshold_pct INTEGER NOT NULL DEFAULT 80,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+
+        # 44. audit_logs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id TEXT PRIMARY KEY,
+                actor_id TEXT NOT NULL,
+                actor_email TEXT,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT,
+                details TEXT DEFAULT '{}',
+                ip_address TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 45. org_memberships
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS org_memberships (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'student',
+                status TEXT NOT NULL DEFAULT 'active',
+                roll_number TEXT,
+                department TEXT,
+                joined_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(organization_id, user_id)
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_org_mem_org_user ON org_memberships (organization_id, user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_org_mem_user_status ON org_memberships (user_id, status)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_org_mem_org_status ON org_memberships (organization_id, status)")
+
+        # 46. org_invites
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS org_invites (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                email TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'student',
+                token TEXT NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'pending',
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_org_inv_token ON org_invites (token)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_org_inv_org_email ON org_invites (organization_id, email)")
+
+        # Backfill org_memberships from users with organization_id
+        try:
+            cursor.execute("""
+                INSERT OR IGNORE INTO org_memberships (id, organization_id, user_id, role, status, joined_at, updated_at)
+                SELECT 
+                    'mem_' || id,
+                    organization_id,
+                    id,
+                    CASE WHEN LOWER(role) = 'admin' THEN 'admin' ELSE 'student' END,
+                    'active',
+                    datetime('now'),
+                    datetime('now')
+                FROM users
+                WHERE organization_id IS NOT NULL AND TRIM(organization_id) != ''
+            """)
+        except Exception:
+            pass
+
+        # Seed initial join codes for standard test organizations
+        try:
+            cursor.execute("UPDATE organization SET join_code = 'SUN2026', max_seats = 150 WHERE id = 'd258e381-6a6e-4376-8bf2-2865731b1939' AND (join_code IS NULL OR join_code = '')")
+            cursor.execute("UPDATE organization SET join_code = 'STAN01', max_seats = 100 WHERE id = 'org_stanford_01' AND (join_code IS NULL OR join_code = '')")
+        except Exception:
+            pass
+
         # Seed Default Achievements
         cursor.execute("SELECT COUNT(*) FROM achievement_definitions")
         if cursor.fetchone()[0] == 0:
@@ -2070,7 +2194,6 @@ class SQLiteSupabaseMock:
         # Seed Default Super Admin Account
         cursor.execute("SELECT COUNT(*) FROM super_admin")
         if cursor.fetchone()[0] == 0:
-            from werkzeug.security import generate_password_hash
             cursor.execute("""
                 INSERT INTO super_admin (id, name, email, password_hash, role, avatar, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -2132,7 +2255,6 @@ class SQLiteSupabaseMock:
         # Seed Default Organization & Admin
         cursor.execute("SELECT COUNT(*) FROM admin")
         if cursor.fetchone()[0] == 0:
-            from werkzeug.security import generate_password_hash
             org_id = "org_stanford_01"
             cursor.execute("""
                 INSERT INTO organization (id, name, type, logo, email, phone, website, address, subscription_plan, subscription_expiry, status, created_at)
@@ -2179,6 +2301,42 @@ class SQLiteSupabaseMock:
                     INSERT INTO students (id, organization_id, name, roll_number, department, semester, year, gender, email, phone, interview_score, coding_score, overall_score, subscription, status, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8], s[9], s[10], s[11], s[12], s[13], s[14], datetime.utcnow().isoformat()))
+
+        # Seed Sunrise Peak Institute and Admin Aditya
+        try:
+            cursor.execute("""
+                INSERT OR IGNORE INTO organization (id, name, type, logo, email, phone, website, address, subscription_plan, subscription_expiry, status, created_at, join_code, max_seats)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "org_sunrise_peak",
+                "Sunrise Peak Institute",
+                "College",
+                "https://lh3.googleusercontent.com/a/sunrise_logo",
+                "admin@sunrisepeak.edu",
+                "+91 9876543210",
+                "https://sunrisepeak.edu",
+                "Sunrise Peak Campus, Hill View Road",
+                "ENTERPRISE",
+                "2027-12-31",
+                "Active",
+                datetime.utcnow().isoformat(),
+                "SUN2026",
+                50
+            ))
+            cursor.execute("""
+                INSERT OR IGNORE INTO admin (id, organization_id, name, email, password_hash, role, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "admin_aditya",
+                "org_sunrise_peak",
+                "Aditya",
+                "aditya@sunrisepeak.edu",
+                generate_password_hash("mock_org_admin_pass_2026"),
+                "Organization Admin",
+                datetime.utcnow().isoformat()
+            ))
+        except Exception:
+            pass
 
         # Seed default coding problems
         cursor.execute("SELECT COUNT(*) FROM coding_problems")
@@ -2424,6 +2582,7 @@ class QueryBuilder:
         self.filters = []
         self.order_by = None
         self.limit_val = None
+        self.offset_val = None
         self.operation = None
         self.data_to_write = None
         self.on_conflict = None
@@ -2506,6 +2665,15 @@ class QueryBuilder:
 
     def limit(self, value):
         self.limit_val = value
+        return self
+
+    def offset(self, value):
+        self.offset_val = value
+        return self
+
+    def range(self, start, end):
+        self.offset_val = int(start)
+        self.limit_val = int(end) - int(start) + 1
         return self
 
     def maybe_single(self):
@@ -2632,8 +2800,12 @@ class QueryBuilder:
             if self.order_by:
                 col, desc = self.order_by
                 sql += f" ORDER BY {col} {'DESC' if desc else 'ASC'}"
-            if self.limit_val:
+            if self.limit_val is not None:
                 sql += f" LIMIT {int(self.limit_val)}"
+                if self.offset_val is not None:
+                    sql += f" OFFSET {int(self.offset_val)}"
+            elif self.offset_val is not None:
+                sql += f" LIMIT -1 OFFSET {int(self.offset_val)}"
                 
             cursor.execute(sql, params)
             rows = cursor.fetchall()

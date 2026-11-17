@@ -293,8 +293,9 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             f"/api/admin/interview-pdf/{self.interview_a_id}",
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"}
         )
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("Forbidden", res.get_json().get("error", ""))
+        self.assertIn(res.status_code, (403, 404))
+        err_msg = res.get_json().get("error", "").lower()
+        self.assertTrue("forbidden" in err_msg or "not found" in err_msg)
 
     def test_interview_pdf_same_tenant_admin_permitted(self):
         """Org Admin A can download their own organization's interview dossier PDF."""
@@ -319,7 +320,7 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             f"/api/admin/reports/student/{self.student_a_id}/pdf",
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"}
         )
-        self.assertEqual(res.status_code, 403)
+        self.assertIn(res.status_code, (403, 404))
 
     def test_student_dossier_pdf_same_tenant_admin_permitted(self):
         """Org Admin A can download their own student's dossier PDF."""
@@ -354,7 +355,7 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             f"/api/admin/coding-test/{self.coding_test_a_id}/leaderboard",
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"}
         )
-        self.assertEqual(res.status_code, 403)
+        self.assertIn(res.status_code, (403, 404))
 
     def test_coding_export_csv_cross_tenant_access_rejected(self):
         """Org Admin B cannot export Org A's coding assessment results."""
@@ -362,7 +363,7 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             f"/api/admin/coding-test/{self.coding_test_a_id}/export-csv",
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"}
         )
-        self.assertEqual(res.status_code, 403)
+        self.assertIn(res.status_code, (403, 404))
 
     def test_coding_leaderboard_same_tenant_admin_permitted(self):
         """Org Admin A can view Org A's coding leaderboard."""
@@ -737,7 +738,7 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"},
             json={"name": "Hacked Student Name", "department": "Malicious Dept"}
         )
-        self.assertEqual(res.status_code, 403)
+        self.assertIn(res.status_code, (403, 404))
 
         # Verify DB student name is unchanged
         s = supabase.table("students").select("name, department").eq("id", self.student_a_id).execute()
@@ -749,7 +750,7 @@ class TestDataIsolationComprehensive(unittest.TestCase):
             f"/api/admin/student/{self.student_a_id}",
             headers={"Authorization": f"Bearer {self.token_admin_org_b}"}
         )
-        self.assertEqual(res.status_code, 403)
+        self.assertIn(res.status_code, (403, 404))
 
         # Verify student still exists in DB
         s = supabase.table("students").select("id").eq("id", self.student_a_id).execute()

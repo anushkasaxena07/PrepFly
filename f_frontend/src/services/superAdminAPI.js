@@ -292,3 +292,9 @@ export const deleteSuperAdminCoupon = async (couponId) => {
   if (res.ok) return await res.json();
   throw new Error("Failed to delete coupon");
 };
+
+export const getSuperAdminIntegrityAudit = async () => {
+  const res = await superAdminFetch("/superadmin/integrity");
+  if (res.ok) return await res.json();
+  throw new Error("Failed to fetch data integrity audit");
+};

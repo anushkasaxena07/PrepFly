@@ -31,15 +31,14 @@ export default function Dashboard() {
       
       {/* SECTION 1: STATS CARDS GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
-        <DashboardCard title="Total Students" value={stats?.total_students ?? 0} subtext="Enrolled Candidates" icon="🎓" trend="+14% this month" color="#6d28d9" />
-        <DashboardCard title="Active Students" value={stats?.active_students ?? 0} subtext="Platform Active" icon="⚡" trend="+8% active" color="#7c3aed" />
-        <DashboardCard title="Premium Students" value={stats?.premium_students ?? 0} subtext="Subscribed Plan" icon="👑" trend="35% conversion" color="#ffb800" />
-        <DashboardCard title="AI Interviews" value={stats?.ai_interviews_conducted ?? 0} subtext="Conducted Sessions" icon="🎤" trend="+24% YoY" color="#3b82f6" />
-        <DashboardCard title="Coding Tests" value={stats?.coding_tests_completed ?? 0} subtext="Completed Solutions" icon="💻" trend="+18% YoY" color="#ec4899" />
-        <DashboardCard title="Avg Interview Score" value={`${stats?.avg_interview_score ?? 0.0} / 10`} subtext="Institutional Average" icon="📊" trend="Grade A" color="#6d28d9" />
-        <DashboardCard title="Avg Coding Score" value={`${stats?.avg_coding_score ?? 0.0}%`} subtext="Algorithmic Average" icon="🏆" trend="86th Percentile" color="#a855f7" />
-        <DashboardCard title="Reports Generated" value={stats?.total_reports_generated ?? 0} subtext="Executive Digests" icon="📄" trend="100% Dynamic" color="#f59e0b" />
-
+        <DashboardCard title="Total Students" value={stats?.total_students ?? 0} subtext="Enrolled Candidates" icon="🎓" color="#6d28d9" />
+        <DashboardCard title="Active Students" value={stats?.active_students ?? 0} subtext="Platform Active" icon="⚡" color="#7c3aed" />
+        <DashboardCard title="Premium Students" value={stats?.premium_students ?? 0} subtext="Subscribed Plan" icon="👑" color="#ffb800" />
+        <DashboardCard title="AI Interviews" value={stats?.ai_interviews_conducted ?? 0} subtext="Conducted Sessions" icon="🎤" color="#3b82f6" />
+        <DashboardCard title="Coding Tests" value={stats?.coding_tests_completed ?? 0} subtext="Completed Solutions" icon="💻" color="#ec4899" />
+        <DashboardCard title="Avg Interview Score" value={`${stats?.avg_interview_score ?? 0.0} / 10`} subtext="Institutional Average" icon="📊" color="#6d28d9" />
+        <DashboardCard title="Avg Coding Score" value={`${stats?.avg_coding_score ?? 0.0}%`} subtext="Algorithmic Average" icon="🏆" color="#a855f7" />
+        <DashboardCard title="Reports Generated" value={stats?.total_reports_generated ?? 0} subtext="Candidate Reports" icon="📄" color="#f59e0b" />
       </div>
 
       {/* SECTION 2: CHARTS ROW */}
@@ -57,15 +56,21 @@ export default function Dashboard() {
             <span>Recent Institutional Activities</span>
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {stats?.recent_activities?.map((act) => (
-              <div key={act.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px 14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{act.title}</div>
-                  <div style={{ fontSize: "11px", color: "#64748b" }}>{act.time}</div>
-                </div>
-                <span className="pill pill-cyan" style={{ fontSize: "10px" }}>{act.type}</span>
+            {(!stats?.recent_activities || stats.recent_activities.length === 0) ? (
+              <div style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "12px" }}>
+                No institutional activities recorded yet. Roster and assessment updates will appear here in real time.
               </div>
-            ))}
+            ) : (
+              stats.recent_activities.map((act) => (
+                <div key={act.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px 14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>{act.title}</div>
+                    <div style={{ fontSize: "11px", color: "#64748b" }}>{act.time}</div>
+                  </div>
+                  <span className="pill pill-cyan" style={{ fontSize: "10px" }}>{act.type}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -78,16 +83,16 @@ export default function Dashboard() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
                 <span style={{ color: "#64748b" }}>Cloud Storage Used</span>
-                <span style={{ color: "#0f172a", fontWeight: 800 }}>{stats?.storage_used_mb ?? 420} MB / {stats?.storage_total_gb ?? 10} GB</span>
+                <span style={{ color: "#0f172a", fontWeight: 800 }}>{stats?.storage_used_mb ?? 0} MB / {stats?.storage_total_gb ?? 10} GB</span>
               </div>
               <div style={{ width: "100%", height: "8px", background: "#eaedf6", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: `${Math.min(100, Math.max(2, stats?.storage_pct ?? 12))}%`, height: "100%", background: "linear-gradient(90deg, #6d28d9, #8b5cf6)", borderRadius: "4px" }} />
+                <div style={{ width: `${Math.min(100, Math.max(0, stats?.storage_pct ?? 0))}%`, height: "100%", background: "linear-gradient(90deg, #6d28d9, #8b5cf6)", borderRadius: "4px" }} />
               </div>
             </div>
 
             <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "10px", padding: "12px", fontSize: "12px", color: "#1e1b4b" }}>
               <div style={{ fontWeight: 800, color: "#6d28d9", marginBottom: "2px" }}>Subscription Plan</div>
-              <div>{stats?.subscription_status || "Active (ENTERPRISE PLAN)"}</div>
+              <div>{stats?.subscription_status || "Active Plan"}</div>
             </div>
 
             <div style={{ fontSize: "12px", color: "var(--text2)" }}>

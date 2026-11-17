@@ -29,6 +29,7 @@ const fields = [
 ];
 
 import SubscriptionPage from "./components/subscription/SubscriptionPage";
+import CollegeAffiliation from "./components/CollegeAffiliation";
 
 const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "info" }) => {
   const navigate = useNavigate();
@@ -224,6 +225,13 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
           >
             Send Feedback
           </button>
+          <button
+            type="button"
+            className={`pf-filter-pill ${profileSubTab === "college" ? "active" : ""}`}
+            onClick={() => setProfileSubTab("college")}
+          >
+            🏛️ My College Affiliation
+          </button>
         </div>
 
         {profileSubTab === "subscription" && (
@@ -234,7 +242,11 @@ const Profile = ({ onBackToDashboard, setActiveTab, apiFetch, initialSubTab = "i
           <StudentFeedbackForm role="Student" />
         )}
 
-        {(profileSubTab === "info" || (!["subscription", "feedback"].includes(profileSubTab))) && (
+        {profileSubTab === "college" && (
+          <CollegeAffiliation />
+        )}
+
+        {(profileSubTab === "info" || (!["subscription", "feedback", "college"].includes(profileSubTab))) && (
           <div className="pr-layout">
 
             <div className="pr-side">

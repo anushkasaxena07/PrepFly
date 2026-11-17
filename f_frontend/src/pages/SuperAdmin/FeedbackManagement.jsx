@@ -268,7 +268,7 @@ export default function FeedbackManagement() {
         <div className="card" style={{ background: 'rgba(12,18,32,0.85)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '14px', padding: '18px' }}>
           <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 800, textTransform: 'uppercase' }}>Average Rating</div>
           <div style={{ fontSize: '24px', fontWeight: 900, color: '#f59e0b', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {summary.average_rating || '5.0'} ⭐
+            {summary.average_rating ? `${summary.average_rating} ⭐` : '—'}
           </div>
         </div>
       </div>

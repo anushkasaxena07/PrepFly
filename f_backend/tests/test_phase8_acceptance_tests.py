@@ -273,11 +273,13 @@ class TestPhase8AcceptanceTests(unittest.TestCase):
 
     def test_at_14_worked_example_eighteen_day_aiml_plan(self):
         """AT-14: With interview in 18 days, 90 min/day, MID AI/ML role: 18 days generated, >= 2 mocks, spaced revisions."""
-        # 18 preparation days means interview is on day 19 (start_date + 19 days)
-        future_date = (datetime.now(timezone.utc) + timedelta(days=19)).strftime("%Y-%m-%d")
+        # 18 preparation days means interview is on day 19 (start_date + 18 prep days -> interview date)
+        start_date = "2026-12-01"
+        future_date = "2026-12-19"
         plan = SpecPlannerService.generate_plan(
             user_id="test_at_14_user",
             target_role="AI/ML Engineer",
+            start_date=start_date,
             interview_date=future_date,
             daily_minutes=90
         )

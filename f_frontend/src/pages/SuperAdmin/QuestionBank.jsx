@@ -28,9 +28,11 @@ export default function QuestionBank() {
   const fetchQuestions = async () => {
     try {
       const data = await getSuperAdminQuestionBank();
-      setQuestions(data || []);
+      const list = Array.isArray(data) ? data : (data?.questions || data?.data || data?.items || []);
+      setQuestions(list);
     } catch (e) {
       console.error("Error fetching global question bank:", e);
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
@@ -71,11 +73,13 @@ export default function QuestionBank() {
     }
   };
 
-  const filtered = questions.filter(q => {
-    const matchesCat = activeCat === "All" || q.category === activeCat;
-    const matchesSearch = !searchQuery || 
-      (q.title && q.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (q.solution && q.solution.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = (questions || []).filter(q => {
+    if (!q) return false;
+    const matchesCat = activeCat === "All" || (q.category || "Technical") === activeCat;
+    const qTitle = String(q.title || "").toLowerCase();
+    const qSol = String(q.solution || "").toLowerCase();
+    const qSearch = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || qTitle.includes(qSearch) || qSol.includes(qSearch);
     return matchesCat && matchesSearch;
   });
 

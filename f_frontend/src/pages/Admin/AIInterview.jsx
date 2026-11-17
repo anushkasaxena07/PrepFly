@@ -110,6 +110,31 @@ export default function AIInterview() {
 
       {loading ? (
         <div style={{ color: "var(--cyan)", padding: "40px", textAlign: "center" }}>⚡ Loading scheduled interviews...</div>
+      ) : interviews.length === 0 ? (
+        <div style={{
+          background: "#ffffff",
+          border: "1px dashed #cbd5e1",
+          borderRadius: "16px",
+          padding: "60px 24px",
+          textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "14px"
+        }}>
+          <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>
+            🎤
+          </div>
+          <div>
+            <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0" }}>No AI Interviews Scheduled Yet</h3>
+            <p style={{ fontSize: "13px", color: "#64748b", margin: 0, maxWidth: "460px" }}>
+              Schedule automated AI mock interviews for your enrolled students to evaluate technical depth, speech confidence, and role-specific competencies.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowScheduleModal(true)} style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", border: "none", fontWeight: 800, marginTop: "8px" }}>
+            ➕ Schedule Your First Interview
+          </button>
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
           {interviews.map((iv) => (
@@ -124,11 +149,11 @@ export default function AIInterview() {
                 Candidate: <strong style={{ color: "#0f172a" }}>{iv.student_name || "Assigned Student"}</strong>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "10px", borderRadius: "8px", fontSize: "11px", marginBottom: "14px" }}>
-                <div>Tech Score: <strong style={{ color: "#6d28d9" }}>{iv.tech_score || 9.0} / 10</strong></div>
-                <div>Comm Score: <strong style={{ color: "#7c3aed" }}>{iv.comm_score || 8.5} / 10</strong></div>
-                <div>Confidence: <strong style={{ color: "#ffb800" }}>{iv.confidence_score || 8.9} / 10</strong></div>
-                <div>Eye Contact: <span style={{ color: "var(--text2)" }}>92% (AI)</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "#f8fafc", padding: "10px", borderRadius: "8px", fontSize: "11px", marginBottom: "14px", border: "1px solid #e2e8f0" }}>
+                <div>Tech Score: <strong style={{ color: "#6d28d9" }}>{iv.tech_score != null ? `${iv.tech_score} / 10` : "Pending"}</strong></div>
+                <div>Comm Score: <strong style={{ color: "#7c3aed" }}>{iv.comm_score != null ? `${iv.comm_score} / 10` : "Pending"}</strong></div>
+                <div>Confidence: <strong style={{ color: "#ffb800" }}>{iv.confidence_score != null ? `${iv.confidence_score} / 10` : "Pending"}</strong></div>
+                <div>Status: <span style={{ color: "#64748b" }}>{iv.status || "Scheduled"}</span></div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

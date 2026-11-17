@@ -149,32 +149,32 @@ export default function Analytics() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
         <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "11px", color: "var(--text2)", fontWeight: 700 }}>PLATFORM GROWTH</div>
-          <div style={{ fontSize: "26px", fontWeight: 900, color: "var(--cyan)", marginTop: "4px" }}>{data?.platform_growth || "+34% YoY"}</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "4px", fontWeight: 700 }}>▲ +12% vs last quarter</div>
+          <div style={{ fontSize: "26px", fontWeight: 900, color: "var(--cyan)", marginTop: "4px" }}>{data?.platform_growth || "—"}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontWeight: 700 }}>Candidate & Org Expansion</div>
         </div>
 
         <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "11px", color: "var(--text2)", fontWeight: 700 }}>REVENUE GROWTH</div>
-          <div style={{ fontSize: "26px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>{data?.revenue_growth || "+42% YoY"}</div>
-          <div style={{ fontSize: "10px", color: "#ec4899", marginTop: "4px", fontWeight: 700 }}>▲ ₹48.5K Monthly Rec. Rev.</div>
+          <div style={{ fontSize: "26px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>{data?.revenue_growth || "—"}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontWeight: 700 }}>Period over Period</div>
         </div>
 
         <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.25)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "11px", color: "#a78bfa", fontWeight: 700 }}>GEMINI API CALLS</div>
-          <div style={{ fontSize: "26px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{data?.ai_api_usage?.gemini_calls ?? 330}</div>
-          <div style={{ fontSize: "10px", color: "#a78bfa", marginTop: "4px", fontWeight: 700 }}>⚡ Avg Latency: 1.1s</div>
+          <div style={{ fontSize: "26px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{data?.ai_api_usage?.gemini_calls ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontWeight: 700 }}>Live Telemetry Logged</div>
         </div>
 
         <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.25)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "11px", color: "#38bdf8", fontWeight: 700 }}>OPENAI API CALLS</div>
-          <div style={{ fontSize: "26px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{data?.ai_api_usage?.openai_calls ?? 120}</div>
-          <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "4px", fontWeight: 700 }}>⚡ Fallback Engine: Active</div>
+          <div style={{ fontSize: "26px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>{data?.ai_api_usage?.openai_calls ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontWeight: 700 }}>Fallback Engine</div>
         </div>
 
         <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.25)", borderRadius: "14px", padding: "16px" }}>
           <div style={{ fontSize: "11px", color: "#f59e0b", fontWeight: 700 }}>LLM TOKENS</div>
-          <div style={{ fontSize: "26px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{data?.ai_api_usage?.total_tokens_millions ?? 4.85}M</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "4px", fontWeight: 700 }}>🔥 99.9% Prompt Efficiency</div>
+          <div style={{ fontSize: "26px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{data?.ai_api_usage?.total_tokens_millions ?? 0}M</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontWeight: 700 }}>Token Consumption</div>
         </div>
       </div>
 

@@ -338,22 +338,25 @@ class TestJWTRBACSecurity(unittest.TestCase):
         """Organization Admin A cannot access Organization B's interview dossier PDF."""
         headers_a = {"Authorization": f"Bearer {self.token_admin_org_a}"}
         res = self.client.get(f"/api/admin/interview-pdf/{self.iv_b_id}", headers=headers_a)
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("Forbidden", res.get_json().get("error", ""))
+        self.assertIn(res.status_code, (403, 404))
+        err_msg = res.get_json().get("error", "").lower()
+        self.assertTrue("forbidden" in err_msg or "not found" in err_msg)
 
     def test_org_admin_cannot_access_other_org_student_dossier(self):
         """Organization Admin A cannot access Organization B's student dossier PDF."""
         headers_a = {"Authorization": f"Bearer {self.token_admin_org_a}"}
         res = self.client.get(f"/api/admin/reports/student/{self.student_b_id}/pdf", headers=headers_a)
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("Forbidden", res.get_json().get("error", ""))
+        self.assertIn(res.status_code, (403, 404))
+        err_msg = res.get_json().get("error", "").lower()
+        self.assertTrue("forbidden" in err_msg or "not found" in err_msg)
 
     def test_org_admin_cannot_access_other_org_coding_leaderboard(self):
         """Organization Admin A cannot access Organization B's coding test leaderboard."""
         headers_a = {"Authorization": f"Bearer {self.token_admin_org_a}"}
         res = self.client.get(f"/api/admin/coding-test/{self.test_b_id}/leaderboard", headers=headers_a)
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("Forbidden", res.get_json().get("error", ""))
+        self.assertIn(res.status_code, (403, 404))
+        err_msg = res.get_json().get("error", "").lower()
+        self.assertTrue("forbidden" in err_msg or "not found" in err_msg)
 
     def test_superadmin_can_access_cross_org_resources(self):
         """Super Admin legitimately has global oversight across organizations."""

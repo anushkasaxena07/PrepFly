@@ -228,13 +228,13 @@ export default function Subscriptions() {
     const revenueSummaryHeader = ["\n--- REVENUE METRICS SUMMARY ---"];
     const summaryRows = [
       ["Metric", "Value"],
-      ["Today's Revenue", `INR ${stats?.today_revenue || "1,495.00"}`],
-      ["Monthly Revenue", `INR ${stats?.monthly_revenue || "42,850.00"}`],
-      ["Annual Revenue", `INR ${stats?.yearly_revenue || "3,80,000.00"}`],
-      ["Total Active Subscriptions", stats?.active_subscriptions || 12],
-      ["MRR (Monthly Recurring Revenue)", "INR 42,850.00"],
-      ["ARR (Annual Projected Revenue)", "INR 5,14,200.00"],
-      ["SLA Renewal Rate", "94.2%"]
+      ["Today's Revenue", `INR ${stats?.today_revenue || "0.00"}`],
+      ["Monthly Revenue", `INR ${stats?.monthly_revenue || "0.00"}`],
+      ["Annual Revenue", `INR ${stats?.yearly_revenue || "0.00"}`],
+      ["Total Active Subscriptions", stats?.active_subscriptions || 0],
+      ["MRR (Monthly Recurring Revenue)", `INR ${(Number(stats?.mrr_paise || 0) / 100).toFixed(2)}`],
+      ["ARR (Annual Projected Revenue)", `INR ${(Number(stats?.arr_paise || 0) / 100).toFixed(2)}`],
+      ["Growth MoM", stats?.revenue_growth_badge || "—"]
     ];
 
     const csvLines = [
@@ -321,67 +321,67 @@ export default function Subscriptions() {
         </div>
       </div>
 
-      {/* 2. 10 DYNAMIC KPI CARDS */}
+      {/* 2. DYNAMIC KPI CARDS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "14px" }}>
         
         <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TODAY'S REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>₹{(stats?.today_revenue || "1,495.00")}</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +14.2% vs Yesterday</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>{stats?.today_revenue || "₹0.00"}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Live Platform Gross</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(236,72,153,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MONTHLY REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>₹{(stats?.monthly_revenue || "42,850.00")}</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +22.8% vs Last Mo</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#ec4899", marginTop: "4px" }}>{stats?.monthly_revenue || "₹0.00"}</div>
+          <div style={{ fontSize: "10px", color: stats?.revenue_growth_badge?.startsWith('-') ? "#dc2626" : "#10b981", marginTop: "2px", fontWeight: 700 }}>
+            {stats?.revenue_growth_badge ? `Growth: ${stats.revenue_growth_badge}` : "Current Month"}
+          </div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(139,92,246,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ANNUAL REVENUE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>₹{(stats?.yearly_revenue || "3,80,000.00")}</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +35.0% YoY</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#a78bfa", marginTop: "4px" }}>{stats?.yearly_revenue || "₹0.00"}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>YTD Gross Total</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TOTAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>{stats?.total_organizations || 14}</div>
-          <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>10 Colleges | 4 Corp</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>{stats?.total_organizations ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#38bdf8", marginTop: "2px", fontWeight: 700 }}>{stats?.total_colleges ?? 0} Colleges | {stats?.total_companies ?? 0} Corp</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(16,185,129,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ACTIVE SUBSCRIPTIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{stats?.active_subscriptions || 12}</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>● 85.7% Active Paid</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#10b981", marginTop: "4px" }}>{stats?.active_subscriptions ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>Current Paid Tenants</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>TRIAL ORGANIZATIONS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{stats?.trial_organizations || 2}</div>
-          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>⏳ 14-Day Free Trial</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f59e0b", marginTop: "4px" }}>{stats?.trial_organizations ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#f59e0b", marginTop: "2px", fontWeight: 700 }}>Free Trial Accounts</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>EXPIRED PLANS</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{stats?.expired_subscriptions || 1}</div>
-          <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>⚠️ Renewal Due</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#f87171", marginTop: "4px" }}>{stats?.expired_subscriptions ?? 0}</div>
+          <div style={{ fontSize: "10px", color: "#f87171", marginTop: "2px", fontWeight: 700 }}>Renewal Due</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(56,189,248,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MRR (RECURRING)</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>₹42,850</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +18.4% MRR Growth</div>
+          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>MRR (RUN-RATE)</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#38bdf8", marginTop: "4px" }}>
+            ₹{(Number(stats?.mrr_paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Current Month Run-rate</div>
         </div>
 
         <div style={{ background: "#ffffff", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "12px", padding: "14px" }}>
           <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>ARR (PROJECTED)</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>₹5,14,200</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ +28% Milestone</div>
-        </div>
-
-        <div style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.2)", borderRadius: "12px", padding: "14px" }}>
-          <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 800 }}>RENEWAL RATE</div>
-          <div style={{ fontSize: "20px", fontWeight: 900, color: "#6d28d9", marginTop: "4px" }}>94.2%</div>
-          <div style={{ fontSize: "10px", color: "#10b981", marginTop: "2px", fontWeight: 700 }}>▲ Top 5% Industry SLA</div>
+          <div style={{ fontSize: "20px", fontWeight: 900, color: "#c084fc", marginTop: "4px" }}>
+            ₹{(Number(stats?.arr_paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", fontWeight: 700 }}>Annual Projected Run-rate</div>
         </div>
 
       </div>
