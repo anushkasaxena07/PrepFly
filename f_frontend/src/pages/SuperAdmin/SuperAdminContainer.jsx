@@ -33,7 +33,7 @@ export default function SuperAdminContainer() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token") || "superadmin_session_token";
+    const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token");
     if (!token) {
       window.location.href = "/superadmin/login";
       return;

@@ -3,7 +3,7 @@ import { BACKEND_URL } from '../config/apiConfig';
 const getHeaders = (isSuperAdmin = false) => {
   const headers = {};
   if (isSuperAdmin) {
-    const token = localStorage.getItem("superadmin_access_token");
+    const token = localStorage.getItem("superadmin_access_token") || localStorage.getItem("access_token");
     if (token) headers["Authorization"] = `Bearer ${token}`;
   } else {
     const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");

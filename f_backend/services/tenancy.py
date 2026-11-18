@@ -45,10 +45,19 @@ def build_tenant_context(user_payload: Dict[str, Any], db_client=None) -> Option
         return None
 
     user_id = str(user_payload.get("sub") or user_payload.get("id") or "")
-    role = str(user_payload.get("role") or "").strip()
+    role = str(user_payload.get("role") or "").strip().upper()
+    email = str(user_payload.get("email") or "").strip().lower()
     
-    is_super_admin = role in ("SUPER_ADMIN", "Super Admin")
-    is_org_admin = role in ("Organization Admin", "ADMIN", "admin")
+    super_admin_emails = {
+        "saxenaanushka9645@gmail.com",
+        "superadmin@prepfly.io",
+        "owner@prepfly.io",
+        "superadmin@interviewai.io",
+        "owner@interviewai.io"
+    }
+
+    is_super_admin = role in ("SUPER_ADMIN", "SUPERADMIN", "SUPER ADMIN") or email in super_admin_emails
+    is_org_admin = role in ("ORGANIZATION ADMIN", "ADMIN")
     is_student = not is_super_admin and not is_org_admin
 
     # For Super Admin: may optionally impersonate/scope via query arg if explicitly requested

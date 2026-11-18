@@ -459,7 +459,7 @@ export default function SupportChat({ role = "Organization Admin" }) {
             />
 
             {/* STATUS FILTER TABS */}
-            <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', paddingBottom: '2px' }}>
               {['All', 'Open', 'In Progress', 'Resolved', 'Closed'].map(tab => (
                 <button
                   key={tab}

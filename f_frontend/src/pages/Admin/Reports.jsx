@@ -107,7 +107,7 @@ export default function Reports() {
             <div className="card" style={{ background: "#ffffff", border: "1px solid rgba(109,40,217,0.25)", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--cyan)", textTransform: "uppercase" }}>BATCH PLACEMENT READINESS</div>
               <div style={{ fontSize: "32px", fontWeight: 900, color: "#0f172a", marginTop: "4px" }}>
-                {reportsData?.placement_readiness_pct || 84}%
+                {reportsData?.placement_readiness_pct ?? 0}%
               </div>
               <div style={{ fontSize: "11px", color: "var(--text2)", marginTop: "4px" }}>Cohort Average Placement Index</div>
             </div>
@@ -116,9 +116,9 @@ export default function Reports() {
             <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "var(--purple)", textTransform: "uppercase" }}>PLACEMENT PREDICTION</div>
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.tier_distribution?.ready || 124}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Ready</span></div>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ffb800" }}>{reportsData?.tier_distribution?.needs_improvement || 65}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Improve</span></div>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ff4d4f" }}>{reportsData?.tier_distribution?.high_risk || 18}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>At Risk</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.tier_distribution?.ready ?? 0}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Ready</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ffb800" }}>{reportsData?.tier_distribution?.needs_improvement ?? 0}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Improve</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#ff4d4f" }}>{reportsData?.tier_distribution?.high_risk ?? 0}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>At Risk</span></div>
               </div>
             </div>
 
@@ -126,8 +126,8 @@ export default function Reports() {
             <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#ffb800", textTransform: "uppercase" }}>TARGET COMPANY ALIGNMENT</div>
               <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#a855f7" }}>{reportsData?.company_readiness?.maang_product_ready || 32}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>MAANG</span></div>
-                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.company_readiness?.tcs_infosys_service_ready || 410}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Tech Enterprise</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#a855f7" }}>{reportsData?.company_readiness?.maang_product_ready ?? 0}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>MAANG</span></div>
+                <div><span style={{ fontSize: "18px", fontWeight: 900, color: "#6d28d9" }}>{reportsData?.company_readiness?.tcs_infosys_service_ready ?? 0}</span> <span style={{ fontSize: "10px", color: "var(--text2)" }}>Tech Enterprise</span></div>
               </div>
             </div>
 
@@ -135,10 +135,9 @@ export default function Reports() {
             <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "18px" }}>
               <div style={{ fontSize: "11px", fontWeight: 800, color: "#a855f7", textTransform: "uppercase" }}>RESUME QUALITY DIST.</div>
               <div style={{ display: "flex", gap: "10px", marginTop: "8px", fontSize: "11px" }}>
-
-                <span style={{ color: "#6d28d9", fontWeight: 800 }}>{reportsData?.resume_distribution?.excellent || 60} Exc</span>
-                <span style={{ color: "#ffb800", fontWeight: 800 }}>{reportsData?.resume_distribution?.good || 180} Good</span>
-                <span style={{ color: "#ff4d4f", fontWeight: 800 }}>{reportsData?.resume_distribution?.needs_improvement || 260} Imp</span>
+                <span style={{ color: "#6d28d9", fontWeight: 800 }}>{reportsData?.resume_distribution?.excellent ?? 0} Exc</span>
+                <span style={{ color: "#ffb800", fontWeight: 800 }}>{reportsData?.resume_distribution?.good ?? 0} Good</span>
+                <span style={{ color: "#ff4d4f", fontWeight: 800 }}>{reportsData?.resume_distribution?.needs_improvement ?? 0} Imp</span>
               </div>
             </div>
 
@@ -151,17 +150,23 @@ export default function Reports() {
             <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
               <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>⚠️ Primary Concept & Skill Bottlenecks</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {(reportsData?.weak_skills || []).map((sk, idx) => (
-                  <div key={idx} style={{ background: "#f8fafc", padding: "12px", borderRadius: "10px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
-                      <strong style={{ color: "#0f172a" }}>{sk.subject}</strong>
-                      <span style={{ color: sk.fail_rate > 40 ? "#ff4d4f" : "#ffb800", fontWeight: 800 }}>{sk.fail_rate}% Fail Rate ({sk.avg_score}% Avg)</span>
-                    </div>
-                    <div style={{ height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ width: `${sk.avg_score}%`, height: "100%", background: sk.avg_score < 50 ? "#ff4d4f" : sk.avg_score < 70 ? "#ffb800" : "#6d28d9" }} />
-                    </div>
+                {(!reportsData?.weak_skills || reportsData.weak_skills.length === 0) ? (
+                  <div style={{ padding: "24px 16px", textAlign: "center", color: "#64748b", fontSize: "12px", background: "#f8fafc", borderRadius: "10px" }}>
+                    No concept bottlenecks identified yet. Gaps populate automatically as candidates take assessments.
                   </div>
-                ))}
+                ) : (
+                  reportsData.weak_skills.map((sk, idx) => (
+                    <div key={idx} style={{ background: "#f8fafc", padding: "12px", borderRadius: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
+                        <strong style={{ color: "#0f172a" }}>{sk.subject}</strong>
+                        <span style={{ color: sk.fail_rate > 40 ? "#ff4d4f" : "#ffb800", fontWeight: 800 }}>{sk.fail_rate}% Fail Rate ({sk.avg_score}% Avg)</span>
+                      </div>
+                      <div style={{ height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ width: `${sk.avg_score}%`, height: "100%", background: sk.avg_score < 50 ? "#ff4d4f" : sk.avg_score < 70 ? "#ffb800" : "#6d28d9" }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -170,20 +175,20 @@ export default function Reports() {
               <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a", marginBottom: "14px" }}>🎤 AI Interview & Coding Sub-Metrics</h3>
               
               <div style={{ fontSize: "12px", color: "var(--cyan)", fontWeight: 700, marginBottom: "8px" }}>AI INTERVIEW SCORECARD</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "10px", fontSize: "11px", marginBottom: "14px" }}>
-                <div>Tech: <strong style={{ color: "#6d28d9" }}>{reportsData?.interview_breakdown?.technical}%</strong></div>
-                <div>Comm: <strong style={{ color: "#a855f7" }}>{reportsData?.interview_breakdown?.communication}%</strong></div>
-                <div>Conf: <strong style={{ color: "#ffb800" }}>{reportsData?.interview_breakdown?.confidence}%</strong></div>
-                <div>Grammar: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.grammar}%</span></div>
-                <div>Eye Contact: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.eye_contact}%</span></div>
-                <div>Voice Clarity: <span style={{ color: "#0f172a" }}>{reportsData?.interview_breakdown?.voice_clarity}%</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "#f8fafc", padding: "12px", borderRadius: "10px", fontSize: "11px", marginBottom: "14px", border: "1px solid #e2e8f0" }}>
+                <div>Tech: <strong style={{ color: "#6d28d9" }}>{reportsData?.interview_breakdown?.technical != null ? `${reportsData.interview_breakdown.technical}%` : "—"}</strong></div>
+                <div>Comm: <strong style={{ color: "#a855f7" }}>{reportsData?.interview_breakdown?.communication != null ? `${reportsData.interview_breakdown.communication}%` : "—"}</strong></div>
+                <div>Conf: <strong style={{ color: "#ffb800" }}>{reportsData?.interview_breakdown?.confidence != null ? `${reportsData.interview_breakdown.confidence}%` : "—"}</strong></div>
+                <div>Grammar: <span style={{ color: "#0f172a", fontWeight: 700 }}>{reportsData?.interview_breakdown?.grammar != null ? `${reportsData.interview_breakdown.grammar}%` : "—"}</span></div>
+                <div>Eye Contact: <span style={{ color: "#0f172a", fontWeight: 700 }}>{reportsData?.interview_breakdown?.eye_contact != null ? `${reportsData.interview_breakdown.eye_contact}%` : "—"}</span></div>
+                <div>Voice Clarity: <span style={{ color: "#0f172a", fontWeight: 700 }}>{reportsData?.interview_breakdown?.voice_clarity != null ? `${reportsData.interview_breakdown.voice_clarity}%` : "—"}</span></div>
               </div>
 
               <div style={{ fontSize: "12px", color: "#ffb800", fontWeight: 700, marginBottom: "8px" }}>CODING DIFFICULTY BREAKDOWN</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "rgba(0,0,0,0.25)", padding: "12px", borderRadius: "10px", fontSize: "11px" }}>
-                <div>Easy: <strong style={{ color: "#6d28d9" }}>{reportsData?.coding_breakdown?.easy_pass}%</strong></div>
-                <div>Medium: <strong style={{ color: "#ffb800" }}>{reportsData?.coding_breakdown?.medium_pass}%</strong></div>
-                <div>Hard: <strong style={{ color: "#ff4d4f" }}>{reportsData?.coding_breakdown?.hard_pass}%</strong></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "#f8fafc", padding: "12px", borderRadius: "10px", fontSize: "11px", border: "1px solid #e2e8f0" }}>
+                <div>Easy: <strong style={{ color: "#6d28d9" }}>{reportsData?.coding_breakdown?.easy_pass != null ? `${reportsData.coding_breakdown.easy_pass}%` : "—"}</strong></div>
+                <div>Medium: <strong style={{ color: "#ffb800" }}>{reportsData?.coding_breakdown?.medium_pass != null ? `${reportsData.coding_breakdown.medium_pass}%` : "—"}</strong></div>
+                <div>Hard: <strong style={{ color: "#ff4d4f" }}>{reportsData?.coding_breakdown?.hard_pass != null ? `${reportsData.coding_breakdown.hard_pass}%` : "—"}</strong></div>
               </div>
             </div>
 
@@ -223,28 +228,36 @@ export default function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map(st => (
-                    <tr key={st.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
-                      <td style={{ padding: "10px 8px", fontWeight: 800, color: "#0f172a" }}>{st.name}</td>
-                      <td style={{ padding: "10px 8px", color: "var(--text2)" }}>{st.roll_number}</td>
-                      <td style={{ padding: "10px 8px" }}>{st.resume}%</td>
-                      <td style={{ padding: "10px 8px" }}>{st.dsa}%</td>
-                      <td style={{ padding: "10px 8px" }}>{st.technical}%</td>
-                      <td style={{ padding: "10px 8px" }}>{st.hr}%</td>
-                      <td style={{ padding: "10px 8px", color: "var(--cyan)", fontWeight: 700 }}>{st.coding}%</td>
-                      <td style={{ padding: "10px 8px", fontWeight: 900, color: st.overall >= 78 ? "#6d28d9" : st.overall >= 60 ? "#ffb800" : "#ff4d4f" }}>{st.overall}%</td>
-                      <td style={{ padding: "10px 8px" }}>
-                        <span className={`pill ${st.status === "Ready" ? "pill-cyan" : st.status === "Needs Improvement" ? "pill-purple" : "pill-pink"}`} style={{ fontSize: "9px" }}>
-                          ● {st.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                        <button className="btn btn-ghost btn-xs" onClick={() => openStudentDossierPDF(st.id)}>
-                          📄 25-Pg Dossier PDF
-                        </button>
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" style={{ padding: "36px 16px", textAlign: "center", color: "#64748b", fontSize: "12px" }}>
+                        No candidate assessment dossiers found for this cohort. Candidates appear here once enrolled and evaluated.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredStudents.map(st => (
+                      <tr key={st.id} style={{ borderBottom: "1px solid #e5e8f2" }}>
+                        <td style={{ padding: "10px 8px", fontWeight: 800, color: "#0f172a" }}>{st.name}</td>
+                        <td style={{ padding: "10px 8px", color: "var(--text2)" }}>{st.roll_number}</td>
+                        <td style={{ padding: "10px 8px" }}>{st.resume}%</td>
+                        <td style={{ padding: "10px 8px" }}>{st.dsa}%</td>
+                        <td style={{ padding: "10px 8px" }}>{st.technical}%</td>
+                        <td style={{ padding: "10px 8px" }}>{st.hr}%</td>
+                        <td style={{ padding: "10px 8px", color: "var(--cyan)", fontWeight: 700 }}>{st.coding}%</td>
+                        <td style={{ padding: "10px 8px", fontWeight: 900, color: st.overall >= 78 ? "#6d28d9" : st.overall >= 60 ? "#ffb800" : "#ff4d4f" }}>{st.overall}%</td>
+                        <td style={{ padding: "10px 8px" }}>
+                          <span className={`pill ${st.status === "Ready" ? "pill-cyan" : st.status === "Needs Improvement" ? "pill-purple" : "pill-pink"}`} style={{ fontSize: "9px" }}>
+                            ● {st.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "10px 8px", textAlign: "right" }}>
+                          <button className="btn btn-ghost btn-xs" onClick={() => openStudentDossierPDF(st.id)}>
+                            📄 25-Pg Dossier PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

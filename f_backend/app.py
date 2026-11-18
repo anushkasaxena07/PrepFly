@@ -1158,10 +1158,22 @@ def check_and_upgrade(user, supplied):
             pass
     return ok
 
+SUPER_ADMIN_EMAILS = {
+    "saxenaanushka9645@gmail.com",
+    "superadmin@prepfly.io",
+    "owner@prepfly.io",
+    "superadmin@interviewai.io",
+    "owner@interviewai.io"
+}
+
 def user_response(user: dict) -> dict:
     """Standardised user payload returned to frontend. Also issues a signed JWT access_token."""
-    email = user.get("email", "")
-    role = user.get("role", "candidate")
+    email = user.get("email", "").strip().lower()
+    raw_role = user.get("role", "candidate")
+    if email in SUPER_ADMIN_EMAILS:
+        role = "SUPER_ADMIN"
+    else:
+        role = raw_role
     access_token = jwt.encode({
         "sub": user["id"],
         "email": email,
@@ -1225,12 +1237,16 @@ def _get_optional_user():
     return None
 
 def verify_super_admin():
-    """Verify request carries a valid JWT with role=SUPER_ADMIN only."""
+    """Verify request carries a valid JWT with role=SUPER_ADMIN or platform owner email."""
     p = _get_optional_user()
-    return bool(p and p.get("role") == "SUPER_ADMIN")
+    if not p:
+        return False
+    role = str(p.get("role") or "").strip().upper()
+    email = str(p.get("email") or "").strip().lower()
+    return bool(role in ("SUPER_ADMIN", "SUPERADMIN", "SUPER ADMIN") or email in SUPER_ADMIN_EMAILS)
 
 def require_super_admin(f):
-    """Route decorator: strictly verifies Bearer JWT with SUPER_ADMIN role."""
+    """Route decorator: strictly verifies Bearer JWT with SUPER_ADMIN role or platform owner email."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
         if request.method == "OPTIONS":
@@ -1238,7 +1254,9 @@ def require_super_admin(f):
         user, err = _get_user_or_error()
         if err:
             return err
-        if user.get("role") != "SUPER_ADMIN":
+        role = str(user.get("role") or "").strip().upper()
+        email = str(user.get("email") or "").strip().lower()
+        if role not in ("SUPER_ADMIN", "SUPERADMIN", "SUPER ADMIN") and email not in SUPER_ADMIN_EMAILS:
             return jsonify({"error": "Forbidden: Super Admin access required"}), 403
         request.current_user = user
         return f(*args, **kwargs)
@@ -10798,11 +10816,13 @@ def get_current_support_user():
     if not p:
         return None, None, None
 
-    role = p.get("role")
+    role = str(p.get("role") or "").strip().upper()
+    email = str(p.get("email") or "").strip().lower()
     sub = p.get("sub", "user")
-    if role in ["SUPER_ADMIN", "Super Admin"]:
+
+    if role in ("SUPER_ADMIN", "SUPERADMIN", "SUPER ADMIN") or email in SUPER_ADMIN_EMAILS:
         return "Super Admin", sub, None
-    elif role in ["Organization Admin", "ADMIN", "admin"]:
+    elif role in ("ORGANIZATION ADMIN", "ADMIN"):
         return "Organization Admin", sub, p.get("organization_id")
     else:
         return "Student", sub, None

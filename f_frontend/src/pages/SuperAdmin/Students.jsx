@@ -614,7 +614,7 @@ export default function Students() {
             </div>
 
             {/* DRAWER TABS */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
               {['personal', 'performance', 'coding', 'interviews', 'resume', 'telemetry'].map(t => (
                 <button
                   key={t}

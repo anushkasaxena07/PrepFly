@@ -44,7 +44,7 @@ export default function Dashboard() {
       {/* SECTION 2: CHARTS ROW */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
         <AnalyticsChart type="line" title="Monthly Interview & Coding Activity" data={stats?.monthly_activity} />
-        <AnalyticsChart type="bar" title="Department Placement Assessment Rates" data={stats?.department_chart_data || stats?.monthly_activity} />
+        <AnalyticsChart type="bar" title="Department Placement Assessment Rates" data={stats?.department_chart_data} />
       </div>
 
       {/* SECTION 3: RECENT ACTIVITIES & RECENT STUDENTS */}

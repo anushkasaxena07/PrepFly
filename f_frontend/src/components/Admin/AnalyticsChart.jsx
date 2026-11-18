@@ -1,9 +1,13 @@
 import React from 'react';
 
 export default function AnalyticsChart({ type = "line", title, data = {} }) {
-  let labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-  let values1 = [45, 60, 75, 82, 88, 91, 94];
-  let values2 = [50, 65, 78, 85, 90, 93, 96];
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const curMonth = new Date().getMonth();
+  const defaultTrailingMonths = Array.from({ length: 6 }, (_, i) => monthNames[(curMonth - 5 + i + 12) % 12]);
+
+  let labels = defaultTrailingMonths;
+  let values1 = [0, 0, 0, 0, 0, 0];
+  let values2 = [0, 0, 0, 0, 0, 0];
   let label1 = null;
   let label2 = null;
 
@@ -12,13 +16,19 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
     values1 = data.map(d => Number(d.interviews ?? d.value1 ?? d.college ?? d.score ?? 0));
     values2 = data.map(d => Number(d.coding ?? d.value2 ?? d.company ?? 0));
   } else if (data && typeof data === 'object') {
-    if (Array.isArray(data.labels) && data.labels.length > 0) labels = data.labels;
-    if (Array.isArray(data.interviews) && data.interviews.length > 0) values1 = data.interviews.map(Number);
-    if (Array.isArray(data.coding) && data.coding.length > 0) values2 = data.coding.map(Number);
+    if (Array.isArray(data.labels) && data.labels.length > 0) {
+      labels = data.labels;
+      values1 = labels.map((_, i) => Number((data.interviews && data.interviews[i]) ?? 0));
+      values2 = labels.map((_, i) => Number((data.coding && data.coding[i]) ?? 0));
+    } else if (Array.isArray(data.interviews) && data.interviews.length > 0) {
+      values1 = data.interviews.map(Number);
+      if (Array.isArray(data.coding)) values2 = data.coding.map(Number);
+    }
     if (data.label1) label1 = data.label1;
     if (data.label2) label2 = data.label2;
   }
 
+  const hasData = values1.some(v => v > 0) || values2.some(v => v > 0);
   const calculatedMax = Math.max(...values1, ...values2, 1);
   const maxVal = calculatedMax > 100 ? calculatedMax : 100;
 
@@ -51,7 +61,12 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
       <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
           <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>📈 {title || "Monthly Activity Trend"}</h3>
-          <div style={{ display: "flex", gap: "12px", fontSize: "11px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "11px" }}>
+            {!hasData && (
+              <span style={{ background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700 }}>
+                No Activity Recorded
+              </span>
+            )}
             <span style={{ color: "#6d28d9", fontWeight: 700 }}>● {label1 || "AI Mock Practice"}</span>
             <span style={{ color: "#7c3aed", fontWeight: 700 }}>● {label2 || "Coding Readiness"}</span>
           </div>
@@ -90,6 +105,21 @@ export default function AnalyticsChart({ type = "line", title, data = {} }) {
   }
 
   if (type === "bar") {
+    if (!hasData || labels.length === 0) {
+      return (
+        <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>📊 {title || "Department Average Scores"}</h3>
+          </div>
+          <div style={{ height: "160px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#f8fafc", borderRadius: "10px", border: "1px dashed #cbd5e1", padding: "20px", textAlign: "center" }}>
+            <span style={{ fontSize: "24px", marginBottom: "6px" }}>📊</span>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>No Department Assessment Records</div>
+            <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>Evaluation metrics will populate as enrolled candidates complete tests.</div>
+          </div>
+        </div>
+      );
+    }
+
     const numBars = labels.length;
     const step = 300 / Math.max(1, numBars);
 

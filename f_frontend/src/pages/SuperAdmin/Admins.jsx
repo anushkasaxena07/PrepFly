@@ -596,7 +596,7 @@ export default function Admins() {
             </div>
 
             {/* DRAWER TABS */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
               {['personal', 'permissions', 'security', 'activity', 'logins'].map(t => (
                 <button
                   key={t}

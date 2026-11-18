@@ -379,7 +379,7 @@ export default function Organizations({ onNavigateCreate }) {
             </div>
 
             {/* DRAWER TABS */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: "6px", marginBottom: "16px", flexWrap: "wrap" }}>
               {['info', 'subscription', 'admins', 'students', 'ai_usage', 'security'].map(t => (
                 <button
                   key={t}

@@ -1,20 +1,30 @@
 import React from 'react';
 
 export default function RevenueChart({ title, data = {} }) {
-  let labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"];
-  let revenue = [18000, 24000, 31000, 29000, 38000, 41000, 42850];
-  let growthYoY = "+42% YoY Growth";
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const curMonth = new Date().getMonth();
+  const defaultTrailingMonths = Array.from({ length: 6 }, (_, i) => monthNames[(curMonth - 5 + i + 12) % 12]);
+
+  let labels = defaultTrailingMonths;
+  let revenue = [0, 0, 0, 0, 0, 0];
+  let growthYoY = "Verified Ledger";
 
   if (Array.isArray(data) && data.length > 0) {
     labels = data.map(d => d.month || d.label || "");
     revenue = data.map(d => Number(d.revenue || 0));
   } else if (data && typeof data === 'object') {
-    if (Array.isArray(data.labels) && data.labels.length > 0) labels = data.labels;
-    if (Array.isArray(data.revenue) && data.revenue.length > 0) revenue = data.revenue.map(Number);
+    if (Array.isArray(data.labels) && data.labels.length > 0) {
+      labels = data.labels;
+      revenue = labels.map((_, i) => Number((data.revenue && data.revenue[i]) ?? 0));
+    } else if (Array.isArray(data.revenue) && data.revenue.length > 0) {
+      revenue = data.revenue.map(Number);
+    }
     if (data.growth_yoy) growthYoY = data.growth_yoy;
   }
 
-  const maxRev = Math.max(...revenue, 50000);
+  const hasData = revenue.some(r => r > 0);
+  const calculatedMax = Math.max(...revenue, 1);
+  const maxRev = calculatedMax > 100 ? calculatedMax : 100;
 
   const points = revenue.map((val, idx) => {
     const x = (idx / Math.max(1, labels.length - 1)) * 320 + 20;
@@ -28,7 +38,14 @@ export default function RevenueChart({ title, data = {} }) {
     <div className="card" style={{ background: "#ffffff", border: "1px solid #e5e8f2", borderRadius: "16px", padding: "20px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#0f172a", margin: 0 }}>💰 {title || "Monthly Platform Revenue ($)"}</h3>
-        <span style={{ fontSize: "12px", color: "#6d28d9", fontWeight: 800 }}>{growthYoY}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {!hasData && (
+            <span style={{ background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700 }}>
+              No Transactions Recorded
+            </span>
+          )}
+          <span style={{ fontSize: "12px", color: "#6d28d9", fontWeight: 800 }}>{growthYoY}</span>
+        </div>
       </div>
 
       <svg viewBox="0 0 360 160" style={{ width: "100%", height: "auto" }}>
