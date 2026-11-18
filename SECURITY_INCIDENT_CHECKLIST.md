@@ -109,7 +109,7 @@ Query the database for unauthorized plan upgrades, altered spending limits, or i
 
 ```sql
 -- 5.1 Audit Subscription Table for Unauthorized Upgrades
-SELECT s.id, s.user_id, s.organization_id, s.plan, s.status, s.created_at, u.email
+SELECT s.id, s.user_id, s.plan, s.price, s.status, s.start_date, s.expiry_date, s.created_at, u.email, u.organization_id
 FROM public.subscription s
 LEFT JOIN public.users u ON s.user_id = u.id
 ORDER BY s.created_at DESC;
