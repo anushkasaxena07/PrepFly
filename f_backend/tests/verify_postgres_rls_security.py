@@ -25,11 +25,19 @@ Demonstrates:
 import sys
 import os
 import tempfile
-import psycopg2
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-import pgserver
+
+try:
+    import psycopg2
+    from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+    import pgserver
+    HAS_PG_DEPS = True
+except ImportError:
+    HAS_PG_DEPS = False
 
 def run_postgres_verification():
+    if not HAS_PG_DEPS:
+        print("[SKIP] psycopg2 or pgserver not installed; skipping disposable postgres test.")
+        return 0
     print("=" * 80)
     print("       STARTING DISPOSABLE POSTGRESQL 16 RLS VERIFICATION TEST")
     print("=" * 80)

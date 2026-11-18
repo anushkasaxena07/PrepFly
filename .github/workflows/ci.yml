@@ -2,9 +2,9 @@ name: PrepFly CI
 
 on:
   push:
-    branches: [ "main", "master", "develop", "staging/*", "ai-inw" ]
+    branches: [ "main", "master", "develop", "staging/*", "stagging", "ai-inw" ]
   pull_request:
-    branches: [ "main", "master", "develop", "staging/*", "ai-inw" ]
+    branches: [ "main", "master", "develop", "staging/*", "stagging", "ai-inw" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
