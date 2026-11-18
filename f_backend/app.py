@@ -904,7 +904,7 @@ def verify_otp_code(email: str, otp: str, purpose: str = "login") -> dict:
 
     # 2. Check Supabase DB table
     try:
-        res = supabase.table("otps").select("*") \
+        res = supabase.table("otps").select("id, expires_at") \
             .eq("email", email_clean).eq("otp", otp_clean) \
             .eq("is_used", False).eq("purpose", purpose) \
             .execute()
@@ -1829,7 +1829,7 @@ def reset_password():
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
     try:
-        res = supabase.table("password_reset_tokens").select("*") \
+        res = supabase.table("password_reset_tokens").select("id, expires_at") \
             .eq("email", email).eq("token", reset_token).eq("is_used", False) \
             .execute()
 
@@ -5729,7 +5729,7 @@ def webrtc_get_signals():
 @require_super_admin
 def superadmin_candidates_summary():
     try:
-        users_res = supabase.table("users").select("*").execute()
+        users_res = supabase.table("users").select("id, email, subscription, plan, created_at").execute()
         all_users = users_res.data or []
     except Exception:
         all_users = []
@@ -5747,7 +5747,7 @@ def superadmin_candidates_summary():
         all_resumes = []
 
     try:
-        coding_res = supabase.table("coding_submissions").select("*").execute()
+        coding_res = supabase.table("coding_submissions").select("id, passed, total").execute()
         all_coding = coding_res.data or []
     except Exception:
         all_coding = []
@@ -6534,13 +6534,13 @@ def get_user_stats(user_id):
             print("Fetch interviews stats notice:", e)
 
         try:
-            coding_res = supabase.table("coding_submissions").select("*").eq("user_id", target_id).order("created_at", desc=True).execute()
+            coding_res = supabase.table("coding_submissions").select("id, passed, total, created_at").eq("user_id", target_id).order("created_at", desc=True).execute()
             coding = coding_res.data or []
         except Exception as e:
             print("Fetch coding stats notice:", e)
 
         try:
-            speech_res = supabase.table("speech_analyses").select("*").eq("user_id", target_id).order("created_at", desc=True).execute()
+            speech_res = supabase.table("speech_analyses").select("id, created_at").eq("user_id", target_id).order("created_at", desc=True).execute()
             speech = speech_res.data or []
         except Exception as e:
             print("Fetch speech stats notice:", e)
@@ -7945,7 +7945,7 @@ def admin_coding_test_leaderboard(test_id):
     leaderboard = []
     # 1. Try querying real coding submissions strictly scoped to this organization
     try:
-        sub_res = supabase.table("coding_submissions").select("*").eq("organization_id", org_id).execute()
+        sub_res = supabase.table("coding_submissions").select("id, user_id, organization_id, passed, total, created_at").eq("organization_id", org_id).execute()
         raw_subs = sub_res.data if sub_res and hasattr(sub_res, "data") and sub_res.data else []
         
         # Get org students map & users map
@@ -7953,7 +7953,7 @@ def admin_coding_test_leaderboard(test_id):
         students = std_res.data if std_res and hasattr(std_res, "data") and std_res.data else []
         std_map = {s.get("id"): s for s in students}
 
-        users_res = supabase.table("users").select("*").eq("organization_id", org_id).execute()
+        users_res = supabase.table("users").select("id, name, email, organization_id").eq("organization_id", org_id).execute()
         users_list = users_res.data if users_res and hasattr(users_res, "data") and users_res.data else []
         user_map = {u.get("id"): u for u in users_list}
         
@@ -9764,7 +9764,7 @@ def superadmin_get_admins():
                 org_map[o["id"]] = o.get("name") or "Organization"
                 org_type_map[o["id"]] = str(o.get("type", "COLLEGE")).upper()
 
-        res = supabase.table("users").select("*").or_("role.eq.ADMIN,role.eq.admin,role.eq.SUPER_ADMIN,role.eq.Organization Admin").execute()
+        res = supabase.table("users").select("id, name, email, phone, role, organization_id, created_at").or_("role.eq.ADMIN,role.eq.admin,role.eq.SUPER_ADMIN,role.eq.Organization Admin").execute()
         rows = res.data if res and hasattr(res, "data") and res.data else []
 
         users_res = supabase.table("users").select("id, organization_id, role").execute()
@@ -9846,7 +9846,7 @@ def superadmin_get_students():
         org_map = {o.get("id"): o.get("name") for o in (orgs_res.data if orgs_res and orgs_res.data else [])}
 
         # --- 2. Load ALL real users (candidates only, not admins) ---
-        users_res = supabase.table("users").select("*").execute()
+        users_res = supabase.table("users").select("id, name, email, phone, roll_number, organization_id, department, subscription, role, created_at").execute()
         all_users = users_res.data if users_res and users_res.data else []
         admin_roles = {"admin", "super_admin", "superadmin", "org_admin", "recruiter"}
         candidates = [u for u in all_users if str(u.get("role") or "").strip().lower() not in admin_roles]
@@ -11402,12 +11402,13 @@ def get_my_feedback():
     org_id = user_payload.get("organization_id") or request.headers.get("X-Organization-Id")
 
     my_feedbacks = []
+    feedback_cols = "id, organization_id, submitted_by, submitted_by_role, category, rating, status, priority, subject, message, admin_notes, screenshot_url, created_at, updated_at"
     try:
         if sub_user_id:
-            res = supabase.table("feedback").select("*").eq("submitted_by", sub_user_id).order("created_at", desc=True).execute()
+            res = supabase.table("feedback").select(feedback_cols).eq("submitted_by", sub_user_id).order("created_at", desc=True).execute()
             if res and res.data: my_feedbacks = res.data
         elif org_id:
-            res = supabase.table("feedback").select("*").eq("organization_id", org_id).order("created_at", desc=True).execute()
+            res = supabase.table("feedback").select(feedback_cols).eq("organization_id", org_id).order("created_at", desc=True).execute()
             if res and res.data: my_feedbacks = res.data
     except Exception as e:
         print("Fetch my feedback notice:", e)
@@ -11476,8 +11477,9 @@ def update_my_feedback(feedback_id):
     token_role = user_payload.get("role", "")
 
     existing = None
+    feedback_cols = "id, organization_id, submitted_by, submitted_by_role, category, rating, status, priority, subject, message, admin_notes, screenshot_url, created_at, updated_at"
     try:
-        res = supabase.table("feedback").select("*").eq("id", feedback_id).execute()
+        res = supabase.table("feedback").select(feedback_cols).eq("id", feedback_id).execute()
         if res and res.data: existing = res.data[0]
     except Exception:
         pass
@@ -11526,8 +11528,9 @@ def get_admin_feedback():
     search_query = request.args.get("search", "").strip().lower()
 
     all_feedbacks = []
+    feedback_cols = "id, organization_id, submitted_by, submitted_by_role, category, rating, status, priority, subject, message, admin_notes, screenshot_url, created_at, updated_at"
     try:
-        res = supabase.table("feedback").select("*").order("created_at", desc=True).execute()
+        res = supabase.table("feedback").select(feedback_cols).order("created_at", desc=True).execute()
         if res and res.data: all_feedbacks = res.data
     except Exception as e:
         print("Admin fetch feedback notice:", e)

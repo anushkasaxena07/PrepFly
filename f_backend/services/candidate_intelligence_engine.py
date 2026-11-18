@@ -509,7 +509,7 @@ class CandidateIntelligenceEngine:
         """Aggregates Judge0 code execution submissions, correctness, and edge-case handling."""
         submissions = []
         try:
-            sub_res = supabase.table("coding_submissions").select("*").eq("user_id", user_id).execute()
+            sub_res = supabase.table("coding_submissions").select("id, user_id, status").eq("user_id", user_id).execute()
             submissions = sub_res.data if (sub_res and sub_res.data) else []
         except Exception as e:
             print(f"[NOTICE] Coding submissions lookup skipped or table empty: {e}")
