@@ -450,12 +450,24 @@ class TestSecurityRegressions(unittest.TestCase):
 
         # In production mode, SupabaseFallbackClient with unreachable host must fail startup
         orig_prod = app.is_production
+        orig_fallback = os.environ.get("ALLOW_SQLITE_FALLBACK")
+        orig_offline = os.environ.get("SUPABASE_ALLOW_OFFLINE_FALLBACK")
         try:
             app.is_production = True
+            os.environ.pop("ALLOW_SQLITE_FALLBACK", None)
+            os.environ.pop("SUPABASE_ALLOW_OFFLINE_FALLBACK", None)
             with self.assertRaises(RuntimeError):
                 app.SupabaseFallbackClient("https://unreachable-mock-supabase-123.supabase.co", "dummy_key")
         finally:
             app.is_production = orig_prod
+            if orig_fallback is not None:
+                os.environ["ALLOW_SQLITE_FALLBACK"] = orig_fallback
+            else:
+                os.environ.pop("ALLOW_SQLITE_FALLBACK", None)
+            if orig_offline is not None:
+                os.environ["SUPABASE_ALLOW_OFFLINE_FALLBACK"] = orig_offline
+            else:
+                os.environ.pop("SUPABASE_ALLOW_OFFLINE_FALLBACK", None)
 
     def test_21_production_database_query_failure_returns_503(self):
         """21. In production, Supabase query failures return HTTP 503 instead of falling back to SQLite."""

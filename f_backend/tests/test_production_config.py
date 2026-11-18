@@ -56,11 +56,12 @@ class TestProductionConfiguration(unittest.TestCase):
 
     def test_production_supabase_fallback_client_refuses_sqlite(self):
         """In production, SupabaseFallbackClient raises RuntimeError on unreachable host and refuses SQLite."""
-        with patch("app._is_production_mode", return_value=True):
-            with patch("app.check_dns_resolves", return_value=False):
-                with self.assertRaises(RuntimeError) as ctx:
-                    prepfly_app.SupabaseFallbackClient("https://unreachable-host.supabase.co", "dummy_key")
-                self.assertIn("Production startup aborted", str(ctx.exception))
+        with patch.dict(os.environ, {"ALLOW_SQLITE_FALLBACK": "", "SUPABASE_ALLOW_OFFLINE_FALLBACK": ""}):
+            with patch("app._is_production_mode", return_value=True):
+                with patch("app.check_dns_resolves", return_value=False):
+                    with self.assertRaises(RuntimeError) as ctx:
+                        prepfly_app.SupabaseFallbackClient("https://unreachable-host.supabase.co", "dummy_key")
+                    self.assertIn("Production startup aborted", str(ctx.exception))
 
     def test_dev_mode_permits_sqlite_fallback(self):
         """In development/test, SupabaseFallbackClient successfully falls back to SQLite."""
