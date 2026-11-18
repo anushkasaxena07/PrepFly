@@ -34,16 +34,27 @@ def run_suite():
     start_time = time.time()
 
     # Phase 0: Ruff Static Integrity Checks (Syntax, Undefined Names, Redefinitions)
-    print("\n[PHASE 0] Running Static Integrity Checks (ruff check . --select F821,E9,F811)...")
+    print("\n[PHASE 0] Running Static Integrity Checks (ruff check f_backend sandbox_worker --select F821,E9,F811)...")
     import subprocess
+    import shutil
     venv_py = os.path.join(BACKEND_DIR, "venv", "Scripts", "python.exe") if os.name == "nt" else os.path.join(BACKEND_DIR, "venv", "bin", "python")
     py_exe = venv_py if os.path.exists(venv_py) else sys.executable
     repo_root = os.path.dirname(BACKEND_DIR)
     check_dir = repo_root if os.path.exists(os.path.join(repo_root, "sandbox_worker")) else BACKEND_DIR
-    ruff_res = subprocess.run([py_exe, "-m", "ruff", "check", ".", "--no-cache", "--select", "F821,E9,F811"], cwd=check_dir)
+    check_targets = ["f_backend", "sandbox_worker"] if check_dir == repo_root else ["."]
+
+    ruff_bin = shutil.which("ruff")
+    if ruff_bin:
+        cmd = [ruff_bin, "check"] + check_targets + ["--no-cache", "--select", "F821,E9,F811"]
+    else:
+        cmd = [py_exe, "-m", "ruff", "check"] + check_targets + ["--no-cache", "--select", "F821,E9,F811"]
+
+    ruff_res = subprocess.run(cmd, cwd=check_dir, capture_output=True, text=True)
     if ruff_res.returncode != 0:
-        print(">>> STATIC INTEGRITY CHECK FAILED! Fix syntax errors, undefined names, or redefinitions.")
+        print(f">>> STATIC INTEGRITY CHECK FAILED (code {ruff_res.returncode})!\n{ruff_res.stdout}\n{ruff_res.stderr}")
+        print(f"::error title=Ruff Static Integrity Failed::{ruff_res.stdout.strip() or ruff_res.stderr.strip()}")
         return 1
+    print("Static integrity checks passed cleanly!")
 
 
     loader = unittest.TestLoader()
@@ -75,7 +86,33 @@ def run_suite():
         print(">>> ALL PREPFLY UNIT & INTEGRATION TESTS PASSED WITH 100% SUCCESS! <<<")
         return 0
     else:
-        print(">>> SOME TESTS FAILED! PLEASE REVIEW THE LOGS ABOVE. <<<")
+        print("\n" + "!" * 75)
+        print(">>> SOME TESTS FAILED! DETAILED REPORT:")
+        print("!" * 75)
+        summary_lines = ["### PrepFly Backend Test Failures", f"**Failed:** {len(result.failures)} | **Errors:** {len(result.errors)}"]
+
+        for test, err in result.failures:
+            print(f"\n[FAILURE] {test}:")
+            print(err)
+            first_err_line = err.strip().splitlines()[-1] if err else "AssertionError"
+            print(f"::error title=Test Failure - {test}::{first_err_line}")
+            summary_lines.append(f"- **FAILURE**: `{test}`: `{first_err_line}`")
+
+        for test, err in result.errors:
+            print(f"\n[ERROR] {test}:")
+            print(err)
+            first_err_line = err.strip().splitlines()[-1] if err else "Exception"
+            print(f"::error title=Test Error - {test}::{first_err_line}")
+            summary_lines.append(f"- **ERROR**: `{test}`: `{first_err_line}`")
+
+        step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if step_summary:
+            try:
+                with open(step_summary, "a", encoding="utf-8") as f:
+                    f.write("\n\n" + "\n".join(summary_lines) + "\n")
+            except Exception:
+                pass
+
         return 1
 
 if __name__ == "__main__":

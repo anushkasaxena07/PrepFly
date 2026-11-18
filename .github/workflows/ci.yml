@@ -45,8 +45,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        if [ -f f_backend/requirements.txt ]; then pip install -r f_backend/requirements.txt; fi
-        pip install ruff bandit
+        if [ -f f_backend/requirements.txt ]; then python -m pip install -r f_backend/requirements.txt; fi
+        python -m pip install ruff bandit
 
     - name: Static Analysis CI Guard (Syntax, Undefined Names, Redefinitions)
       run: |
